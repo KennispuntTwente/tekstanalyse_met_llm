@@ -1,0 +1,29 @@
+# R-related files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Reports and outputs
+R/report_Onderwerpextractie.html
+R/report_Categorisatie.html
+R/report_Scoren.html
+
+# Project files
+llm_open_antwoorden.Rproj
+app.log
+
+# Progress folders
+/progress
+/progress_secondary
+/app_errors
+/shinylive
+
+# Build and dependency directories
+/executable/dist
+/executable/node_modules
+/dist
+/node_modules
+/portable-r
+/portable-pandoc
+
