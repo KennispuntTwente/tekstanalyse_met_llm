@@ -115,7 +115,7 @@ htmltools::tags$footer(
   htmltools::HTML(paste0(
     "Deze analyse is automatisch geproduceerd door een app ontwikkeld door ",
     "<a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a> i.s.m. GGD Twente.<br>",
-    "Bekijk de <a href='https://github.com/KennispuntTwente/tekstanalyse_app' target='_blank'>GitHub-repository</a> voor meer informatie.",
+    "Bekijk de <a href='https://github.com/kennispunttwente/tekstanalyse_met_llm' target='_blank'>GitHub-repository</a> voor meer informatie.",
     "<br>",
     "<br>",
     format(Sys.Date(), "%Y-%m-%d")

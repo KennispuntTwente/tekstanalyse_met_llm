@@ -97,7 +97,7 @@ en optioneel een omgeving zoals [RStudio](https://www.rstudio.com/products/rstud
 [Pandoc](https://pandoc.org/) is nodig voor het genereren van rapporten (wordt geïnstalleerd met RStudio).
 Via het package 'renv' worden de benodigde R-packages automatisch geïnstalleerd.
 
-1. `git clone https://github.com/tjarkvandemerwe/llm_open_antwoorden.git` (of: download
+1. `git clone https://github.com/kennispunttwente/tekstanalyse_met_llm.git` (of: download
 de zip van de repository en unzip deze)
 
 2. Open een R-omgeving in de map (in RStudio kan dit door het .Rproj-bestand te openen)
@@ -143,7 +143,7 @@ Deze app is ontwikkeld door [Kennispunt Twente](https://www.kennispunttwente.nl)
 toepassingen met generatieve AI ten behoeve van de samenleving.
 
 Ideeën of verbeterpunten voor de app?
-[Open een issue in de GitHub-repository](https://github.com/KennispuntTwente/tekstanalyse_app/issues/new).
+[Open een issue in de GitHub-repository](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
 
 Kennispunt Twente is een non-profit organisatie voor data, inzicht en kennis. 
 Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?

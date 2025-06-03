@@ -87,7 +87,7 @@ main_ui <- function(
           HTML(paste0(
             "Kennispunt Twente is een non-profit organisatie voor data, inzicht, en kennis.",
             " Ideeën of verbeterpunten voor de app? ",
-            "<a href='https://github.com/KennispuntTwente/tekstanalyse_app/issues/new' target='_blank'>Open een issue in de GitHub-repository</a>.",
+            "<a href='https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new' target='_blank'>Open een issue in de GitHub-repository</a>.",
             " Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?",
             " Bezoek <a href='https://www.kennispunttwente.nl' target='_blank'>onze website</a>",
             " of <a href=\"mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl\" target=\"_blank\">neem contact op met onze ontwikkelaars</a>."
