@@ -25,7 +25,8 @@ zoals categorisatie, scoren op kenmerken, en topic modelling.
     in [Wanrooij, Manhar, en Yang
     (2024)](https://bnaic2024.sites.uu.nl/wp-content/uploads/sites/986/2024/10/Topic-Modeling-for-Small-Data-using-Generative-LLMs.pdf)
     en [Pham et al. (2023)](https://arxiv.org/abs/2311.01449).
-    Performance van deze procedure zou beter zijn dan BERTopic
+    Performance van deze procedure zou beter zijn dan BERTopic, waarbij deze procedure ook 
+    geschikt is voor kleinere datasets
 
 ### Gebruiksvriendelijke interface:
             
