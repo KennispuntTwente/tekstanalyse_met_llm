@@ -18,8 +18,8 @@ llm_provider_server <- function(
   id,
   processing = reactiveVal(FALSE),
   preconfigured_llm_provider = NULL,
-  preconfigured_main_models = c(),
-  preconfigured_large_models = c(),
+  preconfigured_main_models = NULL,
+  preconfigured_large_models = NULL,
   can_configure_oai = getOption("llm_provider__can_configure_oai", TRUE),
   can_configure_ollama = getOption("llm_provider__can_configure_ollama", TRUE)
 ) {
@@ -170,9 +170,26 @@ llm_provider_server <- function(
         "ollama"
       }
 
+      initial_llm_provider <- if (initial_provider_mode == "preconfigured") {
+        preconfigured_llm_provider$clone()
+      } else if (initial_provider_mode == "openai") {
+        tidyprompt::llm_provider_openai(
+          parameters = list(model = "gpt-4o-mini", stream = FALSE),
+          verbose = getOption("tidyprompt.verbose", TRUE),
+          url = "https://api.openai.com/v1/chat/completions",
+          api_key = Sys.getenv("OPENAI_API_KEY")
+        )
+      } else {
+        tidyprompt::llm_provider_ollama(
+          parameters = list(model = "llama3.1:8b", stream = FALSE),
+          verbose = getOption("tidyprompt.verbose", TRUE),
+          url = "http://localhost:11434/api/chat"
+        )
+      }
+
       # Reactive values to store the current LLM provider and mode
       llm_provider_rv <- reactiveValues(
-        llm_provider = preconfigured_llm_provider,
+        llm_provider = initial_llm_provider,
         provider_mode = initial_provider_mode,
         available_models_main = NULL,
         available_models_large = NULL
@@ -411,6 +428,17 @@ llm_provider_server <- function(
         )
       })
 
+      observeEvent(api_key_input(), {
+        if (llm_provider_rv$provider_mode == "openai") {
+          llm_provider_rv$llm_provider <- tidyprompt::llm_provider_openai(
+            parameters = list(model = "gpt-4o-mini", stream = FALSE),
+            verbose = getOption("tidyprompt.verbose", TRUE),
+            url = paste0(openai_url(), "/chat/completions"),
+            api_key = api_key_input()
+          )
+        }
+      })
+
       observeEvent(input$toggle_api_key_visibility, {
         session$sendCustomMessage(
           type = paste0(ns("api_key_text"), "-togglePassword"),
@@ -579,7 +607,7 @@ llm_provider_server <- function(
 
 #### 3 Example/development usage ####
 
-if (TRUE) {
+if (FALSE) {
   library(shiny)
   library(shinyjs)
   library(bslib)
@@ -597,12 +625,12 @@ if (TRUE) {
   server <- function(input, output, session) {
     processing <- reactiveVal(FALSE)
 
-    llm_provider <- llm_provider_server(
+    llm_provider_rv <- llm_provider_server(
       "llm_provider",
-      processing,
-      preconfigured_llm_provider = tidyprompt::llm_provider_openai(),
-      preconfigured_main_models = c("gpt-4o-mini", "gpt-3.5-turbo"),
-      preconfigured_large_models = c("gpt-4o", "o3")
+      processing
+      # preconfigured_llm_provider = tidyprompt::llm_provider_openai(),
+      # preconfigured_main_models = c("gpt-4o-mini", "gpt-3.5-turbo"),
+      # preconfigured_large_models = c("gpt-4o", "o3")
     )
   }
 
