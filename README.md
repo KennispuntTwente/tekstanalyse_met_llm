@@ -110,7 +110,7 @@ de zip van de repository en unzip deze)
 De applicatie kan ook gebruikt worden als desktop-applicatie. Dit kan handig zijn
 voor gebruikers die niet bekend zijn met R of Docker.
 
-Onder 'releases' komt (binnenkort) een pre-built desktop-applicatie beschikbaar voor Windows (64-bit).
+Onder 'releases' komt (binnenkort) een pre-built desktop-applicatie beschikbaar voor Windows 10/11 (64-bit, x64/AMD64).
 Deze applicatie bevat alle benodigde dependencies en kan direct worden gebruikt.
 
 1. Download de release
