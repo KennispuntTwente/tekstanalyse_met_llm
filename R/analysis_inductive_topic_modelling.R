@@ -177,6 +177,10 @@ create_candidate_topics <- function(
         "If it occurs, you may also add a topic such as 'no topic/not applicable'.",
         sep = "\n"
       ) |>
+      tidyprompt::add_text(
+        "Please list the topics in Dutch.",
+        sep = "\n"
+      ) |>
       tidyprompt::answer_as_json(
         schema = list(
           type = "object",
@@ -301,6 +305,12 @@ reduce_topics <- function(
         sep = "\n"
       )
   }
+
+  prompt <- prompt |>
+    tidyprompt::add_text(
+      "Please list the topics in Dutch.",
+      sep = "\n"
+    )
 
   prompt <- prompt |>
     tidyprompt::answer_as_json(
