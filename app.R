@@ -42,7 +42,7 @@ for (file in r_files) {
 # - When you asynchronous processing is not needed, you can use
 #     `future::plan("sequential")`
 # - See the documentation for `future::plan()` for more details
-future::plan(multisession, .skip = TRUE)
+future::plan(sequential, .skip = TRUE)
 
 # Set LLM provider and available models
 # - This example uses the OpenAI API; you can configure any other LLM provider
@@ -91,7 +91,10 @@ options(
   #   as alternative to the preconfigured LLM provider;
   #     see: R/llm_provider.R
   llm_provider__can_configure_oai = TRUE,
-  llm_provider__can_configure_ollama = TRUE
+  llm_provider__can_configure_ollama = TRUE,
+
+  # Language (Dutch (nl) or English (en));
+  language = "en"
 )
 
 

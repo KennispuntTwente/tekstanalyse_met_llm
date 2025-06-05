@@ -133,7 +133,7 @@ llm_provider_server <- function(
             card_header(
               div(
                 class = "d-flex justify-content-between align-items-center w-100",
-                span("LLM-provider"),
+                span(lang$t("LLM-provider")),
                 uiOutput(ns("provider_mode_selection")),
               )
             ),
@@ -211,7 +211,7 @@ llm_provider_server <- function(
                 "llm-icon",
                 if (current_mode == "preconfigured") "llm-icon-active"
               ),
-              title = "Preconfigureerd",
+              title = lang$t("Pregeconfigureerd"),
               onclick = sprintf(
                 "Shiny.setInputValue('%s', Math.random())",
                 ns("select_preconfigured")
@@ -222,7 +222,7 @@ llm_provider_server <- function(
                 style = "height: 20px;"
               )
             ) |>
-              bslib::tooltip("Preconfigureerd", placement = "bottom")
+              bslib::tooltip(lang$t("Pregeconfigureerd"), placement = "bottom")
           },
 
           if (can_configure_oai) {
@@ -243,7 +243,7 @@ llm_provider_server <- function(
                 alt = "OpenAI"
               )
             ) |>
-              bslib::tooltip("OpenAI-compatible", placement = "bottom")
+              bslib::tooltip(lang$t("OpenAI-compatible"), placement = "bottom")
           },
 
           if (can_configure_ollama) {
@@ -308,9 +308,15 @@ llm_provider_server <- function(
 
         description_text <- switch(
           mode,
-          "preconfigured" = "Je gebruikt nu een vooraf ingestelde LLM-API,<br>zoals vastgelegd in de appconfiguratie.<br>De URL en de beschikbare modellen zijn vooraf ingesteld.",
-          "openai" = "Configureer hier een OpenAI-compatibele API.<br>Dit soort API-endpoints worden niet alleen door OpenAI aangeboden,<br>maar ook door diverse andere providers.<br>Haal na het instellen de beschikbare modellen op met de button.",
-          "ollama" = "Configureer hier een Ollama-API.<br>Host bijvoorbeeld Ollama op je eigen systeem<br>(zie: https://ollama.com/).<br>Haal na het instellen de beschikbare modellen op met de button.",
+          "preconfigured" = lang$t(
+            "Je gebruikt nu een vooraf ingestelde LLM-API,<br>zoals vastgelegd in de appconfiguratie.<br>De URL en de beschikbare modellen zijn vooraf ingesteld."
+          ),
+          "openai" = lang$t(
+            "Configureer hier een OpenAI-compatibele API.<br>Dit soort API-endpoints worden niet alleen door OpenAI aangeboden,<br>maar ook door diverse andere providers.<br>Haal na het instellen de beschikbare modellen op met de button."
+          ),
+          "ollama" = lang$t(
+            "Configureer hier een Ollama-API.<br>Host bijvoorbeeld Ollama op je eigen systeem<br>(zie: https://ollama.com/).<br>Haal na het instellen de beschikbare modellen op met de button."
+          ),
           ""
         )
 
@@ -345,7 +351,7 @@ llm_provider_server <- function(
             class = "llm-narrow-container mb-1",
             textInput(
               ns("openai_url"),
-              "OpenAI-API-compatible endpoint URL:",
+              lang$t("OpenAI-API-compatible endpoint URL:"),
               value = openai_url(),
               width = "100%"
             )
@@ -356,7 +362,7 @@ llm_provider_server <- function(
             class = "llm-narrow-container mb-1",
             textInput(
               ns("ollama_url"),
-              "Ollama-API endpoint URL:",
+              lang$t("Ollama-API endpoint URL:"),
               value = ollama_url(),
               width = "100%"
             )
@@ -379,7 +385,7 @@ llm_provider_server <- function(
               class = "form-group mb-2 w-100",
               tags$label(
                 `for` = ns_api,
-                "API-key:",
+                lang$t("API-key:"),
                 style = "display: block; width: 100%; text-align: center; margin-bottom: 0.5rem;"
               ),
               tags$div(
@@ -453,7 +459,7 @@ llm_provider_server <- function(
           class = "llm-narrow-container mb-1",
           actionButton(
             ns("get_models"),
-            "Ping beschikbare modellen",
+            lang$t("Ping beschikbare modellen"),
             class = "btn-primary"
           )
         )
@@ -464,14 +470,20 @@ llm_provider_server <- function(
         now <- Sys.time()
         if (difftime(now, last_model_request_time(), units = "secs") < 5) {
           showNotification(
-            "Wacht even voordat je het opnieuw probeert (min. 5 seconden tussen aanvragen)",
+            lang$t(
+              "Wacht even voordat je het opnieuw probeert (min. 5 seconden tussen aanvragen)"
+            ),
             type = "warning"
           )
           return(NULL)
         }
         last_model_request_time(now)
         shinyjs::disable("get_models")
-        showNotification("Modellen ophalen...", type = "default", duration = 3)
+        showNotification(
+          lang$t("Modellen ophalen..."),
+          type = "default",
+          duration = 3
+        )
 
         provider_mode <- llm_provider_rv$provider_mode
 
@@ -486,7 +498,7 @@ llm_provider_server <- function(
               )
               if (httr::http_error(res)) {
                 stop(sprintf(
-                  "OpenAI API error (%s): %s",
+                  "Error (%s): %s",
                   httr::status_code(res),
                   httr::content(res, as = "text", encoding = "UTF-8")
                 ))
@@ -499,7 +511,7 @@ llm_provider_server <- function(
               )
               if (httr::http_error(res)) {
                 stop(sprintf(
-                  "Ollama API error (%s): %s",
+                  "Error (%s): %s",
                   httr::status_code(res),
                   httr::content(res, as = "text", encoding = "UTF-8")
                 ))
@@ -529,14 +541,17 @@ llm_provider_server <- function(
             }
 
             showNotification(
-              "Succes: modellen opgehaald",
+              lang$t("Succes: modellen opgehaald"),
               type = "message",
               duration = 3
             )
           }) %...!%
           (function(e) {
             showNotification(
-              paste("Error: modellen niet opgehaald -", conditionMessage(e)),
+              paste(
+                lang$t("Error: modellen niet opgehaald -"),
+                conditionMessage(e)
+              ),
               type = "error",
               duration = 8
             )

@@ -8,10 +8,12 @@ mode_ui <- function(id) {
     bslib::card(
       class = "card",
       card_header(
-        "Modus",
+        lang$t("Modus"),
         tooltip(
           bs_icon("info-circle"),
-          "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren."
+          lang$t(
+            "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren."
+          )
         )
       ),
       card_body(
@@ -20,8 +22,12 @@ mode_ui <- function(id) {
           shinyWidgets::radioGroupButtons(
             ns("mode"),
             NULL,
-            choices = c("Categorisatie", "Scoren", "Onderwerpextractie"),
-            selected = "Categorisatie",
+            choices = c(
+              lang$t("Categorisatie"),
+              lang$t("Scoren"),
+              lang$t("Onderwerpextractie")
+            ),
+            selected = lang$t("Categorisatie"),
             size = "sm"
           )
         )
@@ -42,7 +48,17 @@ mode_server <- function(id, processing) {
 
       # When selecting input, update reactiveVal
       observeEvent(input$mode, {
-        mode(input$mode)
+        new_mode <- NULL
+
+        if (input$mode == lang$t("Categorisatie")) {
+          new_mode <- "Categorisatie"
+        } else if (input$mode == lang$t("Scoren")) {
+          new_mode <- "Scoren"
+        } else if (input$mode == lang$t("Onderwerpextractie")) {
+          new_mode <- "Onderwerpextractie"
+        }
+
+        mode(new_mode)
       })
 
       # When processing, disable the mode selection

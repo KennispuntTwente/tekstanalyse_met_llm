@@ -10,11 +10,13 @@ research_background_ui <- function(id) {
     shinyjs::useShinyjs(),
     bslib::card(
       class = "card",
-      card_header("Onderzoeksachtergrond"),
+      card_header(lang$t("Onderzoeksachtergrond")),
       card_body(
         p(paste0(
-          "Beschrijf kort je onderzoek zodat het LLM wat context heeft.",
-          " Wat onderzoek je & hoe? Wie gaf antwoord?"
+          lang$t(
+            "Beschrijf kort je onderzoek zodat het LLM wat context heeft."
+          ),
+          lang$t(" Wat onderzoek je & hoe? Wie gaf antwoord?")
         )),
         textAreaInput(
           ns("research_background"),

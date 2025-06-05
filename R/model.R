@@ -13,7 +13,7 @@ model_ui <- function(
         "Model",
         bslib::tooltip(
           bsicons::bs_icon("info-circle"),
-          "Details over het LLM (large language model) dat je gebruikt."
+          lang$t("Details over het LLM (large language model) dat je gebruikt.")
         )
       ),
       card_body(
@@ -94,7 +94,7 @@ model_server <- function(
           class = "selector-container text-center",
           selectInput(
             inputId = ns("large_model"),
-            label = HTML(paste0("Model voor onderwerpreductie")),
+            label = HTML(paste0(lang$t("Model voor onderwerpreductie"))),
             choices = llm_provider_rv$available_models_large,
             # Use the reactive value or the initial value
             selected = models$large # Use the reactive value
@@ -210,11 +210,11 @@ if (FALSE) {
     )
 
     output$main_model <- renderText({
-      paste("Main model:", model$main)
+      paste(lang$t("Primair model:"), model$main)
     })
 
     output$large_model <- renderText({
-      paste("Large model:", model$large)
+      paste(lang$t("Groot model:"), model$large)
     })
   }
 

@@ -27,11 +27,11 @@ write_paragraphs_toggle_server <- function(id, processing, mode) {
           shinyjs::useShinyjs(),
           bslib::card(
             class = "card",
-            card_header("Rapport schrijven"),
+            card_header(lang$t("Rapport schrijven")),
             card_body(
               # Toggle for inter-rater reliability
               p(
-                "Rapport schrijven over categorieën?",
+                lang$t("Rapport schrijven over categorieën?"),
                 class = "mb-2 text-center"
               ),
               div(
@@ -39,8 +39,11 @@ write_paragraphs_toggle_server <- function(id, processing, mode) {
                 shinyWidgets::radioGroupButtons(
                   ns("toggle"),
                   NULL,
-                  choices = c("Nee", "Ja"),
-                  selected = "Ja",
+                  choices = c(
+                    lang$t("Nee"),
+                    lang$t("Ja")
+                  ),
+                  selected = lang$t("Ja"),
                   size = "sm"
                 )
               )
@@ -51,7 +54,7 @@ write_paragraphs_toggle_server <- function(id, processing, mode) {
 
       # Observe the toggle input and update the reactive value
       observeEvent(input$toggle, {
-        toggle(input$toggle == "Ja")
+        toggle(input$toggle == lang$t("Ja"))
       })
 
       # Disable when processing

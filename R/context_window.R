@@ -13,17 +13,23 @@ context_window_ui <- function(id) {
       bslib::card(
         class = "card",
         card_header(
-          "Context-window",
+          lang$t("Context-window"),
           tooltip(
             bs_icon("info-circle"),
             paste0(
-              "Het context-window is de hoeveelheid tekst die het taalmodel kan verwerken in één keer.",
-              " Er moet voor worden gezorgd dat de onderzoeksachtergrond met de (langste) tekst die je invoert binnen het context-window van het model past.",
-              " Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen.",
-              " Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen."
+              lang$t(
+                "Het context-window is de hoeveelheid tekst die het taalmodel kan verwerken in één keer."
+              ),
+              lang$t(
+                " Er moet voor worden gezorgd dat de onderzoeksachtergrond met de (langste) tekst die je invoert binnen het context-window van het model past."
+              ),
+              lang$t(
+                " Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen."
+              ),
+              lang$t(
+                " Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen."
+              )
             )
-
-
           )
         ),
         card_body(
@@ -125,17 +131,11 @@ context_window_server <- function(
           return(TRUE)
         }
 
-        if (
-          is_valid_number(input$chunk_size)
-          && input$chunk_size <= 100
-        ) {
+        if (is_valid_number(input$chunk_size) && input$chunk_size <= 100) {
           rv$max_chunk_size <- input$chunk_size
         }
 
-        if (
-          is_valid_number(input$redrawing)
-          && input$redrawing <= 10
-        ) {
+        if (is_valid_number(input$redrawing) && input$redrawing <= 10) {
           rv$max_redrawing <- input$redrawing
         }
 
@@ -285,8 +285,8 @@ context_window_server <- function(
       observe({
         if (isTRUE(mode() == "Onderwerpextractie")) {
           if (
-            isFALSE(rv$fit_context_window_chunks)
-            || isFALSE(rv$fit_context_window_assigning)
+            isFALSE(rv$fit_context_window_chunks) ||
+              isFALSE(rv$fit_context_window_assigning)
           ) {
             rv$any_fit_problem <- TRUE
           } else {
@@ -308,11 +308,28 @@ context_window_server <- function(
         req(mode() %in% c("Categorisatie", "Scoren", "Onderwerpextractie"))
         return(div(
           class = "d-flex flex-column align-items-center",
-          numericInput(ns("context_window"), "Context-window grootte (# tokens)", value = rv$n_tokens_context_window, min = 0),
+          numericInput(
+            ns("context_window"),
+            lang$t("Context-window grootte (# tokens)"),
+            value = rv$n_tokens_context_window,
+            min = 0
+          ),
           if (mode() == "Onderwerpextractie") {
             list(
-              numericInput(ns("chunk_size"), "Maximaal aantal teksten per chunk", value = rv$max_chunk_size, min = 1, max = 100),
-              numericInput(ns("redrawing"), "Aantal trekkingen per tekst", value = rv$max_redrawing, min = 1, max = 5)
+              numericInput(
+                ns("chunk_size"),
+                lang$t("Maximaal aantal teksten per chunk"),
+                value = rv$max_chunk_size,
+                min = 1,
+                max = 100
+              ),
+              numericInput(
+                ns("redrawing"),
+                lang$t("Aantal trekkingen per tekst"),
+                value = rv$max_redrawing,
+                min = 1,
+                max = 5
+              )
             )
           }
         ))
@@ -327,7 +344,7 @@ context_window_server <- function(
         return(div(
           class = "alert alert-info d-flex align-items-center mt-2",
           bs_icon("blockquote-left"),
-          span(class = "ms-2 fw", paste("Aantal chunks:", rv$n_chunks))
+          span(class = "ms-2 fw", paste(lang$t("Aantal chunks:"), rv$n_chunks))
         ))
       })
 
@@ -338,7 +355,13 @@ context_window_server <- function(
         return(div(
           class = "alert alert-danger d-flex align-items-center mt-2",
           bs_icon("exclamation-triangle-fill"),
-          span(class = "ms-2", "Te veel chunks (> 100)")
+          span(
+            class = "ms-2",
+            paste0(
+              lang$t("Te veel chunks"),
+              " (> 100)"
+            )
+          )
         ))
       })
 
@@ -346,17 +369,18 @@ context_window_server <- function(
       output$fit_context_window_warning <- renderUI({
         req(length(texts$preprocessed) > 0)
         req(
-          (
-            !is.null(rv$n_char_base_prompt)
-            | isTRUE(mode() == "Onderwerpextractie")
-          )
+          (!is.null(rv$n_char_base_prompt) |
+            isTRUE(mode() == "Onderwerpextractie"))
         )
 
         if (isTRUE(rv$any_fit_problem)) {
           return(div(
             class = "alert alert-danger d-flex align-items-center mt-2",
             bs_icon("exclamation-triangle-fill"),
-            span(class = "ms-2", "Sommige teksten zijn te lang voor het context-window")
+            span(
+              class = "ms-2",
+              lang$t("Sommige teksten zijn te lang voor het context-window")
+            )
           ))
         }
 
@@ -364,7 +388,10 @@ context_window_server <- function(
           return(div(
             class = "alert alert-success d-flex align-items-center mt-2",
             bs_icon("check-circle-fill"),
-            span(class = "ms-2", "Alle teksten passen binnen het context-window")
+            span(
+              class = "ms-2",
+              lang$t("Alle teksten passen binnen het context-window")
+            )
           ))
         }
       })
@@ -405,11 +432,11 @@ context_window_server <- function(
 #' @return A list of text chunks, where each chunk is a vector of texts.
 #' @export
 create_text_chunks <- function(
-    texts,
-    max_chunk_size = 50,
-    max_redrawing = 1, # new parameter: maximum number of times each text can be used,
-    n_tokens_context_window = 2056,
-    n_char_base_prompt = 600
+  texts,
+  max_chunk_size = 50,
+  max_redrawing = 1, # new parameter: maximum number of times each text can be used,
+  n_tokens_context_window = 2056,
+  n_char_base_prompt = 600
 ) {
   stopifnot(
     is.character(texts),
@@ -481,44 +508,55 @@ create_text_chunks <- function(
 # Will default to 2048 if the model is not recognized
 # Better approach may be to retrieve via API or configuration file
 get_context_window_size_in_tokens <- function(model) {
-  if (model %in% c(
-    "gpt-4.1-mini-2025-04-14",
-    "gpt-4.1-2025-04-14",
-    "gpt-4.1",
-    "gpt-4.1-mini"
-  ) ) {
+  if (
+    model %in%
+      c(
+        "gpt-4.1-mini-2025-04-14",
+        "gpt-4.1-2025-04-14",
+        "gpt-4.1",
+        "gpt-4.1-mini"
+      )
+  ) {
     return(1047576)
   }
 
-  if (model %in% c(
-    "o4-mini-2025-04-16",
-    "o3-2025-04-16",
-    "o3-mini-2025-01-31",
-    "o1-2024-12-17",
-    "o1-pro-2025-03-19",
-    "o4-mini",
-    "o3",
-    "o3-mini",
-    "o1",
-    "o1-pro"
-  )) {
+  if (
+    model %in%
+      c(
+        "o4-mini-2025-04-16",
+        "o3-2025-04-16",
+        "o3-mini-2025-01-31",
+        "o1-2024-12-17",
+        "o1-pro-2025-03-19",
+        "o4-mini",
+        "o3",
+        "o3-mini",
+        "o1",
+        "o1-pro"
+      )
+  ) {
     return(200000)
   }
 
-  if (model %in% c(
-    "gpt-4o-2024-08-06",
-    "chatgpt-4o-latest",
-    "gpt-4o-mini-2024-07-18",
-    "gpt-4o-mini",
-    "gpt-4o"
-
-  )) {
+  if (
+    model %in%
+      c(
+        "gpt-4o-2024-08-06",
+        "chatgpt-4o-latest",
+        "gpt-4o-mini-2024-07-18",
+        "gpt-4o-mini",
+        "gpt-4o"
+      )
+  ) {
     return(128000)
   }
 
-  if (model %in% c(
-    "gpt-3.5-turbo-0125"
-  )) {
+  if (
+    model %in%
+      c(
+        "gpt-3.5-turbo-0125"
+      )
+  ) {
     return(4096)
   }
 
@@ -553,10 +591,14 @@ if (FALSE) {
       mode = mode,
       llm_provider = tidyprompt::llm_provider_openai(),
       available_main_models = c(
-        "gpt-4o-mini-2024-07-18", "gpt-4.1-mini-2025-04-14", "some model"
+        "gpt-4o-mini-2024-07-18",
+        "gpt-4.1-mini-2025-04-14",
+        "some model"
       ),
       available_large_models = c(
-        "gpt-4o-mini-2024-07-18", "gpt-4.1-mini-2025-04-14", "some model"
+        "gpt-4o-mini-2024-07-18",
+        "gpt-4.1-mini-2025-04-14",
+        "some model"
       )
     )
     context_window_server(

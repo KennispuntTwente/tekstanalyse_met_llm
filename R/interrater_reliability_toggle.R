@@ -8,17 +8,20 @@ interrater_toggle_ui <- function(id) {
     shinyjs::useShinyjs(),
     bslib::card(
       class = "card",
-      card_header("Inter-rater reliability"),
+      card_header(lang$t("Inter-rater reliability")),
       card_body(
         # Toggle for inter-rater reliability
-        p("Zelf steekproef beoordelen?", class = "mb-2 text-center"),
+        p(lang$t("Zelf steekproef beoordelen?"), class = "mb-2 text-center"),
         div(
           class = "d-flex justify-content-center",
           shinyWidgets::radioGroupButtons(
             ns("interrater_reliability"),
             NULL,
-            choices = c("Nee", "Ja"),
-            selected = "Nee",
+            choices = c(
+              lang$t("Nee"),
+              lang$t("Ja")
+            ),
+            selected = lang$t("Nee"),
             size = "sm"
           )
         )
@@ -37,7 +40,9 @@ interrater_toggle_server <- function(id, processing) {
       interrater_reliability_toggle <- reactiveVal(FALSE)
 
       observeEvent(input$interrater_reliability, {
-        interrater_reliability_toggle(input$interrater_reliability == "Ja")
+        interrater_reliability_toggle(
+          input$interrater_reliability == lang$t("Ja")
+        )
       })
 
       # Disable when processing

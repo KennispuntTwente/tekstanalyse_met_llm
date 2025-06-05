@@ -1,0 +1,473 @@
+{
+  "cultural_date_format": "%d-%m-%Y",
+  "languages": ["nl", "en"],
+  "translation": [
+      {
+        "nl": "Hallo!",
+        "en": "Hello!"
+      },
+      {
+        "nl": "Tekstanalyse",
+        "en": "Textual Analysis"
+      },
+      {
+        "nl": "met LLM",
+        "en": "with LLM"
+      },
+      {
+        "nl": "Deze app is ontwikkeld door <a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a>,",
+        "en": "This app was developed by <a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a>,"
+      },
+      {
+        "nl": " voortkomend uit een samenwerkingstraject van de Kennispunt Twente en GGD Twente.",
+        "en": " resulting from a collaboration project of Kennispunt Twente and GGD Twente."
+      },
+      {
+        "nl": " Samen werken onze organisaties toepassingen met generatieve AI ten behoeve van de samenleving.",
+        "en": " Together, our organizations work on applications with generative AI for the benefit of society."
+      },
+      {
+        "nl": "Kennispunt Twente is een non-profit organisatie voor data, inzicht, en kennis.",
+        "en": "Kennispunt Twente is a non-profit organization for data, insight, and knowledge."
+      },
+      {
+        "nl": " Ideeën of verbeterpunten voor de app? ",
+        "en": " Ideas or improvements for the app? "
+      },
+      {
+        "nl": "<a href='https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new' target='_blank'>Open een issue in de GitHub-repository</a>.",
+        "en": "<a href='https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new' target='_blank'>Open an issue in the GitHub-repository</a>."
+      },
+      {
+        "nl": " Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?",
+        "en": " Interested in what Kennispunt Twente can do for your organization, for example in the field of generative AI?"
+      },
+      {
+        "nl": " Bezoek <a href='https://www.kennispunttwente.nl' target='_blank'>onze website</a>",
+        "en": " Visit <a href='https://www.kennispunttwente.nl' target='_blank'>our website</a>"
+      },
+      {
+        "nl": " of <a href=\"mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl\" target=\"_blank\">neem contact op met onze ontwikkelaars</a>.",
+        "en": " or <a href=\"mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl\" target=\"_blank\">get in touch with our developers</a>. "
+      },
+      {
+        "nl": "Bekijk team",
+        "en": "View team"
+      },
+      {
+        "nl": "Upload teksten",
+        "en": "Upload texts"
+      },
+      {
+        "nl": "Error bij lezen van tekstbestand:",
+        "en": "Error reading text file:"
+      },
+      {
+        "nl": "Error bij lezen van CSV/TSV-bestand:",
+        "en": "Error reading CSV/TSV file:"
+      },
+      {
+        "nl": "Error bij lezen van Excel-bestand:",
+        "en": "Error reading Excel file:"
+      },{
+        "nl": "Error bij lezen van SAV-bestand:",
+        "en": "Error reading SAV file:"
+      },
+      {
+        "nl": "Niet ondersteund bestandstype",
+        "en": "Unsupported file type"
+      },
+      {
+        "nl": "Selecteer sheet",
+        "en": "Select sheet"
+      },
+      {
+        "nl": "Error bij lezen sheet:",
+        "en": "Error reading sheet:"
+      },
+      {
+        "nl": "Selecteer kolom met teksten",
+        "en": "Select column with texts"
+      },
+      {
+        "nl": "Je kunt hier de data filteren op basis van waarden in een kolom. Selecteer een kolom en kies waarden. Rijen zonder de gekozen waarden worden uitgesloten.",
+        "en": "You can filter the data here based on values in a column. Select a column and choose values. Rows without the selected values will be excluded."
+      },
+      {
+        "nl": "Kies kolom voor filter",
+        "en": "Choose column for filter"
+      },
+      {
+        "nl": "Kies waarden om te behouden",
+        "en": "Choose values to keep"
+      },
+      {
+        "nl": "Deselecteer alles",
+        "en": "Deselect all"
+      },
+      {
+        "nl": "Selecteer alles",
+        "en": "Select all"
+      },
+      {
+        "nl": "Niks geselecteerd",
+        "en": "Nothing selected"
+      },
+      {
+        "nl": "Selecteer minstens één waarde om te behouden.",
+        "en": "Select at least one value to keep."
+      },
+      {
+        "nl": "Filter data",
+        "en": "Filter data"
+      },
+      {
+        "nl": "Toepassen",
+        "en": "Apply"
+      },
+      {
+        "nl": "Filter wissen",
+        "en": "Clear filter"
+      },
+      {
+        "nl": "Sluiten",
+        "en": "Close"
+      },
+      {
+        "nl": "Teksten",
+        "en": "Texts"
+      },
+      {
+        "nl": "Bekijk tabel",
+        "en": "View table"
+      },
+      {
+        "nl": "<< e-mailadres verwijderd >>",
+        "en": "<< removed e-mail address >>"
+      },
+      {
+        "nl": "<< (telefoon)nummer verwijderd >>",
+        "en": "<< removed (phone) number >>"
+      },
+      {
+        "nl": "<< postcode verwijderd >>",
+        "en": "<< removed postal code >>"
+      },
+      {
+        "nl": "Dubbele teksten verwijderd:",
+        "en": "Duplicate texts removed:"
+      },
+      {
+        "nl": "Persoonsgegevens verwijderd:",
+        "en": "Personal data removed:"
+      },
+      {
+        "nl": "teksten",
+        "en": "texts"
+      },
+      {
+        "nl": "e‑mail(s)",
+        "en": "e-mail address(es)"
+      },
+      {
+        "nl": "nummer(s)",
+        "en": "number(s)"
+      },
+      {
+        "nl": "postcode(s)",
+        "en": "postal code(s)"
+      },
+      {
+        "nl": "Onderzoeksachtergrond",
+        "en": "Research background"
+      },
+      {
+        "nl": "Beschrijf kort je onderzoek zodat het LLM wat context heeft.",
+        "en": "Briefly describe your research so that the LLM has some context."
+      },
+      {
+        "nl": " Wat onderzoek je & hoe? Wie gaf antwoord?",
+        "en": " What are you researching & how? Who provided the answers?"
+      },
+      {
+        "nl": "Details over het LLM (large language model) dat je gebruikt.",
+        "en": "Details about the LLM (large language model) you are using."
+      },
+      {
+        "nl": "Primair model:",
+        "en": "Main model:"
+      },
+      {
+        "nl": "Groot model:",
+        "en": "Large model:"
+      },
+      {
+        "nl": "Model voor onderwerpreductie:",
+        "en": "Model for topic reduction:"
+      },
+      {
+        "nl": "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren.",
+        "en": "Choose the desired analysis method: categorization, scoring, or topic extraction."
+      },
+      {
+        "nl": "Modus",
+        "en": "Mode"
+      },
+      {
+        "nl": "Categorisatie",
+        "en": "Categorization"
+      },
+      {
+        "nl": "Scoren",
+        "en": "Scoring"
+      },
+      {
+        "nl": "Onderwerpextractie",
+        "en": "Topic extraction"
+      },
+      {
+        "nl": "Categorie",
+        "en": "Category"
+      },
+      {
+        "nl": "Categorieën",
+        "en": "Categories"
+      },
+      {
+        "nl": "Geef beknopte, duidelijke omschrijvingen. Overweeg een categorie 'Overig'/'Onbekend'/'Geen antwoord'.",
+        "en": "Provide concise, clear descriptions. Consider an 'Other'/'Unknown'/'No answer' category."
+      },
+      {
+        "nl": "Geef de karakteristiek op waarop de tekst gescoord moet worden (bijv. 'emotionele lading', 'duidelijkheid').",
+        "en": "Specify the characteristic on which the text should be scored (e.g., 'emotional charge', 'clarity')."
+      },
+      {
+        "nl": "De LLM zal een score tussen 0 en 100 geven, welke aangeeft hoe goed de tekst past bij de karakteristiek.",
+        "en": "The LLM will provide a score between 0 and 100, indicating how well the text fits the characteristic."
+      },
+      {
+        "nl": "Karakteristiek",
+        "en": "Characteristic"
+      },
+      {
+        "nl": "Context-window",
+        "en": "Context window"
+      },
+      {
+        "nl": "Het context-window is de hoeveelheid tekst die het taalmodel kan verwerken in één keer.",
+        "en": "The context window is the amount of text that the language model can process at once."
+      },
+      {
+        "nl": " Er moet voor worden gezorgd dat de onderzoeksachtergrond met de (langste) tekst die je invoert binnen het context-window van het model past.",
+        "en": " It is important to ensure that the research background and the (longest) text you input fit within the model's context window."
+      },
+      {
+        "nl": " Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen.",
+        "en": " Additionally, in the first step of topic extraction, the texts are divided into chunks; these chunks must also fit within the context window."
+      },
+      {
+        "nl": " Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen.",
+        "en": " You can set the size of the chunks and the number of extractions per text with parameters."
+      },
+      {
+        "nl": "Context-window grootte (# tokens)",
+        "en": "Context window size (# tokens)"
+      },
+      {
+        "nl": "Maximaal aantal teksten per chunk",
+        "en": "Maximum number of texts per chunk"
+      },
+      {
+        "nl": "Aantal trekkingen per tekst",
+        "en": "Number of draws per text"
+      },
+      {
+        "nl": "Aantal chunks:",
+        "en": "Number of chunks:"
+      },
+      {
+        "nl": "Te veel chunks",
+        "en": "Too many chunks"
+      },
+      {
+        "nl": "Sommige teksten zijn te lang voor het context-window",
+        "en": "Some texts are too long for the context window"
+      },
+      {
+        "nl": "Alle teksten passen binnen het context-window",
+        "en": "All texts fit within the context window"
+      },
+      {
+        "nl": "LLM-provider",
+        "en": "LLM provider"
+      },
+      {
+        "nl": "Pregeconfigureerd",
+        "en": "Preconfigured"
+      },
+      {
+        "nl": "OpenAI-compatible",
+        "en": "OpenAI compatible"
+      },
+      {
+        "nl": "Je gebruikt nu een vooraf ingestelde LLM-API,<br>zoals vastgelegd in de appconfiguratie.<br>De URL en de beschikbare modellen zijn vooraf ingesteld.",
+        "en": "You are now using a preconfigured LLM API,<br>as defined in the app configuration.<br>The URL and available models are pre-set."
+      },
+      {
+        "nl": "Configureer hier een OpenAI-compatibele API.<br>Dit soort API-endpoints worden niet alleen door OpenAI aangeboden,<br>maar ook door diverse andere providers.<br>Haal na het instellen de beschikbare modellen op met de button.",
+        "en": "Configure an OpenAI-compatible API here.<br>This type of API endpoints is offered not only by OpenAI,<br>but also by various other providers.<br>After setting it up, retrieve the available models with the button."
+      },
+      {
+        "nl": "Configureer hier een Ollama-API.<br>Host bijvoorbeeld Ollama op je eigen systeem<br>(zie: https://ollama.com/).<br>Haal na het instellen de beschikbare modellen op met de button.",
+        "en": "Configure an Ollama API here.<br>For example, host Ollama on your own system<br>(see: https://ollama.com/).<br>After setting it up, retrieve the available models with the button."
+      },
+      {
+        "nl": "OpenAI-API-compatible endpoint URL:",
+        "en": "OpenAI API-compatible endpoint URL:"
+      },
+      {
+        "nl": "Ollama-API endpoint URL:",
+        "en": "Ollama API endpoint URL:"
+      },
+      {
+        "nl": "API-key",
+        "en": "API key"
+      },
+      {
+        "nl": "Ping beschikbare modellen",
+        "en": "Ping available models"
+      },
+      {
+        "nl": "Wacht even voordat je het opnieuw probeert (min. 5 seconden tussen aanvragen)",
+        "en": "Wait a moment before trying again (min. 5 seconds between requests)"
+      },
+      {
+        "nl": "Modellen ophalen...",
+        "en": "Retrieving models..."
+      },
+      {
+        "nl": "Succes: modellen opgehaald",
+        "en": "Success: models retrieved"
+      },
+      {
+        "nl": "Error: modellen niet opgehaald -",
+        "en": "Error: models not retrieved -"
+      },
+      {
+        "nl": "Nee",
+        "en": "No"
+      },
+      {
+        "nl": "Ja",
+        "en": "Yes"
+      },
+      {
+        "nl": "Meerdere categorieën per tekst toegestaan?",
+        "en": "Allow multiple categories per text?"
+      },
+      {
+        "nl": "Meerdere categorieën",
+        "en": "Multiple categories"
+      },
+      {
+        "nl": "Rapport schrijven",
+        "en": "Write report"
+      },
+      {
+        "nl": "Rapport schrijven over categorieën?",
+        "en": "Write report about categories?"
+      },
+      {
+        "nl": "Inter-rater reliability",
+        "en": "Interrater reliability"
+      },
+      {
+        "nl": "Zelf steekproef beoordelen?",
+        "en": "Self-assess sample?"
+      },
+      {
+        "nl": "Zelf onderwerpen bewerken?",
+        "en": "Self-edit topics?"
+      },
+      {
+        "nl": "Human-in-the-loop",
+        "en": "Human in the loop"
+      },
+      {
+        "nl": "Ik kreeg zojuist deze foutmelding:",
+        "en": "I just got this error message:"
+      },
+      {
+        "nl": "Tekstanalyse-app-foutmelding: ",
+        "en": "Textual analysis app error message: "
+      },
+      {
+        "nl": "Foutmelding: ",
+        "en": "Error message: "
+      },
+      {
+        "nl": "Klik hier om een e-mail te sturen met de foutmelding.",
+        "en": "Click here to send an email with the error message."
+      },
+      {
+        "nl": "Neem contact op met",
+        "en": "Contact"
+      },
+      {
+        "nl": "als je deze foutmelding blijft zien.",
+        "en": "if you keep seeing this error message."
+      },
+      {
+        "nl": "Er gebeurde iets onverwachts, waardoor de app is gestopt. Sorry!",
+        "en": "Something unexpected happened, causing the app to stop. Sorry!"
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      },
+      {
+        "nl": "",
+        "en": ""
+      }
+    ]
+}

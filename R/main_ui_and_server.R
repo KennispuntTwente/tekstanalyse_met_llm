@@ -10,7 +10,12 @@
 
 ##### Main UI #####
 
-# Here we build the main UI for the Shiny app
+lang <- shiny.i18n::Translator$new(
+  translation_json_path = "language/language.json"
+)
+lang$set_translation_language(
+  getOption("language", "nl")
+)
 
 main_ui <- function(
   azure_auth = FALSE
@@ -49,9 +54,9 @@ main_ui <- function(
           id = "title",
           h1(
             style = "margin: 0; text-align: center;",
-            span(class = "title-part1", "Tekstanalyse"),
+            span(class = "title-part1", lang$t("Tekstanalyse")),
             span(class = "title-break", " "), # this will turn into a line break on small screens
-            span(class = "title-part2", "met LLM")
+            span(class = "title-part2", lang$t("met LLM"))
           )
         ),
 
@@ -78,26 +83,42 @@ main_ui <- function(
       ",
         p(
           HTML(paste0(
-            "Deze app is ontwikkeld door <a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a>,",
-            " voortkomend uit een samenwerkingstraject van de Kennispunt Twente en GGD Twente.",
-            " Samen werken onze organisaties toepassingen met generatieve AI ten behoeve van de samenleving."
+            lang$t(
+              "Deze app is ontwikkeld door <a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a>,"
+            ),
+            lang$t(
+              " voortkomend uit een samenwerkingstraject van de Kennispunt Twente en GGD Twente."
+            ),
+            lang$t(
+              " Samen werken onze organisaties toepassingen met generatieve AI ten behoeve van de samenleving."
+            )
           ))
         ),
         p(
           HTML(paste0(
-            "Kennispunt Twente is een non-profit organisatie voor data, inzicht, en kennis.",
-            " Ideeën of verbeterpunten voor de app? ",
-            "<a href='https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new' target='_blank'>Open een issue in de GitHub-repository</a>.",
-            " Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?",
-            " Bezoek <a href='https://www.kennispunttwente.nl' target='_blank'>onze website</a>",
-            " of <a href=\"mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl\" target=\"_blank\">neem contact op met onze ontwikkelaars</a>."
+            lang$t(
+              "Kennispunt Twente is een non-profit organisatie voor data, inzicht, en kennis."
+            ),
+            lang$t(" Ideeën of verbeterpunten voor de app? "),
+            lang$t(
+              "<a href='https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new' target='_blank'>Open een issue in de GitHub-repository</a>."
+            ),
+            lang$t(
+              " Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?"
+            ),
+            lang$t(
+              " Bezoek <a href='https://www.kennispunttwente.nl' target='_blank'>onze website</a>"
+            ),
+            lang$t(
+              " of <a href=\"mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl\" target=\"_blank\">neem contact op met onze ontwikkelaars</a>."
+            )
           ))
         ),
         accordion(
           id = "team-accordion",
           open = FALSE,
           accordion_panel(
-            "Bekijk team",
+            lang$t("Bekijk team"),
             div(
               style = "text-align: left;",
               tags$ul(

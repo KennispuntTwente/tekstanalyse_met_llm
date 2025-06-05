@@ -11,14 +11,14 @@ text_management_ui <- function(id) {
     bslib::card(
       class = "card",
       card_header(
-        "Teksten"
+        lang$t("Teksten")
       ),
       card_body(
         div(
           class = "text-center",
           actionButton(
             ns("open_text_table_modal"),
-            label = paste0("Bekijk tabel"),
+            label = paste0(lang$t("Bekijk tabel")),
             class = "btn btn-primary"
           ),
           br(),
@@ -71,7 +71,7 @@ text_management_server <- function(id, raw_texts) {
         # Count how many times each placeholder appears
         email_count <- sum(stringr::str_count(
           txts,
-          stringr::fixed("<< removed e-mail address >>")
+          stringr::fixed(lang$t("<< e-mailadres verwijderd >>"))
         ))
         # iban_count <- sum(stringr::str_count(
         #   txts,
@@ -79,11 +79,11 @@ text_management_server <- function(id, raw_texts) {
         # ))
         phone_count <- sum(stringr::str_count(
           txts,
-          stringr::fixed("<< removed (phone) number >>")
+          stringr::fixed(lang$t("<< (telefoon)nummer verwijderd >>"))
         ))
         postal_count <- sum(stringr::str_count(
           txts,
-          stringr::fixed("<< removed postal code >>")
+          stringr::fixed(lang$t("<< postcode verwijderd >>"))
         ))
 
         # Count removed duplicates
@@ -102,7 +102,7 @@ text_management_server <- function(id, raw_texts) {
                 class = "border rounded p-2 mb-3 bg-light fade-in gap-2",
                 div(
                   class = "text-muted small mb-1 text-center",
-                  "Dubbele teksten verwijderd:"
+                  lang$t("Dubbele teksten verwijderd:")
                 ),
                 div(
                   class = "d-flex align-items-center justify-content-center gap-2",
@@ -120,7 +120,7 @@ text_management_server <- function(id, raw_texts) {
                 class = "border rounded p-2 bg-light fade-in",
                 div(
                   class = "text-muted small mb-1 gap-2",
-                  "Persoonsgegevens verwijderd:"
+                  lang$t("Persoonsgegevens verwijderd:")
                 ),
                 div(
                   class = "small d-flex flex-wrap justify-content-center align-items-center gap-2",
@@ -128,7 +128,7 @@ text_management_server <- function(id, raw_texts) {
                     class = "d-flex align-items-center",
                     bs_icon("envelope", class = "me-1", aria_hidden = "true"),
                     span(class = "badge bg-secondary me-1", email_count),
-                    span(class = "text-muted", "e‑mail(s)")
+                    span(class = "text-muted", lang$t("e‑mail(s)"))
                   ),
                   # div(
                   #   class = "d-flex align-items-center",
@@ -140,13 +140,13 @@ text_management_server <- function(id, raw_texts) {
                     class = "d-flex align-items-center",
                     bs_icon("telephone", class = "me-1", aria_hidden = "true"),
                     span(class = "badge bg-secondary me-1", phone_count),
-                    span(class = "text-muted", "nummer(s)")
+                    span(class = "text-muted", lang$t("nummer(s)"))
                   ),
                   div(
                     class = "d-flex align-items-center",
                     bs_icon("mailbox", class = "me-1", aria_hidden = "true"),
                     span(class = "badge bg-secondary me-1", postal_count),
-                    span(class = "text-muted", "postcode(s)")
+                    span(class = "text-muted", lang$t("postcode(s)"))
                   )
                 )
               )
@@ -162,9 +162,12 @@ text_management_server <- function(id, raw_texts) {
           session,
           "open_text_table_modal",
           label = paste0(
-            "Bekijk tabel (",
+            lang$t("Bekijk tabel"),
+            " (",
             length(texts$preprocessed),
-            " teksten)"
+            " ",
+            lang$t("teksten"),
+            ")"
           )
         )
 
@@ -180,10 +183,10 @@ text_management_server <- function(id, raw_texts) {
       observeEvent(input$open_text_table_modal, {
         showModal(
           modalDialog(
-            title = "Teksten",
+            title = lang$t("Teksten"),
             DT::dataTableOutput(session$ns("text_table")),
             easyClose = TRUE,
-            footer = modalButton("Sluiten"),
+            footer = modalButton(lang$t("Sluiten")),
             size = "l"
           )
         )
@@ -221,7 +224,7 @@ pre_process_texts <- function(txts) {
       "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
       ignore_case = TRUE
     ),
-    "<< removed e-mail address >>"
+    lang$t("<< e-mailadres verwijderd >>")
   )
 
   # Find all Dutch IBAN numbers, replace with "<< removed IBAN number >>"
@@ -243,7 +246,7 @@ pre_process_texts <- function(txts) {
       "(?<!\\S)(?=(?:\\D*\\d){7})\\+?[\\d\\-\\.\\(\\)\\s]{7,}?(?=\\s|$|[[:punct:]])",
       ignore_case = TRUE
     ),
-    "<< removed (phone) number >>"
+    lang$t("<< (telefoon)nummer verwijderd >>")
   )
 
   # Find all Dutch postal codes, replace with "<< removed postal code >>"
@@ -254,7 +257,7 @@ pre_process_texts <- function(txts) {
       "\\b\\d{4}\\s*[a-zA-Z]{2}\\b",
       ignore_case = TRUE
     ),
-    "<< removed postal code >>"
+    lang$t("<< postcode verwijderd >>")
   )
 
   return(txts)
