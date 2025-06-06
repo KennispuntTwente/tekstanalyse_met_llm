@@ -33,7 +33,15 @@ text_management_ui <- function(id) {
 
 #### 2 Server ####
 
-text_management_server <- function(id, raw_texts) {
+text_management_server <- function(
+  id,
+  raw_texts,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   moduleServer(
     id,
     function(input, output, session) {

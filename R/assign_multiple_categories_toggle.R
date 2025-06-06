@@ -7,7 +7,16 @@ assign_multiple_categories_toggle_ui <- function(id) {
   uiOutput(ns("ui_toggle"))
 }
 
-assign_multiple_categories_toggle_server <- function(id, processing, mode) {
+assign_multiple_categories_toggle_server <- function(
+  id,
+  processing,
+  mode,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   moduleServer(
     id,
     function(input, output, session) {

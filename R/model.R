@@ -7,27 +7,8 @@ model_ui <- function(
 ) {
   ns <- NS(id) # Define namespace function for the UI
   tagList(
-    bslib::card(
-      class = "card",
-      card_header(
-        "Model",
-        bslib::tooltip(
-          bsicons::bs_icon("info-circle"),
-          lang$t("Details over het LLM (large language model) dat je gebruikt.")
-        )
-      ),
-      card_body(
-        div(
-          class = "d-flex flex-wrap justify-content-center gap-3",
-          uiOutput(ns("main_model_selector_ui")),
-          uiOutput(ns("large_model_selector_ui"))
-        ),
-        div(
-          class = "d-flex flex-wrap justify-content-center gap-3",
-          textOutput(ns("url"))
-        )
-      )
-    )
+    shinyjs::useShinyjs(),
+    uiOutput(ns("card"))
   )
 }
 
@@ -43,6 +24,11 @@ model_server <- function(
     provider_mode = "preconfigured",
     available_models_main = c("gpt-4o-mini", "gpt-4o"),
     available_models_large = c("gpt-4o", "o3")
+  ),
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
   )
 ) {
   moduleServer(
@@ -54,6 +40,32 @@ model_server <- function(
         main = NULL,
         large = NULL
       )
+
+      output$card <- renderUI({
+        bslib::card(
+          class = "card",
+          card_header(
+            "Model",
+            bslib::tooltip(
+              bsicons::bs_icon("info-circle"),
+              lang()$t(
+                "Details over het LLM (large language model) dat je gebruikt."
+              )
+            )
+          ),
+          card_body(
+            div(
+              class = "d-flex flex-wrap justify-content-center gap-3",
+              uiOutput(ns("main_model_selector_ui")),
+              uiOutput(ns("large_model_selector_ui"))
+            ),
+            div(
+              class = "d-flex flex-wrap justify-content-center gap-3",
+              textOutput(ns("url"))
+            )
+          )
+        )
+      })
 
       observe({
         req(llm_provider_rv$llm_provider)
@@ -94,7 +106,7 @@ model_server <- function(
           class = "selector-container text-center",
           selectInput(
             inputId = ns("large_model"),
-            label = HTML(paste0(lang$t("Model voor onderwerpreductie"))),
+            label = HTML(paste0(lang()$t("Model voor onderwerpreductie"))),
             choices = llm_provider_rv$available_models_large,
             # Use the reactive value or the initial value
             selected = models$large # Use the reactive value
@@ -178,7 +190,7 @@ model_server <- function(
 
 #### 3 Example/development usage ####
 
-if (FALSE) {
+if (TRUE) {
   library(shiny)
   library(shinyjs)
   library(bslib)
@@ -187,6 +199,7 @@ if (FALSE) {
   ui <- bslib::page_fluid(
     css_js_head(),
     shinyjs::useShinyjs(),
+    language_ui("language"),
     llm_provider_ui("llm_provider"),
     model_ui("model"),
     tagList(
@@ -196,25 +209,29 @@ if (FALSE) {
   )
 
   server <- function(input, output, session) {
+    lang <- language_server("language", processing = reactiveVal(FALSE))
+
     llm_provider_rv <- llm_provider_server(
       "llm_provider",
-      processing,
+      processing = reactiveVal(FALSE),
       preconfigured_llm_provider = tidyprompt::llm_provider_openai(),
       preconfigured_main_models = c("gpt-4o-mini", "gpt-3.5-turbo"),
-      preconfigured_large_models = c("gpt-4o", "o3")
+      preconfigured_large_models = c("gpt-4o", "o3"),
+      lang = lang
     )
 
     model <- model_server(
       "model",
-      llm_provider_rv = llm_provider_rv
+      llm_provider_rv = llm_provider_rv,
+      lang = lang
     )
 
     output$main_model <- renderText({
-      paste(lang$t("Primair model:"), model$main)
+      paste("Primair model:", model$main)
     })
 
     output$large_model <- renderText({
-      paste(lang$t("Groot model:"), model$large)
+      paste("Groot model:", model$large)
     })
   }
 

@@ -21,7 +21,12 @@ llm_provider_server <- function(
   preconfigured_main_models = NULL,
   preconfigured_large_models = NULL,
   can_configure_oai = getOption("llm_provider__can_configure_oai", TRUE),
-  can_configure_ollama = getOption("llm_provider__can_configure_ollama", TRUE)
+  can_configure_ollama = getOption("llm_provider__can_configure_ollama", TRUE),
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
 ) {
   if (
     is.null(preconfigured_llm_provider) &
@@ -133,7 +138,7 @@ llm_provider_server <- function(
             card_header(
               div(
                 class = "d-flex justify-content-between align-items-center w-100",
-                span(lang$t("LLM-provider")),
+                span(lang()$t("LLM-provider")),
                 uiOutput(ns("provider_mode_selection")),
               )
             ),
@@ -211,7 +216,7 @@ llm_provider_server <- function(
                 "llm-icon",
                 if (current_mode == "preconfigured") "llm-icon-active"
               ),
-              title = lang$t("Pregeconfigureerd"),
+              title = lang()$t("Pregeconfigureerd"),
               onclick = sprintf(
                 "Shiny.setInputValue('%s', Math.random())",
                 ns("select_preconfigured")
@@ -222,7 +227,10 @@ llm_provider_server <- function(
                 style = "height: 20px;"
               )
             ) |>
-              bslib::tooltip(lang$t("Pregeconfigureerd"), placement = "bottom")
+              bslib::tooltip(
+                lang()$t("Pregeconfigureerd"),
+                placement = "bottom"
+              )
           },
 
           if (can_configure_oai) {
@@ -243,7 +251,10 @@ llm_provider_server <- function(
                 alt = "OpenAI"
               )
             ) |>
-              bslib::tooltip(lang$t("OpenAI-compatible"), placement = "bottom")
+              bslib::tooltip(
+                lang()$t("OpenAI-compatible"),
+                placement = "bottom"
+              )
           },
 
           if (can_configure_ollama) {
@@ -308,13 +319,13 @@ llm_provider_server <- function(
 
         description_text <- switch(
           mode,
-          "preconfigured" = lang$t(
+          "preconfigured" = lang()$t(
             "Je gebruikt nu een vooraf ingestelde LLM-API,<br>zoals vastgelegd in de appconfiguratie.<br>De URL en de beschikbare modellen zijn vooraf ingesteld."
           ),
-          "openai" = lang$t(
+          "openai" = lang()$t(
             "Configureer hier een OpenAI-compatibele API.<br>Dit soort API-endpoints worden niet alleen door OpenAI aangeboden,<br>maar ook door diverse andere providers.<br>Haal na het instellen de beschikbare modellen op met de button."
           ),
-          "ollama" = lang$t(
+          "ollama" = lang()$t(
             "Configureer hier een Ollama-API.<br>Host bijvoorbeeld Ollama op je eigen systeem<br>(zie: https://ollama.com/).<br>Haal na het instellen de beschikbare modellen op met de button."
           ),
           ""
@@ -351,7 +362,7 @@ llm_provider_server <- function(
             class = "llm-narrow-container mb-1",
             textInput(
               ns("openai_url"),
-              lang$t("OpenAI-API-compatible endpoint URL:"),
+              lang()$t("OpenAI-API-compatible endpoint URL:"),
               value = openai_url(),
               width = "100%"
             )
@@ -362,7 +373,7 @@ llm_provider_server <- function(
             class = "llm-narrow-container mb-1",
             textInput(
               ns("ollama_url"),
-              lang$t("Ollama-API endpoint URL:"),
+              lang()$t("Ollama-API endpoint URL:"),
               value = ollama_url(),
               width = "100%"
             )
@@ -385,7 +396,7 @@ llm_provider_server <- function(
               class = "form-group mb-2 w-100",
               tags$label(
                 `for` = ns_api,
-                lang$t("API-key:"),
+                lang()$t("API-key:"),
                 style = "display: block; width: 100%; text-align: center; margin-bottom: 0.5rem;"
               ),
               tags$div(
@@ -459,7 +470,7 @@ llm_provider_server <- function(
           class = "llm-narrow-container mb-1",
           actionButton(
             ns("get_models"),
-            lang$t("Ping beschikbare modellen"),
+            lang()$t("Ping beschikbare modellen"),
             class = "btn-primary"
           )
         )
@@ -470,7 +481,7 @@ llm_provider_server <- function(
         now <- Sys.time()
         if (difftime(now, last_model_request_time(), units = "secs") < 5) {
           showNotification(
-            lang$t(
+            lang()$t(
               "Wacht even voordat je het opnieuw probeert (min. 5 seconden tussen aanvragen)"
             ),
             type = "warning"
@@ -480,7 +491,7 @@ llm_provider_server <- function(
         last_model_request_time(now)
         shinyjs::disable("get_models")
         showNotification(
-          lang$t("Modellen ophalen..."),
+          lang()$t("Modellen ophalen..."),
           type = "default",
           duration = 3
         )
@@ -541,7 +552,7 @@ llm_provider_server <- function(
             }
 
             showNotification(
-              lang$t("Succes: modellen opgehaald"),
+              lang()$t("Succes: modellen opgehaald"),
               type = "message",
               duration = 3
             )
@@ -549,7 +560,7 @@ llm_provider_server <- function(
           (function(e) {
             showNotification(
               paste(
-                lang$t("Error: modellen niet opgehaald -"),
+                lang()$t("Error: modellen niet opgehaald -"),
                 conditionMessage(e)
               ),
               type = "error",

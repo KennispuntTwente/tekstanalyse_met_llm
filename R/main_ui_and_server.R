@@ -10,13 +10,6 @@
 
 ##### Main UI #####
 
-lang <- shiny.i18n::Translator$new(
-  translation_json_path = "language/language.json"
-)
-lang$set_translation_language(
-  getOption("language", "nl")
-)
-
 main_ui <- function(
   azure_auth = FALSE
 ) {
@@ -229,18 +222,20 @@ main_server <- function(
     #### 1 Text management ####
 
     # Text upload
-    raw_texts <- text_upload_server("text_upload", processing)
+    raw_texts <- text_upload_server("text_upload", processing, lang)
 
     # Pre-process texts, show table
     texts <- text_management_server(
       "text_management",
-      raw_texts = raw_texts
+      raw_texts = raw_texts,
+      lang = lang
     )
 
     # Obtain research background
     research_background <- research_background_server(
       "research_background",
-      processing = processing
+      processing = processing,
+      lang = lang
     )
 
     # Manage context window, chunking
@@ -253,38 +248,43 @@ main_server <- function(
       research_background = research_background,
       assign_multiple_categories = assign_multiple_categories_toggle,
       texts = texts,
-      processing = processing
+      processing = processing,
+      lang = lang
     )
 
     #### 2 Mode management ####
 
     # Obtain mode
-    mode <- mode_server("mode", processing)
+    mode <- mode_server("mode", processing, lang)
 
     # Obtain toggle for assigning multiple categories
     assign_multiple_categories_toggle <- assign_multiple_categories_toggle_server(
       "assign_multiple_categories_toggle",
       processing,
-      mode
+      mode,
+      lang
     )
 
     write_paragraphs_toggle <- write_paragraphs_toggle_server(
       "write_paragraphs_toggle",
       processing,
-      mode
+      mode,
+      lang
     )
 
     # Obtain toggle for interrater reliability
     interrater_reliability_toggle <- interrater_toggle_server(
       "interrater_toggle",
-      processing
+      processing,
+      lang
     )
 
     # Obtain toggle for human-in-the-loop
     human_in_the_loop_toggle <- human_in_the_loop_toggle_server(
       "human_in_the_loop_toggle",
       processing,
-      mode
+      mode,
+      lang
     )
 
     #### 3 Model management ####
@@ -294,20 +294,22 @@ main_server <- function(
       processing = processing,
       preconfigured_llm_provider = preconfigured_llm_provider,
       preconfigured_main_models = preconfigured_main_models,
-      preconfigured_large_models = preconfigured_large_models
+      preconfigured_large_models = preconfigured_large_models,
+      lang = lang
     )
 
     models <- model_server(
       "model",
       processing = processing,
       mode = mode,
-      llm_provider_rv = llm_provider_rv
+      llm_provider_rv = llm_provider_rv,
+      lang = lang
     )
 
     #### 4 Category & score fields ####
 
-    categories <- categories_server("categories", mode, processing)
-    scoring_characteristic <- score_server("scoring", mode, processing)
+    categories <- categories_server("categories", mode, processing, lang)
+    scoring_characteristic <- score_server("scoring", mode, processing, lang)
 
     #### 5 Processing ####
 
@@ -324,8 +326,13 @@ main_server <- function(
       human_in_the_loop = human_in_the_loop_toggle,
       assign_multiple_categories = assign_multiple_categories_toggle,
       write_paragraphs = write_paragraphs_toggle,
-      context_window = context_window
+      context_window = context_window,
+      lang = lang
     )
+
+    #### 6 Language ####
+
+    lang <- language_server("language", processing)
   }
 
   return(server)

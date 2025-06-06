@@ -68,7 +68,15 @@ text_upload_ui <- function(id) {
 
 #### 2 Server ####
 
-text_upload_server <- function(id, processing) {
+text_upload_server <- function(
+  id,
+  processing,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 

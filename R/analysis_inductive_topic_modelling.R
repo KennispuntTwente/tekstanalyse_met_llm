@@ -127,8 +127,10 @@ create_candidate_topics <- function(
   research_background = "",
   llm_provider = tidyprompt::llm_provider_openai(
     parameters = list(model = "gpt-4o-mini")
-  )
+  ),
+  language = c("nl", "en")
 ) {
+  language <- match.arg(language)
   stopifnot(
     is.list(text_chunks),
     all(purrr::map_lgl(text_chunks, is.character)),
@@ -176,11 +178,17 @@ create_candidate_topics <- function(
       tidyprompt::add_text(
         "If it occurs, you may also add a topic such as 'no topic/not applicable'.",
         sep = "\n"
-      ) |>
-      tidyprompt::add_text(
-        "Please list the topics in Dutch.",
-        sep = "\n"
-      ) |>
+      )
+
+    if (language == "nl") {
+      prompt <- prompt |>
+        tidyprompt::add_text(
+          "Please list the topics in Dutch.",
+          sep = "\n"
+        )
+    }
+
+    prompt <- prompt |>
       tidyprompt::answer_as_json(
         schema = list(
           type = "object",
@@ -227,8 +235,10 @@ reduce_topics <- function(
     parameters = list(model = "gpt-4o")
   ),
   desired_number = NULL,
-  desired_number_type = c("max", "goal")
+  desired_number_type = c("max", "goal"),
+  language = c("nl", "en")
 ) {
+  language <- match.arg(language)
   stopifnot(
     is.character(candidate_topics),
     length(candidate_topics) > 0,
@@ -306,11 +316,13 @@ reduce_topics <- function(
       )
   }
 
-  prompt <- prompt |>
-    tidyprompt::add_text(
-      "Please list the topics in Dutch.",
-      sep = "\n"
-    )
+  if (language == "nl") {
+    prompt <- prompt |>
+      tidyprompt::add_text(
+        "Please list the topics in Dutch.",
+        sep = "\n"
+      )
+  }
 
   prompt <- prompt |>
     tidyprompt::answer_as_json(

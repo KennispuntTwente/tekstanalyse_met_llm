@@ -16,7 +16,7 @@ research_background_ui <- function(id) {
           lang$t(
             "Beschrijf kort je onderzoek zodat het LLM wat context heeft."
           ),
-          lang$t(" Wat onderzoek je & hoe? Wie gaf antwoord?")
+          lang$t(" Wat onderzoek je & hoe?")
         )),
         textAreaInput(
           ns("research_background"),
@@ -33,7 +33,15 @@ research_background_ui <- function(id) {
 
 #### 2 Server ####
 
-research_background_server <- function(id, processing) {
+research_background_server <- function(
+  id,
+  processing,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   moduleServer(
     id,
     function(input, output, session) {

@@ -12,7 +12,16 @@ human_in_the_loop_toggle_ui <- function(id) {
 
 #### 2 Server
 
-human_in_the_loop_toggle_server <- function(id, processing, mode) {
+human_in_the_loop_toggle_server <- function(
+  id,
+  processing,
+  mode,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   moduleServer(
     id,
     function(input, output, session) {

@@ -171,7 +171,16 @@ categories_ui <- function(id) {
   )
 }
 
-categories_server <- function(id, mode, processing) {
+categories_server <- function(
+  id,
+  mode,
+  processing,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   moduleServer(
     id,
     function(input, output, session) {

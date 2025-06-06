@@ -39,7 +39,15 @@ mode_ui <- function(id) {
 
 #### 2 Server ####
 
-mode_server <- function(id, processing) {
+mode_server <- function(
+  id,
+  processing,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   moduleServer(
     id,
     function(input, output, session) {

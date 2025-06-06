@@ -28,7 +28,7 @@
       },
       {
         "nl": "Kennispunt Twente is een non-profit organisatie voor data, inzicht, en kennis.",
-        "en": "Kennispunt Twente is a non-profit organization for data, insight, and knowledge."
+        "en": "Kennispunt Twente is a (Dutch) non-profit organization for data, insight, and knowledge."
       },
       {
         "nl": " Ideeën of verbeterpunten voor de app? ",
@@ -186,8 +186,8 @@
         "en": "Briefly describe your research so that the LLM has some context."
       },
       {
-        "nl": " Wat onderzoek je & hoe? Wie gaf antwoord?",
-        "en": " What are you researching & how? Who provided the answers?"
+        "nl": " Wat onderzoek je & hoe?",
+        "en": " What are you researching & how?"
       },
       {
         "nl": "Details over het LLM (large language model) dat je gebruikt.",
@@ -311,7 +311,7 @@
       },
       {
         "nl": "Je gebruikt nu een vooraf ingestelde LLM-API,<br>zoals vastgelegd in de appconfiguratie.<br>De URL en de beschikbare modellen zijn vooraf ingesteld.",
-        "en": "You are now using a preconfigured LLM API,<br>as defined in the app configuration.<br>The URL and available models are pre-set."
+        "en": "You are now using a preconfigured LLM API,<br>as defined in the app configuration.<br>The URL and available models were preconfigured."
       },
       {
         "nl": "Configureer hier een OpenAI-compatibele API.<br>Dit soort API-endpoints worden niet alleen door OpenAI aangeboden,<br>maar ook door diverse andere providers.<br>Haal na het instellen de beschikbare modellen op met de button.",
@@ -330,8 +330,8 @@
         "en": "Ollama API endpoint URL:"
       },
       {
-        "nl": "API-key",
-        "en": "API key"
+        "nl": "API-key:",
+        "en": "API key:"
       },
       {
         "nl": "Ping beschikbare modellen",
@@ -422,52 +422,280 @@
         "en": "Something unexpected happened, causing the app to stop. Sorry!"
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "Aantal:",
+        "en": "Number:"
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "van de",
+        "en": "of the"
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "totale items worden willekeurig geselecteerd.",
+        "en": "total items will be randomly selected."
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "Steekproef",
+        "en": "Sample"
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "Selecteer hoeveel items je wil beoordelen.",
+        "en": "Select how many items you want to assess."
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "Aantal",
+        "en": "Number"
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "Aanbevolen: minimaal 10 items of 10% (welke groter is)",
+        "en": "Recommended: at least 10 items or 10% (whichever is larger)"
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "Aantal items om te beoordelen:",
+        "en": "Number of items to assess:"
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "Afronden",
+        "en": "Finish"
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "Volgende",
+        "en": "Next"
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": "Beoordeel item",
+        "en": "Assess item"
       },
       {
-        "nl": "",
-        "en": ""
+        "nl": " van ",
+        "en": " of "
+      },
+      {
+        "nl": "</i><br><br><b>Geef een score (1–100):</b>",
+        "en": "</i><br><br><b>Give a score (1–100):</b>"
+      },
+      {
+        "nl": "</i><br><br><b>Categorie:</b><br><i>",
+        "en": "</i><br><br><b>Category:</b><br><i>"
+      },
+      {
+        "nl": "</i><br><br>Is deze categorie van toepassing?",
+        "en": "</i><br><br>Is this category applicable?"
+      },
+      {
+        "nl": "Terug",
+        "en": "Back"
+      },
+      {
+        "nl": "Ongeldige steekproefgrootte",
+        "en": "Invalid sample size"
+      },
+      {
+        "nl": "Voer een geldige score in tussen 1 en 100.",
+        "en": "Enter a valid score between 1 and 100."
+      },
+      {
+        "nl": "Beantwoord met 'Ja' of 'Nee' voor deze categorie.",
+        "en": "Answer with 'Yes' or 'No' for this category."
+      },
+      {
+        "nl": "Selecteer een categorie.",
+        "en": "Select a category."
+      },
+      {
+        "nl": "Inter-rater reliability is berekend! (t-test)",
+        "en": "Interrater reliability has been calculated! (t-test)"
+      },
+      {
+        "nl": "Met een steekproefgrootte van %d hadden we bij deze test 80%% power om een effectgrootte van %.2f (Cohen's d) te detecteren, wat overeenkomt met %s volgens de conventies van [Cohen (1988)](https://doi.org/10.4324/9780203771587). Kleinere verschillen tussen het taalmodel en de menselijke beoordelaar zijn moeilijker te detecteren met deze steekproefgrootte.",
+        "en": "With a sample size of %d, we had 80%% power to detect an effect size of %.2f (Cohen's d) in this test, which corresponds to %s according to the conventions of [Cohen (1988)](https://doi.org/10.4324/9780203771587). Smaller differences between the language model and the human rater are harder to detect with this sample size."
+      },
+      {
+        "nl": "een klein effect",
+        "en": "a small effect"
+      },
+      {
+        "nl": "een gemiddeld effect",
+        "en": "a medium effect"
+      },
+      {
+        "nl": "een groot effect",
+        "en": "a large effect"
+      },
+      {
+        "nl": "Inter-rater reliability is berekend! (Kappa)",
+        "en": "Interrater reliability has been calculated! (Kappa)"
+      },
+      {
+        "nl": "Je mag maximaal ",
+        "en": "You may analyze a maximum of "
+      },
+      {
+        "nl": " teksten analyseren.",
+        "en": " texts."
+      },
+      {
+        "nl": "Schrijven over ",
+        "en": "Writing about "
+      },
+      {
+        "nl": "Je moet eerst de categorieen opslaan voordat je verder kunt gaan.",
+        "en": "You must first save the categories before proceeding."
+      },
+      {
+        "nl": "Je moet minimaal 2 categorieen opgeven.",
+        "en": "You must specify at least 2 categories."
+      },
+      {
+        "nl": "Geef een karakteristiek op.",
+        "en": "Please specify a characteristic."
+      },
+      {
+        "nl": "Onderwerpen genereren...",
+        "en": "Generating topics..."
+      },
+      {
+        "nl": "Alle chunks zijn geanalyseerd.",
+        "en": "All chunks have been analyzed."
+      },
+      {
+        "nl": "Onderwerpen reduceren...",
+        "en": "Reducing topics..."
+      },
+      {
+        "nl": "Onderwerpen bewerken...",
+        "en": "Editing topics..."
+      },
+      {
+        "nl": "Onderwerpen",
+        "en": "Topics"
+      },
+      {
+        "nl": "Controleer de onderwerpen en pas ze aan waar nodig.",
+        "en": "Check the topics and adjust them as needed."
+      },
+      {
+        "nl": "<i>Dubbel-klik op een onderwerp om het te bewerken.</i>",
+        "en": "<i>Double-click a topic to edit it.</i>"
+      },
+      {
+        "nl": "Voeg onderwerp toe",
+        "en": "Add topic"
+      },
+      {
+        "nl": "Reduceer opnieuw",
+        "en": "Reduce again"
+      },
+      {
+        "nl": "Verwijder geselecteerd",
+        "en": "Remove selected"
+      },
+      {
+        "nl": "Bevestig",
+        "en": "Confirm"
+      },
+      {
+        "nl": "Onderwerp",
+        "en": "Topic"
+      },
+      {
+        "nl": "Onderwerpen moeten uniek zijn.",
+        "en": "Topics must be unique."
+      },
+      {
+        "nl": "Je moet minimaal 2 onderwerpen opgeven.",
+        "en": "You must specify at least 2 topics."
+      },
+      {
+        "nl": "Je moet minimaal 2 onderwerpen opgeven om te reduceren.",
+        "en": "You must specify at least 2 topics to reduce."
+      },
+      {
+        "nl": "Onderwerpen re-reduceren...",
+        "en": "Re-reducing topics..."
+      },
+      {
+        "nl": "Re-reductie mislukt of ongeldige onderwerpen gegenereerd",
+        "en": "Re-reduction failed or invalid topics generated"
+      },
+      {
+        "nl": "Onderwerpen toekennen...",
+        "en": "Assigning topics..."
+      },
+      {
+        "nl": "Alle teksten zijn geanalyseerd...",
+        "en": "All texts have been analyzed..."
+      },
+      {
+        "nl": "Rapport schrijven...",
+        "en": "Writing report..."
+      },
+      {
+        "nl": "Schrijven over '",
+        "en": "Writing about '"
+      },
+      {
+        "nl": "Afronden...",
+        "en": "Finishing..."
+      },
+      {
+        "nl": "Fout opgetreden",
+        "en": "An error occurred"
+      },
+      {
+        "nl": " Verwerking voltooid!",
+        "en": " Processing completed!"
+      },
+      {
+        "nl": "Niet meer dan 1 categorie aanwezig in data; ",
+        "en": "No more than 1 category present in data; "
+      },
+      {
+        "nl": " kan geen interrater-reliability berekenen",
+        "en": " cannot calculate interrater reliability"
+      },
+      {
+        "nl": "Download wordt voorbereid...",
+        "en": "Preparing download..."
+      },
+      {
+        "nl": "Download resultaten",
+        "en": "Download results"
+      },
+      {
+        "nl": " Nieuwe analyse",
+        "en": " New analysis"
+      },
+      {
+        "nl": "Nieuwe analyse starten?",
+        "en": "Start new analysis?"
+      },
+      {
+        "nl": "Zorg dat je eerst de resultaten downloadt.",
+        "en": "Make sure to download the results first."
+      },
+      {
+        "nl": "Annuleren",
+        "en": "Cancel"
+      },
+      {
+        "nl": "Ja, start nieuwe analyse",
+        "en": "Yes, start new analysis"
+      },
+      {
+        "nl": "<< TEKST >>",
+        "en": "<< TEXT >>"
+      },
+      {
+        "nl": "Categoriseer",
+        "en": "Categorize"
+      },
+      {
+        "nl": "Scoreer",
+        "en": "Score"
+      },
+      {
+        "nl": "Extraheer",
+        "en": "Extract"
       }
     ]
 }

@@ -69,7 +69,16 @@ score_ui <- function(id) {
   tagList(uiOutput(ns("scoring")))
 }
 
-score_server <- function(id, mode, processing) {
+score_server <- function(
+  id,
+  mode,
+  processing,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   ns <- NS(id)
   moduleServer(
     id,

@@ -37,7 +37,12 @@ processing_server <- function(
   human_in_the_loop = reactiveVal(TRUE),
   assign_multiple_categories = reactiveVal(TRUE),
   write_paragraphs = reactiveVal(TRUE),
-  context_window
+  context_window,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
 ) {
   ns <- NS(id)
 
@@ -129,9 +134,9 @@ processing_server <- function(
         if (length(texts$preprocessed) > maximum) {
           shiny::showNotification(
             paste0(
-              "Je mag maximaal ",
+              lang$t("Je mag maximaal "),
               maximum,
-              " teksten analyseren."
+              lang$t(" teksten analyseren.")
             ),
             type = "error"
           )
@@ -217,7 +222,7 @@ processing_server <- function(
             write_progress(
               length(texts),
               length(texts),
-              "Alle teksten zijn geanalyseerd...",
+              lang$t("Alle teksten zijn geanalyseerd..."),
               progress_file
             )
 
@@ -259,7 +264,7 @@ processing_server <- function(
               write_progress(
                 0,
                 0,
-                "Rapport schrijven...",
+                lang$t("Rapport schrijven..."),
                 progress_file_secondary
               )
 
@@ -298,7 +303,7 @@ processing_server <- function(
                   write_progress(
                     i,
                     length(categories_texts),
-                    paste0("Schrijven over '", cat_name, "'..."),
+                    paste0(lang$t("Schrijven over '"), cat_name, "'..."),
                     progress_file_secondary
                   )
 
@@ -307,7 +312,8 @@ processing_server <- function(
                     texts = cat_texts,
                     topic = cat_name,
                     research_background = research_background,
-                    llm_provider = llm_provider
+                    llm_provider = llm_provider,
+                    language = lang$get_translation_language()
                   )
                 }
               )
@@ -335,7 +341,8 @@ processing_server <- function(
             write_paragraph = write_paragraph,
             send_prompt_with_retries = send_prompt_with_retries,
             write_paragraphs = write_paragraphs(),
-            get_context_window_size_in_tokens = get_context_window_size_in_tokens
+            get_context_window_size_in_tokens = get_context_window_size_in_tokens,
+            lang = lang
           ),
           packages = c("tidyprompt", "tidyverse", "glue", "fs", "uuid")
         ) %...>%
@@ -355,7 +362,9 @@ processing_server <- function(
         # User must be done editing categories
         if (categories$editing()) {
           shiny::showNotification(
-            "Je moet eerst de categorieen opslaan voordat je verder kunt gaan.",
+            lang$t(
+              "Je moet eerst de categorieen opslaan voordat je verder kunt gaan."
+            ),
             type = "error"
           )
           return(FALSE)
@@ -364,7 +373,7 @@ processing_server <- function(
         # User must have at least 2 non-empty categories
         if (categories$unique_non_empty_count() < 2) {
           shiny::showNotification(
-            "Je moet minimaal 2 categorieen opgeven.",
+            lang$t("Je moet minimaal 2 categorieen opgeven."),
             type = "error"
           )
           return(FALSE)
@@ -378,7 +387,7 @@ processing_server <- function(
         # User must have at least 1 non-empty scoring characteristic
         if (isTRUE(nchar(scoring_characteristic()) < 1)) {
           shiny::showNotification(
-            "Geef een karakteristiek op.",
+            lang$t("Geef een karakteristiek op."),
             type = "error"
           )
           return(FALSE)
@@ -419,7 +428,7 @@ processing_server <- function(
             write_progress(
               1,
               5,
-              "Onderwerpen genereren...",
+              lang$t("Onderwerpen genereren..."),
               progress_file
             )
             candidate_topics <- tryCatch(
@@ -431,7 +440,8 @@ processing_server <- function(
                   result <- create_candidate_topics(
                     list(text_chunk),
                     research_background,
-                    llm_provider_main
+                    llm_provider_main,
+                    language = lang$get_translation_language()
                   )
 
                   write_progress(
@@ -447,7 +457,7 @@ processing_server <- function(
                 write_progress(
                   length(text_chunks),
                   length(text_chunks),
-                  "Alle chunks zijn geanalyseerd.",
+                  lang$t("Alle chunks zijn geanalyseerd."),
                   progress_file_secondary
                 )
 
@@ -460,7 +470,7 @@ processing_server <- function(
             write_progress(
               2,
               5,
-              "Onderwerpen reduceren...",
+              lang$t("Onderwerpen reduceren..."),
               progress_file
             )
             topics <- tryCatch(
@@ -492,7 +502,8 @@ processing_server <- function(
             progress_file_secondary = progress_file_secondary,
             handle_detailed_error = handle_detailed_error,
             text_chunks = context_window$text_chunks,
-            get_context_window_size_in_tokens = get_context_window_size_in_tokens
+            get_context_window_size_in_tokens = get_context_window_size_in_tokens,
+            lang = lang
           ),
           packages = c(
             "tidyprompt",
@@ -546,20 +557,22 @@ processing_server <- function(
         write_progress(
           2.5,
           5,
-          "Onderwerpen bewerken...",
+          lang$t("Onderwerpen bewerken..."),
           progress_file
         )
 
         # Show the editable modal with Add/Remove buttons
         showModal(modalDialog(
-          title = "Onderwerpen",
+          title = lang$t("Onderwerpen"),
           size = "l",
           easyClose = FALSE,
           tagList(
             shinyjs::useShinyjs(),
-            "Controleer de onderwerpen en pas ze aan waar nodig.",
+            lang$t("Controleer de onderwerpen en pas ze aan waar nodig."),
             br(),
-            HTML("<i>Dubbel-klik op een onderwerp om het te bewerken.</i>"),
+            HTML(lang$t(
+              "<i>Dubbel-klik op een onderwerp om het te bewerken.</i>"
+            )),
             hr(),
             fluidRow(
               column(
@@ -571,7 +584,7 @@ processing_server <- function(
                     class = "d-flex justify-content-center justify-content-md-start mb-2 mb-md-0 me-md-auto",
                     actionButton(
                       ns("add_topic"),
-                      "Voeg onderwerp toe",
+                      lang$t("Voeg onderwerp toe"),
                       icon = icon("plus")
                     )
                   ),
@@ -580,7 +593,7 @@ processing_server <- function(
                     class = "d-flex justify-content-center mb-2 mb-md-0",
                     actionButton(
                       ns("reduce_again"),
-                      "Reduceer opnieuw",
+                      lang$t("Reduceer opnieuw"),
                       icon = icon("robot")
                     )
                   ),
@@ -589,7 +602,7 @@ processing_server <- function(
                     class = "d-flex justify-content-center justify-content-md-end ms-md-auto",
                     actionButton(
                       ns("remove_topic"),
-                      "Verwijder geselecteerd",
+                      lang$t("Verwijder geselecteerd"),
                       icon = icon("trash")
                     )
                   )
@@ -616,7 +629,7 @@ processing_server <- function(
                 style = "float: right; margin: 0;",
                 actionButton(
                   ns("confirm_topics"),
-                  "Bevestig",
+                  lang$t("Bevestig"),
                   class = "btn btn-primary",
                   # Continue icon/arrow
                   icon = icon("arrow-right"),
@@ -648,7 +661,10 @@ processing_server <- function(
             editable = list(target = "cell"),
             # ← allow row selection
             selection = list(mode = "multiple", target = "row"),
-            colnames = c("Onderwerp" = "topic")
+            colnames = setNames(
+              c(lang$t("Onderwerp")),
+              "topic"
+            )
           )
         },
         server = TRUE
@@ -719,7 +735,7 @@ processing_server <- function(
         # Topics must be unique
         if (anyDuplicated(updated_topics)) {
           shiny::showNotification(
-            "Onderwerpen moeten uniek zijn.",
+            lang$t("Onderwerpen moeten uniek zijn."),
             type = "error"
           )
           return()
@@ -728,7 +744,7 @@ processing_server <- function(
         # There must be at least 2 unique topics
         if (length(unique(updated_topics)) < 2) {
           shiny::showNotification(
-            "Je moet minimaal 2 onderwerpen opgeven.",
+            lang$t("Je moet minimaal 2 onderwerpen opgeven."),
             type = "error"
           )
           return()
@@ -751,7 +767,7 @@ processing_server <- function(
 
         if (length(updated_topics) < 2) {
           shiny::showNotification(
-            "Je moet minimaal 2 onderwerpen opgeven om te reduceren.",
+            lang$t("Je moet minimaal 2 onderwerpen opgeven om te reduceren."),
             type = "error"
           )
           return()
@@ -760,7 +776,10 @@ processing_server <- function(
         # Randomize order of updated topics
         updated_topics <- sample(updated_topics)
 
-        shiny::showNotification("Onderwerpen re-reduceren...", type = "message")
+        shiny::showNotification(
+          lang$t("Onderwerpen re-reduceren..."),
+          type = "message"
+        )
         reduction_in_progress(TRUE)
         rereduced_topics(NULL)
 
@@ -772,7 +791,8 @@ processing_server <- function(
             reduce_topics(
               updated_topics,
               research_background,
-              llm_provider_large
+              llm_provider_large,
+              language = lang$get_translation_language()
             )
           },
           packages = c("tidyprompt", "tidyverse"),
@@ -788,7 +808,9 @@ processing_server <- function(
             # Only update if the result is valid
             if (length(reduced_topics) < 2 || anyDuplicated(reduced_topics)) {
               app_error(
-                "Re-reductie mislukt of ongeldige onderwerpen gegenereerd",
+                lang$t(
+                  "Re-reductie mislukt of ongeldige onderwerpen gegenereerd"
+                ),
                 when = "re-reducing topics",
                 fatal = FALSE
               )
@@ -859,7 +881,7 @@ processing_server <- function(
         write_progress(
           3,
           5,
-          "Onderwerpen toekennen...",
+          lang$t("Onderwerpen toekennen..."),
           progress_file
         )
 
@@ -902,7 +924,7 @@ processing_server <- function(
                 write_progress(
                   length(texts),
                   length(texts),
-                  "Alle teksten zijn geanalyseerd...",
+                  lang$t("Alle teksten zijn geanalyseerd..."),
                   progress_file_secondary
                 )
 
@@ -939,7 +961,7 @@ processing_server <- function(
             write_progress(
               4,
               5,
-              "Rapport schrijven...",
+              lang$t("Rapport schrijven..."),
               progress_file
             )
 
@@ -980,7 +1002,7 @@ processing_server <- function(
                       i,
                       length(topics_texts_list),
                       paste0(
-                        "Schrijven over '",
+                        lang$t("Schrijven over '"),
                         topic_name,
                         "'..."
                       ),
@@ -991,7 +1013,8 @@ processing_server <- function(
                       texts = topic_texts,
                       topic = topic_name,
                       research_background = research_background,
-                      llm_provider = llm_provider
+                      llm_provider = llm_provider,
+                      language = lang$get_translation_language()
                     )
                   })
                 },
@@ -1005,7 +1028,7 @@ processing_server <- function(
             write_progress(
               4.5,
               5,
-              "Afronden...",
+              lang$t("Afronden..."),
               progress_file
             )
 
@@ -1030,7 +1053,8 @@ processing_server <- function(
             assign_multiple_categories = assign_multiple_categories(),
             write_paragraphs = write_paragraphs(),
             handle_detailed_error = handle_detailed_error,
-            get_context_window_size_in_tokens = get_context_window_size_in_tokens
+            get_context_window_size_in_tokens = get_context_window_size_in_tokens,
+            lang = lang
           ),
           packages = c("tidyprompt", "tidyverse", "glue", "fs", "uuid"),
           seed = NULL
@@ -1079,17 +1103,11 @@ processing_server <- function(
         # Verify that df actually has results
         # (sometimes we have API failure, then result/topic contains NA values)
         if (any(is.na(df$result))) {
-          shiny::showNotification("Fout opgetreden", type = "error")
-          cli::cli_alert_danger(
-            "Fout opgetreden; resultaten niet beschikbaar"
+          app_error(
+            "Results contain NA values; processing failed",
+            when = "processing results",
+            fatal = TRUE
           )
-          progress_primary$set_text(
-            paste0(
-              bsicons::bs_icon("exclamation-triangle"),
-              "Fout opgetreden; resultaten niet beschikbaar"
-            )
-          )
-          stopApp(NULL)
         }
 
         # Update UI to show finished processing
@@ -1097,7 +1115,7 @@ processing_server <- function(
         progress_secondary$hide()
         progress_primary$set_text(paste0(
           bsicons::bs_icon("check2-circle"),
-          " Verwerking voltooid!"
+          lang$t(" Verwerking voltooid!")
         ))
 
         if (interrater_reliability_toggle()) {
@@ -1118,8 +1136,8 @@ processing_server <- function(
               length(unique(all_categories)) < 2
           ) {
             shiny::showNotification(paste0(
-              "Niet meer dan 1 categorie aanwezig in data; ",
-              " kan geen interrater-reliability berekenen"
+              lang$t("Niet meer dan 1 categorie aanwezig in data; "),
+              lang$t(" kan geen interrater-reliability berekenen")
             ))
             irr_done(TRUE)
             return()
@@ -1161,17 +1179,11 @@ processing_server <- function(
           # If any in 'result_list$df$result' are NA, show a warning
           error <- any(is.na(result_list$df$result))
           if (error) {
-            shiny::showNotification("Fout opgetreden", type = "error")
-            cli::cli_alert_danger(
-              "Fout opgetreden; resultaten niet beschikbaar"
+            app_error(
+              "Results contain NA values; processing failed",
+              when = "after inter-rater reliability completion",
+              fatal = TRUE
             )
-            progress_primary$set_text(
-              paste0(
-                bsicons::bs_icon("exclamation-triangle"),
-                "Fout opgetreden; resultaten niet beschikbaar"
-              )
-            )
-            stopApp(NULL)
           }
 
           # Set preparing download state (to show loading animation)
@@ -1263,7 +1275,7 @@ processing_server <- function(
               tags$span(class = "visually-hidden", "Loading...")
             ),
             br(),
-            p("Download wordt voorbereid...")
+            p(lang$t("Download wordt voorbereid..."))
           )
         } else {
           # Download & restart button
@@ -1298,7 +1310,7 @@ processing_server <- function(
             br(),
             downloadButton(
               ns("download_results"),
-              label = "Download resultaten",
+              label = lang$t("Download resultaten"),
               class = "btn btn-success"
             )
           )
@@ -1314,7 +1326,7 @@ processing_server <- function(
               label = HTML(
                 paste0(
                   bsicons::bs_icon("arrow-clockwise"),
-                  " Nieuwe analyse"
+                  lang$t(" Nieuwe analyse")
                 )
               ),
               class = "btn btn-primary"
@@ -1327,13 +1339,13 @@ processing_server <- function(
       # Launches modal dialog to confirm restart
       observeEvent(input$restart, {
         showModal(modalDialog(
-          title = "Nieuwe analyse starten?",
-          "Zorg dat je eerst de resultaten downloadt.",
+          title = lang$t("Nieuwe analyse starten?"),
+          lang$t("Zorg dat je eerst de resultaten downloadt."),
           footer = tagList(
-            modalButton("Annuleren"),
+            modalButton(lang$t("Annuleren")),
             actionButton(
               ns("confirm_restart"),
-              "Ja, nieuwe analyse",
+              lang$t("Ja, nieuwe analyse"),
               class = "btn btn-danger"
             )
           )
@@ -1379,7 +1391,7 @@ processing_server <- function(
           result_list$categories <- categories$texts()
           result_list$assign_multiple_categories <- assign_multiple_categories()
           result_list$prompt <- prompt_category(
-            text = "<< TEKST >>",
+            text = lang$t("<< TEKST >>"),
             research_background = research_background(),
             categories = categories$texts()
           ) |>
@@ -1390,7 +1402,7 @@ processing_server <- function(
           result_list$model <- models$main
           result_list$scoring_characteristic <- scoring_characteristic()
           result_list$prompt <- prompt_score(
-            text = "<< TEKST >>",
+            text = lang$t("<< TEKST >>"),
             research_background = research_background(),
             scoring_characteristic = scoring_characteristic()
           ) |>
@@ -1663,7 +1675,8 @@ processing_server <- function(
             session,
             "process",
             label = paste0(
-              "Categoriseer (",
+              lang$t("Categoriseer"),
+              " (",
               length(texts$preprocessed),
               ")"
             )
@@ -1672,14 +1685,20 @@ processing_server <- function(
           updateActionButton(
             session,
             "process",
-            label = paste0("Scoreer (", length(texts$preprocessed), ")")
+            label = paste0(
+              lang$t("Scoreer"),
+              " (",
+              length(texts$preprocessed),
+              ")"
+            )
           )
         } else if (mode() == "Onderwerpextractie") {
           updateActionButton(
             session,
             "process",
             label = paste0(
-              "Extraheer (",
+              lang$t("Extraheer"),
+              " (",
               length(texts$preprocessed),
               ")"
             )

@@ -82,7 +82,12 @@ context_window_server <- function(
       "Dit is een neutrale review."
     )
   ),
-  processing = reactiveVal(FALSE)
+  processing = reactiveVal(FALSE),
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
 ) {
   moduleServer(
     id,

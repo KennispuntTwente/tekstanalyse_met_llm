@@ -12,7 +12,16 @@ write_paragraphs_toggle_ui <- function(id) {
 
 ##### 2 Server ####
 
-write_paragraphs_toggle_server <- function(id, processing, mode) {
+write_paragraphs_toggle_server <- function(
+  id,
+  processing,
+  mode,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   moduleServer(
     id,
     function(input, output, session) {

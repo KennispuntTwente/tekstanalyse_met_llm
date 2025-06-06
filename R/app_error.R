@@ -13,7 +13,8 @@ app_error <- function(
   in_shiny = TRUE,
   admin_name = getOption("app_admin_name", NULL),
   admin_email = getOption("app_admin_email", NULL),
-  github_repo = "https://github.com/KennispuntTwente/tekstanalyse-app"
+  github_repo = "https://github.com/KennispuntTwente/tekstanalyse-app",
+  lang
 ) {
   current_time <- Sys.time()
   formatted_time <- format(current_time, "%Y-%m-%d %H:%M:%S")
