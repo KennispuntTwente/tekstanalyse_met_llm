@@ -93,7 +93,7 @@ This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) i
 Suggestions or ideas for the app? 
 [Open an issue on GitHub](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new)
 
-Kennispunt Twente is a (Dutch) non-profit organization focused on data, insights, and knowledge. Interested in what we can do for your organization, especially in generative AI?
+Kennispunt Twente is a (Dutch) non-profit organization focused on data, insights, and knowledge. Interested in what we can do for your organization, for exapmle in generative AI?
 Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our developers](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
 
 ---
