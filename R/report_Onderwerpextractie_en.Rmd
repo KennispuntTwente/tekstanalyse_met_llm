@@ -1,0 +1,400 @@
+---
+title: "Topic extraction with LLM"
+output: 
+  html_document:
+    theme:
+      version: 5
+      bootswatch: lux
+params:
+  result_list: !r list(df = data.frame(result = c("A"), text = c("A")), paragraphs = list(A = list(paragraph = "Paragraaf over onderwerp 'A', we quoten de tekst \"A\"... En quoten een tekst die niet bestaat, \"B\"... En nogmaals \"A\"...", texts = c("A"))), model = "gpt-4o", model_reductie = "o1", irr = list(subjects = 20, raters = 2, irr.name = "Kappa", stat.name = "z", statistic = 1.163762, p.value = 0.243845, value = 0.119469))
+---
+
+```{r include=FALSE, error=TRUE}
+library(stringr)
+rl <- params$result_list
+```
+
+## Method
+
+`r nrow(rl$df)` texts have been analyzed with a language model,
+to discover which different topics are mentioned in the texts
+and how often.
+
+A topic modeling procedure has been applied based on
+[Wanrooij, Manhar, and Yang (2024)](https://bnaic2024.sites.uu.nl/wp-content/uploads/sites/986/2024/10/Topic-Modeling-for-Small-Data-using-Generative-LLMs.pdf)
+and [Pham et al. (2023)](https://arxiv.org/abs/2311.01449). This procedure consists of 3 steps:
+
+* In step 1, the texts are presented to the LLM in randomly drawn groups
+of up to 5 texts, asking it to respond with possible topics
+that are neither too specific nor too general. This forms the list of possible topics.
+For this step, the model `r rl$model` has been used.
+
+* In step 2, the list of possible topics
+is presented to the LLM, asking it to reduce the list of topics
+to a final list without duplications and also avoiding overly specific
+or overly general topics. This forms the list of final topics.
+For this step, the model `r rl$model_reductie` has been used.
+
+```{r echo=FALSE, results='asis', error=TRUE}  
+multiple_categories_text <- "The LLM was required to assign one category per text"
+if (isTRUE(rl$assign_multiple_categories)) {
+  multiple_categories_text <- "The LLM was allowed to assign multiple categories per text (at least one category per text)"
+}
+```
+
+* In step 3, each text is presented individually to the LLM,
+along with the list of final topics, asking it to assign these topics to the text.
+`r multiple_categories_text`. For this step, the model `r rl$model` has been used.
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(rl$paragraphs)) {
+  cat(paste0(
+    "With the texts to which subjects were added, a language model ",
+    "(", rl$model, ") finally wrote a report.", "\n",
+    "For each subject, a summary was created with quotes summarizing what was said."
+  ))
+}
+```
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(rl$irr)) {
+  cat(paste0(
+    "### Reliability\n",
+    "The inter-rater reliability between the language model and a human rater was calculated. ",
+    "A random sample of ",
+    rl$irr$subjects, " texts was taken.",
+    " The calculated inter-rater reliability is ",
+    round(rl$irr$value, 3), " (", rl$irr$irr.name, "; ", rl$irr$stat.name, " = ",
+    round(rl$irr$statistic, 3), ", p = ", round(rl$irr$p.value, 3), ").",
+    " This can be interpreted as a ",
+    dplyr::case_when(
+      rl$irr$value < 0 ~ "poor",
+      rl$irr$value < 0.2 ~ "slight",
+      rl$irr$value < 0.4 ~ "fair",
+      rl$irr$value < 0.6 ~ "moderate",
+      rl$irr$value < 0.8 ~ "substantial",
+      rl$irr$value < 1 ~ "almost perfect",
+      TRUE ~ "perfect"
+    ),
+    " agreement between the language model and the human rater ([Landis & Koch, 1977](https://doi.org/10.2307/2529310))."
+  ))
+}
+```
+
+## Results
+
+### Frequency
+
+Below table shows the topics that have been identified and how often
+they were mentioned in the texts.
+
+```{r, echo=FALSE, results='asis', error=TRUE}
+
+if (!isTRUE(rl$assign_multiple_categories)) {
+  rl$df |>
+  dplyr::group_by(result) |>
+  dplyr::summarise(
+    Number = dplyr::n(),
+    Percentage = round(dplyr::n() / nrow(rl$df) * 100, 2)
+  ) |>
+  dplyr::arrange(dplyr::desc(Number)) |>
+  dplyr::rename(Topic = result) |>
+  DT::datatable(
+    rownames = FALSE,
+    extensions = 'Buttons',
+    options = list(
+      pageLength = 10,
+      lengthMenu = c(10, 25, 50, 100),
+      fixedHeader = TRUE,
+      scrollX = TRUE,
+      scrollY = "400px",
+      scrollCollapse = TRUE,
+      dom = 'Bfrtip',
+      buttons = list('excel', 'csv', 'pdf', 'print')
+    )
+  )
+} else {
+  rl$df |>
+    dplyr::select(-text) |>
+    # For each binary category column, count the number of TRUE values
+    dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(.x, na.rm = TRUE))) |>
+    tidyr::pivot_longer(
+      cols = dplyr::everything(),
+      names_to = "Topic",
+      values_to = "Number"
+    ) |>
+    dplyr::mutate(
+      Percentage = round(Number / nrow(rl$df) * 100, 2)
+    ) |>
+    dplyr::arrange(dplyr::desc(Number)) |>
+    DT::datatable(
+      rownames = FALSE,
+      extensions = 'Buttons',
+      options = list(
+        pageLength = 10,
+        lengthMenu = c(10, 25, 50, 100),
+        scrollX = TRUE,
+        scrollY = "400px",
+        scrollCollapse = TRUE,
+        dom = 'Bfrtip',
+        buttons = list('excel', 'csv', 'pdf', 'print')
+      )
+    )
+}
+
+
+```
+
+### Per text
+
+Below table shows the assigned topic for each text.
+
+```{r, echo=FALSE, results='asis', error=TRUE}
+if (!isTRUE(rl$assign_multiple_categories)) {
+  rl$df |>
+  dplyr::select(result, text) |>
+  dplyr::rename(Text = text, Topic = result) |>
+  dplyr::arrange(dplyr::desc(Topic)) |>
+  DT::datatable(
+    extensions = 'Buttons',
+    options = list(
+      pageLength = 10,
+      lengthMenu = c(10, 25, 50, 100),
+      fixedHeader = TRUE,
+      scrollX = TRUE,
+      scrollY = "400px",
+      scrollCollapse = TRUE,
+      dom = 'Bfrtip',
+      buttons = list('excel', 'csv', 'pdf', 'print')
+    )
+  )
+} else {
+  rl$df |>
+    dplyr::rename(Text = text) |>
+    dplyr::arrange(dplyr::desc(Text)) |>
+    DT::datatable(
+      options = list(
+        pageLength = 10,
+        lengthMenu = c(10, 25, 50, 100),
+        scrollX = TRUE,
+        scrollY = "400px",
+        scrollCollapse = TRUE,
+        dom = 'Bfrtip',
+        buttons = list('excel', 'csv', 'pdf', 'print')
+      )
+    )
+}
+```
+ 
+```{r echo=FALSE, results='asis', error=TRUE}
+if (is.null(rl$paragraphs)) return(invisible(NULL))
+
+output <- list()
+
+output <- append(output, list(
+  htmltools::HTML("<h3>Report</h3>"),
+  htmltools::HTML("<p>The following paragraphs are the summaries of the texts per topic.</p>"),
+  htmltools::div(
+    class = "d-flex justify-content-center",
+    htmltools::div(
+      class = "d-flex justify-content-center",
+      htmltools::div(
+        class = "alert alert-warning p-2 text-center",
+        style = "max-width: 500px; font-size: 0.9rem;",
+        htmltools::tags$div(
+          class = "d-flex align-items-center",
+          bsicons::bs_icon("exclamation-triangle-fill", class = "me-2 fs-1"),
+          htmltools::tags$small(
+            htmltools::tags$i(
+              "Language models can 'hallucinate'.",
+              " Check whether the summaries are supported by the texts.",
+              " Icons next to quotes indicate whether they appear in the texts."
+            )
+          )
+        )
+      )
+    )
+  )
+))
+
+sub_fixed <- function(pattern, replacement, text) {
+  loc <- regexpr(pattern, text, fixed = TRUE)
+  if (loc == -1) return(text)
+  paste0(
+    substr(text, 1, loc - 1),
+    replacement,
+    substr(text, loc + attr(loc, "match.length"), nchar(text))
+  )
+}
+
+for (i in seq_along(rl$paragraphs)) {
+  paragraph <- rl$paragraphs[[i]]
+  topic <- paragraph$topic
+  paragraph_text <- paragraph$paragraph
+  
+  supporting_texts <- paste(paragraph$texts, collapse = " ")
+  if (length(supporting_texts) == 0) {
+    next
+  }
+  
+  #### 1 Verify quotes on presence in supporting texts ####
+  
+  # We'll build a map of placeholders to replacement values
+  placeholder_map <- list()
+  
+  extract_quotes_matrix <- function(text) {
+    # --- Input Validation ---
+    # Ensure input is a single character string
+    if (!is.character(text) || length(text) != 1) {
+      warning("Input 'text' must be a single character string. Returning empty matrix.", call. = FALSE)
+      # Return an empty matrix with the correct column names
+      result_matrix <- matrix(character(0), ncol = 2, nrow = 0)
+      colnames(result_matrix) <- c("Full Match", "Content")
+      return(result_matrix)
+    }
+    
+    # --- Regex Definition ---
+    # Define the improved regex pattern with backreference
+    # Group 1: Captures the specific opening quote character
+    # Group 2: Captures the content inside the quotes (non-greedily)
+    # \\1: Matches the same character captured by Group 1 for the closing quote
+    # Note the double backslash \\ needed within an R string for \1
+    quote_regex <- '([\\p{Pi}\\p{Pf}"\'‘’‚‛“”„‟‹›«»"「」『』【】〝〞〟⹂｢｣＂＇])(.*?)\\1'
+    # Raw string version (R 4.0+) for potentially clearer reading:
+    # quote_regex <- r"(([\\p{Pi}\\p{Pf}"\'‘’‚‛“”„‟‹›«»"「」『』【】〝〞〟⹂｢｣＂＇])(.*?)\1)"
+    
+    # --- Perform Matching ---
+    # Use stringr::str_match_all to find all matches and capture groups
+    # The :: ensures the function is found without explicitly loading the library
+    # The result is a list; for a single input string, we access the first element [[1]]
+    all_groups_list <- stringr::str_match_all(text, quote_regex)
+    
+    # If no match is found, all_groups_list[[1]] will be a matrix with 0 rows.
+    all_groups_matrix <- all_groups_list[[1]]
+    
+    # --- Format Output ---
+    # Check if any matches were found (i.e., the matrix has rows)
+    if (nrow(all_groups_matrix) > 0) {
+      # Select Column 1 (Full Match) and Column 3 (Content, which is Group 2)
+      # drop = FALSE ensures the result is always a matrix, even if only one match is found
+      result_matrix <- all_groups_matrix[, c(1, 3), drop = FALSE]
+    } else {
+      # If no matches were found, create an empty matrix with 0 rows and 2 columns
+      result_matrix <- matrix(character(0), ncol = 2, nrow = 0)
+    }
+    
+    # Assign standard column names for clarity and consistency
+    colnames(result_matrix) <- c("Full Match", "Content")
+    
+    # Return the resulting matrix
+    return(result_matrix)
+  }
+  quote_matches <- extract_quotes_matrix(paragraph_text)
+  
+  # Check if any matches were found
+  if (nrow(quote_matches) > 0) {
+    quotes <- quote_matches[, 2]
+    
+    # Continue with the quote replacement logic...
+    for (j in seq_along(quotes)) {
+      q <- quotes[j]
+      q_clean <- stringr::str_remove(q, "[,\\.]+$")
+      placeholder <- paste0("___QUOTEPLACEHOLDER", j, "___")
+      
+      if (
+        length(q_clean) > 0 && 
+        !is.na(q_clean) &&
+        stringr::str_detect(supporting_texts, stringr::fixed(q_clean, ignore_case = TRUE))
+      ) {
+        icon_html <- as.character(
+          bsicons::bs_icon("check-circle-fill", title = "Quote geverifieerd", class = "text-success")
+        )
+      } else {
+        icon_html <- as.character(
+          bsicons::bs_icon("exclamation-triangle-fill", title = "Quote niet teruggevonden in teksten", class = "text-warning")
+        )
+      }
+  
+      replacement <- paste0('"', q, '"<sup>', icon_html, '</sup>')
+      placeholder_map[[placeholder]] <- replacement
+  
+      quoted_with_marks <- paste0('"', q, '"')
+      paragraph_text <- sub_fixed(quoted_with_marks, placeholder, paragraph_text)
+    }
+  }
+  
+  # Replace placeholders with their final replacements
+  for (ph in names(placeholder_map)) {
+    paragraph_text <- stringr::str_replace_all(paragraph_text, stringr::fixed(ph), placeholder_map[[ph]])
+  }
+  
+  #### 2 Check if paragraph has attribute about prompt not fitting in context window ####
+  
+  # If paragraph has attribute 'prompt_fits' and it is FALSE, add a warning
+  #   to the output
+  warning_context_window <- NULL
+  prompt_fits <- paragraph$prompt_fits
+  if (isFALSE(prompt_fits)) {
+    warning_context_window <- htmltools::div(
+      class = "d-flex justify-content-center",
+      htmltools::div(
+        class = "d-flex justify-content-center",
+        htmltools::div(
+          class = "alert alert-warning p-2 text-center",
+          style = "max-width: 500px; font-size: 0.9rem;",
+          htmltools::tags$div(
+            class = "d-flex align-items-center",
+            bsicons::bs_icon("exclamation-triangle-fill", class = "me-2 fs-1"),
+            htmltools::tags$small(
+              htmltools::tags$i(
+                "The prompt for the summary of this category did",
+                " not fit in the context window of the language model.",
+                " It is possible that not all instructions or texts were seen by the language model."
+              )
+            )
+          )
+        )
+      )
+    )
+  }
+  
+  # Append processed output
+  output <- append(output, list(
+    htmltools::HTML(paste0("<h4>", topic, "</h4>")),
+    warning_context_window,
+    htmltools::HTML(paste0("<p>", paragraph_text, "</p>"))
+  ))
+
+  if (!is.null(paragraph$texts)) {
+    acc <- bslib::accordion(
+      bslib::accordion_panel(
+        title = "View texts",
+        htmltools::HTML(paste0("<ul>", paste0("<li><i>", paragraph$texts, "</i></li>", collapse = ""), "</ul>")),
+      ),
+      id = paste0("acc-", i),
+      open = FALSE
+    )
+    output <- append(output, list(acc))
+  }
+
+  output <- append(output, list(htmltools::HTML("<br>")))
+}
+
+if (length(rl$paragraphs) > 0) {
+  htmltools::tagList(output)
+}
+``` 
+
+```{r footer, echo=FALSE, results='asis', error=TRUE}
+htmltools::tags$footer(
+  style = "text-align:center; font-size: 0.8em; color: #888; margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee;",
+  htmltools::HTML(paste0(
+    "This analysis was automatically generated by an app developed by ",
+    "<a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a> in collaboration with GGD Twente.<br>",
+    "Visit the <a href='https://github.com/kennispunttwente/tekstanalyse_met_llm' target='_blank'>GitHub-repository</a> for more information.",
+    "<br>",
+    "<br>",
+    format(Sys.Date(), "%Y-%m-%d")
+  ))
+)
+```

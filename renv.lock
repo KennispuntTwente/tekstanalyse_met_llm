@@ -4023,6 +4023,12 @@
       "Maintainer": "Winston Chang <winston@posit.co>",
       "Repository": "CRAN"
     },
+    "shiny.i18n": {
+      "Package": "shiny.i18n",
+      "Version": "0.3.0",
+      "Source": "Repository",
+      "Repository": "CRAN"
+    },
     "shinyWidgets": {
       "Package": "shinyWidgets",
       "Version": "0.9.0",

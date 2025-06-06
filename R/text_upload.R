@@ -9,16 +9,36 @@
 
 text_upload_ui <- function(id) {
   ns <- NS(id)
-
   tagList(
     div(
       class = "card-container",
+      uiOutput(ns("card"))
+    )
+  )
+}
+
+
+#### 2 Server ####
+
+text_upload_server <- function(
+  id,
+  processing,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+
+    output$card <- renderUI({
       card(
         # ---- Card header -----------------------------------------------------
         card_header(
           div(
             class = "d-flex justify-content-between align-items-center w-100",
-            span("Upload teksten"),
+            span(lang()$t("Upload teksten")),
             # Dynamic filter icon (updated from server for colour change)
             uiOutput(ns("filter_icon"))
           )
@@ -61,16 +81,7 @@ text_upload_ui <- function(id) {
           )
         )
       )
-    )
-  )
-}
-
-
-#### 2 Server ####
-
-text_upload_server <- function(id, processing) {
-  moduleServer(id, function(input, output, session) {
-    ns <- session$ns
+    })
 
     # ---- Helpers ------------------------------------------------------------
     discard_empty <- function(x) {
@@ -139,7 +150,7 @@ text_upload_server <- function(id, processing) {
           },
           error = function(e) {
             showNotification(
-              paste("Error reading text file:", e$message),
+              paste(lang()$t("Error bij lezen van tekstbestand:"), e$message),
               type = "error"
             )
           }
@@ -152,7 +163,10 @@ text_upload_server <- function(id, processing) {
           },
           error = function(e) {
             showNotification(
-              paste("Error reading CSV/TSV file:", e$message),
+              paste(
+                lang()$t("Error bij lezen van CSV/TSV bestand:"),
+                e$message
+              ),
               type = "error"
             )
           }
@@ -166,7 +180,7 @@ text_upload_server <- function(id, processing) {
           },
           error = function(e) {
             showNotification(
-              paste("Error reading Excel file:", e$message),
+              paste(lang()$t("Error bij lezen van Excel-bestand:"), e$message),
               type = "error"
             )
           }
@@ -179,13 +193,16 @@ text_upload_server <- function(id, processing) {
           },
           error = function(e) {
             showNotification(
-              paste("Error reading SAV file:", e$message),
+              paste(lang()$t("Error bij lezen van SAV-bestand:"), e$message),
               type = "error"
             )
           }
         )
       } else {
-        showNotification("Unsupported file type", type = "error")
+        showNotification(
+          lang()$t("Niet ondersteund bestandstype"),
+          type = "error"
+        )
       }
     })
 
@@ -204,7 +221,7 @@ text_upload_server <- function(id, processing) {
       req(sheet_names())
       selectInput(
         ns("sheet"),
-        "Selecteer sheet",
+        lang()$t("Selecteer sheet"),
         choices = sheet_names(),
         selected = sheet_names()[1]
       )
@@ -220,7 +237,7 @@ text_upload_server <- function(id, processing) {
         },
         error = function(e) {
           showNotification(
-            paste("Error reading Excel sheet:", e$message),
+            paste(lang()$t("Error bij lezen sheet:"), e$message),
             type = "error"
           )
         }
@@ -235,7 +252,7 @@ text_upload_server <- function(id, processing) {
       # if (length(cols) <= 1) return(NULL)
       selectInput(
         ns("column"),
-        "Selecteer kolom met teksten",
+        lang()$t("Selecteer kolom met teksten"),
         choices = cols,
         selected = NULL
       )
@@ -258,7 +275,7 @@ text_upload_server <- function(id, processing) {
         icon("filter", lib = "font-awesome"),
         style = paste0(style, "font-size:1.25rem;")
       ) |>
-        bslib::tooltip("Filter data")
+        bslib::tooltip(lang()$t("Filter data"))
     })
 
     # ---- Filter modal -------------------------------------------------------
@@ -266,15 +283,15 @@ text_upload_server <- function(id, processing) {
       req(uploaded_data())
 
       showModal(modalDialog(
-        title = "Filter data",
+        title = lang()$t("Filter data"),
         size = "l",
         easyClose = TRUE,
         footer = NULL,
 
         bslib::page(
-          p(
+          p(lang()$t(
             "Je kunt hier de data filteren op basis van waarden in een kolom. Selecteer een kolom en kies waarden. Rijen zonder de gekozen waarden worden uitgesloten."
-          ),
+          )),
           hr(),
 
           # Inputs centered in modal
@@ -295,7 +312,7 @@ text_upload_server <- function(id, processing) {
             # Left: Sluiten
             div(
               class = "d-flex align-items-stretch",
-              div(class = "h-100", modalButton("Sluiten"))
+              div(class = "h-100", modalButton(lang()$t("Sluiten")))
             ),
 
             # Center: Filter wissen
@@ -303,7 +320,7 @@ text_upload_server <- function(id, processing) {
               class = "d-flex justify-content-center flex-grow-1 align-items-stretch",
               actionButton(
                 ns("clear_filter"),
-                label = tagList(icon("rotate-left"), "Filter wissen"),
+                label = tagList(icon("rotate-left"), lang()$t("Filter wissen")),
                 class = "btn btn-warning h-100 w-100"
               )
             ),
@@ -313,7 +330,7 @@ text_upload_server <- function(id, processing) {
               class = "d-flex align-items-stretch",
               actionButton(
                 ns("apply_filter"),
-                label = tagList(icon("filter"), "Toepassen"),
+                label = tagList(icon("filter"), lang()$t("Toepassen")),
                 class = "btn btn-primary h-100"
               )
             )
@@ -329,7 +346,7 @@ text_upload_server <- function(id, processing) {
 
       shinyWidgets::pickerInput(
         ns("filter_col"),
-        label = "Kies kolom voor filter",
+        label = lang()$t("Kies kolom voor filter"),
         choices = names(uploaded_data()),
         selected = filter_spec()$col %||% input$column %||% NULL,
         options = shinyWidgets::pickerOptions(container = "body")
@@ -389,7 +406,7 @@ text_upload_server <- function(id, processing) {
 
         shinyWidgets::pickerInput(
           ns("filter_vals"),
-          "Kies waarden om te behouden",
+          lang()$t("Kies waarden om te behouden"),
           choices = choices,
           selected = filter_spec()$vals %||% vals,
           multiple = TRUE,
@@ -397,9 +414,9 @@ text_upload_server <- function(id, processing) {
           options = shinyWidgets::pickerOptions(
             actionsBox = TRUE,
             liveSearch = TRUE,
-            deselectAllText = "Deselecteer alles",
-            selectAllText = "Selecteer alles",
-            noneSelectedText = "Niks geselecteerd"
+            deselectAllText = lang()$t("Deselecteer alles"),
+            selectAllText = lang()$t("Selecteer alles"),
+            noneSelectedText = lang()$t("Niks geselecteerd")
           )
         )
       )
@@ -409,7 +426,7 @@ text_upload_server <- function(id, processing) {
     observeEvent(input$apply_filter, {
       if (!length(input$filter_vals))
         return(showNotification(
-          "Selecteer minstens één waarde om te behouden.",
+          lang()$t("Selecteer minstens één waarde om te behouden."),
           type = "error"
         ))
 

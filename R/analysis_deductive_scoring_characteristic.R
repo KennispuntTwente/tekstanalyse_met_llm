@@ -69,7 +69,16 @@ score_ui <- function(id) {
   tagList(uiOutput(ns("scoring")))
 }
 
-score_server <- function(id, mode, processing) {
+score_server <- function(
+  id,
+  mode,
+  processing,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   ns <- NS(id)
   moduleServer(
     id,
@@ -82,15 +91,15 @@ score_server <- function(id, mode, processing) {
         if (mode() == "Scoren") {
           bslib::card(
             class = "card",
-            card_header("Karakteristiek"),
+            card_header(lang()$t("Karakteristiek")),
             card_body(
-              paste0(
+              paste0(lang()$t(
                 "Geef de karakteristiek op waarop de tekst gescoord moet worden (bijv. 'emotionele lading', 'duidelijkheid')."
-              ),
+              )),
               HTML("<br>"),
-              paste0(
+              paste0(lang()$t(
                 "De LLM zal een score tussen 0 en 100 geven, welke aangeeft hoe goed de tekst past bij de karakteristiek."
-              ),
+              )),
               textAreaInput(
                 ns("scoring_characteristic"),
                 NULL,

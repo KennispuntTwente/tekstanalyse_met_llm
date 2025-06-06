@@ -13,7 +13,8 @@ app_error <- function(
   in_shiny = TRUE,
   admin_name = getOption("app_admin_name", NULL),
   admin_email = getOption("app_admin_email", NULL),
-  github_repo = "https://github.com/KennispuntTwente/tekstanalyse-app"
+  github_repo = "https://github.com/KennispuntTwente/tekstanalyse-app",
+  lang
 ) {
   current_time <- Sys.time()
   formatted_time <- format(current_time, "%Y-%m-%d %H:%M:%S")
@@ -48,14 +49,15 @@ app_error <- function(
     removeModal()
 
     body_encoded <- URLencode(paste0(
-      "Ik kreeg zojuist deze foutmelding:\n\n",
+      lang$t("Ik kreeg zojuist deze foutmelding:"),
+      "\n\n",
       log_message
     ))
 
     # Fallback if admin contact info is missing
     contact_info <- if (!is.null(admin_name) && !is.null(admin_email)) {
       email_subject <- URLencode(paste0(
-        "Tekstanalyse-app-foutmelding: ",
+        lang$t("Tekstanalyse-app-foutmelding: "),
         stringr::str_trunc(error, 50, ellipsis = "...")
       ))
       mailto_link <- paste0(
@@ -68,13 +70,13 @@ app_error <- function(
       )
       tagList(
         p(paste(
-          "Neem contact op met",
+          lang$t("Neem contact op met"),
           admin_name,
-          "als je deze foutmelding blijft zien."
+          lang$t("als je deze foutmelding blijft zien.")
         )),
         p(tags$a(
           href = mailto_link,
-          "Klik hier om een e-mail te sturen met de foutmelding.",
+          lang$t("Klik hier om een e-mail te sturen met de foutmelding."),
           target = "_blank"
         ))
       )
@@ -82,14 +84,19 @@ app_error <- function(
       github_issue_link <- paste0(
         github_repo,
         "/issues/new?labels=bug&title=",
-        URLencode(paste0("Foutmelding: ", stringr::str_trunc(error, 50))),
+        URLencode(paste0(
+          lang$t("Foutmelding: "),
+          stringr::str_trunc(error, 50)
+        )),
         "&body=",
         body_encoded
       )
       tagList(
         p(tags$a(
           href = github_issue_link,
-          "Klik hier deze foutmelding te rapporteren als GitHub issue. Bedankt!",
+          lang$t(
+            "Klik hier deze foutmelding te rapporteren als GitHub issue. Bedankt!"
+          ),
           target = "_blank"
         ))
       )
@@ -98,7 +105,9 @@ app_error <- function(
     showModal(modalDialog(
       title = "Error",
       tagList(
-        p("Er gebeurde iets onverwachts, waardoor de app is gestopt. Sorry!"),
+        p(lang$t(
+          "Er gebeurde iets onverwachts, waardoor de app is gestopt. Sorry!"
+        )),
         hr(),
         pre(log_message),
         hr(),
@@ -112,7 +121,7 @@ app_error <- function(
     shiny::stopApp(NULL)
   } else {
     showNotification(
-      paste("Fout:", error),
+      paste("Error:", error),
       type = "error",
       duration = NULL
     )

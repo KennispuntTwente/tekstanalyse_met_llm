@@ -1,0 +1,381 @@
+---
+title: "Categoriseren met LLM"
+output: 
+  html_document:
+    theme:
+      version: 5
+      bootswatch: lux
+params:
+  result_list: !r list(df = data.frame(text = c("a", "b", "c"), result = c("A", "B", "C")), categories = c("A", "B", "C"), scoring_characteristic = "onderwerp", model = "gpt-4o", irr = list(subjects = 20, raters = 2, irr.name = "Kappa", stat.name = "z", statistic = 1.163762, p.value = 0.243845, value = 0.119469))
+---
+
+```{r include=FALSE, error=TRUE}
+rl <- params$result_list
+```
+
+## Methode
+
+Er zijn `r nrow(rl$df)` teksten geanalyseerd met een LLM (model: `r rl$model`),
+waarbij het LLM gevraagd werd om het in te delen in één van de volgende `r length(rl$categories)` categorieën:
+
+```{r echo=FALSE, results='asis', error=TRUE}
+cat(paste0("* *", rl$categories, "*"), sep = "\n")
+```
+
+```{r echo=FALSE, results='asis', error=TRUE}  
+multiple_categories_text <- "Het LLM moest één categorie toewijzen per tekst"
+if (isTRUE(rl$assign_multiple_categories)) {
+  multiple_categories_text <- "Het LLM mocht meerdere categorieën toewijzen per tekst (minimaal één categorie per tekst)"
+}
+```
+
+`r multiple_categories_text`. Elke tekst is afzonderlijk gepresenteerd aan het LLM.
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(rl$paragraphs)) {
+  cat(paste0(
+    "Met de teksten waaraan onderwerpen zijn toegevoegd, heeft een taalmodel ",
+    "(", rl$model, ") tenslotte een rapport geschreven.", "\n",
+    "Per onderwerp is met quotes samengevat wat er is gezegd."
+  ))
+}
+```
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(rl$irr)) {
+  cat(paste0(
+    "### Betrouwbaarheid\n",
+    "De interbeoordelaarsbetrouwbaarheid tussen het taalmodel en een menselijke beoordelaar berekend.",
+    " Hiervoor is een willekeurige steekproef genomen van " , 
+    rl$irr$subjects, " teksten.",
+    " De berekende interbeoordelaarsbetrouwbaarheid is ",
+    round(rl$irr$value, 3), " (", rl$irr$irr.name, "; ", rl$irr$stat.name, " = ", 
+    round(rl$irr$statistic, 3), ", p = ", round(rl$irr$p.value, 3), ").",
+    " Dit valt te interpreteren als een ",
+    dplyr::case_when(
+      rl$irr$value < 0 ~ "slechte ('poor')",
+      rl$irr$value < 0.2 ~ "zwakke ('slight')",
+      rl$irr$value < 0.4 ~ "matige ('fair')",
+      rl$irr$value < 0.6 ~ "redelijke ('moderate')",
+      rl$irr$value < 0.8 ~ "goede ('substantial')",
+      rl$irr$value < 1 ~ "zeer goede ('almost perfect')",
+      TRUE ~ "perfecte"
+    ),
+    " overeenstemming tussen het taalmodel en de menselijke beoordelaar ([Landis & Koch, 1977](https://doi.org/10.2307/2529310))."
+  ))
+}
+```
+
+## Resultaten
+
+### Frequentie
+
+Onderstaande tabel toont hoe vaak elke categorie is toegewezen.
+
+```{r, echo=FALSE, results='asis', error=TRUE}
+
+if (!isTRUE(rl$assign_multiple_categories)) {
+  rl$df |>
+    dplyr::count(result, name = "Aantal") |>
+    tidyr::complete(result = rl$categories, fill = list(Aantal = 0)) |>
+    dplyr::mutate(
+      Percentage = round(Aantal / nrow(rl$df) * 100, 2)
+    ) |>
+    dplyr::rename(Categorie = result) |>
+    dplyr::arrange(Categorie) |>
+    DT::datatable(
+      rownames = FALSE,
+      extensions = 'Buttons',
+      options = list(
+        pageLength = 10,
+        lengthMenu = c(10, 25, 50, 100),
+        scrollX = TRUE,
+        scrollY = "400px",
+        scrollCollapse = TRUE,
+        dom = 'Bfrtip',
+        buttons = list('excel', 'csv', 'pdf', 'print')
+      )
+    )
+} else {
+  rl$df |>
+    dplyr::select(-text) |>
+    # For each binary category column, count the number of TRUE values
+    dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(.x, na.rm = TRUE))) |>
+    tidyr::pivot_longer(
+      cols = dplyr::everything(),
+      names_to = "Categorie",
+      values_to = "Aantal"
+    ) |>
+    dplyr::mutate(
+      Percentage = round(Aantal / nrow(rl$df) * 100, 2)
+    ) |>
+    dplyr::arrange(dplyr::desc(Aantal)) |>
+    DT::datatable(
+      rownames = FALSE,
+      extensions = 'Buttons',
+      options = list(
+        pageLength = 10,
+        lengthMenu = c(10, 25, 50, 100),
+        scrollX = TRUE,
+        scrollY = "400px",
+        scrollCollapse = TRUE,
+        dom = 'Bfrtip',
+        buttons = list('excel', 'csv', 'pdf', 'print')
+      )
+    )
+}
+
+
+```
+
+### Per tekst
+
+Onderstaande tabel de categorieën per tekst.
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!isTRUE(rl$assign_multiple_categories)) {
+  rl$df |>
+  dplyr::select(result, text) |>
+  dplyr::rename(Tekst = text, Categorie = result) |>
+  dplyr::arrange(Categorie) |>
+  DT::datatable(
+    options = list(
+      pageLength = 10,
+      lengthMenu = c(10, 25, 50, 100),
+      scrollX = TRUE,
+      scrollY = "400px",
+      scrollCollapse = TRUE,
+      dom = 'Bfrtip',
+      buttons = list('excel', 'csv', 'pdf', 'print')
+    )
+  )
+} else {
+  rl$df |>
+    dplyr::rename(Tekst = text) |>
+    dplyr::arrange(dplyr::desc(Tekst)) |>
+    DT::datatable(
+      options = list(
+        pageLength = 10,
+        lengthMenu = c(10, 25, 50, 100),
+        scrollX = TRUE,
+        scrollY = "400px",
+        scrollCollapse = TRUE,
+        dom = 'Bfrtip',
+        buttons = list('excel', 'csv', 'pdf', 'print')
+      )
+    )
+}
+```
+ 
+```{r echo=FALSE, results='asis', error=TRUE}
+if (is.null(rl$paragraphs)) return(invisible(NULL))
+
+output <- list()
+
+output <- append(output, list(
+  htmltools::HTML("<h3>Rapport</h3>"),
+  htmltools::HTML("<p>Onderstaande paragrafen zijn de samenvattingen van de teksten per onderwerp.</p>"),
+  htmltools::div(
+    class = "d-flex justify-content-center",
+    htmltools::div(
+      class = "d-flex justify-content-center",
+      htmltools::div(
+        class = "alert alert-warning p-2 text-center",
+        style = "max-width: 500px; font-size: 0.9rem;",
+        htmltools::tags$div(
+          class = "d-flex align-items-center",
+          bsicons::bs_icon("exclamation-triangle-fill", class = "me-2 fs-1"),
+          htmltools::tags$small(
+            htmltools::tags$i(
+              "Taalmodellen kunnen 'hallucineren'.",
+              " Controleer of de samenvattingen worden ondersteund door de teksten.",
+              " Iconen bij quotes geven aan of ze voorkomen in de teksten."
+            )
+          )
+        )
+      )
+    )
+  )
+))
+
+sub_fixed <- function(pattern, replacement, text) {
+  loc <- regexpr(pattern, text, fixed = TRUE)
+  if (loc == -1) return(text)
+  paste0(
+    substr(text, 1, loc - 1),
+    replacement,
+    substr(text, loc + attr(loc, "match.length"), nchar(text))
+  )
+}
+
+for (i in seq_along(rl$paragraphs)) {
+  paragraph <- rl$paragraphs[[i]]
+  topic <- paragraph$topic
+  paragraph_text <- paragraph$paragraph
+  
+  supporting_texts <- paste(paragraph$texts, collapse = " ")
+  if (length(supporting_texts) == 0) {
+    next
+  }
+  
+  #### 1 Verify quotes on presence in supporting texts ####
+  
+  # We'll build a map of placeholders to replacement values
+  placeholder_map <- list()
+  
+  extract_quotes_matrix <- function(text) {
+    # --- Input Validation ---
+    # Ensure input is a single character string
+    if (!is.character(text) || length(text) != 1) {
+      warning("Input 'text' must be a single character string. Returning empty matrix.", call. = FALSE)
+      # Return an empty matrix with the correct column names
+      result_matrix <- matrix(character(0), ncol = 2, nrow = 0)
+      colnames(result_matrix) <- c("Full Match", "Content")
+      return(result_matrix)
+    }
+    
+    # --- Regex Definition ---
+    # Define the improved regex pattern with backreference
+    # Group 1: Captures the specific opening quote character
+    # Group 2: Captures the content inside the quotes (non-greedily)
+    # \\1: Matches the same character captured by Group 1 for the closing quote
+    # Note the double backslash \\ needed within an R string for \1
+    quote_regex <- '([\\p{Pi}\\p{Pf}"\'‘’‚‛“”„‟‹›«»"「」『』【】〝〞〟⹂｢｣＂＇])(.*?)\\1'
+    # Raw string version (R 4.0+) for potentially clearer reading:
+    # quote_regex <- r"(([\\p{Pi}\\p{Pf}"\'‘’‚‛“”„‟‹›«»"「」『』【】〝〞〟⹂｢｣＂＇])(.*?)\1)"
+    
+    # --- Perform Matching ---
+    # Use stringr::str_match_all to find all matches and capture groups
+    # The :: ensures the function is found without explicitly loading the library
+    # The result is a list; for a single input string, we access the first element [[1]]
+    all_groups_list <- stringr::str_match_all(text, quote_regex)
+    
+    # If no match is found, all_groups_list[[1]] will be a matrix with 0 rows.
+    all_groups_matrix <- all_groups_list[[1]]
+    
+    # --- Format Output ---
+    # Check if any matches were found (i.e., the matrix has rows)
+    if (nrow(all_groups_matrix) > 0) {
+      # Select Column 1 (Full Match) and Column 3 (Content, which is Group 2)
+      # drop = FALSE ensures the result is always a matrix, even if only one match is found
+      result_matrix <- all_groups_matrix[, c(1, 3), drop = FALSE]
+    } else {
+      # If no matches were found, create an empty matrix with 0 rows and 2 columns
+      result_matrix <- matrix(character(0), ncol = 2, nrow = 0)
+    }
+    
+    # Assign standard column names for clarity and consistency
+    colnames(result_matrix) <- c("Full Match", "Content")
+    
+    # Return the resulting matrix
+    return(result_matrix)
+  }
+  quote_matches <- extract_quotes_matrix(paragraph_text)
+  
+  # Check if any matches were found
+  if (nrow(quote_matches) > 0) {
+    quotes <- quote_matches[, 2]
+    
+    # Continue with the quote replacement logic...
+    for (j in seq_along(quotes)) {
+      q <- quotes[j]
+      q_clean <- stringr::str_remove(q, "[,\\.]+$")
+      placeholder <- paste0("___QUOTEPLACEHOLDER", j, "___")
+      
+      if (
+        length(q_clean) > 0 && 
+        !is.na(q_clean) &&
+        stringr::str_detect(supporting_texts, stringr::fixed(q_clean, ignore_case = TRUE))
+      ) {
+        icon_html <- as.character(
+          bsicons::bs_icon("check-circle-fill", title = "Quote geverifieerd", class = "text-success")
+        )
+      } else {
+        icon_html <- as.character(
+          bsicons::bs_icon("exclamation-triangle-fill", title = "Quote niet teruggevonden in teksten", class = "text-warning")
+        )
+      }
+  
+      replacement <- paste0('"', q, '"<sup>', icon_html, '</sup>')
+      placeholder_map[[placeholder]] <- replacement
+  
+      quoted_with_marks <- paste0('"', q, '"')
+      paragraph_text <- sub_fixed(quoted_with_marks, placeholder, paragraph_text)
+    }
+  }
+  
+  # Replace placeholders with their final replacements
+  for (ph in names(placeholder_map)) {
+    paragraph_text <- stringr::str_replace_all(paragraph_text, stringr::fixed(ph), placeholder_map[[ph]])
+  }
+  
+  #### 2 Check if paragraph has attribute about prompt not fitting in context window ####
+  
+  # If paragraph has attribute 'prompt_fits' and it is FALSE, add a warning
+  #   to the output
+  warning_context_window <- NULL
+  prompt_fits <- paragraph$prompt_fits
+  if (isFALSE(prompt_fits)) {
+    warning_context_window <- htmltools::div(
+      class = "d-flex justify-content-center",
+      htmltools::div(
+        class = "d-flex justify-content-center",
+        htmltools::div(
+          class = "alert alert-warning p-2 text-center",
+          style = "max-width: 500px; font-size: 0.9rem;",
+          htmltools::tags$div(
+            class = "d-flex align-items-center",
+            bsicons::bs_icon("exclamation-triangle-fill", class = "me-2 fs-1"),
+            htmltools::tags$small(
+              htmltools::tags$i(
+                "De prompt voor de samenvatting van deze categorie paste",
+                " niet in het context-window van het taalmodel.",
+                " Mogelijk zijn niet alle instructies of teksten door het taalmodel gezien."
+              )
+            )
+          )
+        )
+      )
+    )
+  }
+  
+  # Append processed output
+  output <- append(output, list(
+    htmltools::HTML(paste0("<h4>", topic, "</h4>")),
+    warning_context_window,
+    htmltools::HTML(paste0("<p>", paragraph_text, "</p>"))
+  ))
+
+  if (!is.null(paragraph$texts)) {
+    acc <- bslib::accordion(
+      bslib::accordion_panel(
+        title = "Bekijk teksten",
+        htmltools::HTML(paste0("<ul>", paste0("<li><i>", paragraph$texts, "</i></li>", collapse = ""), "</ul>")),
+      ),
+      id = paste0("acc-", i),
+      open = FALSE
+    )
+    output <- append(output, list(acc))
+  }
+
+  output <- append(output, list(htmltools::HTML("<br>")))
+}
+
+if (length(rl$paragraphs) > 0) {
+  htmltools::tagList(output)
+}
+``` 
+ 
+```{r footer, echo=FALSE, results='asis', error=TRUE}
+htmltools::tags$footer(
+  style = "text-align:center; font-size: 0.8em; color: #888; margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee;",
+  htmltools::HTML(paste0(
+    "Deze analyse is automatisch geproduceerd door een app ontwikkeld door ",
+    "<a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a> i.s.m. GGD Twente.<br>",
+    "Bekijk de <a href='https://github.com/kennispunttwente/tekstanalyse_met_llm' target='_blank'>GitHub-repository</a> voor meer informatie.",
+    "<br>",
+    "<br>",
+    format(Sys.Date(), "%Y-%m-%d")
+  ))
+)
+```

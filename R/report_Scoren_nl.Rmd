@@ -1,0 +1,125 @@
+---
+title: "Scoren met LLM"
+output: 
+  html_document:
+    theme:
+      version: 5
+      bootswatch: lux
+params:
+  result_list: !r list(df = data.frame(result = c(1), text = c("Tekst A")), irr = list(estimate = setNames(27.58, "mean difference"), statistic = setNames(8.975326, "t"), p.value = 6.416833e-12, parameter = setNames(49, "df"), conf.low = 21.40484, conf.high = 33.75516, method = "Paired t-test", alternative = "two.sided", llm_mean = 23.33, llm_sd = 5.72, user_mean = 36.7824, user_sd = 7.23), sensitivity_sentence = "Met een steekproefgrootte van (...).")
+
+---
+
+```{r include=FALSE, error=TRUE}
+rl <- params$result_list
+```
+
+## Methode
+
+Er zijn `r nrow(rl$df)` teksten geanalyseerd met een LLM (model: `r rl$model`),
+waarbij het LLM gevraagd werd om een score (1-100) te geven voor
+in hoeverre een tekst bij het kenmerk '*`r rl$scoring_characteristic`*' past.
+
+Elke tekst is afzonderlijk gepresenteerd aan het LLM. 
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(rl$irr)) {
+  cat(paste0(
+    "### Betrouwbaarheid\n",
+    "De interbeoordelaarsbetrouwbaarheid tussen het taalmodel en een menselijke beoordelaar berekend.",
+    " Hiervoor is een willekeurige steekproef genomen van " , 
+    rl$irr$subjects, " teksten.",
+    "Met een paired t-test is zijn de gegeven scores van het taalmodel vergeleken met de gegeven scores van de menselijke beoordelaar.",
+    " Het gemiddelde verschil tussen de scores is ",
+    round(rl$irr$estimate, 2), " (95% CI [", 
+    round(rl$irr$conf.low, 2), ", ",
+    round(rl$irr$conf.high, 2), "];",
+    " gemiddelde taalmodel = ", round(rl$irr$llm_mean, 2), 
+    " [sd = ", round(rl$irr$llm_sd, 2), "];",
+    " gemiddelde menselijke beoordelaar = ", round(rl$irr$user_mean, 2),
+    " [sd = ", round(rl$irr$user_sd, 2), "]).",
+    " Dit is een  ",
+    dplyr::case_when(
+      rl$irr$p.value < 0.05 ~ "significant",
+      TRUE ~ "niet-significant"
+    ),
+    " verschil (t(", rl$irr$parameter, ") = ",
+    round(rl$irr$statistic, 3), ", p = ", round(rl$irr$p.value, 3), ") ",
+    " en valt te interpreteren als ",
+    dplyr::case_when(
+      rl$irr$p.value >= 0.05 ~ "een overeenkomst tussen de scores van het taalmodel en de menselijke beoordelaar",
+      rl$irr$llm_mean > rl$irr$user_mean ~ "een overschatting van de scores door het taalmodel",
+      rl$irr$llm_mean < rl$irr$user_mean ~ "een onderschatting van de scores door het taalmodel",
+      TRUE ~ "?"
+    ), ".\n\n", rl$irr$sensitivity_sentence
+  ))
+}
+```
+
+## Resultaten
+
+### Statistieken
+
+Onderstaande tabel toont statistieken van de gegeven scores.
+
+```{r results='asis', echo=FALSE, error=TRUE}
+rl$df |>
+  dplyr::summarise(
+    Gemiddelde = round(mean(result), 2),
+    Standaardafwijking = round(sd(result), 2),
+    Minimum = min(result),
+    Maximum = max(result),
+    Median = median(result)
+  ) |>
+  DT::datatable(
+    rownames = FALSE,
+    extensions = 'Buttons',
+    options = list(
+      pageLength = 10,
+      lengthMenu = c(10, 25, 50, 100),
+      scrollX = TRUE,
+      scrollY = "400px",
+      scrollCollapse = TRUE,
+      dom = 'Bfrtip',
+      buttons = list('excel', 'csv', 'pdf', 'print')
+    )
+  )
+```
+
+### Per tekst
+
+Onderstaande tabel de scores per tekst.
+
+```{r results='asis', echo=FALSE, error=TRUE}
+rl$df |>
+  dplyr::select(result, text) |>
+  dplyr::rename(Tekst = text, Score = result) |>
+  dplyr::arrange(dplyr::desc(Score)) |>
+  DT::datatable(
+    extensions = 'Buttons',
+    options = list(
+      rownames = FALSE,
+      pageLength = 10,
+      lengthMenu = c(10, 25, 50, 100),
+      scrollX = TRUE,
+      scrollY = "400px",
+      scrollCollapse = TRUE,
+      dom = 'Bfrtip',
+      buttons = list('excel', 'csv', 'pdf', 'print')
+    )
+  )
+```
+ 
+```{r footer, echo=FALSE, results='asis', error=TRUE}
+htmltools::tags$footer(
+  style = "text-align:center; font-size: 0.8em; color: #888; margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee;",
+  htmltools::HTML(paste0(
+    "Deze analyse is automatisch geproduceerd door een app ontwikkeld door ",
+    "<a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a> i.s.m. GGD Twente.<br>",
+    "Bekijk de <a href='https://github.com/kennispunttwente/tekstanalyse_met_llm' target='_blank'>GitHub-repository</a> voor meer informatie.",
+    "<br>",
+    "<br>",
+    format(Sys.Date(), "%Y-%m-%d")
+  ))
+)
+```

@@ -35,7 +35,10 @@ prompt_category <- function(
     collapse = "\n  "
   )
 
-  instruction <- "You need to categorize a text for a research project.\n\n"
+  instruction <- paste0(
+    "You need to categorize a text for a research project.",
+    "\n\n"
+  )
   if (research_background != "") {
     instruction <- paste0(
       instruction,
@@ -168,7 +171,16 @@ categories_ui <- function(id) {
   )
 }
 
-categories_server <- function(id, mode, processing) {
+categories_server <- function(
+  id,
+  mode,
+  processing,
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
   moduleServer(
     id,
     function(input, output, session) {
@@ -184,7 +196,7 @@ categories_server <- function(id, mode, processing) {
             value <- txt_in_fields()[i] %||% ""
             textAreaInput(
               inputId = ns(paste0("category", i)),
-              label = paste("Categorie", i),
+              label = paste(lang()$t("Categorie"), i),
               value = value,
               rows = 1,
               width = "100%"
@@ -207,11 +219,11 @@ categories_server <- function(id, mode, processing) {
         if (mode() == "Categorisatie") {
           bslib::card(
             class = "card",
-            card_header("Categorieën"),
+            card_header(lang()$t("Categorieën")),
             card_body(
-              p(
+              p(lang()$t(
                 "Geef beknopte, duidelijke omschrijvingen. Overweeg een categorie 'Overig'/'Onbekend'/'Geen antwoord'."
-              ),
+              )),
               div(
                 class = "category-button-container",
                 actionButton(
@@ -309,6 +321,33 @@ categories_server <- function(id, mode, processing) {
             shinyjs::disable(paste0("category", i))
           })
         }
+      })
+
+      observeEvent(lang(), {
+        shinyjs::delay(100, {
+          if (mode() == "Categorisatie") {
+            if (!isEditing() || processing()) {
+              lapply(seq_len(n_fields()), function(i) {
+                shinyjs::disable(paste0("category", i))
+              })
+            } else {
+              lapply(seq_len(n_fields()), function(i) {
+                shinyjs::enable(paste0("category", i))
+              })
+            }
+
+            # Re-render the edit button (pencil/save)
+            output$editButtonUI <- renderUI({
+              button_label <- if (isEditing()) icon("save") else icon("pencil")
+              actionButton(
+                ns("toggleEdit"),
+                label = tagList(button_label, ""),
+                class = "btn btn-primary",
+                style = "min-width: 75px;"
+              )
+            })
+          }
+        })
       })
 
       # Also create reactive for unique, non-empty texts

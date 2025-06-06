@@ -12,8 +12,10 @@ write_paragraph <- function(
   research_background = "",
   llm_provider = tidyprompt::llm_provider_openai(
     parameters = list(model = "gpt-4o-mini")
-  )
+  ),
+  language = c("nl", "en")
 ) {
+  language <- match.arg(language)
   stopifnot(
     is.character(texts),
     length(texts) > 0,
@@ -35,7 +37,9 @@ write_paragraph <- function(
     "Describe only perspectives which are related to the topic ('",
     topic,
     "').\n",
-    "Write the paragraph in Dutch.\n",
+    if (language == "nl") {
+      "Write the paragraph in Dutch.\n"
+    },
     "Quote (parts of) the texts where relevant. Put quotes inside quotation marks (\"...\").\n",
     "Quotes must be literal: do not paraphrase; do not alter texts.\n",
     "The tone must be objective and scientific, but not overly formal."

@@ -40,11 +40,15 @@ for (file in r_files) {
 # - To enable asynchronous processing, you need to use `future::plan()`, e.g.,
 #     `future::plan(multisession)`
 # - When you asynchronous processing is not needed, you can use
-#     `future::plan("sequential")`
+#     `future::plan("sequential")`; note that the progress bar may lag behind
+#     in that case, as this is built around asynchronous processing
 # - See the documentation for `future::plan()` for more details
 future::plan(multisession, .skip = TRUE)
 
-# Set LLM provider and available models
+# Set preconfigured LLM provider and available models (optional)
+# - You can preconfigure the LLM provider and available models here
+#   It is also possible for users to configure their own LLM provider
+#     in the interface of the app (OpenAI compatible or Ollama; see options below)
 # - This example uses the OpenAI API; you can configure any other LLM provider
 #     (e.g., Ollama, Azure OpenAI API, OpenRouter, etc.)
 # - See: https://tjarkvandemerwe.github.io/tidyprompt/articles/getting_started.html#setup-an-llm-provider
@@ -91,7 +95,12 @@ options(
   #   as alternative to the preconfigured LLM provider;
   #     see: R/llm_provider.R
   llm_provider__can_configure_oai = TRUE,
-  llm_provider__can_configure_ollama = TRUE
+  llm_provider__can_configure_ollama = TRUE,
+
+  # - Language for app interface & results (Dutch (nl) or English (en));
+  #   see R/language.R
+  language = "en", # Default language
+  language__can_toggle = TRUE # If user can switch language in the app
 )
 
 

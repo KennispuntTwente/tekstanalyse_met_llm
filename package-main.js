@@ -108,7 +108,7 @@ function createSplashWindow() {
     autoHideMenuBar: true,
     resizable: false,
     alwaysOnTop: false,
-    title: 'Tekstanalyse met LLM',
+    title: 'Text analysis with LLM',
     icon: path.join(__dirname, 'www', 'icon.ico'),
     webPreferences: {
       contextIsolation: true,
@@ -142,9 +142,9 @@ function createSplashWindow() {
         </style>
       </head>
       <body>
-        <h1>App wordt geladen...</h2>
-        <p>Dit zou maximaal 30 seconden moeten duren.<br>
-        Werkt het niet? Bekijk het logbestand:<br><br>
+        <h1>App is loading...</h2>
+        <p>This should take no longer than 30 seconds.<br>
+        Is it not working? View the log file:<br><br>
         <code>${logFilePath}</code></p>
       </body>
     </html>
@@ -162,7 +162,7 @@ function createMainWindow(port) {
     autoHideMenuBar: true,
     resizable: true,
     alwaysOnTop: false,
-    title: 'Tekstanalyse met LLM',
+    title: 'Text analysis with LLM',
     icon: path.join(__dirname, 'www', 'icon.ico'),
     webPreferences: {
       contextIsolation: true
