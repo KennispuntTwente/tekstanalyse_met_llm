@@ -19,7 +19,7 @@ This is an app (R, Shiny) for (automated) qualitative text analysis using large 
   - See [screenshot](example/screenshot_interface_en.png)
 
 - **Report with results and explanation** of the applied method.  
-  - See [screenshot](example/usecase/report_with_results_screenshot.png)
+  - See [screenshot](example/usecase/report_with_results_screenshot_en.png)
 
 ### Additional analysis features
 
@@ -114,7 +114,7 @@ Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our 
 
 ### Report with results (topic modelling)
 
-![Screenshot of report](example/usecase/report_with_results_screenshot.png)
+![Screenshot of report](example/usecase/report_with_results_screenshot_en.png)
 
 ---
 
@@ -160,7 +160,7 @@ zoals categorisatie, scoren op kenmerken, en topic modelling.
 -   Gebruikers krijgen een **rapport met de resultaten en uitleg** over
     de toegepaste methode
     
-    - Zie [screenshot](example/usecase/report_with_results_screenshot.png)
+    - Zie [screenshot](example/usecase/report_with_results_screenshot_nl.png)
         
 ### Aanvullende mogelijkheden bij tekstanalyse:
 
@@ -190,6 +190,9 @@ zoals categorisatie, scoren op kenmerken, en topic modelling.
 -   Mogelijkheid om **lokaal** te draaien of te hosten als
     **webapplicatie** (bijv. als containerized application). Niet-technische
     gebruikers kunnen dus de optie krijgen om de applicatie te gebruiken als webpagina
+    
+-   De app-interface en resultaten kunnen worden ingesteld op **Engels of
+    Nederlands**
       
 ## Use-case
         
@@ -290,4 +293,4 @@ Bezoek [onze website](https://www.kennispunttwente.nl) of [neem contact op met o
 
 ### Rapport met resultaten (topic modelling)
 
-![Screenshot van een rapport met resultaten](example/usecase/report_with_results_screenshot.png)
+![Screenshot van een rapport met resultaten](example/usecase/report_with_results_screenshot_nl.png)
