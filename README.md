@@ -1,7 +1,8 @@
 # Text analysis with LLM (app)
-*[Klik hier voor een Nederlandse-README (click here for a Dutch README).](#tekstanalyse-met-llm-app)*
 
 This is an app (R, Shiny) for (automated) qualitative text analysis using large language models (LLMs). Through a user-friendly interface, users can upload texts and have them analyzed by an LLM. The app offers various types of analysis, including categorization, scoring on characteristics, and topic modelling.
+
+*[Klik hier voor een Nederlandse-README (click here for a Dutch README).](#tekstanalyse-met-llm-app)*
 
 ## Features
 
@@ -119,13 +120,14 @@ Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our 
 ---
 
 # Tekstanalyse met LLM (app)
-*[Click here for an English version of the README (klik hier voor een Engelse versie van de README).](#text-analysis-with-llm-app)*
 
 Dit is een app (ontwikkeld met R, Shiny) voor (automatische) kwalitatieve
 tekstanalyse met large language models (LLMs). Via een gebruiksvriendelijke
 interface kunnen gebruikers teksten uploaden en deze laten analyseren
 door een taalmodel. De app biedt verschillende analyse-mogelijkheden,
 zoals categorisatie, scoren op kenmerken, en topic modelling.
+
+*[Click here for an English version of the README (klik hier voor een Engelse versie van de README).](#text-analysis-with-llm-app)*
 
 ## Functionaliteiten
 
