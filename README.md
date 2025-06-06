@@ -16,10 +16,10 @@ This is an app (R, Shiny) for (automated) qualitative text analysis using large 
 ### User-friendly interface
 
 - **Web interface** suitable for non-technical users. Users can easily upload texts, choose an analysis method, and start the analysis.  
-  - See [screenshot](example/screenshot_interface_en.png)
+  - See [screenshot](example/screenshot_interface_en.png) (or scroll below)
 
 - **Report with results and explanation** of the applied method.  
-  - See [screenshot](example/usecase/report_with_results_screenshot_en.png)
+  - See [screenshot](example/usecase/report_with_results_screenshot_en.png) (or scroll below)
 
 ### Additional analysis features
 
@@ -155,12 +155,12 @@ zoals categorisatie, scoren op kenmerken, en topic modelling.
     gebruikers. Met een eenvoudige interface kunnen gebruikers
     teksten uploaden, de analyse-methode kiezen, en de analyse starten
     
-    - Zie [screenshot](example/screenshot_interface_nl.png)
+    - Zie [screenshot](example/screenshot_interface_nl.png) (of scroll naar beneden)
         
 -   Gebruikers krijgen een **rapport met de resultaten en uitleg** over
     de toegepaste methode
     
-    - Zie [screenshot](example/usecase/report_with_results_screenshot_nl.png)
+    - Zie [screenshot](example/usecase/report_with_results_screenshot_nl.png) (of scroll naar beneden)
         
 ### Aanvullende mogelijkheden bij tekstanalyse:
 
