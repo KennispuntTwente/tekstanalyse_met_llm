@@ -1539,7 +1539,13 @@ processing_server <- function(
         result <- tryCatch(
           {
             rmarkdown::render(
-              input = paste0("R/report_", result_list$mode, ".Rmd"),
+              input = paste0(
+                "R/report_",
+                result_list$mode,
+                "_",
+                lang$get_translation_language(),
+                ".Rmd"
+              ),
               output_file = output_file_html,
               params = list(result_list = result_list),
               envir = new.env()
