@@ -1,7 +1,7 @@
 {
-  "name": "tekstanalyse-met-llm",
+  "name": "text-analysis-with-llm-app",
   "version": "1.0.0",
-  "description": "Desktop-versie van tekstanalyse-app, zie: github.com/KennispuntTwente/tekstanalyse-app",
+  "description": "Desktop app version of text analysis app, see: github.com/KennispuntTwente/tekstanalyse-app",
   "author": "Luka Koning <l.koning@kennispunttwente.nl>",
   "license": "AGPL-3.0",
   "main": "package-main.js",
