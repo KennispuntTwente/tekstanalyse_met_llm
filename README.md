@@ -119,9 +119,9 @@ Contact: [info@kennispunttwente.nl](mailto:info@kennispunttwente.nl)
 
 ---
 
-# Tekstanalyse met LLM (app) (Nederlands)
+# Tekstanalyse met LLM (app)
 
-<small>Go back to [English version of the README](#text-analysis-with-llm-app)</small>
+_**[Click here for an English version of the README (klik hier voor een Engelse versie van de README).](#text-analysis-with-llm-app)**_
 
 Dit is een app (ontwikkeld met R, Shiny) voor (automatische) kwalitatieve
 tekstanalyse met large language models (LLMs). Via een gebruiksvriendelijke
