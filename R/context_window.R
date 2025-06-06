@@ -10,38 +10,7 @@ context_window_ui <- function(id) {
     shinyjs::useShinyjs(),
     div(
       class = "card-container",
-      bslib::card(
-        class = "card",
-        card_header(
-          lang$t("Context-window"),
-          tooltip(
-            bs_icon("info-circle"),
-            paste0(
-              lang$t(
-                "Het context-window is de hoeveelheid tekst die het taalmodel kan verwerken in één keer."
-              ),
-              lang$t(
-                " Er moet voor worden gezorgd dat de onderzoeksachtergrond met de (langste) tekst die je invoert binnen het context-window van het model past."
-              ),
-              lang$t(
-                " Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen."
-              ),
-              lang$t(
-                " Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen."
-              )
-            )
-          )
-        ),
-        card_body(
-          div(
-            class = "d-flex flex-column align-items-center",
-            uiOutput(ns("context_window_ui")),
-            uiOutput(ns("fit_context_window_warning")),
-            uiOutput(ns("too_many_chunks_warning")),
-            uiOutput(ns("n_chunks_display")),
-          )
-        )
-      )
+      uiOutput(ns("card"))
     )
   )
 }
@@ -93,6 +62,41 @@ context_window_server <- function(
     id,
     function(input, output, session) {
       ns <- session$ns
+
+      output$card <- renderUI({
+        bslib::card(
+          class = "card",
+          card_header(
+            lang()$t("Context-window"),
+            tooltip(
+              bs_icon("info-circle"),
+              paste0(
+                lang()$t(
+                  "Het context-window is de hoeveelheid tekst die het taalmodel kan verwerken in één keer."
+                ),
+                lang()$t(
+                  " Er moet voor worden gezorgd dat de onderzoeksachtergrond met de (langste) tekst die je invoert binnen het context-window van het model past."
+                ),
+                lang()$t(
+                  " Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen."
+                ),
+                lang()$t(
+                  " Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen."
+                )
+              )
+            )
+          ),
+          card_body(
+            div(
+              class = "d-flex flex-column align-items-center",
+              uiOutput(ns("context_window_ui")),
+              uiOutput(ns("fit_context_window_warning")),
+              uiOutput(ns("too_many_chunks_warning")),
+              uiOutput(ns("n_chunks_display")),
+            )
+          )
+        )
+      })
 
       #### Reactive values ####
       rv <- reactiveValues(
@@ -315,7 +319,7 @@ context_window_server <- function(
           class = "d-flex flex-column align-items-center",
           numericInput(
             ns("context_window"),
-            lang$t("Context-window grootte (# tokens)"),
+            lang()$t("Context-window grootte (# tokens)"),
             value = rv$n_tokens_context_window,
             min = 0
           ),
@@ -323,14 +327,14 @@ context_window_server <- function(
             list(
               numericInput(
                 ns("chunk_size"),
-                lang$t("Maximaal aantal teksten per chunk"),
+                lang()$t("Maximaal aantal teksten per chunk"),
                 value = rv$max_chunk_size,
                 min = 1,
                 max = 100
               ),
               numericInput(
                 ns("redrawing"),
-                lang$t("Aantal trekkingen per tekst"),
+                lang()$t("Aantal trekkingen per tekst"),
                 value = rv$max_redrawing,
                 min = 1,
                 max = 5
@@ -349,7 +353,10 @@ context_window_server <- function(
         return(div(
           class = "alert alert-info d-flex align-items-center mt-2",
           bs_icon("blockquote-left"),
-          span(class = "ms-2 fw", paste(lang$t("Aantal chunks:"), rv$n_chunks))
+          span(
+            class = "ms-2 fw",
+            paste(lang()$t("Aantal chunks:"), rv$n_chunks)
+          )
         ))
       })
 
@@ -363,7 +370,7 @@ context_window_server <- function(
           span(
             class = "ms-2",
             paste0(
-              lang$t("Te veel chunks"),
+              lang()$t("Te veel chunks"),
               " (> 100)"
             )
           )
@@ -384,7 +391,7 @@ context_window_server <- function(
             bs_icon("exclamation-triangle-fill"),
             span(
               class = "ms-2",
-              lang$t("Sommige teksten zijn te lang voor het context-window")
+              lang()$t("Sommige teksten zijn te lang voor het context-window")
             )
           ))
         }
@@ -395,7 +402,7 @@ context_window_server <- function(
             bs_icon("check-circle-fill"),
             span(
               class = "ms-2",
-              lang$t("Alle teksten passen binnen het context-window")
+              lang()$t("Alle teksten passen binnen het context-window")
             )
           ))
         }

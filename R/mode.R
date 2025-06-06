@@ -5,34 +5,7 @@
 mode_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    bslib::card(
-      class = "card",
-      card_header(
-        lang$t("Modus"),
-        tooltip(
-          bs_icon("info-circle"),
-          lang$t(
-            "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren."
-          )
-        )
-      ),
-      card_body(
-        div(
-          class = "d-flex justify-content-center",
-          shinyWidgets::radioGroupButtons(
-            ns("mode"),
-            NULL,
-            choices = c(
-              lang$t("Categorisatie"),
-              lang$t("Scoren"),
-              lang$t("Onderwerpextractie")
-            ),
-            selected = lang$t("Categorisatie"),
-            size = "sm"
-          )
-        )
-      )
-    )
+    uiOutput(ns("card"))
   )
 }
 
@@ -54,15 +27,46 @@ mode_server <- function(
       ns <- session$ns
       mode <- reactiveVal("Categorisatie")
 
+      output$card <- renderUI({
+        bslib::card(
+          class = "card",
+          card_header(
+            lang()$t("Modus"),
+            tooltip(
+              bs_icon("info-circle"),
+              lang()$t(
+                "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren."
+              )
+            )
+          ),
+          card_body(
+            div(
+              class = "d-flex justify-content-center",
+              shinyWidgets::radioGroupButtons(
+                ns("mode"),
+                NULL,
+                choices = c(
+                  lang()$t("Categorisatie"),
+                  lang()$t("Scoren"),
+                  lang()$t("Onderwerpextractie")
+                ),
+                selected = lang()$t("Categorisatie"),
+                size = "sm"
+              )
+            )
+          )
+        )
+      })
+
       # When selecting input, update reactiveVal
       observeEvent(input$mode, {
         new_mode <- NULL
 
-        if (input$mode == lang$t("Categorisatie")) {
+        if (input$mode == lang()$t("Categorisatie")) {
           new_mode <- "Categorisatie"
-        } else if (input$mode == lang$t("Scoren")) {
+        } else if (input$mode == lang()$t("Scoren")) {
           new_mode <- "Scoren"
-        } else if (input$mode == lang$t("Onderwerpextractie")) {
+        } else if (input$mode == lang()$t("Onderwerpextractie")) {
           new_mode <- "Onderwerpextractie"
         }
 

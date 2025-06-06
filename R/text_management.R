@@ -5,29 +5,7 @@
 
 text_management_ui <- function(id) {
   ns <- NS(id)
-
-  tagList(
-    shinyjs::useShinyjs(),
-    bslib::card(
-      class = "card",
-      card_header(
-        lang$t("Teksten")
-      ),
-      card_body(
-        div(
-          class = "text-center",
-          actionButton(
-            ns("open_text_table_modal"),
-            label = paste0(lang$t("Bekijk tabel")),
-            class = "btn btn-primary"
-          ),
-          br(),
-          br(),
-          uiOutput(ns("preprocess_counts"))
-        )
-      )
-    )
-  )
+  uiOutput(ns("card"))
 }
 
 
@@ -45,6 +23,8 @@ text_management_server <- function(
   moduleServer(
     id,
     function(input, output, session) {
+      ns <- session$ns
+
       # Return reactive;
       #   raw_texts; preprocessed (unique), data.frame with raw and preprocessed texts
       texts <- reactiveValues(
@@ -53,12 +33,51 @@ text_management_server <- function(
         df = NULL
       )
 
+      output$card <- renderUI({
+        req(lang())
+        preproc <- texts$preprocessed
+        n_pre <- if (is.null(preproc)) 0 else length(preproc)
+
+        tagList(
+          shinyjs::useShinyjs(),
+          bslib::card(
+            class = "card",
+            card_header(
+              lang()$t("Teksten")
+            ),
+            card_body(
+              div(
+                class = "text-center",
+                # Build the label text:
+                actionButton(
+                  ns("open_text_table_modal"),
+                  label = paste0(
+                    lang()$t("Bekijk tabel"),
+                    " (",
+                    n_pre,
+                    " ",
+                    lang()$t("teksten"),
+                    ")"
+                  ),
+                  # If there are no preprocessed texts *or* preproc is NULL, disable immediately:
+                  disabled = if (n_pre == 0) TRUE else FALSE,
+                  class = "btn btn-primary"
+                ),
+                br(),
+                br(),
+                uiOutput("preprocess_counts") # unchanged
+              )
+            )
+          )
+        )
+      })
+
       # Pre-process texts, fill reactive values
       observeEvent(raw_texts(), {
         req(raw_texts())
 
         # Pre-process texts
-        preprocessed_texts <- pre_process_texts(raw_texts())
+        preprocessed_texts <- pre_process_texts(raw_texts(), lang = lang())
 
         # Fill reactive values
         texts$raw <- raw_texts()
@@ -79,7 +98,7 @@ text_management_server <- function(
         # Count how many times each placeholder appears
         email_count <- sum(stringr::str_count(
           txts,
-          stringr::fixed(lang$t("<< e-mailadres verwijderd >>"))
+          stringr::fixed(lang()$t("<< e-mailadres verwijderd >>"))
         ))
         # iban_count <- sum(stringr::str_count(
         #   txts,
@@ -87,11 +106,11 @@ text_management_server <- function(
         # ))
         phone_count <- sum(stringr::str_count(
           txts,
-          stringr::fixed(lang$t("<< (telefoon)nummer verwijderd >>"))
+          stringr::fixed(lang()$t("<< (telefoon)nummer verwijderd >>"))
         ))
         postal_count <- sum(stringr::str_count(
           txts,
-          stringr::fixed(lang$t("<< postcode verwijderd >>"))
+          stringr::fixed(lang()$t("<< postcode verwijderd >>"))
         ))
 
         # Count removed duplicates
@@ -110,7 +129,7 @@ text_management_server <- function(
                 class = "border rounded p-2 mb-3 bg-light fade-in gap-2",
                 div(
                   class = "text-muted small mb-1 text-center",
-                  lang$t("Dubbele teksten verwijderd:")
+                  lang()$t("Dubbele teksten verwijderd:")
                 ),
                 div(
                   class = "d-flex align-items-center justify-content-center gap-2",
@@ -128,7 +147,7 @@ text_management_server <- function(
                 class = "border rounded p-2 bg-light fade-in",
                 div(
                   class = "text-muted small mb-1 gap-2",
-                  lang$t("Persoonsgegevens verwijderd:")
+                  lang()$t("Persoonsgegevens verwijderd:")
                 ),
                 div(
                   class = "small d-flex flex-wrap justify-content-center align-items-center gap-2",
@@ -136,7 +155,7 @@ text_management_server <- function(
                     class = "d-flex align-items-center",
                     bs_icon("envelope", class = "me-1", aria_hidden = "true"),
                     span(class = "badge bg-secondary me-1", email_count),
-                    span(class = "text-muted", lang$t("e‑mail(s)"))
+                    span(class = "text-muted", lang()$t("e‑mail(s)"))
                   ),
                   # div(
                   #   class = "d-flex align-items-center",
@@ -148,13 +167,13 @@ text_management_server <- function(
                     class = "d-flex align-items-center",
                     bs_icon("telephone", class = "me-1", aria_hidden = "true"),
                     span(class = "badge bg-secondary me-1", phone_count),
-                    span(class = "text-muted", lang$t("nummer(s)"))
+                    span(class = "text-muted", lang()$t("nummer(s)"))
                   ),
                   div(
                     class = "d-flex align-items-center",
                     bs_icon("mailbox", class = "me-1", aria_hidden = "true"),
                     span(class = "badge bg-secondary me-1", postal_count),
-                    span(class = "text-muted", lang$t("postcode(s)"))
+                    span(class = "text-muted", lang()$t("postcode(s)"))
                   )
                 )
               )
@@ -163,38 +182,46 @@ text_management_server <- function(
         )
       })
 
-      # Update modal button to show how many texts are available
-      shinyjs::disable("open_text_table_modal")
-      observeEvent(texts$preprocessed, {
+      # Update modal button to show how many texts are available;
+      #   disable when no texts are available
+      observe({
+        preprocessed <- texts$preprocessed
+        n_preprocessed <- if (is.null(preprocessed)) 0 else length(preprocessed)
+
+        # Trigger re-render on language change or modal interaction
+        lang()
+        input$open_text_table_modal
+
+        # Update label
         updateActionButton(
           session,
           "open_text_table_modal",
           label = paste0(
-            lang$t("Bekijk tabel"),
+            lang()$t("Bekijk tabel"),
             " (",
-            length(texts$preprocessed),
+            n_preprocessed,
             " ",
-            lang$t("teksten"),
+            lang()$t("teksten"),
             ")"
           )
         )
 
-        # Disable button when no texts are available
-        if (length(texts$preprocessed) == 0) {
-          shinyjs::disable("open_text_table_modal")
-        } else {
-          shinyjs::enable("open_text_table_modal")
-        }
+        # # Enable/disable logic
+        # if (n_preprocessed == 0 || is.null(preprocessed)) {
+        #   shinyjs::disable("open_text_table_modal")
+        # } else {
+        #   shinyjs::enable("open_text_table_modal")
+        # }
       })
 
       # Show modal with text table
       observeEvent(input$open_text_table_modal, {
         showModal(
           modalDialog(
-            title = lang$t("Teksten"),
-            DT::dataTableOutput(session$ns("text_table")),
+            title = lang()$t("Teksten"),
+            DT::dataTableOutput(ns("text_table")),
             easyClose = TRUE,
-            footer = modalButton(lang$t("Sluiten")),
+            footer = modalButton(lang()$t("Sluiten")),
             size = "l"
           )
         )
@@ -217,7 +244,12 @@ text_management_server <- function(
 #### 3 Helper functions ####
 
 # Function for pre-processing texts
-pre_process_texts <- function(txts) {
+pre_process_texts <- function(
+  txts,
+  lang = shiny.i18n::Translator$new(
+    translation_json_path = "language/language.json"
+  )
+) {
   # Ensure stringr is loaded
   if (!requireNamespace("stringr", quietly = TRUE)) {
     stop("Please install and load the 'stringr' package.")
@@ -274,7 +306,7 @@ pre_process_texts <- function(txts) {
 
 #### 4 Example/development usage ####
 
-if (FALSE) {
+if (TRUE) {
   library(shiny)
   library(shinyjs)
   library(bslib)
@@ -288,7 +320,8 @@ if (FALSE) {
   server <- function(input, output, session) {
     text_management_server(
       "text_management",
-      reactive(c("a", "b", "0631377835", "b", "b"))
+      reactive(NULL)
+      # reactive(c("a", "b", "0631377835", "b", "b"))
     )
   }
 

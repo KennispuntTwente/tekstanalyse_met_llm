@@ -6,27 +6,7 @@ interrater_toggle_ui <- function(id) {
   ns <- NS(id)
   tagList(
     shinyjs::useShinyjs(),
-    bslib::card(
-      class = "card",
-      card_header(lang$t("Inter-rater reliability")),
-      card_body(
-        # Toggle for inter-rater reliability
-        p(lang$t("Zelf steekproef beoordelen?"), class = "mb-2 text-center"),
-        div(
-          class = "d-flex justify-content-center",
-          shinyWidgets::radioGroupButtons(
-            ns("interrater_reliability"),
-            NULL,
-            choices = c(
-              lang$t("Nee"),
-              lang$t("Ja")
-            ),
-            selected = lang$t("Nee"),
-            size = "sm"
-          )
-        )
-      )
-    )
+    uiOutput(ns("card"))
   )
 }
 
@@ -45,11 +25,39 @@ interrater_toggle_server <- function(
   moduleServer(
     id,
     function(input, output, session) {
+      ns <- session$ns
       interrater_reliability_toggle <- reactiveVal(FALSE)
+
+      output$card <- renderUI({
+        bslib::card(
+          class = "card",
+          card_header(lang()$t("Inter-rater reliability")),
+          card_body(
+            # Toggle for inter-rater reliability
+            p(
+              lang()$t("Zelf steekproef beoordelen?"),
+              class = "mb-2 text-center"
+            ),
+            div(
+              class = "d-flex justify-content-center",
+              shinyWidgets::radioGroupButtons(
+                ns("interrater_reliability"),
+                NULL,
+                choices = c(
+                  lang()$t("Nee"),
+                  lang()$t("Ja")
+                ),
+                selected = lang()$t("Nee"),
+                size = "sm"
+              )
+            )
+          )
+        )
+      })
 
       observeEvent(input$interrater_reliability, {
         interrater_reliability_toggle(
-          input$interrater_reliability == lang$t("Ja")
+          input$interrater_reliability == lang()$t("Ja")
         )
       })
 

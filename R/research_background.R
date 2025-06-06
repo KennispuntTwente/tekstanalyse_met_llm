@@ -8,25 +8,7 @@ research_background_ui <- function(id) {
   ns <- NS(id)
   tagList(
     shinyjs::useShinyjs(),
-    bslib::card(
-      class = "card",
-      card_header(lang$t("Onderzoeksachtergrond")),
-      card_body(
-        p(paste0(
-          lang$t(
-            "Beschrijf kort je onderzoek zodat het LLM wat context heeft."
-          ),
-          lang$t(" Wat onderzoek je & hoe?")
-        )),
-        textAreaInput(
-          ns("research_background"),
-          NULL,
-          value = "",
-          rows = 3,
-          width = "100%"
-        )
-      )
-    )
+    uiOutput(ns("card"))
   )
 }
 
@@ -48,6 +30,28 @@ research_background_server <- function(
       ns <- session$ns
 
       research_background <- reactiveVal("")
+
+      output$card <- renderUI({
+        bslib::card(
+          class = "card",
+          card_header(lang()$t("Onderzoeksachtergrond")),
+          card_body(
+            p(paste0(
+              lang()$t(
+                "Beschrijf kort je onderzoek zodat het LLM wat context heeft."
+              ),
+              lang()$t(" Wat onderzoek je & hoe?")
+            )),
+            textAreaInput(
+              ns("research_background"),
+              NULL,
+              value = "",
+              rows = 3,
+              width = "100%"
+            )
+          )
+        )
+      })
 
       # Observe input
       observeEvent(input$research_background, {

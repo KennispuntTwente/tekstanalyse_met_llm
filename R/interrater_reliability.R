@@ -74,7 +74,7 @@ interrater_server <- function(
       # To start/initialize the module from the main server:
       start <- function() {
         showModal(modalDialog(
-          title = lang$t("Inter-rater reliability"),
+          title = lang()$t("Inter-rater reliability"),
           size = "l",
           easyClose = FALSE,
           footer = NULL,
@@ -105,7 +105,7 @@ interrater_server <- function(
         default_val <- min(10, max(1, max_items))
         numericInput(
           ns("sample_abs"),
-          lang$t("Aantal:"),
+          lang()$t("Aantal:"),
           value = default_val,
           min = 1,
           max = max_items,
@@ -148,9 +148,9 @@ interrater_server <- function(
         req(n, total_n)
         paste(
           n,
-          lang$t("van de"),
+          lang()$t("van de"),
           total_n,
-          lang$t("totale items worden willekeurig geselecteerd.")
+          lang()$t("totale items worden willekeurig geselecteerd.")
         )
       })
 
@@ -164,14 +164,14 @@ interrater_server <- function(
           total_items_full <- nrow(full_data)
 
           tagList(
-            tags$h4(lang$t("Steekproef")),
-            tags$p(lang$t("Selecteer hoeveel items je wil beoordelen.")),
+            tags$h4(lang()$t("Steekproef")),
+            tags$p(lang()$t("Selecteer hoeveel items je wil beoordelen.")),
             radioButtons(
               ns("sample_type"),
-              lang$t("Trek als:"),
+              lang()$t("Trek als:"),
               choices = setNames(
                 c("perc", "abs"),
-                c("Percentage", lang$t("Aantal"))
+                c("Percentage", lang()$t("Aantal"))
               ),
               selected = isolate(input$sample_type) %||% "perc", # Preserve selection if returning
               inline = TRUE
@@ -194,11 +194,11 @@ interrater_server <- function(
               # Use the dynamic UI output here
               uiOutput(ns("abs_count_input_ui_module")) # Will update based on data
             ),
-            tags$small(lang$t(
+            tags$small(lang()$t(
               "Aanbevolen: minimaal 10 items of 10% (welke groter is)"
             )),
             tags$hr(),
-            tags$p(strong(lang$t("Aantal items om te beoordelen:"))),
+            tags$p(strong(lang()$t("Aantal items om te beoordelen:"))),
             wellPanel(
               style = "background-color: #f8f9fa;", # Light background
               # Use the dynamic text output here
@@ -246,16 +246,16 @@ interrater_server <- function(
             character(0)
           submit_label <- ifelse(
             current_index == total_items,
-            lang$t("Afronden"),
-            lang$t("Volgende")
+            lang()$t("Afronden"),
+            lang()$t("Volgende")
           )
           show_back_button <- current_index > 1
 
           tagList(
             tags$h4(tags$strong(paste0(
-              lang$t("Beoordeel item "),
+              lang()$t("Beoordeel item "),
               current_index,
-              lang$t(" van "),
+              lang()$t(" van "),
               total_items,
               ":"
             ))),
@@ -265,7 +265,7 @@ interrater_server <- function(
                 label = HTML(paste0(
                   "<i>",
                   htmltools::htmlEscape(item_text),
-                  lang$t("</i><br><br><b>Geef een score (1–100):</b>")
+                  lang()$t("</i><br><br><b>Geef een score (1–100):</b>")
                 )),
                 value = selected_choice %||% NA,
                 min = 1,
@@ -282,13 +282,13 @@ interrater_server <- function(
                   label = HTML(paste0(
                     "<b>Item:</b><br><i>",
                     htmltools::htmlEscape(item_text),
-                    lang$t("</i><br><br><b>Categorie:</b><br><i>"),
+                    lang()$t("</i><br><br><b>Categorie:</b><br><i>"),
                     htmltools::htmlEscape(current_category),
-                    lang$t("</i><br><br>Is deze categorie van toepassing?")
+                    lang()$t("</i><br><br>Is deze categorie van toepassing?")
                   )),
                   choices = setNames(
                     c(TRUE, FALSE),
-                    c(lang$t("Ja"), lang$t("Nee"))
+                    c(lang()$t("Ja"), lang()$t("Nee"))
                   ),
                   selected = selected_choice
                 )
@@ -327,7 +327,7 @@ interrater_server <- function(
                   if (show_back_button) {
                     actionButton(
                       ns("go_back"),
-                      lang$t("Terug"),
+                      lang()$t("Terug"),
                       icon = icon("arrow-left"),
                       class = "btn-default"
                     )
@@ -364,7 +364,7 @@ interrater_server <- function(
 
         if (is.null(n_sample) || n_sample <= 0 || n_sample > total_n) {
           showNotification(
-            lang$t("Ongeldige steekproefgrootte"),
+            lang()$t("Ongeldige steekproefgrootte"),
             type = "error"
           )
           return()
@@ -472,7 +472,7 @@ interrater_server <- function(
               user_input > 100
           ) {
             showNotification(
-              lang$t("Voer een geldige score in tussen 1 en 100."),
+              lang()$t("Voer een geldige score in tussen 1 en 100."),
               type = "warning"
             )
             return()
@@ -480,7 +480,7 @@ interrater_server <- function(
         } else if (assign_multiple_categories) {
           if (!user_input %in% c("TRUE", "FALSE", TRUE, FALSE)) {
             showNotification(
-              lang$t("Beantwoord met 'Ja' of 'Nee' voor deze categorie."),
+              lang()$t("Beantwoord met 'Ja' of 'Nee' voor deze categorie."),
               type = "warning"
             )
             return()
@@ -490,7 +490,7 @@ interrater_server <- function(
         } else {
           if (is.null(user_input) || user_input == "") {
             showNotification(
-              lang$t("Selecteer een categorie."),
+              lang()$t("Selecteer een categorie."),
               type = "warning"
             )
             return()
@@ -539,16 +539,16 @@ interrater_server <- function(
                 # Interpret the effect size
                 effect_size_d <- sensitivity$d
                 effect_size_label <- if (effect_size_d < 0.3) {
-                  lang$t("een klein effect")
+                  lang()$t("een klein effect")
                 } else if (effect_size_d < 0.7) {
-                  lang$t("een gemiddeld effect")
+                  lang()$t("een gemiddeld effect")
                 } else {
-                  lang$t("een groot effect")
+                  lang()$t("een groot effect")
                 }
 
                 # Create Dutch summary sentence
                 sensitivity_sentence <- sprintf(
-                  lang$t(
+                  lang()$t(
                     "Met een steekproefgrootte van %d hadden we bij deze test 80%% power om een effectgrootte van %.2f (Cohen's d) te detecteren, wat overeenkomt met %s volgens de conventies van [Cohen (1988)](https://doi.org/10.4324/9780203771587). Kleinere verschillen tussen het taalmodel en de menselijke beoordelaar zijn moeilijker te detecteren met deze steekproefgrootte."
                   ),
                   length(user_scores),
@@ -567,7 +567,7 @@ interrater_server <- function(
                 )
 
                 showNotification(
-                  lang$t("Inter-rater reliability is berekend! (t-test)"),
+                  lang()$t("Inter-rater reliability is berekend! (t-test)"),
                   type = "message",
                   duration = 3
                 )
@@ -626,7 +626,7 @@ interrater_server <- function(
 
                 # 5. Show message
                 showNotification(
-                  lang$t("Inter-rater reliability is berekend! (Kappa)"),
+                  lang()$t("Inter-rater reliability is berekend! (Kappa)"),
                   type = "message",
                   duration = 3
                 )
@@ -641,7 +641,12 @@ interrater_server <- function(
             error = function(e) {
               # If any step above failed, catch the error here
               # Return a standardized error structure
-              app_error(e, when = "during Kappa calculation", fatal = FALSE)
+              app_error(
+                e,
+                when = "during Kappa calculation",
+                fatal = FALSE,
+                lang = lang()
+              )
               NULL
             }
           )

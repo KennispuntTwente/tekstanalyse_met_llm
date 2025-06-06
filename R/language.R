@@ -12,25 +12,25 @@ language_ui <- function(id) {
 
 ##### 2 Server ####
 
-language_server <- function(
-  id,
-  processing
-) {
+language_server <- function(id, processing) {
   moduleServer(
     id,
     function(input, output, session) {
       ns <- session$ns
 
-      # Initialize translator object
-      init_lang <- shiny.i18n::Translator$new(
-        translation_json_path = "language/language.json"
-      )
-      init_lang$set_translation_language(
-        getOption("language", "nl")
-      )
-      lang <- reactiveVal(init_lang)
+      # Store current language code separately
+      current_lang_code <- reactiveVal(getOption("language", "nl"))
 
-      # Only show in Categorisatie/Onderwerpextractie
+      # Initialize Translator object (updated on language change)
+      lang <- reactive({
+        translator <- shiny.i18n::Translator$new(
+          translation_json_path = "language/language.json"
+        )
+        translator$set_translation_language(current_lang_code())
+        translator
+      })
+
+      # UI rendering
       output$language_ui <- renderUI({
         tagList(
           shinyjs::useShinyjs(),
@@ -39,34 +39,25 @@ language_server <- function(
             shinyWidgets::radioGroupButtons(
               ns("toggle"),
               NULL,
-              choices = setNames(
-                c("en", "nl"),
-                c("English", "Nederlands")
-              ),
-              selected = isolate(lang()$get_translation_language()),
+              choices = setNames(c("en", "nl"), c("English", "Nederlands")),
+              selected = current_lang_code(), # Use separate reactive value here
               size = "sm"
             )
           )
         )
       })
 
-      # Observe the toggle input and update the reactive value
+      # Update language code based on toggle
       observeEvent(input$toggle, {
-        req(input$toggle)
-        req(isTRUE(input$toggle %in% c("en", "nl")))
-        new_lang <- lang()$clone()
-        new_lang$set_translation_language(input$toggle)
-        lang(new_lang)
+        req(input$toggle %in% c("en", "nl"))
+        current_lang_code(input$toggle)
       })
 
-      # Disable when processing
+      # Disable during processing
       observeEvent(
         processing(),
         {
-          shinyjs::toggleState(
-            "toggle",
-            condition = !processing()
-          )
+          shinyjs::toggleState("toggle", condition = !processing())
         },
         ignoreInit = TRUE
       )

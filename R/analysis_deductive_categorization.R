@@ -196,7 +196,7 @@ categories_server <- function(
             value <- txt_in_fields()[i] %||% ""
             textAreaInput(
               inputId = ns(paste0("category", i)),
-              label = paste(lang$t("Categorie"), i),
+              label = paste(lang()$t("Categorie"), i),
               value = value,
               rows = 1,
               width = "100%"
@@ -219,9 +219,9 @@ categories_server <- function(
         if (mode() == "Categorisatie") {
           bslib::card(
             class = "card",
-            card_header(lang$t("Categorieën")),
+            card_header(lang()$t("Categorieën")),
             card_body(
-              p(lang$t(
+              p(lang()$t(
                 "Geef beknopte, duidelijke omschrijvingen. Overweeg een categorie 'Overig'/'Onbekend'/'Geen antwoord'."
               )),
               div(

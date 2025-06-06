@@ -36,11 +36,11 @@ write_paragraphs_toggle_server <- function(
           shinyjs::useShinyjs(),
           bslib::card(
             class = "card",
-            card_header(lang$t("Rapport schrijven")),
+            card_header(lang()$t("Rapport schrijven")),
             card_body(
               # Toggle for inter-rater reliability
               p(
-                lang$t("Rapport schrijven over categorieën?"),
+                lang()$t("Rapport schrijven over categorieën?"),
                 class = "mb-2 text-center"
               ),
               div(
@@ -49,10 +49,10 @@ write_paragraphs_toggle_server <- function(
                   ns("toggle"),
                   NULL,
                   choices = c(
-                    lang$t("Nee"),
-                    lang$t("Ja")
+                    lang()$t("Nee"),
+                    lang()$t("Ja")
                   ),
-                  selected = lang$t("Ja"),
+                  selected = lang()$t("Ja"),
                   size = "sm"
                 )
               )
@@ -63,7 +63,7 @@ write_paragraphs_toggle_server <- function(
 
       # Observe the toggle input and update the reactive value
       observeEvent(input$toggle, {
-        toggle(input$toggle == lang$t("Ja"))
+        toggle(input$toggle == lang()$t("Ja"))
       })
 
       # Disable when processing

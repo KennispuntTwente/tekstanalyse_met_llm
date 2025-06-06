@@ -36,11 +36,11 @@ human_in_the_loop_toggle_server <- function(
           shinyjs::useShinyjs(),
           bslib::card(
             class = "card",
-            card_header(lang$t("Human-in-the-loop")),
+            card_header(lang()$t("Human-in-the-loop")),
             card_body(
               # Toggle for inter-rater reliability
               p(
-                lang$t("Zelf onderwerpen bewerken?"),
+                lang()$t("Zelf onderwerpen bewerken?"),
                 class = "mb-2 text-center"
               ),
               div(
@@ -48,8 +48,8 @@ human_in_the_loop_toggle_server <- function(
                 shinyWidgets::radioGroupButtons(
                   ns("toggle"),
                   NULL,
-                  choices = c(lang$t("Nee"), lang$t("Ja")),
-                  selected = lang$t("Nee"),
+                  choices = c(lang()$t("Nee"), lang()$t("Ja")),
+                  selected = lang()$t("Nee"),
                   size = "sm"
                 )
               )
@@ -60,7 +60,7 @@ human_in_the_loop_toggle_server <- function(
 
       # Observe the toggle input and update the reactive value
       observeEvent(input$toggle, {
-        toggle(input$toggle == lang$t("Ja"))
+        toggle(input$toggle == lang()$t("Ja"))
       })
 
       # Disable when processing

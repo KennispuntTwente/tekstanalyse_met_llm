@@ -31,11 +31,11 @@ assign_multiple_categories_toggle_server <- function(
           shinyjs::useShinyjs(),
           bslib::card(
             class = "card",
-            card_header(lang$t("Meerdere categorieën")),
+            card_header(lang()$t("Meerdere categorieën")),
             card_body(
               # Toggle for inter-rater reliability
               p(
-                lang$t("Meerdere categorieën per tekst toegestaan?"),
+                lang()$t("Meerdere categorieën per tekst toegestaan?"),
                 class = "mb-2 text-center"
               ),
               div(
@@ -44,10 +44,10 @@ assign_multiple_categories_toggle_server <- function(
                   ns("toggle"),
                   NULL,
                   choices = c(
-                    lang$t("Nee"),
-                    lang$t("Ja")
+                    lang()$t("Nee"),
+                    lang()$t("Ja")
                   ),
-                  selected = lang$t("Nee"),
+                  selected = lang()$t("Nee"),
                   size = "sm"
                 )
               )
@@ -58,7 +58,7 @@ assign_multiple_categories_toggle_server <- function(
 
       # Observe the toggle input and update the reactive value
       observeEvent(input$toggle, {
-        toggle(input$toggle == lang$t("Ja"))
+        toggle(input$toggle == lang()$t("Ja"))
       })
 
       # Disable when processing
