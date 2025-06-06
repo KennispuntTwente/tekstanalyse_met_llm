@@ -14,59 +14,59 @@ params:
 rl <- params$result_list
 ```
 
-## Methode
+## Method
 
-Er zijn `r nrow(rl$df)` teksten geanalyseerd met een LLM (model: `r rl$model`),
-waarbij het LLM gevraagd werd om een score (1-100) te geven voor
-in hoeverre een tekst bij het kenmerk '*`r rl$scoring_characteristic`*' past.
+`r nrow(rl$df)` texts were analyzed with an LLM (model: `r rl$model`),
+where the LLM was asked to provide a score (1-100) indicating
+how well a text fits the characteristic '*`r rl$scoring_characteristic`*'.
 
-Elke tekst is afzonderlijk gepresenteerd aan het LLM. 
+Each text was presented separately to the LLM.
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 if (!is.null(rl$irr)) {
   cat(paste0(
-    "### Betrouwbaarheid\n",
-    "De interbeoordelaarsbetrouwbaarheid tussen het taalmodel en een menselijke beoordelaar berekend.",
-    " Hiervoor is een willekeurige steekproef genomen van " , 
-    rl$irr$subjects, " teksten.",
-    "Met een paired t-test is zijn de gegeven scores van het taalmodel vergeleken met de gegeven scores van de menselijke beoordelaar.",
-    " Het gemiddelde verschil tussen de scores is ",
-    round(rl$irr$estimate, 2), " (95% CI [", 
+    "### Reliability\n",
+    "The inter-rater reliability between the language model and a human rater was calculated.",
+    " A random sample of ",
+    rl$irr$subjects, " texts was taken.",
+    "A paired t-test was used to compare the scores given by the language model with those given by the human rater.",
+    " The mean difference between the scores is ",
+    round(rl$irr$estimate, 2), " (95% CI [",
     round(rl$irr$conf.low, 2), ", ",
     round(rl$irr$conf.high, 2), "];",
-    " gemiddelde taalmodel = ", round(rl$irr$llm_mean, 2), 
+    " mean language model = ", round(rl$irr$llm_mean, 2),
     " [sd = ", round(rl$irr$llm_sd, 2), "];",
-    " gemiddelde menselijke beoordelaar = ", round(rl$irr$user_mean, 2),
+    " mean human rater = ", round(rl$irr$user_mean, 2),
     " [sd = ", round(rl$irr$user_sd, 2), "]).",
-    " Dit is een  ",
+    " This is a  ",
     dplyr::case_when(
       rl$irr$p.value < 0.05 ~ "significant",
-      TRUE ~ "niet-significant"
+      TRUE ~ "not significant"
     ),
-    " verschil (t(", rl$irr$parameter, ") = ",
+    " difference (t(", rl$irr$parameter, ") = ",
     round(rl$irr$statistic, 3), ", p = ", round(rl$irr$p.value, 3), ") ",
-    " en valt te interpreteren als ",
+    " and can be interpreted as ",
     dplyr::case_when(
-      rl$irr$p.value >= 0.05 ~ "een overeenkomst tussen de scores van het taalmodel en de menselijke beoordelaar",
-      rl$irr$llm_mean > rl$irr$user_mean ~ "een overschatting van de scores door het taalmodel",
-      rl$irr$llm_mean < rl$irr$user_mean ~ "een onderschatting van de scores door het taalmodel",
+      rl$irr$p.value >= 0.05 ~ "an agreement between the scores of the language model and the human rater",
+      rl$irr$llm_mean > rl$irr$user_mean ~ "an overestimation of the scores by the language model",
+      rl$irr$llm_mean < rl$irr$user_mean ~ "an underestimation of the scores by the language model",
       TRUE ~ "?"
     ), ".\n\n", rl$irr$sensitivity_sentence
   ))
 }
 ```
 
-## Resultaten
+## Results
 
-### Statistieken
+### Statistics
 
-Onderstaande tabel toont statistieken van de gegeven scores.
+Below table shows statistics of the given scores.
 
 ```{r results='asis', echo=FALSE, error=TRUE}
 rl$df |>
   dplyr::summarise(
-    Gemiddelde = round(mean(result), 2),
-    Standaardafwijking = round(sd(result), 2),
+    Mean = round(mean(result), 2),
+    `Standard deviation` = round(sd(result), 2),
     Minimum = min(result),
     Maximum = max(result),
     Median = median(result)
@@ -86,18 +86,19 @@ rl$df |>
   )
 ```
 
-### Per tekst
+### Per text
 
-Onderstaande tabel de scores per tekst.
+Below table shows the scores per text.
 
 ```{r results='asis', echo=FALSE, error=TRUE}
 rl$df |>
   dplyr::select(result, text) |>
-  dplyr::rename(Tekst = text, Score = result) |>
+  dplyr::rename(Text = text, Score = result) |>
   dplyr::arrange(dplyr::desc(Score)) |>
   DT::datatable(
     extensions = 'Buttons',
     options = list(
+      rownnames = FALSE,
       pageLength = 10,
       lengthMenu = c(10, 25, 50, 100),
       scrollX = TRUE,
