@@ -1,5 +1,5 @@
 ---
-title: "Onderwerpextractie met LLM"
+title: "Topic extraction with LLM"
 output: 
   html_document:
     theme:
@@ -14,44 +14,44 @@ library(stringr)
 rl <- params$result_list
 ```
 
-## Methode
+## Method
 
-Er zijn `r nrow(rl$df)` teksten geanalyseerd met een LLM,
-om erachter te komen welke verschillende onderwerpen in de teksten
-worden genoemd en hoe vaak.
+`r nrow(rl$df)` texts have been analyzed with a language model,
+to discover which different topics are mentioned in the texts
+and how often.
 
-Hierbij is een topic modelling-procedure is toegepast op basis van
-[Wanrooij, Manhar, en Yang (2024)](https://bnaic2024.sites.uu.nl/wp-content/uploads/sites/986/2024/10/Topic-Modeling-for-Small-Data-using-Generative-LLMs.pdf)
-en [Pham et al. (2023)](https://arxiv.org/abs/2311.01449). Deze procedure bestaat uit 3 stappen:
+A topic modeling procedure has been applied based on
+[Wanrooij, Manhar, and Yang (2024)](https://bnaic2024.sites.uu.nl/wp-content/uploads/sites/986/2024/10/Topic-Modeling-for-Small-Data-using-Generative-LLMs.pdf)
+and [Pham et al. (2023)](https://arxiv.org/abs/2311.01449). This procedure consists of 3 steps:
 
-* Bij stap 1 worden de teksten aan het LLM gepresenteerd in willekeurig getrokken groepen
-van maximaal 5 teksten, met de vraag om te reageren met mogelijke onderwerpen 
-die niet te specifiek en niet te algemeen zijn. Dit vorm de lijst van mogelijke onderwerpen.
-Voor deze stap is het model `r rl$model` gebruikt.
+* In step 1, the texts are presented to the LLM in randomly drawn groups
+of up to 5 texts, asking it to respond with possible topics
+that are neither too specific nor too general. This forms the list of possible topics.
+For this step, the model `r rl$model` has been used.
 
-* Bij stap 2 wordt de lijst van mogelijke onderwerpen
-gepresenteerd aan het LLM, waarbij gevraagd wordt de lijst onderwerpen terug te brengen
-naar een lijst onderwerpen zonder dubbelingen en ook weer zonder te specifieke
-of te algemene onderwerpen. Dit vormt de lijst van definitieve onderwerpen.
-Voor deze stap is het model `r rl$model_reductie` gebruikt. 
+* In step 2, the list of possible topics
+is presented to the LLM, asking it to reduce the list of topics
+to a final list without duplications and also avoiding overly specific
+or overly general topics. This forms the list of final topics.
+For this step, the model `r rl$model_reductie` has been used.
 
 ```{r echo=FALSE, results='asis', error=TRUE}  
-multiple_categories_text <- "Het LLM moest één onderwerp toewijzen per tekst"
+multiple_categories_text <- "The LLM was required to assign one category per text."
 if (isTRUE(rl$assign_multiple_categories)) {
-  multiple_categories_text <- "Het LLM mocht meerdere onderwerpen toewijzen per tekst (minimaal één onderwerp per tekst)"
+  multiple_categories_text <- "The LLM was allowed to assign multiple categories per text (at least one category per text)."
 }
 ```
 
-* Bij stap 3 wordt elke tekst individueel gepresenteerd aan het LLM, samen
-met de lijst van definitieve onderwerpen, met de vraag om deze toe te wijzen aan 
-de tekst. `r multiple_categories_text`. Voor deze stap is het model `r rl$model` gebruikt. 
+* In step 3, each text is presented individually to the LLM,
+along with the list of final topics, asking it to assign these topics to the text.
+`r multiple_categories_text`. For this step, the model `r rl$model` has been used.
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 if (!is.null(rl$paragraphs)) {
   cat(paste0(
-    "Met de teksten waaraan onderwerpen zijn toegevoegd, heeft een taalmodel ",
-    "(", rl$model, ") tenslotte een rapport geschreven.", "\n",
-    "Per onderwerp is met quotes samengevat wat er is gezegd."
+    "With the texts to which subjects were added, a language model ",
+    "(", rl$model, ") finally wrote a report.", "\n",
+    "For each subject, a summary was created with quotes summarizing what was said."
   ))
 }
 ```
@@ -59,34 +59,34 @@ if (!is.null(rl$paragraphs)) {
 ```{r echo=FALSE, results='asis', error=TRUE}
 if (!is.null(rl$irr)) {
   cat(paste0(
-    "### Betrouwbaarheid\n",
-    "Voor de toewijzing bij stap 3 is de interbeoordelaarsbetrouwbaarheid tussen het taalmodel en een menselijke beoordelaar berekend.",
-    " Hiervoor is een willekeurige steekproef genomen van " , 
-    rl$irr$subjects, " teksten.",
-    " De berekende interbeoordelaarsbetrouwbaarheid is ",
-    round(rl$irr$value, 3), " (", rl$irr$irr.name, "; ", rl$irr$stat.name, " = ", 
+    "### Reliability\n",
+    "The inter-rater reliability between the language model and a human rater was calculated. ",
+    "A random sample of ",
+    rl$irr$subjects, " texts was taken.",
+    " The calculated inter-rater reliability is ",
+    round(rl$irr$value, 3), " (", rl$irr$irr.name, "; ", rl$irr$stat.name, " = ",
     round(rl$irr$statistic, 3), ", p = ", round(rl$irr$p.value, 3), ").",
-    " Dit valt te interpreteren als een ",
+    " This can be interpreted as a ",
     dplyr::case_when(
-      rl$irr$value < 0 ~ "slechte ('poor')",
-      rl$irr$value < 0.2 ~ "zwakke ('slight')",
-      rl$irr$value < 0.4 ~ "matige ('fair')",
-      rl$irr$value < 0.6 ~ "redelijke ('moderate')",
-      rl$irr$value < 0.8 ~ "goede ('substantial')",
-      rl$irr$value < 1 ~ "zeer goede ('almost perfect')",
-      TRUE ~ "perfecte"
+      rl$irr$value < 0 ~ "poor",
+      rl$irr$value < 0.2 ~ "slight",
+      rl$irr$value < 0.4 ~ "fair",
+      rl$irr$value < 0.6 ~ "moderate",
+      rl$irr$value < 0.8 ~ "substantial",
+      rl$irr$value < 1 ~ "almost perfect",
+      TRUE ~ "perfect"
     ),
-    " overeenstemming tussen het taalmodel en de menselijke beoordelaar ([Landis & Koch, 1977](https://doi.org/10.2307/2529310))."
+    " agreement between the language model and the human rater ([Landis & Koch, 1977](https://doi.org/10.2307/2529310))."
   ))
 }
 ```
 
-## Resultaten
+## Results
 
-### Frequentie
+### Frequency
 
-Onderstaande tabel toont welke onderwerpen zijn geïdentificeerd en hoe vaak
-deze zijn genoemd in de teksten.
+Below table shows the topics that have been identified and how often
+they were mentioned in the texts.
 
 ```{r, echo=FALSE, results='asis', error=TRUE}
 
@@ -94,11 +94,11 @@ if (!isTRUE(rl$assign_multiple_categories)) {
   rl$df |>
   dplyr::group_by(result) |>
   dplyr::summarise(
-    Aantal = dplyr::n(),
+    Number = dplyr::n(),
     Percentage = round(dplyr::n() / nrow(rl$df) * 100, 2)
   ) |>
-  dplyr::arrange(dplyr::desc(Aantal)) |>
-  dplyr::rename(Onderwerp = result) |>
+  dplyr::arrange(dplyr::desc(Number)) |>
+  dplyr::rename(Topic = result) |>
   DT::datatable(
     rownames = FALSE,
     extensions = 'Buttons',
@@ -120,13 +120,13 @@ if (!isTRUE(rl$assign_multiple_categories)) {
     dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(.x, na.rm = TRUE))) |>
     tidyr::pivot_longer(
       cols = dplyr::everything(),
-      names_to = "Onderwerp",
-      values_to = "Aantal"
+      names_to = "Topic",
+      values_to = "Number"
     ) |>
     dplyr::mutate(
-      Percentage = round(Aantal / nrow(rl$df) * 100, 2)
+      Percentage = round(Number / nrow(rl$df) * 100, 2)
     ) |>
-    dplyr::arrange(dplyr::desc(Aantal)) |>
+    dplyr::arrange(dplyr::desc(Number)) |>
     DT::datatable(
       rownames = FALSE,
       extensions = 'Buttons',
@@ -145,16 +145,16 @@ if (!isTRUE(rl$assign_multiple_categories)) {
 
 ```
 
-### Per tekst
+### Per text
 
-Onderstaande tabel toont per tekst welk onderwerp deze heeft gekregen.
+Below table shows the assigned topic for each text.
 
 ```{r, echo=FALSE, results='asis', error=TRUE}
 if (!isTRUE(rl$assign_multiple_categories)) {
   rl$df |>
   dplyr::select(result, text) |>
-  dplyr::rename(Tekst = text, Onderwerp = result) |>
-  dplyr::arrange(dplyr::desc(Onderwerp)) |>
+  dplyr::rename(Text = text, Topic = result) |>
+  dplyr::arrange(dplyr::desc(Topic)) |>
   DT::datatable(
     extensions = 'Buttons',
     options = list(
@@ -170,8 +170,8 @@ if (!isTRUE(rl$assign_multiple_categories)) {
   )
 } else {
   rl$df |>
-    dplyr::rename(Tekst = text) |>
-    dplyr::arrange(dplyr::desc(Tekst)) |>
+    dplyr::rename(Text = text) |>
+    dplyr::arrange(dplyr::desc(Text)) |>
     DT::datatable(
       options = list(
         pageLength = 10,
@@ -192,8 +192,8 @@ if (is.null(rl$paragraphs)) return(invisible(NULL))
 output <- list()
 
 output <- append(output, list(
-  htmltools::HTML("<h3>Rapport</h3>"),
-  htmltools::HTML("<p>Onderstaande paragrafen zijn de samenvattingen van de teksten per onderwerp.</p>"),
+  htmltools::HTML("<h3>Report</h3>"),
+  htmltools::HTML("<p>The following paragraphs are the summaries of the texts per topic.</p>"),
   htmltools::div(
     class = "d-flex justify-content-center",
     htmltools::div(
@@ -206,9 +206,9 @@ output <- append(output, list(
           bsicons::bs_icon("exclamation-triangle-fill", class = "me-2 fs-1"),
           htmltools::tags$small(
             htmltools::tags$i(
-              "Taalmodellen kunnen 'hallucineren'.",
-              " Controleer of de samenvattingen worden ondersteund door de teksten.",
-              " Iconen bij quotes geven aan of ze voorkomen in de teksten."
+              "Language models can 'hallucinate'.",
+              " Check whether the summaries are supported by the texts.",
+              " Icons next to quotes indicate whether they appear in the texts."
             )
           )
         )
@@ -347,9 +347,9 @@ for (i in seq_along(rl$paragraphs)) {
             bsicons::bs_icon("exclamation-triangle-fill", class = "me-2 fs-1"),
             htmltools::tags$small(
               htmltools::tags$i(
-                "De prompt voor de samenvatting van deze categorie paste",
-                " niet in het context-window van het taalmodel.",
-                " Mogelijk zijn niet alle instructies of teksten door het taalmodel gezien."
+                "The prompt for the summary of this category did",
+                " not fit in the context window of the language model.",
+                " It is possible that not all instructions or texts were seen by the language model."
               )
             )
           )
@@ -368,7 +368,7 @@ for (i in seq_along(rl$paragraphs)) {
   if (!is.null(paragraph$texts)) {
     acc <- bslib::accordion(
       bslib::accordion_panel(
-        title = "Bekijk teksten",
+        title = "View texts",
         htmltools::HTML(paste0("<ul>", paste0("<li><i>", paragraph$texts, "</i></li>", collapse = ""), "</ul>")),
       ),
       id = paste0("acc-", i),
@@ -383,15 +383,15 @@ for (i in seq_along(rl$paragraphs)) {
 if (length(rl$paragraphs) > 0) {
   htmltools::tagList(output)
 }
-```
+``` 
 
 ```{r footer, echo=FALSE, results='asis', error=TRUE}
 htmltools::tags$footer(
   style = "text-align:center; font-size: 0.8em; color: #888; margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee;",
   htmltools::HTML(paste0(
-    "Deze analyse is automatisch geproduceerd door een app ontwikkeld door ",
-    "<a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a> i.s.m. GGD Twente.<br>",
-    "Bekijk de <a href='https://github.com/kennispunttwente/tekstanalyse_met_llm' target='_blank'>GitHub-repository</a> voor meer informatie.",
+    "This analysis was automatically generated by an app developed by ",
+    "<a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a> in collaboration with GGD Twente.<br>",
+    "Visit the <a href='https://github.com/kennispunttwente/tekstanalyse_met_llm' target='_blank'>GitHub-repository</a> for more information.",
     "<br>",
     "<br>",
     format(Sys.Date(), "%Y-%m-%d")
