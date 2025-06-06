@@ -1,11 +1,11 @@
-# Text Analysis with LLM (app)
+# Text analysis with LLM (app)
 *[Klik hier voor een Nederlandse-README (click here for a Dutch README).](#tekstanalyse-met-llm-app)*
 
 This is an app (R, Shiny) for (automated) qualitative text analysis using large language models (LLMs). Through a user-friendly interface, users can upload texts and have them analyzed by an LLM. The app offers various types of analysis, including categorization, scoring on characteristics, and topic modelling.
 
 ## Features
 
-### Automated Text Analysis by an LLM:
+### Automated text analysis by an LLM
 
 - **Categorization**: Users provide a list of categories, and the model classifies texts accordingly (e.g., 'positive', 'negative', 'neutral').
 
@@ -13,7 +13,7 @@ This is an app (R, Shiny) for (automated) qualitative text analysis using large 
 
 - **Topic Modelling**: The model identifies topics in the texts without requiring predefined categories or features. Topics are then assigned to texts. Based on methods from [Wanrooij, Manhar & Yang (2024)](https://bnaic2024.sites.uu.nl/wp-content/uploads/sites/986/2024/10/Topic-Modeling-for-Small-Data-using-Generative-LLMs.pdf) and [Pham et al. (2023)](https://arxiv.org/abs/2311.01449). This approach is shown to outperform BERTopic and works well on small datasets.
 
-### User-Friendly Interface
+### User-friendly interface
 
 - **Web interface** suitable for non-technical users. Users can easily upload texts, choose an analysis method, and start the analysis.  
   - See [screenshot](example/screenshot_interface_en.png)
@@ -21,7 +21,7 @@ This is an app (R, Shiny) for (automated) qualitative text analysis using large 
 - **Report with results and explanation** of the applied method.  
   - See [screenshot](example/usecase/report_with_results_screenshot.png)
 
-### Additional Analysis Capabilities
+### Additional analysis features
 
 - Generate a **summary** of the assigned categories, including representative quotes.
 
@@ -39,7 +39,7 @@ This is an app (R, Shiny) for (automated) qualitative text analysis using large 
 
 - App interface & results can be set to **English or Dutch**.
 
-## Use Case
+## Use case
 
 This app can be used to analyze open-ended responses in surveys, categorize texts like tweets or news articles, etc.
 
@@ -49,7 +49,7 @@ Example: Kennispunt Twente used the app to analyze open survey responses about i
 
 The app can be run in three ways. In all cases, the file `app.R` (or a variant) starts the app. This file configures the app, such as the LLM provider and available models.
 
-### 1. R Environment
+### 1. R environment
 
 Requires an [R](https://www.r-project.org/) installation (developed on R 4.4.2, other versions may also work) and optionally [RStudio](https://www.rstudio.com/products/rstudio/download/).  
 [Pandoc](https://pandoc.org/) is required to generate reports (included with RStudio).
@@ -62,7 +62,7 @@ Steps:
 
 3. Run `app.R`
 
-### 2. Desktop App
+### 2. Desktop app
 
 A pre-built desktop app will be available under "Releases" (Windows 10/11, 64-bit).
 
@@ -76,7 +76,7 @@ Steps:
 
 (This is built with Node.js & Electron. See `package.json` for details.)
 
-### 3. Container App
+### 3. Container app
 
 You can run the app using Docker. All dependencies are included. Suitable for server or cloud deployment.
 
@@ -85,15 +85,15 @@ You can run the app using Docker. All dependencies are included. Suitable for se
 
 To customize, edit `Dockerfile-app.R` and build the container.
 
-## About This App
+## About this app
 
-Developed by [Kennispunt Twente](https://www.kennispunttwente.nl) in collaboration with GGD Twente.  
-We work on generative AI applications for the public good.
+This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) in collaboration with GGD Twente. Together, we work on generative AI applications for the public good.
 
-Suggestions or ideas?  
+Suggestions or ideas for the app? 
 [Open an issue on GitHub](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new)
 
-Contact: [info@kennispunttwente.nl](mailto:info@kennispunttwente.nl)
+Kennispunt Twente is a (Dutch) non-profit organization focused on data, insights, and knowledge. Interested in what we can do for your organization, especially in generative AI?
+Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our developers](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
 
 ---
 
