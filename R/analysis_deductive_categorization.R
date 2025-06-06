@@ -323,6 +323,33 @@ categories_server <- function(
         }
       })
 
+      observeEvent(lang(), {
+        shinyjs::delay(100, {
+          if (mode() == "Categorisatie") {
+            if (!isEditing() || processing()) {
+              lapply(seq_len(n_fields()), function(i) {
+                shinyjs::disable(paste0("category", i))
+              })
+            } else {
+              lapply(seq_len(n_fields()), function(i) {
+                shinyjs::enable(paste0("category", i))
+              })
+            }
+
+            # Re-render the edit button (pencil/save)
+            output$editButtonUI <- renderUI({
+              button_label <- if (isEditing()) icon("save") else icon("pencil")
+              actionButton(
+                ns("toggleEdit"),
+                label = tagList(button_label, ""),
+                class = "btn btn-primary",
+                style = "min-width: 75px;"
+              )
+            })
+          }
+        })
+      })
+
       # Also create reactive for unique, non-empty texts
       nonEmptyTexts <- reactive({
         values <- txt_in_fields()

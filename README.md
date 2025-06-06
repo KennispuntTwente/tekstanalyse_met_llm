@@ -16,10 +16,10 @@ This is an app (R, Shiny) for (automated) qualitative text analysis using large 
 ### User-Friendly Interface
 
 - **Web interface** suitable for non-technical users. Users can easily upload texts, choose an analysis method, and start the analysis.  
-  - See ![screenshot](example/screenshot_interface.png)
+  - See [screenshot](example/screenshot_interface_en.png)
 
 - **Report with results and explanation** of the applied method.  
-  - See ![screenshot](example/usecase/report_with_results_screenshot.png)
+  - See [screenshot](example/usecase/report_with_results_screenshot.png)
 
 ### Additional Analysis Capabilities
 
@@ -110,7 +110,7 @@ Contact: [info@kennispunttwente.nl](mailto:info@kennispunttwente.nl)
 
 ### Interface
 
-![Screenshot of interface](example/screenshot_interface.png)
+![Screenshot of interface](example/screenshot_interface_en.png)
 
 ### Report with results (topic modelling)
 
@@ -155,12 +155,12 @@ zoals categorisatie, scoren op kenmerken, en topic modelling.
     gebruikers. Met een eenvoudige interface kunnen gebruikers
     teksten uploaden, de analyse-methode kiezen, en de analyse starten
     
-    - Zie ![Screenshot](example/screenshot_interface.png)
+    - Zie [screenshot](example/screenshot_interface_nl.png)
         
 -   Gebruikers krijgen een **rapport met de resultaten en uitleg** over
     de toegepaste methode
     
-    - Zie ![Screenshot](example/usecase/report_with_results_screenshot.png)
+    - Zie [screenshot](example/usecase/report_with_results_screenshot.png)
         
 ### Aanvullende mogelijkheden bij tekstanalyse:
 
@@ -286,7 +286,7 @@ Bezoek [onze website](https://www.kennispunttwente.nl) of [neem contact op met o
 
 ### Interface
 
-![Screenshot van de interface](example/screenshot_interface.png)
+![Screenshot van de interface](example/screenshot_interface_nl.png)
 
 ### Rapport met resultaten (topic modelling)
 
