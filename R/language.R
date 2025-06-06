@@ -12,7 +12,11 @@ language_ui <- function(id) {
 
 ##### 2 Server ####
 
-language_server <- function(id, processing) {
+language_server <- function(
+  id,
+  processing,
+  can_toggle = getOption("language__can_toggle", TRUE)
+) {
   moduleServer(
     id,
     function(input, output, session) {
@@ -32,6 +36,7 @@ language_server <- function(id, processing) {
 
       # UI rendering
       output$language_ui <- renderUI({
+        req(isTRUE(can_toggle))
         tagList(
           shinyjs::useShinyjs(),
           div(
@@ -49,6 +54,7 @@ language_server <- function(id, processing) {
 
       # Update language code based on toggle
       observeEvent(input$toggle, {
+        req(isTRUE(can_toggle))
         req(input$toggle %in% c("en", "nl"))
         current_lang_code(input$toggle)
       })

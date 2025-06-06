@@ -36,9 +36,9 @@ or overly general topics. This forms the list of final topics.
 For this step, the model `r rl$model_reductie` has been used.
 
 ```{r echo=FALSE, results='asis', error=TRUE}  
-multiple_categories_text <- "The LLM was required to assign one category per text."
+multiple_categories_text <- "The LLM was required to assign one category per text"
 if (isTRUE(rl$assign_multiple_categories)) {
-  multiple_categories_text <- "The LLM was allowed to assign multiple categories per text (at least one category per text)."
+  multiple_categories_text <- "The LLM was allowed to assign multiple categories per text (at least one category per text)"
 }
 ```
 

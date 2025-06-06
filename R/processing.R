@@ -474,7 +474,8 @@ processing_server <- function(
               reduce_topics(
                 candidate_topics,
                 research_background,
-                llm_provider_large
+                llm_provider_large,
+                language = lang$get_translation_language()
               ),
               error = handle_detailed_error("Topic reduction")
             )
@@ -660,8 +661,8 @@ processing_server <- function(
             # ← allow row selection
             selection = list(mode = "multiple", target = "row"),
             colnames = setNames(
-              c(lang()$t("Onderwerp")),
-              "topic"
+              "topic",
+              c(lang()$t("Onderwerp"))
             )
           )
         },
@@ -1155,7 +1156,8 @@ processing_server <- function(
             text_col = "text",
             all_categories = all_categories,
             mode = mode(),
-            assign_multiple_categories = assign_multiple_categories()
+            assign_multiple_categories = assign_multiple_categories(),
+            lang = lang
           )
           irr$start()
 
@@ -1250,7 +1252,8 @@ processing_server <- function(
               create_result_excel = create_result_excel,
               create_result_rmarkdown = create_result_rmarkdown,
               result_list = result_list,
-              tempdir = tempdir()
+              tempdir = tempdir(),
+              lang = lang()
             ),
             seed = NULL
           ) %...>%
@@ -1391,7 +1394,8 @@ processing_server <- function(
           mode = mode(),
           research_background = research_background(),
           url = llm_provider_rv$llm_provider$url,
-          irr = irr_result()
+          irr = irr_result(),
+          language = lang()$get_translation_language()
         )
 
         if (mode() == "Categorisatie") {
@@ -1535,7 +1539,6 @@ processing_server <- function(
           paste0("report_", result_list$uuid, "_error.txt")
         )
 
-        # Try rendering
         result <- tryCatch(
           {
             rmarkdown::render(
@@ -1543,22 +1546,30 @@ processing_server <- function(
                 "R/report_",
                 result_list$mode,
                 "_",
-                lang$get_translation_language(),
+                result_list$language,
                 ".Rmd"
               ),
               output_file = output_file_html,
               params = list(result_list = result_list),
               envir = new.env()
             )
-            output_file_html # On success, return HTML path
+            output_file_html
           },
           error = function(e) {
-            # On error, write the error message to a text file
-            writeLines(
-              paste("Error during rendering:", conditionMessage(e)),
-              con = output_file_txt
+            # Capture detailed stack trace and message
+            error_details <- paste(
+              "Error during rendering:",
+              conditionMessage(e),
+              "\n\n--- Traceback ---\n",
+              paste(capture.output(traceback()), collapse = "\n"),
+              "\n\n--- Full Error Object ---\n",
+              paste(capture.output(print(e)), collapse = "\n")
             )
-            output_file_txt # Return TXT path instead
+
+            # Write error details to file
+            writeLines(error_details, con = output_file_txt)
+
+            output_file_txt
           }
         )
 

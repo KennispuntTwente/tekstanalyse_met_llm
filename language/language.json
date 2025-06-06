@@ -8,7 +8,7 @@
       },
       {
         "nl": "Tekstanalyse",
-        "en": "Textual Analysis"
+        "en": "Text Analysis"
       },
       {
         "nl": "met LLM",
@@ -462,8 +462,8 @@
         "en": "Next"
       },
       {
-        "nl": "Beoordeel item",
-        "en": "Assess item"
+        "nl": "Beoordeel item ",
+        "en": "Assess item "
       },
       {
         "nl": " van ",
@@ -696,6 +696,14 @@
       {
         "nl": "Extraheer",
         "en": "Extract"
+      },
+      {
+        "nl": "Klik hier deze foutmelding te rapporteren als GitHub issue. Bedankt!",
+        "en": "Click here to report this error message as a GitHub issue. Thank you!"
+      },
+      {
+        "nl": "Trek als:",
+        "en": "Draw as:"
       }
     ]
 }
