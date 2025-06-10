@@ -237,6 +237,13 @@ css_js_head <- function() {
         overflow: visible !important;
       }
     "
+    )),
+    tags$script(HTML(
+      "
+      $(document).on('click', 'a.action-button', function(e) {
+        e.preventDefault();
+      });
+    "
     ))
   )
 }

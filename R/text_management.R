@@ -14,6 +14,7 @@ text_management_ui <- function(id) {
 text_management_server <- function(
   id,
   raw_texts,
+  processing = reactiveVal(FALSE),
   lang = reactiveVal(
     shiny.i18n::Translator$new(
       translation_json_path = "language/language.json"
@@ -43,7 +44,11 @@ text_management_server <- function(
           bslib::card(
             class = "card",
             card_header(
-              lang()$t("Teksten")
+              div(
+                class = "d-flex justify-content-between align-items-center w-100",
+                span(lang()$t("Teksten")),
+                uiOutput(ns("preprocessing_icon"))
+              )
             ),
             card_body(
               div(
@@ -65,26 +70,59 @@ text_management_server <- function(
                 ),
                 br(),
                 br(),
-                uiOutput("preprocess_counts") # unchanged
+                uiOutput(ns("preprocess_counts"))
               )
             )
           )
         )
       })
 
+      # Toggle preprocessing on/off
+      preprocessing_on <- reactiveVal(getOption(
+        "anonymization__enabled",
+        TRUE
+      )) # default is ON
+
+      output$preprocessing_icon <- renderUI({
+        req(isTRUE(getOption("anonymization__can_toggle", TRUE)))
+
+        style <- if (preprocessing_on()) "color:#0d6efd;" else "color:#6c757d;"
+        icon_name <- "user-secret"
+        title <- if (preprocessing_on()) {
+          lang()$t("Zet anonimisering uit")
+        } else {
+          lang()$t("Zet anonimisering aan")
+        }
+
+        actionLink(
+          ns("toggle_preprocessing"),
+          icon(icon_name, lib = "font-awesome"),
+          style = paste0(style, "font-size: 1.25rem;"),
+          title = title
+        ) |>
+          bslib::tooltip(title)
+      })
+
+      observeEvent(input$toggle_preprocessing, {
+        req(isTRUE(getOption("anonymization__can_toggle", TRUE)))
+        req(!isTRUE(processing()))
+        preprocessing_on(!preprocessing_on())
+      })
+
       # Pre-process texts, fill reactive values
-      observeEvent(raw_texts(), {
+      observe({
         req(raw_texts())
+        preproc <- if (isTRUE(preprocessing_on())) {
+          pre_process_texts(raw_texts(), lang = lang())
+        } else {
+          raw_texts()
+        }
 
-        # Pre-process texts
-        preprocessed_texts <- pre_process_texts(raw_texts(), lang = lang())
-
-        # Fill reactive values
         texts$raw <- raw_texts()
-        texts$preprocessed <- unique(preprocessed_texts)
+        texts$preprocessed <- unique(preproc)
         texts$df <- data.frame(
           raw = raw_texts(),
-          preprocessed = preprocessed_texts,
+          preprocessed = preproc,
           stringsAsFactors = FALSE
         )
       })
@@ -92,7 +130,6 @@ text_management_server <- function(
       # Render anonymization count summary below the button
       output$preprocess_counts <- renderUI({
         req(texts$preprocessed)
-
         txts <- texts$preprocessed
 
         # Count how many times each placeholder appears
@@ -100,10 +137,6 @@ text_management_server <- function(
           txts,
           stringr::fixed(lang()$t("<< e-mailadres verwijderd >>"))
         ))
-        # iban_count <- sum(stringr::str_count(
-        #   txts,
-        #   stringr::fixed("<< removed IBAN number >>")
-        # ))
         phone_count <- sum(stringr::str_count(
           txts,
           stringr::fixed(lang()$t("<< (telefoon)nummer verwijderd >>"))
@@ -143,40 +176,46 @@ text_management_server <- function(
               ),
 
               # Box for Anonymization
-              div(
-                class = "border rounded p-2 bg-light fade-in",
+              if (isTRUE(preprocessing_on())) {
                 div(
-                  class = "text-muted small mb-1 gap-2",
-                  lang()$t("Persoonsgegevens verwijderd:")
-                ),
-                div(
-                  class = "small d-flex flex-wrap justify-content-center align-items-center gap-2",
+                  class = "border rounded p-2 bg-light fade-in",
                   div(
-                    class = "d-flex align-items-center",
-                    bs_icon("envelope", class = "me-1", aria_hidden = "true"),
-                    span(class = "badge bg-secondary me-1", email_count),
-                    span(class = "text-muted", lang()$t("e‑mail(s)"))
-                  ),
-                  # div(
-                  #   class = "d-flex align-items-center",
-                  #   bs_icon("bank", class = "me-1", aria_hidden = "true"),
-                  #   span(class = "badge bg-secondary me-1", iban_count),
-                  #   span(class = "text-muted", "IBAN(s)")
-                  # ),
-                  div(
-                    class = "d-flex align-items-center",
-                    bs_icon("telephone", class = "me-1", aria_hidden = "true"),
-                    span(class = "badge bg-secondary me-1", phone_count),
-                    span(class = "text-muted", lang()$t("nummer(s)"))
+                    class = "text-muted small mb-1 gap-2",
+                    lang()$t("Persoonsgegevens geanonimiseerd:")
                   ),
                   div(
-                    class = "d-flex align-items-center",
-                    bs_icon("mailbox", class = "me-1", aria_hidden = "true"),
-                    span(class = "badge bg-secondary me-1", postal_count),
-                    span(class = "text-muted", lang()$t("postcode(s)"))
+                    class = "small d-flex flex-wrap justify-content-center align-items-center gap-2",
+                    div(
+                      class = "d-flex align-items-center",
+                      bs_icon("envelope", class = "me-1", aria_hidden = "true"),
+                      span(class = "badge bg-secondary me-1", email_count),
+                      span(class = "text-muted", lang()$t("e‑mail(s)"))
+                    ),
+                    # div(
+                    #   class = "d-flex align-items-center",
+                    #   bs_icon("bank", class = "me-1", aria_hidden = "true"),
+                    #   span(class = "badge bg-secondary me-1", iban_count),
+                    #   span(class = "text-muted", "IBAN(s)")
+                    # ),
+                    div(
+                      class = "d-flex align-items-center",
+                      bs_icon(
+                        "telephone",
+                        class = "me-1",
+                        aria_hidden = "true"
+                      ),
+                      span(class = "badge bg-secondary me-1", phone_count),
+                      span(class = "text-muted", lang()$t("nummer(s)"))
+                    ),
+                    div(
+                      class = "d-flex align-items-center",
+                      bs_icon("mailbox", class = "me-1", aria_hidden = "true"),
+                      span(class = "badge bg-secondary me-1", postal_count),
+                      span(class = "text-muted", lang()$t("postcode(s)"))
+                    )
                   )
                 )
-              )
+              }
             )
           )
         )
@@ -234,6 +273,15 @@ text_management_server <- function(
         },
         options = list(pageLength = 5, scrollX = TRUE)
       )
+
+      # When processing, disable buttons (the anonymization button)
+      observe({
+        if (isTRUE(processing())) {
+          shinyjs::disable("toggle_preprocessing")
+        } else {
+          shinyjs::enable("toggle_preprocessing")
+        }
+      })
 
       return(texts)
     }
@@ -306,7 +354,7 @@ pre_process_texts <- function(
 
 #### 4 Example/development usage ####
 
-if (TRUE) {
+if (FALSE) {
   library(shiny)
   library(shinyjs)
   library(bslib)
@@ -320,8 +368,8 @@ if (TRUE) {
   server <- function(input, output, session) {
     text_management_server(
       "text_management",
-      reactive(NULL)
-      # reactive(c("a", "b", "0631377835", "b", "b"))
+      # reactive(NULL)
+      reactive(c("a", "b", "0631377835", "b", "b"))
     )
   }
 

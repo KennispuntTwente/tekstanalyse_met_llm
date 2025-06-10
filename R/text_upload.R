@@ -281,6 +281,7 @@ text_upload_server <- function(
     # ---- Filter modal -------------------------------------------------------
     observeEvent(input$filter_btn, {
       req(uploaded_data())
+      req(!isTRUE(processing()))
 
       showModal(modalDialog(
         title = lang()$t("Filter data"),

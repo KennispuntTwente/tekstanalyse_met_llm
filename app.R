@@ -102,9 +102,15 @@ options(
   llm_provider__default_ollama_url_chat_suffix = "/chat",
 
   # - Language for app interface & results (Dutch (nl) or English (en));
-  #   see R/language.R
+  #     see R/language.R
   language = "en", # Default language
-  language__can_toggle = TRUE # If user can switch language in the app
+  language__can_toggle = TRUE, # If user can switch language in the app
+
+  # - Default setting for anonymization of texts, and if user
+  #   can toggle this setting;
+  #     see R/text_management.R
+  anonymization__enabled = TRUE,
+  anonymization__can_toggle = TRUE
 )
 
 

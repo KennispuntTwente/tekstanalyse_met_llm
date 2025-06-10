@@ -158,8 +158,8 @@
         "en": "Duplicate texts removed:"
       },
       {
-        "nl": "Persoonsgegevens verwijderd:",
-        "en": "Personal data removed:"
+        "nl": "Persoonsgegevens geanonimiseerd:",
+        "en": "Personal data anonymised:"
       },
       {
         "nl": "teksten",
@@ -704,6 +704,14 @@
       {
         "nl": "Trek als:",
         "en": "Draw as:"
+      },
+      {
+        "nl": "Zet anonimisering uit",
+        "en": "Disable anonymisation"
+      },
+      {
+        "nl": "Zet anonimisering aan",
+        "en": "Enable anonymisation"
       }
     ]
 }
