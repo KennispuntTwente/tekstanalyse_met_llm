@@ -308,34 +308,49 @@ llm_provider_server <- function(
       observeEvent(input$select_preconfigured, {
         req(!is.null(preconfigured_llm_provider))
         llm_provider_rv$provider_mode <- "preconfigured"
-        llm_provider_rv$llm_provider <- preconfigured_llm_provider$clone()
       })
-
       observeEvent(input$select_openai, {
         req(can_configure_oai)
         llm_provider_rv$provider_mode <- "openai"
-        llm_provider_rv$llm_provider <- tidyprompt::llm_provider_openai(
-          parameters = list(model = "gpt-4o-mini", stream = FALSE),
-          verbose = getOption("tidyprompt.verbose", TRUE),
-          url = paste0(
-            openai_url(),
-            "/chat/completions"
-          ),
-          api_key = api_key_input()
-        )
       })
 
       observeEvent(input$select_ollama, {
         req(can_configure_ollama)
         llm_provider_rv$provider_mode <- "ollama"
-        llm_provider_rv$llm_provider <- tidyprompt::llm_provider_ollama(
-          parameters = list(model = "llama3.1:8b", stream = FALSE),
-          verbose = getOption("tidyprompt.verbose", TRUE),
-          url = paste0(
-            ollama_url(),
-            "/chat"
+      })
+      observe({
+        req(llm_provider_rv$provider_mode)
+
+        if (llm_provider_rv$provider_mode == "preconfigured") {
+          req(!is.null(preconfigured_llm_provider))
+          llm_provider_rv$llm_provider <- preconfigured_llm_provider$clone()
+        } else if (llm_provider_rv$provider_mode == "openai") {
+          req(isTRUE(can_configure_oai))
+          req(api_key_input())
+          req(openai_url())
+
+          llm_provider_rv$llm_provider <- tidyprompt::llm_provider_openai(
+            parameters = list(model = "gpt-4o-mini", stream = FALSE),
+            verbose = getOption("tidyprompt.verbose", TRUE),
+            url = paste0(
+              openai_url(),
+              "/chat/completions"
+            ),
+            api_key = api_key_input()
           )
-        )
+        } else if (llm_provider_rv$provider_mode == "ollama") {
+          req(isTRUE(can_configure_ollama))
+          req(ollama_url())
+
+          llm_provider_rv$llm_provider <- tidyprompt::llm_provider_ollama(
+            parameters = list(model = "llama3.1:8b", stream = FALSE),
+            verbose = getOption("tidyprompt.verbose", TRUE),
+            url = paste0(
+              ollama_url(),
+              "/chat"
+            )
+          )
+        }
       })
 
       output$mode_description <- renderUI({
@@ -374,9 +389,7 @@ llm_provider_server <- function(
       })
 
       # Custom inputs
-      # Reactively update URLs and API key
-      observeEvent(input$openai_url, openai_url(input$openai_url))
-      observeEvent(input$ollama_url, ollama_url(input$ollama_url))
+      # Reactively update API key (updating URLs only when 'get models' is clicked)
       observeEvent(input$api_key_text, api_key_input(input$api_key_text))
 
       # UI Inputs based on mode
@@ -513,14 +526,27 @@ llm_provider_server <- function(
           return(NULL)
         }
         last_model_request_time(now)
+        provider_mode <- llm_provider_rv$provider_mode
+
+        # Update reactive values for URL only when button is clicked
+        if (provider_mode == "openai") {
+          openai_url(input$openai_url)
+        } else if (provider_mode == "ollama") {
+          ollama_url(input$ollama_url)
+        }
+
+        # Disable button, set available models to empty, show notification
         shinyjs::disable("get_models")
+        if (provider_mode == "openai") {
+          available_models_openai(character(0))
+        } else if (provider_mode == "ollama") {
+          available_models_ollama(character(0))
+        }
         showNotification(
           lang()$t("Modellen ophalen..."),
           type = "default",
           duration = 3
         )
-
-        provider_mode <- llm_provider_rv$provider_mode
 
         future(
           {
