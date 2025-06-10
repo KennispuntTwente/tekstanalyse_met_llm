@@ -76,9 +76,9 @@ A pre-built desktop application for Windows 10/11 (64-bit, x64/AMD64) is
 available under [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases).
 This application contains all necessary dependencies and can be used directly.
 
-1. Download the release
+1. Download the release (`tekstanalyse-met-llm-win32-x64.7z`)
 
-2. Unzip the downloaded file; open the folder; start 'tekstanalyse-met-llm.exe'
+2. Extract the release to a folder; open the folder; start `tekstanalyse-met-llm.exe`
 
 The pre-built desktop application does not have a specific LLM provider configured, but users can
 implement an LLM provider themselves while using it (OpenAI-compatible API or [Ollama](https://ollama.com)).
@@ -115,7 +115,7 @@ a specific configuration.
 This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) in collaboration with GGD Twente. Together, we work on generative AI applications for the public good.
 
 Suggestions or ideas for the app? 
-[Open an issue on GitHub](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new)
+[Open an issue on GitHub](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
 
 Kennispunt Twente is a (Dutch) non-profit organization focused on data, insights, and knowledge. Interested in what we can do for your organization, for example in generative AI?
 Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our developers](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
@@ -153,7 +153,7 @@ zoals categorisatie, scoren op kenmerken, en topic modelling.
 
 ## Functionaliteiten
 
-### Automatische tekstanalyse door een LLM:
+### Automatische tekstanalyse door een LLM
 
 -   **Categorisatie**: gebruiker levert een lijst van categorieën
     aan, en het model categoriseert teksten op basis van deze
@@ -173,7 +173,7 @@ zoals categorisatie, scoren op kenmerken, en topic modelling.
     Performance van deze procedure zou beter zijn dan BERTopic, waarbij deze procedure ook 
     geschikt is voor kleinere datasets
 
-### Gebruiksvriendelijke interface:
+### Gebruiksvriendelijke interface
             
 -   **Web-interface**, geschikt voor niet-technische
     gebruikers. Met een eenvoudige interface kunnen gebruikers
@@ -186,7 +186,7 @@ zoals categorisatie, scoren op kenmerken, en topic modelling.
     
     - Zie [screenshot](example/usecase/report_with_results_screenshot_nl.png) (of scroll naar beneden)
         
-### Aanvullende mogelijkheden bij tekstanalyse:
+### Aanvullende mogelijkheden bij tekstanalyse
 
 -   Het taalmodel kan een **samenvattende tekst** schrijven over
     toegekende categorieën, inclusief quotes
@@ -205,7 +205,7 @@ zoals categorisatie, scoren op kenmerken, en topic modelling.
     voordat deze naar het taalmodel worden gestuurd. Hiermee kan
     de privacy van respondenten extra worden beschermd
         
-### Configureerbaar:
+### Configureerbaar
 
 -   Mogelijkheid om aan te sluiten op **elke LLM-provider**, waaronder
     bijvoorbeeld Ollama (lokaal) of Azure OpenAI API. Hiermee kan worden voldaan aan
@@ -262,9 +262,9 @@ voor gebruikers die niet bekend zijn met R of Docker.
 Onder [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases) is een pre-built desktop-applicatie beschikbaar voor Windows 10/11 (64-bit, x64/AMD64).
 Deze applicatie bevat alle benodigde dependencies en kan direct worden gebruikt.
 
-1. Download de release
+1. Download de release (`tekstanalyse-met-llm-win32-x64.7z`)
    
-2. Unzip het gedownloadde bestand; open de map; start 'tekstanalyse-met-llm.exe'
+2. Unzip de release naar een map; open de map; start `tekstanalyse-met-llm.exe`
 
 De pre-built desktop-applicatie heeft geen specifieke LLM-provider geconfigureerd, maar gebruikers kunnen
 zelf tijdens het gebruik een LLM-provider configureren (OpenAI-compatible API of [Ollama](https://ollama.com)).
