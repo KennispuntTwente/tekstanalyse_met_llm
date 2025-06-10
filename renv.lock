@@ -3724,51 +3724,6 @@
       "Maintainer": "Yihui Xie <xie@yihui.name>",
       "Repository": "RSPM"
     },
-    "rollama": {
-      "Package": "rollama",
-      "Version": "0.2.2",
-      "Source": "Repository",
-      "Title": "Communicate with 'Ollama' to Run Large Language Models Locally",
-      "Authors@R": "c(person(given = \"Johannes B.\", family = \"Gruber\", email = \"JohannesB.Gruber@gmail.com\",  role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0001-9177-1772\")), person(given = \"Maximilian\", family = \"Weber\", role = c(\"aut\", \"ctb\"), comment = c(ORCID = \"0000-0002-1174-449X\")))",
-      "Description": "Wraps the 'Ollama' <https://ollama.com> API, which can be used to  communicate with generative large language models locally.",
-      "License": "GPL (>= 3)",
-      "Encoding": "UTF-8",
-      "RoxygenNote": "7.3.2",
-      "Imports": [
-        "callr",
-        "cli",
-        "dplyr",
-        "httr2",
-        "jsonlite",
-        "methods",
-        "prettyunits",
-        "purrr",
-        "rlang",
-        "tibble",
-        "withr"
-      ],
-      "Suggests": [
-        "base64enc",
-        "covr",
-        "glue",
-        "knitr",
-        "rmarkdown",
-        "spelling",
-        "testthat (>= 3.0.0)"
-      ],
-      "Depends": [
-        "R (>= 4.1.0)"
-      ],
-      "VignetteBuilder": "knitr",
-      "Config/testthat/edition": "3",
-      "Language": "en-US",
-      "URL": "https://jbgruber.github.io/rollama/, https://github.com/JBGruber/rollama",
-      "BugReports": "https://github.com/JBGruber/rollama/issues",
-      "NeedsCompilation": "no",
-      "Author": "Johannes B. Gruber [aut, cre] (<https://orcid.org/0000-0001-9177-1772>), Maximilian Weber [aut, ctb] (<https://orcid.org/0000-0002-1174-449X>)",
-      "Maintainer": "Johannes B. Gruber <JohannesB.Gruber@gmail.com>",
-      "Repository": "CRAN"
-    },
     "rstudioapi": {
       "Package": "rstudioapi",
       "Version": "0.17.1",
