@@ -95,7 +95,11 @@ options(
   #   as alternative to the preconfigured LLM provider;
   #     see: R/llm_provider.R
   llm_provider__can_configure_oai = TRUE,
+  llm_provider__default_oai_url = "https://api.openai.com/v1",
+  llm_provider__default_oai_url_chat_suffix = "/chat/completions",
   llm_provider__can_configure_ollama = TRUE,
+  llm_provider__default_ollama_url = "http://localhost:11434/api",
+  llm_provider__default_ollama_url_chat_suffix = "/chat",
 
   # - Language for app interface & results (Dutch (nl) or English (en));
   #   see R/language.R

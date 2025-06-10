@@ -160,8 +160,14 @@ llm_provider_server <- function(
       })
 
       # Default URLs and state
-      openai_url <- reactiveVal("https://api.openai.com/v1")
-      ollama_url <- reactiveVal("http://localhost:11434/api")
+      openai_url <- reactiveVal(getOption(
+        "llm_provider__default_oai_url",
+        "https://api.openai.com/v1"
+      ))
+      ollama_url <- reactiveVal(getOption(
+        "llm_provider__default_ollama_url",
+        "http://localhost:11434/api"
+      ))
       api_key_input <- reactiveVal(Sys.getenv("OPENAI_API_KEY"))
       available_models_openai <- reactiveVal(character(0))
       available_models_ollama <- reactiveVal(character(0))
@@ -181,14 +187,32 @@ llm_provider_server <- function(
         tidyprompt::llm_provider_openai(
           parameters = list(model = "gpt-4o-mini", stream = FALSE),
           verbose = getOption("tidyprompt.verbose", TRUE),
-          url = "https://api.openai.com/v1/chat/completions",
+          url = paste0(
+            getOption(
+              "llm_provider__default_oai_url",
+              "https://api.openai.com/v1"
+            ),
+            getOption(
+              "llm_provider_default_oai_url_chat_suffix",
+              "/chat/completions"
+            )
+          ),
           api_key = Sys.getenv("OPENAI_API_KEY")
         )
       } else {
         tidyprompt::llm_provider_ollama(
           parameters = list(model = "llama3.1:8b", stream = FALSE),
           verbose = getOption("tidyprompt.verbose", TRUE),
-          url = "http://localhost:11434/api/chat"
+          url = paste0(
+            getOption(
+              "llm_provider__default_ollama_url",
+              "http://localhost:11434/api"
+            ),
+            getOption(
+              "llm_provider_default_ollama_url_chat_suffix",
+              "/chat"
+            )
+          )
         )
       }
 
