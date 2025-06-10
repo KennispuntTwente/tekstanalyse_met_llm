@@ -72,14 +72,16 @@ the zip of the repository and unzip it)
 The application can also be used as a desktop application. This can be useful
 for users who are not familiar with R or Docker.
 
-A pre-built desktop application for Windows 10/11 (64-bit, x64/AMD64) will be available under 'releases' (soon).
+A pre-built desktop application for Windows 10/11 (64-bit, x64/AMD64) is
+available under [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases).
 This application contains all necessary dependencies and can be used directly.
 
 1. Download the release
 
 2. Unzip the downloaded file; open the folder; start 'tekstanalyse-met-llm.exe'
 
-3. In the interface you can configure an LLM provider (OpenAI-compatible API or [Ollama](https://ollama.com))
+The pre-built desktop application does not have a specific LLM provider configured, but users can
+implement an LLM provider themselves while using it (OpenAI-compatible API or [Ollama](https://ollama.com)).
 
 (This application is built with Node.js & Electron; see 'package.json' for more information.
 It would also be possible to build a desktop application yourself with the desired configuration,
@@ -90,10 +92,20 @@ or for other operating systems such as MacOS or Linux.)
 The application can also be used as a container application.
 For users familiar with Docker (or Podman), this is a convenient way to run the application, because all dependencies are already included in the container. In addition, a container can easily be run on a server or as a cloud-hosted application.
 
-See 'Dockerfile' for an example configuration. You can also use the pre-built container,
-which will be available (soon) under 'releases'. The pre-built
-container does not have a specific LLM provider configured, but users can
+See 'Dockerfile' for an example configuration. You can also use the pre-built container:
+
+1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+
+2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+
+3. Open the app in your browser (at `http://localhost:3838`)
+
+The pre-built container does not have a specific LLM provider configured, but users can
 implement an LLM provider themselves while using it (OpenAI-compatible API from [Ollama](https://ollama.com)).
+
+Note that if you run Ollama on your own machine (i.e., not in the Docker container of this app),
+the endpoint `localhost:11434` will not work correctly (because that is a reference within the container). 
+You should use the IP address of your machine, or for example the hostname `host.docker.internal` instead of 'localhost' (so: `http://host.docker.internal:11434`).
 
 You can also modify 'Dockerfile-app.R' yourself and then build the container with
 a specific configuration.
@@ -247,14 +259,15 @@ de zip van de repository en unzip deze)
 De applicatie kan ook gebruikt worden als desktop-applicatie. Dit kan handig zijn
 voor gebruikers die niet bekend zijn met R of Docker.
 
-Onder 'releases' komt (binnenkort) een pre-built desktop-applicatie beschikbaar voor Windows 10/11 (64-bit, x64/AMD64).
+Onder [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases) is een pre-built desktop-applicatie beschikbaar voor Windows 10/11 (64-bit, x64/AMD64).
 Deze applicatie bevat alle benodigde dependencies en kan direct worden gebruikt.
 
 1. Download de release
    
 2. Unzip het gedownloadde bestand; open de map; start 'tekstanalyse-met-llm.exe'
 
-3. In de interface kan je een LLM-provider configureren (OpenAI-compatible API of [Ollama](https://ollama.com))
+De pre-built desktop-applicatie heeft geen specifieke LLM-provider geconfigureerd, maar gebruikers kunnen
+zelf tijdens het gebruik een LLM-provider configureren (OpenAI-compatible API of [Ollama](https://ollama.com)).
 
 (Deze applicatie is gebouwd met Node.js & Electron; zie 'package.json' voor meer informatie.
 Het zou ook mogelijk zijn om zelf een desktop-applicatie te bouwen met de gewenste configuratie,
@@ -267,10 +280,20 @@ met Docker (of Podman) is dit een handige manier om de applicatie te draaien, om
 al zijn opgenomen in de container. Daarnaast kan een container gemakkelijk op een server
 of als cloud-gehoste applicatie worden gedraaid.
 
-Zie 'Dockerfile' voor een voorbeeld-configuratie. Je kan ook de pre-built container gebruiken,
-welke (binnenkort) beschikbaar komt onder 'releases'. Bij de pre-built
-container is geen specifieke LLM-provider geconfigureerd, maar gebruikers kunnen
+Zie 'Dockerfile' voor een voorbeeld-configuratie. Je kan ook de pre-built container gebruiken: 
+
+1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+
+2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+
+3. Open de app in je browser (op `http://localhost:3838`)
+
+Bij de pre-built container is geen specifieke LLM-provider geconfigureerd, maar gebruikers kunnen
 zelf tijdens het gebruik een LLM-provider configureren (OpenAI-compatible API of [Ollama](https://ollama.com)). 
+
+Let op dat wanneer je Ollama draait op je eigen machine (d.w.z., niet in de docker-container van deze app),
+het endpoint `localhost:11434` niet juist is (omdat dat een verwijzing is binnen de container). Je moet dan de IP-adres van je machine gebruiken, 
+of bijvoorbeeld hostnaam `host.docker.internal` in plaats van 'localhost' (dus: `http://host.docker.internal:11434`).
 
 Je kan ook zelf 'Dockerfile-app.R' aanpassen en dan de container bouwen met 
 een specifieke configuratie.
