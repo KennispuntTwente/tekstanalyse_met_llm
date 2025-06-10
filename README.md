@@ -42,9 +42,9 @@ This is an app (developed with R, Shiny) for (automated) qualitative text analys
 
 ## Use case
 
-This app can be used to analyze open-ended responses in surveys, categorize texts like tweets or news articles, etc.
+This app can be used to analyze open-ended responses in surveys, categorize texts like tweets or news articles, et cetera.
 
-Example: Kennispunt Twente used the app to analyze open survey responses about improvements for sports venues in municipalities in Twente. Researchers were able to analyze large volumes of text quickly and easily.
+For example, Kennispunt Twente used the app to analyze open survey responses about improvements for sports venues in municipalities in Twente. With the app, researchers are able to analyze large volumes of text quickly and easily.
 
 ## Installation
 
@@ -52,39 +52,51 @@ The app can be run in three ways. In all cases, the file `app.R` (or a variant) 
 
 ### 1. R environment
 
-Requires an [R](https://www.r-project.org/) installation (developed on R 4.4.2, other versions may also work) and optionally [RStudio](https://www.rstudio.com/products/rstudio/download/).  
-[Pandoc](https://pandoc.org/) is required to generate reports (included with RStudio).
+The application can be run from an R environment.
+This requires an installation of [R](https://www.r-project.org/)
+(this project was built with R 4.4. 2, but other versions may work),
+and optionally an environment such as [RStudio](https://www.rstudio.com/products/rstudio/download/).
+[Pandoc](https://pandoc.org/) is required to generate reports (installed with RStudio).
+[RTools](https://cran.r-project.org/bin/windows/Rtools/) may be required to build packages that this application needs.
+The required R packages are automatically installed via the 'renv' package.
 
-Steps:
+1. `git clone https://github.com/kennispunttwente/tekstanalyse_met_llm.git` (or: download
+the zip of the repository and unzip it)
 
-1. `git clone https://github.com/kennispunttwente/tekstanalyse_met_llm.git` (or download & unzip)
+2. Open an R environment in the folder (in RStudio this can be done by opening the .Rproj file)
 
-2. Open the folder in RStudio (`.Rproj` file)
-
-3. Run `app.R`
+3. Run 'app.R'
 
 ### 2. Desktop app
 
-A pre-built desktop app will be available under "Releases" (Windows 10/11, 64-bit).
+The application can also be used as a desktop application. This can be useful
+for users who are not familiar with R or Docker.
 
-Steps:
+A pre-built desktop application for Windows 10/11 (64-bit, x64/AMD64) will be available under 'releases' (soon).
+This application contains all necessary dependencies and can be used directly.
 
 1. Download the release
 
-2. Unzip and run `tekstanalyse-met-llm.exe`
+2. Unzip the downloaded file; open the folder; start 'tekstanalyse-met-llm.exe'
 
-3. Configure your LLM provider (OpenAI-compatible API or [Ollama](https://ollama.com))
+3. In the interface you can configure an LLM provider (OpenAI-compatible API or [Ollama](https://ollama.com))
 
-(This is built with Node.js & Electron. See `package.json` for details.)
+(This application is built with Node.js & Electron; see 'package.json' for more information.
+It would also be possible to build a desktop application yourself with the desired configuration,
+or for other operating systems such as MacOS or Linux.)
 
 ### 3. Container app
 
-You can run the app using Docker. All dependencies are included. Suitable for server or cloud deployment.
+The application can also be used as a container application.
+For users familiar with Docker (or Podman), this is a convenient way to run the application, because all dependencies are already included in the container. In addition, a container can easily be run on a server or as a cloud-hosted application.
 
-- See `Dockerfile` or use the pre-built image (coming soon under Releases).
-- Users can configure the LLM provider during use.
+See 'Dockerfile' for an example configuration. You can also use the pre-built container,
+which will be available (soon) under 'releases'. The pre-built
+container does not have a specific LLM provider configured, but users can
+implement an LLM provider themselves while using it (OpenAI-compatible API from [Ollama](https://ollama.com)).
 
-To customize, edit `Dockerfile-app.R` and build the container.
+You can also modify 'Dockerfile-app.R' yourself and then build the container with
+a specific configuration.
 
 ## About this app
 
@@ -220,6 +232,7 @@ Hiervoor een installatie van [R](https://www.r-project.org/) nodig
 (dit project is gemaakt met R 4.4.2, maar andere versies kunnen ook werken),
 en optioneel een omgeving zoals [RStudio](https://www.rstudio.com/products/rstudio/download/).
 [Pandoc](https://pandoc.org/) is nodig voor het genereren van rapporten (wordt geïnstalleerd met RStudio).
+Mogelijk is [RTools](https://cran.r-project.org/bin/windows/Rtools/) nodig om packages te bouwen die deze applicatie nodig heeft.
 Via het package 'renv' worden de benodigde R-packages automatisch geïnstalleerd.
 
 1. `git clone https://github.com/kennispunttwente/tekstanalyse_met_llm.git` (of: download
@@ -250,7 +263,7 @@ of voor andere besturingssystemen zoals MacOS of Linux.)
 ### 3. Container-applicatie
 
 De applicatie kan ook gebruikt worden als container-applicatie. Voor gebruikers bekend
-met Docker is dit een handige manier om de applicatie te draaien, omdat alle dependencies
+met Docker (of Podman) is dit een handige manier om de applicatie te draaien, omdat alle dependencies
 al zijn opgenomen in de container. Daarnaast kan een container gemakkelijk op een server
 of als cloud-gehoste applicatie worden gedraaid.
 
