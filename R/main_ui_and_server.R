@@ -129,7 +129,7 @@ main_server <- function(
               id = "team-accordion",
               open = FALSE,
               accordion_panel(
-                lang()$t("Bekijk team"),
+                lang()$t("Bekijk contactinformatie"),
                 div(
                   style = "text-align: left;",
                   tags$ul(
@@ -141,16 +141,6 @@ main_server <- function(
                     tags$li(
                       HTML(
                         "Tjark van de Merwe (<a href='mailto:t.vandemerwe@kennispunttwente.nl'>t.vandemerwe@kennispunttwente.nl</a>)"
-                      )
-                    ),
-                    tags$li(
-                      HTML(
-                        "Henk Broekhuizen (<a href='mailto:h.broekhuizen@ggdtwente.nl'>h.broekhuizen@ggdtwente.nl</a>)"
-                      )
-                    ),
-                    tags$li(
-                      HTML(
-                        "Floor Kerkhof (<a href='mailto:f.kerkhof@ggdtwente.nl'>f.kerkhof@ggdtwente.nl</a>)"
                       )
                     )
                   )
@@ -227,6 +217,7 @@ main_server <- function(
     # Pre-process texts, show table
     texts <- text_management_server(
       "text_management",
+      processing = processing,
       raw_texts = raw_texts,
       lang = lang
     )

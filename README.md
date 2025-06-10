@@ -1,44 +1,44 @@
 # Text analysis with LLM (app)
 
-This is an app (R, Shiny) for (automated) qualitative text analysis using large language models (LLMs). Through a user-friendly interface, users can upload texts and have them analyzed by an LLM. The app offers various types of analysis, including categorization, scoring on characteristics, and topic modelling.
+This is an app (developed with R, Shiny) for (automated) qualitative text analysis using large language models (LLMs). Through a user-friendly interface, users can upload texts and have them analyzed by an LLM. The app offers various types of analysis, including categorization, scoring on characteristics, and topic modelling.
 
-*[Klik hier voor een Nederlandse-README (click here for a Dutch README).](#tekstanalyse-met-llm-app)*
+*[Klik hier voor een Nederlandse README (click here for a Dutch README).](#tekstanalyse-met-llm-app)*
 
 ## Features
 
 ### Automated text analysis by an LLM
 
-- **Categorization**: Users provide a list of categories, and the model classifies texts accordingly (e.g., 'positive', 'negative', 'neutral').
+- **Categorization**: Users provide a list of categories, and the model classifies texts accordingly (e.g., 'positive', 'negative', 'neutral')
 
-- **Scoring on a Feature**: Users define a feature (e.g., 'positive sentiment'), and the model scores texts based on the degree to which they match the feature.
+- **Scoring on a feature**: Users define a feature (e.g., 'positive sentiment'), and the model scores texts based on the degree to which they match the feature
 
-- **Topic Modelling**: The model identifies topics in the texts without requiring predefined categories or features. Topics are then assigned to texts. Based on methods from [Wanrooij, Manhar & Yang (2024)](https://bnaic2024.sites.uu.nl/wp-content/uploads/sites/986/2024/10/Topic-Modeling-for-Small-Data-using-Generative-LLMs.pdf) and [Pham et al. (2023)](https://arxiv.org/abs/2311.01449). This approach is shown to outperform BERTopic and works well on small datasets.
+- **Topic modelling**: The model identifies topics in the texts without requiring predefined categories or features. Topics are then assigned to texts. Based on methods from [Wanrooij, Manhar & Yang (2024)](https://bnaic2024.sites.uu.nl/wp-content/uploads/sites/986/2024/10/Topic-Modeling-for-Small-Data-using-Generative-LLMs.pdf) and [Pham et al. (2023)](https://arxiv.org/abs/2311.01449). This approach is shown to outperform BERTopic and works well on small datasets
 
 ### User-friendly interface
 
-- **Web interface** suitable for non-technical users. Users can easily upload texts, choose an analysis method, and start the analysis.  
+- **Web interface** suitable for non-technical users. Users can easily upload texts, choose an analysis method, and start the analysis  
   - See [screenshot](example/screenshot_interface_en.png) (or scroll below)
 
-- **Report with results and explanation** of the applied method.  
+- **Report with results and explanation** of the applied method
   - See [screenshot](example/usecase/report_with_results_screenshot_en.png) (or scroll below)
 
 ### Additional analysis features
 
-- Generate a **summary** of the assigned categories, including representative quotes.
+- Have the LLM write a **summary** representing the texts in each category, including quotes
 
-- **Interrater Reliability**: Users can draw a blind sample to compare their own ratings to those of the LLM. Cohen’s Kappa is calculated for reliability.
+- **Interrater reliability**: Users can draw a blind sample to compare their own ratings to those of the LLM. Cohen’s Kappa is calculated for reliability
 
-- **Human-in-the-loop**: Users can edit topics identified by the model, e.g., merge or delete topics.
+- **Human-in-the-loop**: Users can edit topics identified by the model, e.g., merge or delete topics
 
-- **PII Redaction**: Email addresses, phone numbers, and postal codes are automatically redacted before texts are sent to the LLM, to protect respondent privacy.
+- **PII redaction**: Email addresses, phone numbers, and postal codes are automatically redacted before texts are sent to the LLM, to protect respondent privacy
 
 ### Configurable
 
-- Connect to **any LLM provider**, including local ones (e.g., [Ollama](https://ollama.com)) or external APIs like Azure OpenAI.
+- Connect to **any LLM provider**, including local ones (e.g., [Ollama](https://ollama.com)) or external APIs like Azure OpenAI
 
-- Can be run **locally or hosted** as a **web application** (e.g., via containerization). Non-technical users can use it like a web page.
+- Can be run **locally** or **hosted** as a **web application** (e.g., via containerization). Non-technical users can use it like a web page
 
-- App interface & results can be set to **English or Dutch**.
+- App interface & results can be set to **English or Dutch**
 
 ## Use case
 
@@ -93,17 +93,15 @@ This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) i
 Suggestions or ideas for the app? 
 [Open an issue on GitHub](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new)
 
-Kennispunt Twente is a (Dutch) non-profit organization focused on data, insights, and knowledge. Interested in what we can do for your organization, for exapmle in generative AI?
+Kennispunt Twente is a (Dutch) non-profit organization focused on data, insights, and knowledge. Interested in what we can do for your organization, for example in generative AI?
 Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our developers](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
 
 ---
 
-### Team
+### Contact
 
 - Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)  
 - Tjark van de Merwe – [t.vandemerwe@kennispunttwente.nl](mailto:t.vandemerwe@kennispunttwente.nl)  
-- Henk Broekhuizen – [h.broekhuizen@ggdtwente.nl](mailto:h.broekhuizen@ggdtwente.nl)  
-- Floor Kerkhof – [f.kerkhof@ggdtwente.nl](mailto:f.kerkhof@ggdtwente.nl)
 
 ---
 
@@ -127,7 +125,7 @@ interface kunnen gebruikers teksten uploaden en deze laten analyseren
 door een taalmodel. De app biedt verschillende analyse-mogelijkheden,
 zoals categorisatie, scoren op kenmerken, en topic modelling.
 
-*[Click here for an English version of the README (klik hier voor een Engelse versie van de README).](#text-analysis-with-llm-app)*
+*[Click here for an English README (klik hier voor een Engelse README).](#text-analysis-with-llm-app)*
 
 ## Functionaliteiten
 
@@ -278,12 +276,10 @@ Bezoek [onze website](https://www.kennispunttwente.nl) of [neem contact op met o
 
 ---
 
-### Team
+### Contact
 
 - Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)  
 - Tjark van de Merwe – [t.vandemerwe@kennispunttwente.nl](mailto:t.vandemerwe@kennispunttwente.nl)  
-- Henk Broekhuizen – [h.broekhuizen@ggdtwente.nl](mailto:h.broekhuizen@ggdtwente.nl)  
-- Floor Kerkhof – [f.kerkhof@ggdtwente.nl](mailto:f.kerkhof@ggdtwente.nl)
 
 ---
 
