@@ -1,6 +1,6 @@
-# Text analysis with LLM (app)
+# KWALLM: Text analysis with LLM (app)
 
-This is an app (developed with R, Shiny) for (automated) qualitative text analysis using large language models (LLMs). Through a user-friendly interface, users can upload texts and have them analyzed by an LLM. The app offers various types of analysis, including categorization, scoring on characteristics, and topic modelling.
+KWALLM is an app (developed with R, Shiny) for (automated) qualitative text analysis using large language models (LLMs). Through a user-friendly interface, users can upload texts and have them analyzed by an LLM. The app offers various types of analysis, including categorization, scoring on characteristics, and topic modelling.
 
 *[Klik hier voor een Nederlandse README (click here for a Dutch README).](#tekstanalyse-met-llm-app)*
 
@@ -141,9 +141,9 @@ Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our 
 
 ---
 
-# Tekstanalyse met LLM (app)
+# KWALLM: Tekstanalyse met LLM (app)
 
-Dit is een app (ontwikkeld met R, Shiny) voor (automatische) kwalitatieve
+KWALLM is een app (ontwikkeld met R, Shiny) voor (automatische) kwalitatieve
 tekstanalyse met large language models (LLMs). Via een gebruiksvriendelijke
 interface kunnen gebruikers teksten uploaden en deze laten analyseren
 door een taalmodel. De app biedt verschillende analyse-mogelijkheden,

@@ -202,8 +202,8 @@
         "en": "Large model:"
       },
       {
-        "nl": "Model voor onderwerpreductie:",
-        "en": "Model for topic reduction:"
+        "nl": "Model voor onderwerpreductie",
+        "en": "Model for topic reduction"
       },
       {
         "nl": "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren.",

@@ -62,7 +62,25 @@ main_server <- function(
             # Middle: title
             div(
               id = "title",
-              h1(
+              div(
+                style = "display: flex; justify-content: center; align-items: center; gap: 10px;",
+                img(
+                  src = "www/logo.png",
+                  style = "width: 3rem; height: 3rem"
+                ),
+                h1(
+                  style = "margin: 0; text-align: center;",
+                  strong("KWALLM")
+                ),
+                img(
+                  src = "www/logo.png",
+                  style = "width: 3rem; height: 3rem; transform: scaleX(-1);"
+                )
+              ),
+              tags$hr(
+                style = "border: none; border-top: 1px solid #ccc; width: 60%; margin: 10px auto;"
+              ),
+              h2(
                 style = "margin: 0; text-align: center;",
                 span(class = "title-part1", lang()$t("Tekstanalyse")),
                 span(class = "title-break", " "), # this will turn into a line break on small screens
