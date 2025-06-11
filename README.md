@@ -1,8 +1,14 @@
-# KWALLM: Text analysis with LLM (app)
+<div align="center">
+  <img src="example/banner_en.png" alt="KWALLM banner English" />
+</div>
+
+---
+
+# KWALLM: text analysis with LLM (app)
 
 KWALLM is an app (developed with R, Shiny) for (automated) qualitative text analysis using large language models (LLMs). Through a user-friendly interface, users can upload texts and have them analyzed by an LLM. The app offers various types of analysis, including categorization, scoring on characteristics, and topic modelling.
 
-*[Klik hier voor een Nederlandse README (click here for a Dutch README).](#tekstanalyse-met-llm-app)*
+*[Klik hier voor een Nederlandse README (click here for a Dutch README).](#kwallm-tekstanalyse-met-llm-app)*
 
 ## Features
 
@@ -133,15 +139,25 @@ Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our 
 
 ### Interface
 
-![Screenshot of interface](example/screenshot_interface_en.png)
+<div align="center">
+  <img src="example/screenshot_interface_en.png" alt="Screenshot of interface" />
+</div>
 
 ### Report with results (topic modelling)
 
-![Screenshot of report](example/usecase/report_with_results_screenshot_en.png)
+<div align="center">
+  <img src="example/usecase/report_with_results_screenshot_en.png" alt="Screenshot of report" />
+</div>
 
 ---
 
-# KWALLM: Tekstanalyse met LLM (app)
+<div align="center">
+  <img src="example/banner_nl.png" alt="KWALLM banner Dutch" />
+</div>
+
+---
+
+# KWALLM: tekstanalyse met LLM (app)
 
 KWALLM is een app (ontwikkeld met R, Shiny) voor (automatische) kwalitatieve
 tekstanalyse met large language models (LLMs). Via een gebruiksvriendelijke
@@ -149,7 +165,7 @@ interface kunnen gebruikers teksten uploaden en deze laten analyseren
 door een taalmodel. De app biedt verschillende analyse-mogelijkheden,
 zoals categorisatie, scoren op kenmerken, en topic modelling.
 
-*[Click here for an English README (klik hier voor een Engelse README).](#text-analysis-with-llm-app)*
+*[Click here for an English README (klik hier voor een Engelse README).](#kwallm-text-analysis-with-llm-app)*
 
 ## Functionaliteiten
 
@@ -323,8 +339,12 @@ Bezoek [onze website](https://www.kennispunttwente.nl) of [neem contact op met o
 
 ### Interface
 
-![Screenshot van de interface](example/screenshot_interface_nl.png)
+<div align="center">
+  <img src="example/screenshot_interface_nl.png" alt="Screenshot van de interface" />
+</div>
 
 ### Rapport met resultaten (topic modelling)
 
-![Screenshot van een rapport met resultaten](example/usecase/report_with_results_screenshot_nl.png)
+<div align="center">
+  <img src="example/usecase/report_with_results_screenshot_nl.png" alt="Screenshot van een rapport met resultaten" />
+</div>
