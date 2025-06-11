@@ -1,7 +1,7 @@
 {
-  "name": "text-analysis-with-llm-app",
-  "version": "1.0.0",
-  "description": "Desktop app version of text analysis app, see: github.com/KennispuntTwente/tekstanalyse-app",
+  "name": "kwallm-text-analysis-app",
+  "version": "1.0.1",
+  "description": "Desktop app version of text analysis app, see: github.com/kennispunttwente/tekstanalyse_met_llm",
   "author": "Luka Koning <l.koning@kennispunttwente.nl>",
   "license": "AGPL-3.0",
   "main": "package-main.js",
@@ -10,7 +10,7 @@
     "setup-portable-r": "node scripts/package-setup-portable-r.js",
     "setup-portable-pandoc": "node scripts/package-setup-portable-pandoc.js",
     "prebuild": "node scripts/package-prebuild.js",
-    "build": "npm run prebuild && electron-packager . tekstanalyse-met-llm --platform=win32 --arch=x64 --out=dist --overwrite --icon=www/icon.ico --ignore=\"^/(dist|build|example|progress|progress_secondary|renv|scripts|\\.gitignore|\\.Rhistory|\\.Rprofile|app\\.log|app\\.R|Dockerfile|.*\\.Rproj|README|renv\\.lock|run\\.bat)$\""
+    "build": "npm run prebuild && electron-packager . kwallm-text-analysis-app --platform=win32 --arch=x64 --out=dist --overwrite --icon=www/icon.ico --ignore=\"^/(dist|build|example|progress|progress_secondary|renv|scripts|\\.gitignore|\\.Rhistory|\\.Rprofile|app\\.log|app\\.R|Dockerfile|.*\\.Rproj|README|renv\\.lock|run\\.bat)$\""
   },
   "devDependencies": {
     "@electron/packager": "^18.3.6",

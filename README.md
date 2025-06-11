@@ -82,9 +82,9 @@ A pre-built desktop application for Windows 10/11 (64-bit, x64/AMD64) is
 available under [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases).
 This application contains all necessary dependencies and can be used directly.
 
-1. Download the release (`tekstanalyse-met-llm-win32-x64.7z`)
+1. Download the release (`kwallm-text-analysis-app-win32-x64.7z`)
 
-2. Extract the release to a folder; open the folder; start `tekstanalyse-met-llm.exe`
+2. Extract the release to a folder; open the folder; start `kwallm-text-analysis-app.exe`
 
 The pre-built desktop application does not have a specific LLM provider configured, but users can
 implement an LLM provider themselves while using it (OpenAI-compatible API or [Ollama](https://ollama.com)).
@@ -278,9 +278,9 @@ voor gebruikers die niet bekend zijn met R of Docker.
 Onder [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases) is een pre-built desktop-applicatie beschikbaar voor Windows 10/11 (64-bit, x64/AMD64).
 Deze applicatie bevat alle benodigde dependencies en kan direct worden gebruikt.
 
-1. Download de release (`tekstanalyse-met-llm-win32-x64.7z`)
+1. Download de release (`kwallm-text-analysis-app-win32-x64.7z`)
    
-2. Unzip de release naar een map; open de map; start `tekstanalyse-met-llm.exe`
+2. Unzip de release naar een map; open de map; start `kwallm-text-analysis-app.exe`
 
 De pre-built desktop-applicatie heeft geen specifieke LLM-provider geconfigureerd, maar gebruikers kunnen
 zelf tijdens het gebruik een LLM-provider configureren (OpenAI-compatible API of [Ollama](https://ollama.com)).
