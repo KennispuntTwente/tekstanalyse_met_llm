@@ -60,7 +60,7 @@ The app can be run in three ways. In all cases, the file `app.R` (or a variant) 
 
 The application can be run from an R environment.
 This requires an installation of [R](https://www.r-project.org/)
-(this project was built with R 4.4. 2, but other versions may work),
+(this project was built with R 4.4.2, but other versions may work),
 and optionally an environment such as [RStudio](https://www.rstudio.com/products/rstudio/download/).
 [Pandoc](https://pandoc.org/) is required to generate reports (installed with RStudio).
 [RTools](https://cran.r-project.org/bin/windows/Rtools/) may be required to build packages that this application needs.
@@ -71,7 +71,7 @@ the zip of the repository and unzip it)
 
 2. Open an R environment in the folder (in RStudio this can be done by opening the .Rproj file)
 
-3. Run 'app.R'
+3. Run `app.R`
 
 ### 2. Desktop app
 
@@ -87,9 +87,9 @@ This application contains all necessary dependencies and can be used directly.
 2. Extract the release to a folder; open the folder; start `kwallm-text-analysis-app.exe`
 
 The pre-built desktop application does not have a specific LLM provider configured, but users can
-implement an LLM provider themselves while using it (OpenAI-compatible API or [Ollama](https://ollama.com)).
+implement an LLM provider themselves while using it (any OpenAI-compatible API or [Ollama](https://ollama.com)).
 
-(This application is built with Node.js & Electron; see 'package.json' for more information.
+(This application is built with Node.js & Electron; see `package.json` for more information.
 It would also be possible to build a desktop application yourself with the desired configuration,
 or for other operating systems such as MacOS or Linux.)
 
@@ -98,7 +98,7 @@ or for other operating systems such as MacOS or Linux.)
 The application can also be used as a container application.
 For users familiar with Docker (or Podman), this is a convenient way to run the application, because all dependencies are already included in the container. In addition, a container can easily be run on a server or as a cloud-hosted application.
 
-See 'Dockerfile' for an example configuration. You can also use the pre-built container:
+See `Dockerfile` for an example configuration. You can also use the pre-built container:
 
 1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
 
@@ -107,24 +107,30 @@ See 'Dockerfile' for an example configuration. You can also use the pre-built co
 3. Open the app in your browser (at `http://localhost:3838`)
 
 The pre-built container does not have a specific LLM provider configured, but users can
-implement an LLM provider themselves while using it (OpenAI-compatible API from [Ollama](https://ollama.com)).
+implement an LLM provider themselves while using it (any OpenAI-compatible API from [Ollama](https://ollama.com)).
 
 Note that if you run Ollama on your own machine (i.e., not in the Docker container of this app),
 the endpoint `localhost:11434` will not work correctly (because that is a reference within the container). 
-You should use the IP address of your machine, or for example the hostname `host.docker.internal` instead of 'localhost' (so: `http://host.docker.internal:11434`).
+You should use the IP address of your machine, or for example the hostname `host.docker.internal` instead of `localhost` (so: `http://host.docker.internal:11434`).
 
-You can also modify 'Dockerfile-app.R' yourself and then build the container with
+You can also modify `Dockerfile-app.R` yourself and then build the container with
 a specific configuration.
 
 ## About this app
 
-This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) in collaboration with GGD Twente. Together, we work on generative AI applications for the public good.
+This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) in collaboration with [GGD Twente](https://www.ggdtwente.nl/). Together, we work on generative AI applications for the public good.
 
 Suggestions or ideas for the app? 
 [Open an issue on GitHub](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
 
 Kennispunt Twente is a (Dutch) non-profit organization focused on data, insights, and knowledge. Interested in what we can do for your organization, for example in generative AI?
 Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our developers](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
+
+### Name & logo of the app
+
+The name 'KWALLM' is a combination of '*kwalitatief*' (Dutch for: qualitative) and '*LLM*',
+and refers to the application of LLMs for qualitative text analysis.
+The name also includes 'kwal' (Dutch for: jellyfish), which is the logo of the app.
 
 ---
 
@@ -246,10 +252,10 @@ Met de app kunnen onderzoekers snel en gemakkelijk grote hoeveelheden tekst anal
 ## Installatie
 
 De applicatie kan op verschillende manieren gebruikt worden. 
-Bij alle manieren start het bestand 'app.R' (of een variant) de applicatie.
+Bij alle manieren start het bestand `app.R` (of een variant) de applicatie.
 Dit bestand bevat de configuratie van de applicatie, zoals welke
 LLM-provider gebruikt wordt en welke taalmodellen beschikbaar zijn.
-Bekijk voor meer informatie over de configuratie het bestand 'app.R' en de documentatie daarin.
+Bekijk voor meer informatie over de configuratie het bestand `app.R` en de documentatie daarin.
 
 Er zijn drie opties om de applicatie te starten:
 
@@ -268,7 +274,7 @@ de zip van de repository en unzip deze)
 
 2. Open een R-omgeving in de map (in RStudio kan dit door het .Rproj-bestand te openen)
 
-3. Run 'app.R'
+3. Run `app.R`
 
 ### 2. Desktop-applicatie 
 
@@ -283,9 +289,9 @@ Deze applicatie bevat alle benodigde dependencies en kan direct worden gebruikt.
 2. Unzip de release naar een map; open de map; start `kwallm-text-analysis-app.exe`
 
 De pre-built desktop-applicatie heeft geen specifieke LLM-provider geconfigureerd, maar gebruikers kunnen
-zelf tijdens het gebruik een LLM-provider configureren (OpenAI-compatible API of [Ollama](https://ollama.com)).
+zelf tijdens het gebruik een LLM-provider configureren (elke OpenAI-compatible API of [Ollama](https://ollama.com)).
 
-(Deze applicatie is gebouwd met Node.js & Electron; zie 'package.json' voor meer informatie.
+(Deze applicatie is gebouwd met Node.js & Electron; zie `package.json` voor meer informatie.
 Het zou ook mogelijk zijn om zelf een desktop-applicatie te bouwen met de gewenste configuratie,
 of voor andere besturingssystemen zoals MacOS of Linux.)
 
@@ -296,7 +302,7 @@ met Docker (of Podman) is dit een handige manier om de applicatie te draaien, om
 al zijn opgenomen in de container. Daarnaast kan een container gemakkelijk op een server
 of als cloud-gehoste applicatie worden gedraaid.
 
-Zie 'Dockerfile' voor een voorbeeld-configuratie. Je kan ook de pre-built container gebruiken: 
+Zie `Dockerfile` voor een voorbeeld-configuratie. Je kan ook de pre-built container gebruiken: 
 
 1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
 
@@ -305,18 +311,18 @@ Zie 'Dockerfile' voor een voorbeeld-configuratie. Je kan ook de pre-built contai
 3. Open de app in je browser (op `http://localhost:3838`)
 
 Bij de pre-built container is geen specifieke LLM-provider geconfigureerd, maar gebruikers kunnen
-zelf tijdens het gebruik een LLM-provider configureren (OpenAI-compatible API of [Ollama](https://ollama.com)). 
+zelf tijdens het gebruik een LLM-provider configureren (elke OpenAI-compatible API of [Ollama](https://ollama.com)). 
 
 Let op dat wanneer je Ollama draait op je eigen machine (d.w.z., niet in de docker-container van deze app),
-het endpoint `localhost:11434` niet juist is (omdat dat een verwijzing is binnen de container). Je moet dan de IP-adres van je machine gebruiken, 
-of bijvoorbeeld hostnaam `host.docker.internal` in plaats van 'localhost' (dus: `http://host.docker.internal:11434`).
+het endpoint `localhost:11434` niet juist is (omdat dat een verwijzing is binnen de container). Je moet dan het IP-adres van je machine gebruiken, 
+of bijvoorbeeld hostnaam `host.docker.internal` in plaats van `localhost` (dus: `http://host.docker.internal:11434`).
 
-Je kan ook zelf 'Dockerfile-app.R' aanpassen en dan de container bouwen met 
+Je kan ook zelf `Dockerfile-app.R` aanpassen en dan de container bouwen met 
 een specifieke configuratie.
 
 ## Over deze app
 
-Deze app is ontwikkeld door [Kennispunt Twente](https://www.kennispunttwente.nl), voortkomend uit een samenwerkingstraject van de Kennispunt Twente en GGD Twente. Samen werken onze organisaties aan
+Deze app is ontwikkeld door [Kennispunt Twente](https://www.kennispunttwente.nl), voortkomend uit een samenwerkingstraject van Kennispunt Twente en [GGD Twente](https://www.ggdtwente.nl/). Samen werken onze organisaties aan
 toepassingen met generatieve AI ten behoeve van de samenleving.
 
 Ideeën of verbeterpunten voor de app?
@@ -325,6 +331,12 @@ Ideeën of verbeterpunten voor de app?
 Kennispunt Twente is een non-profit organisatie voor data, inzicht en kennis. 
 Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?
 Bezoek [onze website](https://www.kennispunttwente.nl) of [neem contact op met onze ontwikkelaars](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
+
+### Naam & logo van de app
+
+De naam 'KWALLM' is een samentrekking van '*kwalitatief*' en '*LLM*', 
+en is een verwijzing naar de toepassing van LLM's voor kwalitatieve tekstanalyse.
+Omdat 'kwal' in de naam voorkomt, is het logo van de app een kwal.
 
 ---
 
