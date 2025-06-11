@@ -58,7 +58,7 @@ text_upload_server <- function(
                 style = "max-width: 300px;", # fixed width
                 fileInput(
                   inputId = ns("text_file"),
-                  label = "Upload (.txt, .csv, .xlsx, of .sav)",
+                  label = lang()$t("Upload (.txt, .csv, .xlsx, of .sav)"),
                   accept = c(".txt", ".csv", ".xlsx", ".sav")
                 )
               ),

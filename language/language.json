@@ -712,6 +712,10 @@
       {
         "nl": "Zet anonimisering aan",
         "en": "Enable anonymisation"
+      },
+      {
+        "nl": "Upload (.txt, .csv, .xlsx, of .sav)",
+        "en": "Upload (.txt, .csv, .xlsx, or .sav)"
       }
     ]
 }
