@@ -1,5 +1,10 @@
 #### 1 Load dependencies ####
 
+# Set library path explicitly to portable R library
+portable_lib <- file.path(dirname(R.home()), "library")
+.libPaths(portable_lib)
+print(paste("Using library path:", portable_lib))
+
 # Load core packages
 library(tidyverse)
 library(tidyprompt)
