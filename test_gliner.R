@@ -15,20 +15,23 @@
 
 gliner_server <- function(
   id,
-  pii_texts = reactiveVal(c(
-    "My name is Luka Koning, I live on 5th avenue street in London.",
-    "i'm Bob and I work at Kennispunt Twente sometimes I visit the University of Twente",
-    "my phone number is +3125251512, call me! or mail me at bob@bobthebob.com",
-    "it's a nice and sunny day today! Let's go for a walk",
-    "i am Bob de Nijs, this is a veryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy longggggggggggggggggggggggggggggggggggggggggggggggggggggg text and here is my phone number +313243244243 by the way this text will never fit inside a cell of a datatable loooooooooooooooooooooooool",
-    "lets go for a walk at 5th avenue street today! btw, my name is Kangorowits Wakka Wakka",
-    " u should really check out my twitter, its at twitter.com/lukakoning"
-  )),
+  pii_texts = reactiveVal(
+    c(
+      "My name is Luka Koning, I live on 5th avenue street in London.",
+      "i'm Bob and I work at Kennispunt Twente sometimes I visit the University of Twente",
+      "my phone number is +3125251512, call me! or mail me at bob@bobthebob.com",
+      "it's a nice and sunny day today! Let's go for a walk",
+      "i am Bob de Nijs, this is a veryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy longggggggggggggggggggggggggggggggggggggggggggggggggggggg text and here is my phone number +313243244243 by the way this text will never fit inside a cell of a datatable loooooooooooooooooooooooool",
+      "lets go for a walk at 5th avenue street today! btw, my name is Kangorowits Wakka Wakka",
+      " u should really check out my twitter, its at twitter.com/lukakoning"
+    )
+  ),
   lang = reactiveVal(
     shiny.i18n::Translator$new(
       translation_json_path = "language/language.json"
     )
-  )
+  ),
+  model = gliner_load_model()
 ) {
   moduleServer(
     id,
@@ -53,7 +56,8 @@ gliner_server <- function(
       return <- reactiveValues(
         start = start,
         done = FALSE,
-        result = NULL
+        anonymized_texts = NULL,
+        number_of_pii_entities_removed = NULL
       )
 
       # State can be:
@@ -79,8 +83,9 @@ gliner_server <- function(
                 lang()$t(
                   "Bijvoorbeeld: naam, adres, werkgever, telefoonnummer, e-mail, et cetera."
                 ),
+                br(),
                 lang()$t(
-                  "Het lokale GLiNER-model zal deze entities proberen te vinden in de teksten."
+                  "Het lokale GLiNER-model zal deze entities proberen te flaggen in de teksten."
                 )
               ),
               hr(),
@@ -139,10 +144,14 @@ gliner_server <- function(
           running = {
             tagList(
               p(
-                lang()$t("Model is bezig met detectie van entiteiten..."),
+                lang()$t("Model is bezig met detectie van entiteiten."),
                 br(),
                 lang()$t(
-                  "Dit kan even duren, afhankelijk van de hoeveelheid tekst en de hardware van de machine..."
+                  "Dit kan even duren, afhankelijk van de hoeveelheid tekst en de hardware van de machine."
+                ),
+                br(),
+                lang()$t(
+                  "Bekijk de voortgang in de notificatie..."
                 )
               ),
               shiny::tags$div(
@@ -165,8 +174,27 @@ gliner_server <- function(
               p(lang()$t(
                 "Probeer het opnieuw of neem contact op met de beheerder."
               )),
-              actionButton(ns("retry"), lang()$t("Opnieuw proberen")),
-              actionButton(ns("quit"), lang()$t("Stoppen"))
+              hr(),
+              # Quit & retry buttons
+              div(
+                style = "display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;",
+                actionButton(
+                  ns("quit"),
+                  label = tagList(
+                    icon("sign-out-alt"),
+                    lang()$t("Stoppen")
+                  ),
+                  class = "btn btn-danger"
+                ),
+                actionButton(
+                  ns("retry"),
+                  label = tagList(
+                    icon("redo"),
+                    lang()$t("Probeer opnieuw")
+                  ),
+                  class = "btn btn-primary"
+                )
+              )
             )
           },
 
@@ -187,10 +215,28 @@ gliner_server <- function(
                 }
               "
               )),
-              h3(lang()$t("Evalueer de verwijderde PII-entities")),
               uiOutput(ns("pii_entities_ui")),
-              actionButton(ns("undo_removals"), lang()$t("Ongedaan maken")),
-              actionButton(ns("save_anonymized_texts"), lang()$t("Opslaan"))
+              hr(),
+              # Quit button left & save button right
+              div(
+                style = "display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;",
+                actionButton(
+                  ns("quit"),
+                  label = tagList(
+                    icon("sign-out-alt"),
+                    lang()$t("Stoppen")
+                  ),
+                  class = "btn btn-danger"
+                ),
+                actionButton(
+                  ns("save_anonymization"),
+                  label = tagList(
+                    icon("save"),
+                    lang()$t("Anonimiseer")
+                  ),
+                  class = "btn btn-success"
+                )
+              )
             )
           },
 
@@ -207,7 +253,7 @@ gliner_server <- function(
 
       #### 3 Process handlers ####
 
-      ##### 3.1 Anonymization #####
+      ##### 3.1 Run model to detect PII entities #####
 
       # Reactive value to store the PII entities predictions
       pii_predictions <- reactiveVal(NULL)
@@ -218,11 +264,8 @@ gliner_server <- function(
         {
           req(input$pii_labels)
 
-          # Get the labels from the text area input
-          labels <- strsplit(input$pii_labels, ",")[[1]]
-          labels <- trimws(labels) # Remove any leading/trailing whitespace
-
-          # Check if labels are provided
+          ## 1 Parse & validate labels
+          labels <- strsplit(input$pii_labels, ",")[[1]] |> trimws()
           if (length(labels) == 0 || all(labels == "")) {
             shiny::showNotification(
               lang()$t("Voer ten minste één entity in om te verwijderen."),
@@ -231,119 +274,98 @@ gliner_server <- function(
             return()
           }
 
-          # Set the module state to running
+          ## 2 Switch the modal to the “running” state
           module_state("running")
 
-          # Predict entities using the GLiNER model (async)
-          # Async prediction
+          ## 3 Build a progress bar that the worker can update
+          n_txt <- length(pii_texts())
+          progress <- ipc::AsyncProgress$new(
+            message = lang()$t("Detectie van entiteiten…"),
+            detail = sprintf(lang()$t("0 van %d teksten klaar"), n_txt)
+          )
+
+          ## 4 Spawn the future that runs GLiNER model on texts
           future(
             {
-              model <- gliner_load_model()
+              purrr::imap(pii_texts, function(txt, i) {
+                res <- model$predict_entities(text = txt, labels = labels)
 
-              purrr::map(texts, function(text) {
-                # Predict entities for each text
-                model$predict_entities(
-                  text = text,
-                  labels = labels
-                )
+                # Bump progress after each text
+                n_txt <- length(pii_texts)
+                progress$inc(1 / n_txt, detail = sprintf("%d / %d", i, n_txt))
+
+                res
               }) |>
-                setNames(texts)
+                # Return a named list; original texts are names
+                setNames(pii_texts)
             },
             globals = list(
-              gliner_load_model = gliner_load_model,
-              texts = pii_texts(),
-              labels = labels
+              model = model,
+              pii_texts = pii_texts(),
+              labels = labels,
+              progress = progress
             ),
             seed = NULL
           ) %...>%
             {
-              # Successful prediction
-              predictions <- .
+              ## SUCCESS ─ tidy predictions & then set state to “evaluating”
+              preds <- .
 
-              # Every prediction is a list, containing potentially multiple entities
-              # E.g., entity <- predictions[[1]][[1]],
-              #   where we will have:
-              #     entity$score (e.g., 0.985),
-              #     entity$text (e.g., "Luka Koning"),
-              #     entity$label (e.g., "name")
-              #     entity$start (e.g., 11), entity$end (e.g., 22)
-              # And the predictions are a named list, where the names are the original texts
-
-              # Clean the predictions to a data frame;
-              #   should contain:
-              #     text (original text),
-              #     start (start index of the entity in the original text),
-              #     end (end index of the entity in the original text),
-              #     entity_text (text of the entity),
-              #     label (label of the entity),
-              #     score (confidence score of the entity)
-              # Discard any texts that do not have any entities
-              predictions_clean <- purrr::map_df(
-                predictions,
-                function(pred) {
-                  if (length(pred) == 0) {
-                    return(NULL) # No entities found for this text
-                  }
-                  # Convert each entity to a data frame row
-                  purrr::map_df(pred, function(entity) {
+              # ── clean up the raw list into a data frame
+              predictions_clean <- purrr::imap_dfr(
+                preds,
+                function(pred, original) {
+                  if (length(pred) == 0) return(NULL)
+                  purrr::map_dfr(pred, function(ent) {
                     data.frame(
-                      start = entity$start,
-                      end = entity$end,
-                      entity_text = entity$text,
-                      label = entity$label,
-                      score = entity$score,
+                      original_text = original,
+                      start = ent$start,
+                      end = ent$end,
+                      entity_text = ent$text,
+                      label = ent$label,
+                      score = ent$score,
                       stringsAsFactors = FALSE
                     )
                   })
-                },
-                .id = "original_text"
-              )
+                }
+              ) |>
+                dplyr::group_by(original_text, start, end, entity_text) |>
+                dplyr::filter(score == max(score)) |>
+                dplyr::ungroup() |>
+                dplyr::arrange(dplyr::desc(score)) |>
+                tibble::rowid_to_column(".row_id") |>
+                dplyr::mutate(anonymize = TRUE)
 
-              # If same text has same entity multiple times,
-              #   take the one with the highest score
-              #   and get rid of the others
-              predictions_clean <- predictions_clean |>
-                group_by(original_text, start, end, entity_text) |>
-                filter(score == max(score)) |>
-                ungroup()
-
-              # Add some additional columns for evaluation
-              predictions_clean <- predictions_clean |>
-                arrange(
-                  desc(score)
-                ) |>
-                tibble::rowid_to_column(".row_id") |> # unique id for every row
-                dplyr::mutate(anonymize = TRUE) # default: anonymise
-
-              # Store the predictions in the reactive value, update state
+              # Hand the data to the rest of the module
               pii_predictions(predictions_clean)
               pii_eval(predictions_clean)
               module_state("evaluating")
+
+              progress$close()
             } %...!%
-            (function(e) {
-              # Error during prediction
+            {
+              ## ERROR ─ notify the user and set state to “error”
+              err <- .
+              progress$close()
+
+              print(err)
+
               shiny::showNotification(
                 paste0(
                   lang()$t("Er is een fout opgetreden bij het anonimiseren: "),
-                  e$message
+                  err$message
                 ),
                 type = "error"
               )
-              print(e)
               module_state("error")
-            })
+            }
 
-          print("Started entity scanning by GLiNER model...")
-        }
+          NULL # Don't block Shiny's reactive chain by ending on a future
+        },
+        ignoreInit = TRUE
       )
 
-      #### 3.2 Evaluate PII entities #####
-
-      # Store dataframe with predictions + evaluation state (user decisions)
-      # User can click checkboxes to decide which entities to anonymize or not
-      ###############################################################################
-      ## 3·2  Evaluate PII entities – check-box version                             ##
-      ###############################################################################
+      ##### 3.2 User evaluation of PII entities #####
 
       # Reactive dataframe with entities + if user wants to anonymize them
       # Column 'anonymize' is TRUE by default, meaning the entity will be anonymized
@@ -369,9 +391,15 @@ gliner_server <- function(
         }
 
         tagList(
-          p(lang()$t(
-            "Vink het vakje uit als je deze entiteit níet wilt anonimiseren."
-          )),
+          p(
+            lang()$t(
+              "Bekijk de gevonden PII-entities hieronder."
+            ),
+            br(),
+            lang()$t(
+              "Klik een checkbox leeg als je een entiteit niet wilt anonimiseren."
+            )
+          ),
           # Max height for the table, otherwise scrollable
           div(
             style = "max-height: 80%; overflow-y: auto; overflow-x: hidden; max-width: 100%;",
@@ -421,68 +449,91 @@ gliner_server <- function(
         ns("anon_toggle")
       )
 
+      # Helper function to highlight the entity in the text as bold
+      highlight_entity <- function(txt, start, end) {
+        htmltools::HTML(paste0(
+          htmltools::htmlEscape(substr(txt, 1, start - 1)),
+          "<b>",
+          htmltools::htmlEscape(substr(txt, start, end)),
+          "</b>",
+          htmltools::htmlEscape(substr(txt, end + 1, nchar(txt)))
+        ))
+      }
+
       # Render the data table with PII entities, plus check-boxes for anonymization
-      output$pii_entities_table <- renderDT(
-        server = TRUE,
-        {
-          req(isTRUE(module_state() == "evaluating"))
-          df <- isolate(pii_eval())
-          req(nrow(df) > 0)
+      output$pii_entities_table <- renderDT(server = TRUE, {
+        req(isTRUE(module_state() == "evaluating"))
+        df <- isolate(pii_eval())
+        req(nrow(df) > 0)
 
-          df$checkbox <- mapply(
-            build_cb,
-            df$anonymize,
-            df$.row_id,
-            USE.NAMES = FALSE
-          )
+        # add the check-boxes
+        df$checkbox <- mapply(
+          build_cb,
+          df$anonymize,
+          df$.row_id,
+          USE.NAMES = FALSE
+        )
 
-          DT::datatable(
-            df[, c(
-              ".row_id",
-              "checkbox",
-              "original_text",
-              "entity_text",
-              "label",
-              "score"
-            )],
-            rownames = FALSE,
-            escape = FALSE,
-            colnames = c(
-              ".row_id",
-              "", # hide id, blank header
-              lang()$t("Brontekst"),
-              lang()$t("Entiteit"),
-              lang()$t("Label"),
-              lang()$t("Confidence")
+        # prettified version of the text
+        df$display_text <- mapply(
+          highlight_entity,
+          df$original_text,
+          df$start,
+          df$end,
+          USE.NAMES = FALSE
+        )
+
+        DT::datatable(
+          # NB: keep raw text as the *last* column so we can hide it & still group on it
+          df[, c(
+            ".row_id",
+            "checkbox",
+            "display_text",
+            "entity_text",
+            "label",
+            "score",
+            "original_text"
+          )],
+          rownames = FALSE,
+          escape = FALSE, # allow our <b> tags through
+          colnames = c(
+            ".row_id",
+            "", # hidden id
+            lang()$t("Tekst"),
+            lang()$t("Entiteit"),
+            lang()$t("Label"),
+            lang()$t("Confidence"),
+            "orig_raw" # hidden column used for grouping
+          ),
+          selection = "none",
+          options = list(
+            columnDefs = list(
+              list(visible = FALSE, targets = c(0, 6)) # hide .row_id & entity_text & orig_raw
             ),
-            selection = "none",
-            options = list(
-              columnDefs = list(list(visible = FALSE, targets = 0)), # hide .row_id
-              paging = FALSE,
-              searching = FALSE,
-              autoWidth = TRUE,
-              ordering = FALSE,
-              rowGroup = list(dataSrc = 2), # group on text
-              rowCallback = JS(row_css),
-              initComplete = JS(click_js)
-            )
-          ) |>
-            formatRound("score", 2)
-        }
-      )
+            paging = FALSE,
+            searching = FALSE,
+            autoWidth = TRUE,
+            ordering = FALSE,
+            rowGroup = list(dataSrc = 6), # group on the *raw*, hidden text
+            rowCallback = JS(row_css),
+            initComplete = JS(click_js)
+          )
+        ) |>
+          formatRound("score", 2)
+      })
 
+      # Use data table proxy to update the table without re-rendering
       proxy_dt <- dataTableProxy(ns("pii_entities_table"))
 
+      # Handle checkbox with which user can choose to not anonymize a specific entity
       observeEvent(
         input$anon_toggle,
         {
           info <- input$anon_toggle # $row, $val, $ts
-          print(str(info))
 
           df <- pii_eval()
           df$anonymize[df$.row_id == info$row] <- info$val
           pii_eval(df)
-          print(pii_eval())
 
           # Rebuild check-box HTML for the changed row(s)
           df$checkbox <- mapply(
@@ -509,6 +560,76 @@ gliner_server <- function(
         ignoreInit = TRUE
       )
 
+      ##### 3.3 Save anonymized texts #####
+
+      # User clicks the save anonymization button
+      observeEvent(
+        input$save_anonymization,
+        {
+          req(isTRUE(module_state() == "evaluating"))
+          req(pii_eval())
+          df <- pii_eval()
+
+          # Filter out the entities that user chose to not anonymize
+          df <- df[df$anonymize, ]
+
+          if (nrow(df) == 0) {
+            shiny::showNotification(
+              lang()$t(
+                "Er zijn geen PII-entities geselecteerd om te anonimiseren."
+              ),
+              type = "warning"
+            )
+            return()
+          }
+
+          # Build the anonymized texts
+          anonymized_texts <- pii_texts() |>
+            purrr::imap(function(txt, i) {
+              # Get all entities for this text
+              ents <- df[df$original_text == txt, ]
+              if (nrow(ents) == 0) return(txt)
+
+              # Replace each entity with a placeholder
+              for (j in seq_len(nrow(ents))) {
+                ent <- ents[j, ]
+                txt <- stringr::str_sub(
+                  txt,
+                  start = 1,
+                  end = ent$start - 1
+                ) |>
+                  paste0("<< removed: ", ent$label, " >>") |>
+                  paste0(
+                    stringr::str_sub(txt, start = ent$end + 1)
+                  )
+              }
+              txt
+            }) |>
+            setNames(pii_texts())
+
+          # Set the result and done status
+          return$anonymized_texts <- anonymized_texts
+          return$done <- TRUE
+          return$number_of_pii_entities_removed <- nrow(df)
+
+          # Show notification about the anonymization; number of entities removed
+          shiny::showNotification(
+            paste0(
+              lang()$t(
+                "Teksten geanonimiseerd! ",
+              ),
+              return$number_of_pii_entities_removed,
+              " PII-entities verwijderd"
+            ),
+            type = "message"
+          )
+
+          # Finished; close modal
+          shiny::removeModal()
+        },
+        ignoreInit = TRUE
+      )
+
       return(return)
     }
   )
@@ -518,7 +639,7 @@ gliner_server <- function(
 #### 2 Load model ####
 
 gliner_load_model <- function(
-  venv_name = "kwallm__venv7",
+  venv_name = "kwallm8",
   python_version = "3.12.10",
   model_name = "urchade/gliner_multi_pii-v1"
 ) {
@@ -560,7 +681,7 @@ gliner_load_model <- function(
       "' does not exist; cannot load GLiNER model"
     )
   }
-  reticulate::use_virtualenv(venv_name)
+  reticulate::use_virtualenv(venv_name, required = TRUE)
 
   #### 2 Load gliner ####
 
@@ -648,7 +769,7 @@ library(htmltools)
 library(future)
 library(promises)
 library(DT)
-library(reactable)
+library(ipc)
 
 # Load components in R/-folder
 r_files <- list.files(
@@ -662,21 +783,25 @@ for (file in r_files) {
   }
 }
 
-if (FALSE) {
+if (!exists("model")) {
+  # Allows to load Python & interrupt R without fatal R session crash
+  Sys.setenv(FOR_DISABLE_CONSOLE_CTRL_HANDLER = "1")
+
   model <- gliner_load_model(
-    venv_name = "kwallm__venv7",
+    venv_name = "kwallm8",
     python_version = "3.12.10",
     model_name = "urchade/gliner_multi_pii-v1"
   )
-  prediction <- model$predict_entities(
-    text = paste0(
-      "My name is Luka Koning,",
-      " I live on 5th avenue street in London.",
-      " I work at Kennispunt Twente",
-      " sometimes I visit the University of Twente"
-    ),
-    labels = c("person", "address", "employer")
-  )
+
+  # prediction <- model$predict_entities(
+  #   text = paste0(
+  #     "My name is Luka Koning,",
+  #     " I live on 5th avenue street in London.",
+  #     " I work at Kennispunt Twente",
+  #     " sometimes I visit the University of Twente"
+  #   ),
+  #   labels = c("person", "address", "employer")
+  # )
 }
 
 if (TRUE) {
@@ -691,7 +816,8 @@ if (TRUE) {
     # Create the GLiNER module server
     gliner <- gliner_server(
       "gliner",
-      lang = lang
+      lang = lang,
+      model = model
     )
 
     # Automatically start the GLiNER module when the app starts
