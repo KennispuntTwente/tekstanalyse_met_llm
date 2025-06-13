@@ -31,7 +31,8 @@ main_server <- function(
   preconfigured_llm_provider = NULL,
   preconfigured_main_models = NULL,
   preconfigured_large_models = NULL,
-  azure_auth = FALSE
+  azure_auth = FALSE,
+  gliner_model = NULL
 ) {
   server <- function(input, output, session) {
     #### UI ####
@@ -234,10 +235,11 @@ main_server <- function(
 
     # Pre-process texts, show table
     texts <- text_management_server(
-      "text_management",
+      id = "text_management",
       processing = processing,
       raw_texts = raw_texts,
-      lang = lang
+      lang = lang,
+      gliner_model = gliner_model
     )
 
     # Obtain research background

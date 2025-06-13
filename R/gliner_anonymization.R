@@ -23,7 +23,9 @@ gliner_server <- function(
       "it's a nice and sunny day today! Let's go for a walk",
       "i am Bob de Nijs, this is a veryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy longggggggggggggggggggggggggggggggggggggggggggggggggggggg text and here is my phone number +313243244243 by the way this text will never fit inside a cell of a datatable loooooooooooooooooooooooool",
       "lets go for a walk at 5th avenue street today! btw, my name is Kangorowits Wakka Wakka",
-      " u should really check out my twitter, its at twitter.com/lukakoning"
+      " u should really check out my twitter, its at twitter.com/lukakoning",
+      " im christian and i live in enschede",
+      " im gay and i live in amsterdam"
     )
   ),
   lang = reactiveVal(
@@ -31,7 +33,7 @@ gliner_server <- function(
       translation_json_path = "language/language.json"
     )
   ),
-  model = gliner_load_model()
+  gliner_model = gliner_load_model()
 ) {
   moduleServer(
     id,
@@ -42,6 +44,27 @@ gliner_server <- function(
 
       # To start/initialize the module from the main server:
       start <- function() {
+        if (
+          !getOption("anonymization__gliner_model", FALSE) |
+            length(pii_texts()) == 0
+        ) {
+          return$enabled <- FALSE
+          return()
+        }
+
+        # Require model to be not NULL
+        if (is.null(gliner_model)) {
+          shiny::showNotification(
+            lang()$t("GLiNER model is not loaded"),
+            type = "error"
+          )
+          return$enabled <- FALSE
+          return()
+        }
+
+        # Close any existing modal
+        shiny::removeModal()
+
         showModal(modalDialog(
           title = lang()$t("Anonimiseer met GLiNER-model"),
           size = "xl",
@@ -49,12 +72,15 @@ gliner_server <- function(
           footer = NULL,
           uiOutput(ns("modal_content"))
         ))
+
+        return$enabled <- TRUE
       }
 
       # Make available to the main server:
       #   start function; done status; result (will be the anonymized texts)
       return <- reactiveValues(
         start = start,
+        enabled = FALSE,
         done = FALSE,
         anonymized_texts = NULL,
         number_of_pii_entities_removed = NULL
@@ -78,7 +104,7 @@ gliner_server <- function(
             tagList(
               p(
                 lang()$t(
-                  "Voer namen in van 'entities' die je zou willen verwijderen."
+                  "Voer PII-entiteiten in die je zou willen verwijderen."
                 ),
                 lang()$t(
                   "Bijvoorbeeld: naam, adres, werkgever, telefoonnummer, e-mail, et cetera."
@@ -92,26 +118,24 @@ gliner_server <- function(
               textAreaInput(
                 ns("pii_labels"),
                 width = "100%",
-                label = lang()$t("Entities (gescheiden door komma's):"),
+                label = lang()$t("Entiteiten (gescheiden door komma's):"),
                 value = "
                   name of person,
                   date of birth,
-                  employer of person,
-                  personal address,
-                  personal phone number,
-                  personal email address,
+                  employer,
+                  address,
+                  phone number,
+                  email address,
                   personal identification number,
                   passport number,
                   bank account number,
                   license plate code,
-                  personal religious affiliation,
-                  personal political affiliation,
-                  personal sexual orientation,
-                  link to personal web page,
-                  link to personal social media profile,
+                  religious affiliation,
+                  political affiliation,
+                  sexual orientation,
                   IP address,
-                  personal username,
-                  personal password
+                  username,
+                  password
                 " |>
                   stringr::str_squish(),
                 rows = 4
@@ -232,7 +256,7 @@ gliner_server <- function(
                   ns("save_anonymization"),
                   label = tagList(
                     icon("save"),
-                    lang()$t("Anonimiseer")
+                    lang()$t("Sla op")
                   ),
                   class = "btn btn-success"
                 )
@@ -263,6 +287,7 @@ gliner_server <- function(
         input$start_anonymization,
         {
           req(input$pii_labels)
+          req(isTRUE(return$enabled))
 
           ## 1 Parse & validate labels
           labels <- strsplit(input$pii_labels, ",")[[1]] |> trimws()
@@ -284,11 +309,19 @@ gliner_server <- function(
             detail = sprintf(lang()$t("0 van %d teksten klaar"), n_txt)
           )
 
+          print(gliner_model)
+          print(pii_texts())
+          print(labels)
+          print(progress)
+
           ## 4 Spawn the future that runs GLiNER model on texts
           future(
             {
               purrr::imap(pii_texts, function(txt, i) {
-                res <- model$predict_entities(text = txt, labels = labels)
+                res <- gliner_model$predict_entities(
+                  text = txt,
+                  labels = labels
+                )
 
                 # Bump progress after each text
                 n_txt <- length(pii_texts)
@@ -300,7 +333,7 @@ gliner_server <- function(
                 setNames(pii_texts)
             },
             globals = list(
-              model = model,
+              gliner_model = gliner_model,
               pii_texts = pii_texts(),
               labels = labels,
               progress = progress
@@ -381,7 +414,7 @@ gliner_server <- function(
         if (nrow(df) == 0) {
           return(p(
             lang()$t(
-              "Er zijn geen PII-entities gevonden in de teksten."
+              "Er zijn geen PII-entiteiten gevonden in de teksten."
             ),
             br(),
             lang()$t(
@@ -392,12 +425,14 @@ gliner_server <- function(
 
         tagList(
           p(
-            lang()$t(
-              "Bekijk de gevonden PII-entities hieronder."
+            paste0(
+              lang()$t("Er zijn "),
+              nrow(df),
+              lang()$t(" PII-entiteiten gevonden in de teksten.")
             ),
             br(),
             lang()$t(
-              "Klik een checkbox leeg als je een entiteit niet wilt anonimiseren."
+              "Alle checkboxes die aangevinkt zijn, worden geanonimiseerd nadat je op 'Sla op' klikt.",
             )
           ),
           # Max height for the table, otherwise scrollable
@@ -569,54 +604,53 @@ gliner_server <- function(
           req(isTRUE(module_state() == "evaluating"))
           req(pii_eval())
           df <- pii_eval()
+          req(isTRUE(return$enabled))
 
           # Filter out the entities that user chose to not anonymize
           df <- df[df$anonymize, ]
 
           if (nrow(df) == 0) {
-            shiny::showNotification(
-              lang()$t(
-                "Er zijn geen PII-entities geselecteerd om te anonimiseren."
-              ),
-              type = "warning"
+            # Just keep the original texts
+            anonymized_texts <- pii_texts()
+
+            # Update counts
+            return$number_of_pii_entities_removed <- 0
+            return$pii_label_counts <- tibble::tibble(
+              label = character(),
+              count = integer()
             )
-            return()
+          } else {
+            # Anonymize the texts by replacing the PII entities with a placeholder
+            anonymized_texts <- pii_texts() |>
+              purrr::imap(function(txt, i) {
+                ents <- df[df$original_text == txt, ]
+                if (nrow(ents) == 0) return(txt)
+
+                for (j in seq_len(nrow(ents))) {
+                  ent <- ents[j, ]
+                  txt <- stringr::str_sub(txt, 1, ent$start - 1) |>
+                    paste0("<< removed: ", ent$label, " >>") |>
+                    paste0(stringr::str_sub(txt, ent$end + 1))
+                }
+                txt
+              })
+
+            # Update counts
+            return$number_of_pii_entities_removed <- nrow(df)
+            return$pii_label_counts <- df |>
+              dplyr::count(label, name = "count") |>
+              dplyr::arrange(dplyr::desc(count))
           }
-
-          # Build the anonymized texts
-          anonymized_texts <- pii_texts() |>
-            purrr::imap(function(txt, i) {
-              # Get all entities for this text
-              ents <- df[df$original_text == txt, ]
-              if (nrow(ents) == 0) return(txt)
-
-              # Replace each entity with a placeholder
-              for (j in seq_len(nrow(ents))) {
-                ent <- ents[j, ]
-                txt <- stringr::str_sub(
-                  txt,
-                  start = 1,
-                  end = ent$start - 1
-                ) |>
-                  paste0("<< removed: ", ent$label, " >>") |>
-                  paste0(
-                    stringr::str_sub(txt, start = ent$end + 1)
-                  )
-              }
-              txt
-            }) |>
-            setNames(pii_texts())
 
           # Set the result and done status
           return$anonymized_texts <- anonymized_texts
           return$done <- TRUE
-          return$number_of_pii_entities_removed <- nrow(df)
 
           # Show notification about the anonymization; number of entities removed
           shiny::showNotification(
             paste0(
               lang()$t(
-                "Teksten geanonimiseerd! ",
+                "Teksten opgeslagen! ",
               ),
               return$number_of_pii_entities_removed,
               " PII-entities verwijderd"
@@ -626,6 +660,46 @@ gliner_server <- function(
 
           # Finished; close modal
           shiny::removeModal()
+        },
+        ignoreInit = TRUE
+      )
+
+      #### 3.4 Reset, quit, retry ####
+
+      # Function to reset module state
+      reset_state <- function(close_modal = FALSE) {
+        module_state("defining")
+        pii_predictions(NULL)
+        pii_eval(NULL)
+        return$done <- FALSE
+        return$anonymized_texts <- NULL
+        return$number_of_pii_entities_removed <- NULL
+        if (isTRUE(close_modal)) shiny::removeModal()
+      }
+
+      # Auto-reset when the source texts change
+      observeEvent(
+        pii_texts(),
+        {
+          reset_state(close_modal = FALSE)
+        },
+        ignoreInit = TRUE
+      )
+
+      # Quit button
+      observeEvent(
+        input$quit,
+        {
+          reset_state(close_modal = TRUE)
+        },
+        ignoreInit = TRUE
+      )
+
+      # Retry button (shown in the “error” state)
+      observeEvent(
+        input$retry,
+        {
+          reset_state(close_modal = FALSE) # keep modal open so user can hit Start again
         },
         ignoreInit = TRUE
       )
@@ -785,17 +859,14 @@ if (FALSE) {
     }
   }
 
-  if (!exists("model")) {
-    # Allows to load Python & interrupt R without fatal R session crash
+  if (!exists("gliner_model")) {
+    # Allows to load Python & interrupt R session without fatal R crash:
     Sys.setenv(FOR_DISABLE_CONSOLE_CTRL_HANDLER = "1")
 
-    model <- gliner_load_model(
-      venv_name = "kwallm8",
-      python_version = "3.12.10",
-      model_name = "urchade/gliner_multi_pii-v1"
-    )
+    # Load model:
+    if (!exists("gliner_model")) gliner_model <- gliner_load_model()
 
-    # prediction <- model$predict_entities(
+    # prediction <- gliner_model$predict_entities(
     #   text = paste0(
     #     "My name is Luka Koning,",
     #     " I live on 5th avenue street in London.",
@@ -805,6 +876,10 @@ if (FALSE) {
     #   labels = c("person", "address", "employer")
     # )
   }
+
+  options(
+    anonymization__gliner_model = TRUE # Enable GLiNER model usage
+  )
 
   ui <- bslib::page(
     shinyjs::useShinyjs(),
@@ -818,7 +893,7 @@ if (FALSE) {
     gliner <- gliner_server(
       "gliner",
       lang = lang,
-      model = model
+      gliner_model = gliner_model
     )
 
     # Automatically start the GLiNER module when the app starts

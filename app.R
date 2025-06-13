@@ -110,8 +110,43 @@ options(
   #   can toggle this setting;
   #     see R/text_management.R
   anonymization__enabled = TRUE,
-  anonymization__can_toggle = TRUE
+  anonymization__can_toggle = TRUE,
+
+  # - If users can use the Gliner model for anonymization;
+  #   this is a lightweight local model that can be used to
+  #   detect various forms of PII in texts;
+  #     see: R/anonymization_gliner.R
+  anonymization__gliner_model = TRUE
 )
+
+# Load Gliner anonymization model if enabled
+if (getOption("anonymization__gliner_model", FALSE)) {
+  # A Python virtual environment with the Python 'gliner' package
+  #   will be created; in this virtual environment, the Gliner model
+  #   will be downloaded and installed
+  # Note that this may take some time the first time you do this,
+  #   it will go faster after initial setup has been performed
+
+  # Allows to load Python & interrupt R session without fatal R crash:
+  Sys.setenv(FOR_DISABLE_CONSOLE_CTRL_HANDLER = "1")
+
+  # Load model:
+  if (!exists("gliner_model") || is.null(gliner_model)) {
+    gliner_model <- tryCatch(
+      {
+        gliner_load_model()
+      },
+      error = function(e) {
+        cli::cli_alert_danger(paste0(
+          "Error loading Gliner model: ",
+          e$message
+        ))
+
+        NULL
+      }
+    )
+  }
+}
 
 
 #### 3 Run app ####
@@ -124,6 +159,7 @@ shiny::shinyApp(
   server = main_server(
     preconfigured_llm_provider = preconfigured_llm_provider,
     preconfigured_main_models = preconfigured_models_main,
-    preconfigured_large_models = preconfigured_models_large
+    preconfigured_large_models = preconfigured_models_large,
+    gliner_model = gliner_model
   )
 )
