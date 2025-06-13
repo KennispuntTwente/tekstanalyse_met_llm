@@ -758,53 +758,54 @@ gliner_load_model <- function(
 
 #### 3 Example/development usage ####
 
-# Load core packages
-library(tidyverse)
-library(tidyprompt)
-library(shiny)
-library(shinyjs)
-library(bslib)
-library(bsicons)
-library(htmltools)
-library(future)
-library(promises)
-library(DT)
-library(ipc)
+if (FALSE) {
+  # Load core packages
+  library(tidyverse)
+  library(tidyprompt)
+  library(shiny)
+  library(shinyjs)
+  library(bslib)
+  library(bsicons)
+  library(htmltools)
+  library(future)
+  library(promises)
+  library(DT)
+  library(ipc)
 
-# Load components in R/-folder
-r_files <- list.files(
-  path = "R",
-  pattern = "\\.R$",
-  full.names = TRUE
-)
-for (file in r_files) {
-  if (!grepl("llmQuali-package\\.R|rstudio_addin\\.R|zzz\\.R", file)) {
-    source(file)
-  }
-}
-
-if (!exists("model")) {
-  # Allows to load Python & interrupt R without fatal R session crash
-  Sys.setenv(FOR_DISABLE_CONSOLE_CTRL_HANDLER = "1")
-
-  model <- gliner_load_model(
-    venv_name = "kwallm8",
-    python_version = "3.12.10",
-    model_name = "urchade/gliner_multi_pii-v1"
+  # Load components in R/-folder
+  r_files <- list.files(
+    path = "R",
+    pattern = "\\.R$",
+    full.names = TRUE
   )
+  for (file in r_files) {
+    # Source if it isn't this file (avoid infinite recursion)
+    if (!grepl("gliner_anonymization\\.R", file)) {
+      source(file)
+    }
+  }
 
-  # prediction <- model$predict_entities(
-  #   text = paste0(
-  #     "My name is Luka Koning,",
-  #     " I live on 5th avenue street in London.",
-  #     " I work at Kennispunt Twente",
-  #     " sometimes I visit the University of Twente"
-  #   ),
-  #   labels = c("person", "address", "employer")
-  # )
-}
+  if (!exists("model")) {
+    # Allows to load Python & interrupt R without fatal R session crash
+    Sys.setenv(FOR_DISABLE_CONSOLE_CTRL_HANDLER = "1")
 
-if (TRUE) {
+    model <- gliner_load_model(
+      venv_name = "kwallm8",
+      python_version = "3.12.10",
+      model_name = "urchade/gliner_multi_pii-v1"
+    )
+
+    # prediction <- model$predict_entities(
+    #   text = paste0(
+    #     "My name is Luka Koning,",
+    #     " I live on 5th avenue street in London.",
+    #     " I work at Kennispunt Twente",
+    #     " sometimes I visit the University of Twente"
+    #   ),
+    #   labels = c("person", "address", "employer")
+    # )
+  }
+
   ui <- bslib::page(
     shinyjs::useShinyjs(),
     language_ui("language")
