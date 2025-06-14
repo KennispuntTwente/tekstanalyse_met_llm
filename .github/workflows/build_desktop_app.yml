@@ -1,4 +1,4 @@
-name: Build desktop app (Windows, 64-bit, x64/AMD64)
+name: Build desktop app & draft release
 
 on:
   workflow_dispatch:
