@@ -5,10 +5,12 @@
   "author": "Luka Koning <l.koning@kennispunttwente.nl>",
   "license": "AGPL-3.0",
   "main": "package-main.js",
+  "type": "module",
   "scripts": {
     "start": "npm run prebuild && electron .",
     "setup-portable-r": "node scripts/package-setup-portable-r.js",
     "setup-portable-pandoc": "node scripts/package-setup-portable-pandoc.js",
+    "setup-portable-gliner-venv-r": "node scripts/package-setup-portable-gliner-venv-r.js",
     "setup-portable-gliner-venv": "node scripts/package-setup-portable-gliner-venv.js",
     "prebuild": "node scripts/package-prebuild.js",
     "build": "npm run prebuild && electron-packager . kwallm-text-analysis-app --platform=win32 --arch=x64 --out=dist --overwrite --icon=www/icon.ico --ignore=\"^/(dist|build|example|progress|progress_secondary|renv|scripts|\\.gitignore|\\.Rhistory|\\.Rprofile|app\\.log|app\\.R|Dockerfile|.*\\.Rproj|README|renv\\.lock|run\\.bat)$\""
@@ -19,6 +21,9 @@
   },
   "dependencies": {
     "axios": "^1.9.0",
+    "commander": "^14.0.0",
+    "execa": "^9.6.0",
+    "tmp": "^0.2.3",
     "tree-kill": "^1.2.2",
     "unzipper": "^0.12.3",
     "wait-on": "^8.0.3"

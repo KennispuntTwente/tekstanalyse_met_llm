@@ -15,4 +15,4 @@ function runIfMissing(folder, command) {
 
 runIfMissing('portable-r', 'node scripts/package-setup-portable-r.js');
 runIfMissing('portable-pandoc', 'node scripts/package-setup-portable-pandoc.js');
-runIfMissing('portable-gliner-venv', 'node scripts/package-setup-portable-gliner-venv.js');
+runIfMissing('portable-gliner-venv', 'node scripts/package-setup-portable-gliner-venv-js.js');
