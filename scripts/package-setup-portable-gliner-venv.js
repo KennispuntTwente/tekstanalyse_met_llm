@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Bootstrap a GLiNER venv + download model.
  *
