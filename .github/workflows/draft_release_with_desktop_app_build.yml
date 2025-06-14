@@ -21,7 +21,6 @@ jobs:
       R_VERSION: "4.4.2"
 
     steps:
-    steps:
       # 1 – Checkout repo
       - uses: actions/checkout@v4
 
