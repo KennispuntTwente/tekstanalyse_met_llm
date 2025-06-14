@@ -117,7 +117,7 @@ text_management_server <- function(
             "Shiny.setInputValue('%s', Math.random())",
             ns("select_none")
           ),
-          bs_icon("x-circle", class = "tm-icon-img", style = "height:20px;")
+          bs_icon("x-square", class = "tm-icon-img", style = "height:20px;")
         ) |>
           bslib::tooltip(lang()$t("Geen anonimisering"), placement = "bottom"),
 
@@ -130,7 +130,7 @@ text_management_server <- function(
             "Shiny.setInputValue('%s', Math.random())",
             ns("select_simple")
           ),
-          tags$img(src = "www/regex_avatar.png", height = "20", alt = "Regex")
+          bs_icon("regex", class = "tm-icon-img", style = "height:20px;")
         ) |>
           bslib::tooltip(
             lang()$t("Eenvoudige anonimisering met regex"),
@@ -146,7 +146,7 @@ text_management_server <- function(
             "Shiny.setInputValue('%s', Math.random())",
             ns("select_gliner")
           ),
-          tags$img(src = "www/gliner_avatar.png", height = "20", alt = "GLiNER")
+          bs_icon("magic", class = "tm-icon-img", style = "height:20px;")
         ) |>
           bslib::tooltip(
             "Geavanceerde anonimisering met GLiNER-model",
@@ -156,14 +156,27 @@ text_management_server <- function(
     })
 
     # Click observers
-    observeEvent(input$select_none, anonymization_mode("none"))
-    observeEvent(input$select_simple, anonymization_mode("simple"))
-    observeEvent(input$select_gliner, {
-      anonymization_mode("gliner")
-      # isolate({
-      #   if (is.function(gliner$start)) gliner$start()
-      # })
-    })
+    observeEvent(
+      input$select_none,
+      {
+        req(!isTRUE(processing()))
+        anonymization_mode("none")
+      }
+    )
+    observeEvent(
+      input$select_simple,
+      {
+        req(!isTRUE(processing()))
+        anonymization_mode("simple")
+      }
+    )
+    observeEvent(
+      input$select_gliner,
+      {
+        req(!isTRUE(processing()))
+        anonymization_mode("gliner")
+      }
+    )
 
     # Highlight active icon (add/remove class)
     observe({
@@ -317,7 +330,7 @@ text_management_server <- function(
             open_btn,
             p(
               class = "text-muted small mt-1",
-              lang()$t("GLiNER-anonimisering niet afgerond")
+              lang()$t("GLiNER-anonimisering nog niet voltooid...")
             )
           )
         } else {
@@ -361,6 +374,7 @@ text_management_server <- function(
     })
 
     observeEvent(input$open_gliner_modal, {
+      req(!isTRUE(processing()))
       isolate({
         if (is.function(gliner$start)) gliner$start()
       })
@@ -484,7 +498,12 @@ if (FALSE) {
       "It's a nice and sunny day today!"
     ))
 
-    text_management_server("tm", raw_texts = raw, gliner_model = gliner_model)
+    text_management_server(
+      "tm",
+      raw_texts = raw,
+      # gliner_model = gliner_model
+      gliner_model = NULL
+    )
   }
 
   shinyApp(ui, server)

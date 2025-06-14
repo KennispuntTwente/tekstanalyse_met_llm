@@ -33,6 +33,14 @@ gliner_server <- function(
       translation_json_path = "language/language.json"
     )
   ),
+  # If gliner model is NULL, the gliner model will be
+  #   loaded in the async process. This takes some exra time but is required
+  #   for true async, as the reticulate object cannot be passed to an
+  #   async process
+  # If async is not important (i.e., running with having planned async),
+  #   you can pass the model directly here; that means model does not
+  #   have to be (re)loaded upon start of anonymization, and things
+  #   will go faster (initial loading can then be done once, before user clicks button)
   gliner_model = gliner_load_model()
 ) {
   moduleServer(
@@ -52,16 +60,6 @@ gliner_server <- function(
           return()
         }
 
-        # Require model to be not NULL
-        if (is.null(gliner_model)) {
-          shiny::showNotification(
-            lang()$t("GLiNER model is not loaded"),
-            type = "error"
-          )
-          return$enabled <- FALSE
-          return()
-        }
-
         # Close any existing modal
         shiny::removeModal()
 
@@ -72,6 +70,8 @@ gliner_server <- function(
           footer = NULL,
           uiOutput(ns("modal_content"))
         ))
+
+        pii_entities_ui_rerender(Sys.time())
 
         return$enabled <- TRUE
       }
@@ -124,18 +124,31 @@ gliner_server <- function(
                   date of birth,
                   employer,
                   address,
+                  postal code,
+                  place of residence,
                   phone number,
-                  email address,
+                  mobile phone number,
+                  landline phone number,
+                  Dutch (mobile) phone number,
+                  registration number,
+                  serial number,
+                  email,
                   personal identification number,
+                  identity card number,
                   passport number,
+                  paspport expiration date,
                   bank account number,
                   license plate code,
-                  religious affiliation,
-                  political affiliation,
+                  personal religious orientation,
+                  personal political orientation,
                   sexual orientation,
-                  IP address,
+                  ip address,
                   username,
-                  password
+                  social media handle,
+                  digital signature,
+                  iban,
+                  bic,
+                  student id number
                 " |>
                   stringr::str_squish(),
                 rows = 4
@@ -147,7 +160,7 @@ gliner_server <- function(
                   ns("quit"),
                   label = tagList(
                     icon("sign-out-alt"),
-                    lang()$t("Stoppen")
+                    lang()$t("Sluit")
                   ),
                   class = "btn btn-danger"
                 ),
@@ -155,7 +168,7 @@ gliner_server <- function(
                   ns("start_anonymization"),
                   label = tagList(
                     icon("play"),
-                    lang()$t("Start anonimiseren")
+                    lang()$t("Start")
                   ),
                   class = "btn btn-success"
                 )
@@ -168,24 +181,21 @@ gliner_server <- function(
           running = {
             tagList(
               p(
-                lang()$t("Model is bezig met detectie van entiteiten."),
-                br(),
                 lang()$t(
-                  "Dit kan even duren, afhankelijk van de hoeveelheid tekst en de hardware van de machine."
+                  "Het model wordt geladen. Even geduld..."
                 ),
                 br(),
                 lang()$t(
-                  "Bekijk de voortgang in de notificatie..."
+                  "De allereerste keer dat deze machine dit doet, kan het wat langer duren omdat het model moet worden gedownload."
                 )
               ),
-              shiny::tags$div(
+              hr(),
+              tags$div(
                 class = "text-center",
-                shiny::tags$img(
-                  src = "www/loading.gif",
-                  alt = lang()$t("Loading..."),
-                  style = "width: 50px; height: 50px;"
-                )
-              )
+                style = "margin-top: 20px;",
+                icon("spinner", class = "fa-spin fa-3x")
+              ),
+              hr()
             )
           },
 
@@ -206,7 +216,7 @@ gliner_server <- function(
                   ns("quit"),
                   label = tagList(
                     icon("sign-out-alt"),
-                    lang()$t("Stoppen")
+                    lang()$t("Sluit")
                   ),
                   class = "btn btn-danger"
                 ),
@@ -214,7 +224,7 @@ gliner_server <- function(
                   ns("retry"),
                   label = tagList(
                     icon("redo"),
-                    lang()$t("Probeer opnieuw")
+                    lang()$t("Reset")
                   ),
                   class = "btn btn-primary"
                 )
@@ -248,9 +258,17 @@ gliner_server <- function(
                   ns("quit"),
                   label = tagList(
                     icon("sign-out-alt"),
-                    lang()$t("Stoppen")
+                    lang()$t("Sluit")
                   ),
                   class = "btn btn-danger"
+                ),
+                actionButton(
+                  ns("retry"),
+                  label = tagList(
+                    icon("redo"),
+                    lang()$t("Reset")
+                  ),
+                  class = "btn btn-primary"
                 ),
                 actionButton(
                   ns("save_anonymization"),
@@ -291,13 +309,22 @@ gliner_server <- function(
 
           ## 1 Parse & validate labels
           labels <- strsplit(input$pii_labels, ",")[[1]] |> trimws()
-          if (length(labels) == 0 || all(labels == "")) {
+          if (length(labels) < 2 || all(labels == "")) {
+            # Need at least 2 labels, otherwise model won't function
+            # Not sure why 1 label is not enough, but it isn't;
+            #   bug (feature?) in the GLiNER package/model?
             shiny::showNotification(
-              lang()$t("Voer ten minste één entity in om te verwijderen."),
+              lang()$t(
+                "Voer ten minste twee (2) entities in om te verwijderen."
+              ),
               type = "error"
             )
             return()
           }
+          if (!is.vector(labels)) {
+            labels <- c(labels)
+          }
+          print(labels)
 
           ## 2 Switch the modal to the “running” state
           module_state("running")
@@ -309,14 +336,17 @@ gliner_server <- function(
             detail = sprintf(lang()$t("0 van %d teksten klaar"), n_txt)
           )
 
-          print(gliner_model)
-          print(pii_texts())
-          print(labels)
-          print(progress)
-
           ## 4 Spawn the future that runs GLiNER model on texts
           future(
             {
+              if (is.null(gliner_model)) {
+                # If we are truly in async mode, we load the model here;
+                #   because reticulate objects cannot be passed to async processes
+                #   (in that case, ensure `gliner_model` is NULL when passing it on in 'globals')
+                # If not in async, then the gliner_model may already be loaded
+                gliner_model <- gliner_load_model()
+              }
+
               purrr::imap(pii_texts, function(txt, i) {
                 res <- gliner_model$predict_entities(
                   text = txt,
@@ -334,6 +364,7 @@ gliner_server <- function(
             },
             globals = list(
               gliner_model = gliner_model,
+              gliner_load_model = gliner_load_model,
               pii_texts = pii_texts(),
               labels = labels,
               progress = progress
@@ -361,7 +392,21 @@ gliner_server <- function(
                     )
                   })
                 }
-              ) |>
+              )
+
+              if (nrow(predictions_clean) == 0) {
+                # create an empty tibble with the expected columns
+                predictions_clean <- tibble::tibble(
+                  original_text = character(),
+                  start = integer(),
+                  end = integer(),
+                  entity_text = character(),
+                  label = character(),
+                  score = double()
+                )
+              }
+
+              predictions_clean <- predictions_clean |>
                 dplyr::group_by(original_text, start, end, entity_text) |>
                 dplyr::filter(score == max(score)) |>
                 dplyr::ungroup() |>
@@ -405,6 +450,9 @@ gliner_server <- function(
       # User can uncheck the box to skip anonymization for that entity (setting to FALSE)
       pii_eval <- reactiveVal(NULL)
 
+      # Reactive value to force rerender of pii_entities_ui
+      pii_entities_ui_rerender <- reactiveVal(Sys.time())
+
       # Render the UI for PII entities evaluation
       output$pii_entities_ui <- renderUI({
         req(module_state() == "evaluating")
@@ -414,12 +462,13 @@ gliner_server <- function(
         if (nrow(df) == 0) {
           return(p(
             lang()$t(
-              "Er zijn geen PII-entiteiten gevonden in de teksten."
+              "Geen van de opgegeven PII-entiteiten zijn gevonden in de teksten."
             ),
             br(),
             lang()$t(
-              "Dat zou kunnen betekenen dat de teksten al anoniem zijn."
-            )
+              "Dat zou kunnen betekenen dat de teksten al anoniem zijn, of dat de entiteiten te beperkt zijn, of dat het model bepaaalde PII niet kan herkennen."
+            ),
+            hr()
           ))
         }
 
@@ -433,7 +482,8 @@ gliner_server <- function(
             br(),
             lang()$t(
               "Alle checkboxes die aangevinkt zijn, worden geanonimiseerd nadat je op 'Sla op' klikt.",
-            )
+            ),
+            hr()
           ),
           # Max height for the table, otherwise scrollable
           div(
@@ -500,6 +550,7 @@ gliner_server <- function(
         req(isTRUE(module_state() == "evaluating"))
         df <- isolate(pii_eval())
         req(nrow(df) > 0)
+        pii_entities_ui_rerender()
 
         # add the check-boxes
         df$checkbox <- mapply(
@@ -621,19 +672,30 @@ gliner_server <- function(
             )
           } else {
             # Anonymize the texts by replacing the PII entities with a placeholder
-            anonymized_texts <- pii_texts() |>
-              purrr::imap(function(txt, i) {
-                ents <- df[df$original_text == txt, ]
-                if (nrow(ents) == 0) return(txt)
+            anonymized_texts <- purrr::imap_chr(pii_texts(), function(txt, i) {
+              ents <- df[df$original_text == txt & df$anonymize, ]
+              if (nrow(ents) == 0) return(txt)
 
-                for (j in seq_len(nrow(ents))) {
-                  ent <- ents[j, ]
-                  txt <- stringr::str_sub(txt, 1, ent$start - 1) |>
-                    paste0("<< removed: ", ent$label, " >>") |>
-                    paste0(stringr::str_sub(txt, ent$end + 1))
-                }
-                txt
-              })
+              ## 1. convert GLiNER’s 0-based inclusive indices to R’s 1-based, end-inclusive
+              ents <- ents |>
+                dplyr::mutate(start = start + 1, end = end + 1)
+
+              ## 2. work **right-to-left** so every replacement leaves earlier indices intact
+              ents <- ents[order(ents$start, decreasing = TRUE), ]
+
+              ## 3. do the replacements
+              for (k in seq_len(nrow(ents))) {
+                ent <- ents[k, ]
+                txt <- paste0(
+                  substr(txt, 1, ent$start - 1),
+                  sprintf("<< %s verwijderd >>", ent$label),
+                  substr(txt, ent$end + 1, nchar(txt))
+                )
+              }
+              txt
+            })
+
+            print(anonymized_texts)
 
             # Update counts
             return$number_of_pii_entities_removed <- nrow(df)
@@ -690,15 +752,17 @@ gliner_server <- function(
       observeEvent(
         input$quit,
         {
-          reset_state(close_modal = TRUE)
+          # Just close the modal, no state reset
+          shiny::removeModal()
         },
         ignoreInit = TRUE
       )
 
-      # Retry button (shown in the “error” state)
+      # Retry/reset button
       observeEvent(
         input$retry,
         {
+          # State reset, but keep modal open
           reset_state(close_modal = FALSE) # keep modal open so user can hit Start again
         },
         ignoreInit = TRUE
@@ -866,15 +930,15 @@ if (FALSE) {
     # Load model:
     if (!exists("gliner_model")) gliner_model <- gliner_load_model()
 
-    # prediction <- gliner_model$predict_entities(
-    #   text = paste0(
-    #     "My name is Luka Koning,",
-    #     " I live on 5th avenue street in London.",
-    #     " I work at Kennispunt Twente",
-    #     " sometimes I visit the University of Twente"
-    #   ),
-    #   labels = c("person", "address", "employer")
-    # )
+    prediction <- gliner_model$predict_entities(
+      text = paste0(
+        "My name is Luka Koning,",
+        " I live on 5th avenue street in London.",
+        " I work at Kennispunt Twente",
+        " sometimes I visit the University of Twente"
+      ),
+      labels = c("person", "address")
+    )
   }
 
   options(
@@ -893,7 +957,8 @@ if (FALSE) {
     gliner <- gliner_server(
       "gliner",
       lang = lang,
-      gliner_model = gliner_model
+      # gliner_model = gliner_model
+      gliner_model = NULL
     )
 
     # Automatically start the GLiNER module when the app starts
