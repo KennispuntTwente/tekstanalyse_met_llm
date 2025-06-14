@@ -1,0 +1,168 @@
+name: Draft release with a build of the desktop app
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: "Enter a version tag (e.g., v1.0.3) (leave blank to let GitHub create one)"
+        required: false
+      draft:
+        description: "Create release as a draft (recommended)?"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  win:
+    runs-on: windows-latest
+    env:
+      R_VERSION: "4.4.2"
+
+    steps:
+      # 1 – Checkout repo
+      - uses: actions/checkout@v4
+
+      # 2 – Node
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # 3 – R (adds Rscript & Rtools)
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ env.R_VERSION }}
+
+      # 4 – Restore renv library
+      - uses: r-lib/actions/setup-renv@v2
+
+      # 5 – Python (for reticulate / gliner venv)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      # 6 – JS deps
+      - name: Install npm packages
+        run: npm ci
+
+      # 7 – Build (downloads R installer, packages Electron app)
+      - name: Build portable app
+        run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 8 – Zip & upload
+      - name: Zip dist
+        run: |
+          Compress-Archive -Path dist\kwallm-text-analysis-app-win32-x64 `
+                           -DestinationPath kwallm-text-analysis-app-win32-x64.zip
+
+      # 9 – Create/update release + attach asset + auto “What’s Changed”
+      - name: Draft / update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version_tag || github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: "KWALLM ${{ github.event.inputs.version_tag || 'build-' }}${{ github.run_number }} (Windows, 64-bit, x64/AMD64)"
+          draft: ${{ github.event.inputs.draft }}
+          generate_release_notes: true
+          append_body: true
+          body: |
+            # ${{ github.event.inputs.version_tag || 'Unreleased build' }} (EN)
+            *English version above — Dutch version below (Engelse versie boven — Nederlandse versie onder)*
+
+            *This is a new release of our app for text analysis with LLMs! Changes:*
+            **TODO: ADD LIST OF CHANGES HERE**
+
+            ## Desktop app
+            The files in this release are for the desktop application (Windows, 64-bit, x64/AMD64).
+            Usage is simple:
+            1. Download `kwallm-text-analysis-app-win32-x64.7z` (see ‘Assets’ below)
+            2. Unzip this to a folder, open the folder, and launch `kwallm-text-analysis-app.exe`
+
+            ### Admin rights & network access
+            Admin rights are not required to use this app. However, the app may ask to access your local network to find a free port for the R (Shiny) process.
+            If you do not (or cannot) grant permission, port **21471** is chosen by default.
+            If that port is busy the app will fail to start. In some cases, the app may not close properly (keeping the port occupied) and therefore cannot restart.
+            If that happens: close the R processes on your machine via task manager, or restart your machine.
+
+            ## Container app
+            You can use the pre-built container:
+            1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+            2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+            3. Browse to `http://localhost:3838`
+
+            Alternatively build your own image; see the *Dockerfile* and the instructions in the [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#3-container-app).
+
+            ## Want to launch the app from R (e.g., RStudio)?
+            See the instructions in the [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#1-r-environment).
+
+            ## About this app
+            This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) in collaboration with **GGD Twente**.
+            Together, our organizations work on applying generative AI for the benefit of society.
+
+            Ideas or suggestions? [Open an issue](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
+
+            Kennispunt Twente is a (Dutch) non-profit organization for data, insights, and knowledge.
+            Interested in what we can do for your organisation (e.g., with generative AI)?
+            Visit [our website](https://www.kennispunttwente.nl) or [mail our developers](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
+
+            ---
+
+            ### Contact
+            - Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)
+            - Tjark van de Merwe – [t.vandemerwe@kennispunttwente.nl](mailto:t.vandemerwe@kennispunttwente.nl)
+
+            ---
+
+            # ${{ github.event.inputs.version_tag || 'Onuitgebrachte build' }} (NL)
+            *Engelse versie boven — Nederlandse versie onder (English version above — Dutch version below)*
+
+            *Dit is een nieuwe release van onze app voor tekstanalyse met LLM's! Wijzigingen:*
+            **TODO: VOEG LIJST VAN WIJZIGINGEN TOE**
+
+            ## Desktop-app
+            Bestanden bij deze release zijn voor de desktopapplicatie (Windows, 64-bit, x64/AMD64).
+            Gebruik is simpel:
+            1. Download `kwallm-text-analysis-app-win32-x64.7z` (zie ‘Assets’ beneden)
+            2. Unzip dit naar een map, open de map, en start `kwallm-text-analysis-app.exe`
+
+            ### Adminrechten & netwerktoegang
+            Adminrechten zijn niet nodig voor het gebruik van deze app. De app kan wel toestemming vragen tot je lokale netwerk om een vrije port voor R (Shiny) te vinden.
+            Geef je geen toestemming, dan wordt standaard de port **21471** gebruikt.
+            Is die port bezet, dan start de app niet. Soms komt het voor dat de app niet goed afsluit, en de port bezet houdt.
+            Sluit in dat geval alle R-processen af via taakbeheer, of restart je machine.
+
+            ## Container-app
+            Gebruik de pre-built container:
+            1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+            2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+            3. Open `http://localhost:3838` in je browser
+
+            Je kunt ook zelf een image bouwen; zie de *Dockerfile* en instructies in de [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#3-container-applicatie).
+
+            ## Wil je de app starten vanuit jouw R-omgeving (bijv. RStudio)?
+            Lees de instructies in de [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#1-r-omgeving).
+
+            ## Over deze app
+            Deze app is ontwikkeld door [Kennispunt Twente](https://www.kennispunttwente.nl) in samenwerking met **GGD Twente**.
+            Samen werken onze organisaties aan toepassingen van generatieve AI ten behoeve van de samenleving.
+
+            Ideeën of verbeterpunten? [Open een issue](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
+
+            Kennispunt Twente is een non-profit organisatie voor data, inzicht en kennis.
+            Interesse in wat wij voor jouw organisatie kunnen doen (bijv. met generatieve AI)?
+            Bezoek [onze website](https://www.kennispunttwente.nl) of [mail onze ontwikkelaars](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
+
+            ---
+
+            ### Contact
+            - Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)
+            - Tjark van de Merwe – [t.vandemerwe@kennispunttwente.nl](mailto:t.vandemerwe@kennispunttwente.nl)
+
+            ---
+          files: kwallm-text-analysis-app-win32-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
