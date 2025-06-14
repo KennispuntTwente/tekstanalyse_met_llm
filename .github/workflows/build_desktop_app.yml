@@ -50,5 +50,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: kwallm-app-win
-          path: kwallm-app-win.zip
+          name: kwallm-text-analysis-app-win32-x64
+          path: kwallm-text-analysis-app-win32-x64.zip
