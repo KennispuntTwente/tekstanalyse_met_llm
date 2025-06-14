@@ -1,0 +1,100 @@
+# .github/workflows/build-container-release.yml
+# Build once on every draft / prerelease, push as `preview`.
+# When the release is published, promote the *same* image digest
+# to `<version>` + `latest`.
+
+name: Build container with release (draft ➜ preview ➜ publish)
+
+on:
+  release:
+    types: [created, edited, published]   # draft/prerelease/publish events
+  workflow_dispatch:                      # allow manual re-runs
+
+env:
+  IMAGE_NAME: ghcr.io/kennispunttwente/tekstanalyse_met_llm
+
+permissions:
+  contents: read
+  packages: write     # allow pushes to GHCR
+
+jobs:
+  # ──────────────────────────────
+  # 1  Build the image once and push it under a temporary SHA tag
+  # ──────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout source at tag/commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Log in to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image (temp SHA tag) → export digest
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true                              # push to registry
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  # ──────────────────────────────
+  # 2  Retag to **preview** for draft / prerelease
+  # ──────────────────────────────
+  preview:
+    needs: build
+    if: ${{ github.event.release.draft || github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Log in to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retag digest → preview
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.IMAGE_NAME }}:preview \
+            ${{ env.IMAGE_NAME }}@${{ needs.build.outputs.digest }}
+
+  # ──────────────────────────────
+  # 3  Promote to <version> + latest when the release is published
+  # ──────────────────────────────
+  publish:
+    needs: build
+    if: >-
+      ${{
+        github.event.action == 'published' &&
+        github.event.release.draft == false &&
+        github.event.release.prerelease == false
+      }}
+    runs-on: ubuntu-latest
+    # Uncomment to require a manual approval gate:
+    # environment: production
+
+    steps:
+      - name: Log in to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retag digest → <version> + latest
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.IMAGE_NAME }}:${{ github.event.release.tag_name }} \
+            --tag ${{ env.IMAGE_NAME }}:latest \
+            ${{ env.IMAGE_NAME }}@${{ needs.build.outputs.digest }}
