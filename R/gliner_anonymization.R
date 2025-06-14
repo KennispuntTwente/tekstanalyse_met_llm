@@ -182,11 +182,15 @@ gliner_server <- function(
             tagList(
               p(
                 lang()$t(
-                  "Het model wordt geladen. Even geduld..."
+                  "Het model wordt geladen en de teksten worden geanalyseerd. Even geduld..."
                 ),
                 br(),
                 lang()$t(
                   "De allereerste keer dat deze machine dit doet, kan het wat langer duren omdat het model moet worden gedownload."
+                ),
+                br(),
+                lang()$t(
+                  "Snelheid hangt af van de hardware die gebruikt wordt. Mogelijk is configuratie nodig om de hardware optimaal te benutten."
                 )
               ),
               hr(),
@@ -202,11 +206,8 @@ gliner_server <- function(
           # Error occurred during processing
           error = {
             tagList(
-              h3(lang()$t(
-                "Er is een fout opgetreden tijdens het anonimiseren"
-              )),
               p(lang()$t(
-                "Probeer het opnieuw of neem contact op met de beheerder."
+                "Er is een fout opgetreden tijdens het anonimiseren. Probeer het opnieuw."
               )),
               hr(),
               # Quit & retry buttons
@@ -707,18 +708,6 @@ gliner_server <- function(
           # Set the result and done status
           return$anonymized_texts <- anonymized_texts
           return$done <- TRUE
-
-          # Show notification about the anonymization; number of entities removed
-          shiny::showNotification(
-            paste0(
-              lang()$t(
-                "Teksten opgeslagen! ",
-              ),
-              return$number_of_pii_entities_removed,
-              " PII-entities verwijderd"
-            ),
-            type = "message"
-          )
 
           # Finished; close modal
           shiny::removeModal()
