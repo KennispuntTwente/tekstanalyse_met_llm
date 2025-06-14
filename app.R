@@ -43,7 +43,7 @@ for (file in r_files) {
 #     `future::plan("sequential")`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
 # - See the documentation for `future::plan()` for more details
-future::plan(multisession, .skip = TRUE)
+# future::plan(multisession, .skip = TRUE)
 
 # Set preconfigured LLM provider and available models (optional)
 # - You can preconfigure the LLM provider and available models here
@@ -109,15 +109,12 @@ options(
   # - Default setting for anonymization of texts, and if user
   #   can toggle this setting;
   #     see R/text_management.R
-  anonymization__enabled = TRUE,
-  anonymization__can_toggle = TRUE,
-
-  # - If users can use the Gliner model for anonymization;
-  #   this is a lightweight local model that can be used to
-  #   detect various forms of PII in texts;
-  #     see: R/anonymization_gliner.R
-  anonymization__gliner_model = TRUE
+  anonymization__default = "regex", # Default anonymization method, either "none', "regex", or "gliner"
+  anonymization__none = TRUE, # If the "none" anonymization method is available
+  anonymization__regex = TRUE, # If the "regex" anonymization method is available
+  anonymization__gliner_model = TRUE # If the "gliner" anonymization method is available
 )
+
 
 #### 3 Run app ####
 

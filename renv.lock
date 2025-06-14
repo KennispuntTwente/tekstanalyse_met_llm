@@ -2271,6 +2271,12 @@
       "Repository": "RSPM",
       "Encoding": "UTF-8"
     },
+    "ipc": {
+      "Package": "ipc",
+      "Version": "0.1.4",
+      "Source": "Repository",
+      "Repository": "CRAN"
+    },
     "irr": {
       "Package": "irr",
       "Version": "0.84.1",
@@ -3622,6 +3628,12 @@
       "Author": "Jennifer Bryan [aut, cre] (<https://orcid.org/0000-0002-6983-2759>), Jim Hester [aut] (<https://orcid.org/0000-0002-2739-7082>), David Robinson [aut], Hadley Wickham [aut] (<https://orcid.org/0000-0003-4757-117X>), Christophe Dervieux [aut] (<https://orcid.org/0000-0003-4474-2498>), Posit Software, PBC [cph, fnd]",
       "Maintainer": "Jennifer Bryan <jenny@posit.co>",
       "Repository": "RSPM"
+    },
+    "reticulate": {
+      "Package": "reticulate",
+      "Version": "1.42.0",
+      "Source": "Repository",
+      "Repository": "CRAN"
     },
     "rlang": {
       "Package": "rlang",

@@ -3,10 +3,11 @@ FROM rocker/r-ver:4.4.2
 # Set timezone
 ENV TZ=Europe/Amsterdam
 
-# Install system dependencies
+# System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     curl \
+    git \
     libcurl4-openssl-dev \
     libsodium-dev \
     libssl-dev \
@@ -14,11 +15,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libblas-dev \
     liblapack-dev \
     gfortran \
-    pandoc \
-    sudo \
-    && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
-    dpkg-reconfigure --frontend noninteractive tzdata && \
-    rm -rf /var/lib/apt/lists/*
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    python3-pip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Symlink python3.12 to python3 if necessary
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python3
 
 # Install R packages via renv
 RUN R -e "install.packages('renv', repos = 'https://cloud.r-project.org')"
@@ -37,6 +42,9 @@ COPY --chown=appuser:appuser Dockerfile-app.R app.R
 COPY --chown=appuser:appuser www/ www/
 COPY --chown=appuser:appuser language/ language/
 COPY --chown=appuser:appuser LICENSE.md LICENSE.md
+
+# Run gliner_load_model() once during build, to install venv & model
+RUN Rscript -e "source('R/gliner_load.R'); gliner_load_model(use_system_python = TRUE)"
 
 # Serve app
 EXPOSE 3838

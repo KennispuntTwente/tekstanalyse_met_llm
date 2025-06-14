@@ -1,6 +1,20 @@
 # Module for managing text anonymization and preprocessing
+#
+# This version integrates global options that control:
+#   * which anonymization methods are available to users;
+#   * which method is selected by default.
+#
+# The following options are recognised (with sensible fall‑backs):#
+#   anonymization__default        – character, one of "none", "regex", or "gliner"
+#   anonymization__none           – logical,   whether the "none" method is offered      (default TRUE)
+#   anonymization__regex          – logical,   whether the simple regex method is offered (default TRUE)
+#   anonymization__gliner_model   – logical,   whether the GLiNER method is offered       (default FALSE)
+#
+# If the configured *default* method is not available, the module will
+# gracefully fall back to the first available method in the order
+# regex → gliner → none.
 
-#### 1 UI & server ####
+#### 1 UI & server ###################################################
 
 text_management_ui <- function(id) {
   ns <- NS(id)
@@ -10,17 +24,74 @@ text_management_ui <- function(id) {
 text_management_server <- function(
   id,
   raw_texts, # reactive vector with raw texts
-  gliner_model, # pre‑loaded GLiNER model object
+  gliner_model, # pre‑loaded GLiNER model object (or NULL)
   processing = reactiveVal(FALSE),
   lang = reactiveVal(
     shiny.i18n::Translator$new(translation_json_path = "language/language.json")
   )
 ) {
+  # Ensure at least one anonymization method is enabled
+  if (
+    !isTRUE(getOption("anonymization__none", TRUE)) &&
+      !isTRUE(getOption("anonymization__regex", TRUE)) &&
+      !isTRUE(getOption("anonymization__gliner_model", FALSE))
+  ) {
+    stop("At least one anonymization method must be enabled via options.")
+  }
+
+  # Ensure the default anonymization method is also enabled
+  opt_default <- getOption("anonymization__default", "regex")
+  if (!(opt_default %in% c("none", "regex", "gliner"))) {
+    stop("Invalid default anonymization method specified in options.")
+  }
+  # Check that default method is also enabled in options
+  if (opt_default == "none" && !getOption("anonymization__none", TRUE)) {
+    stop("Default anonymization method 'none' is not enabled in options.")
+  }
+  if (opt_default == "regex" && !getOption("anonymization__regex", TRUE)) {
+    stop("Default anonymization method 'regex' is not enabled in options.")
+  }
+  if (
+    opt_default == "gliner" && !getOption("anonymization__gliner_model", FALSE)
+  ) {
+    stop("Default anonymization method 'gliner' is not enabled in options.")
+  }
+
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # -- 0 Helper ------------------------------------------------------
-    shinyjs::useShinyjs()
+    # -- 0  Global options ------------------------------------------
+    opt_default <- getOption("anonymization__default", "regex")
+    opt_none <- isTRUE(getOption("anonymization__none", TRUE))
+    opt_regex <- isTRUE(getOption("anonymization__regex", TRUE))
+    opt_gliner <- isTRUE(getOption("anonymization__gliner_model", FALSE))
+
+    # Determine which methods are actually available ----------------
+    available_modes <- c(
+      none = if (opt_none) "none" else NA,
+      simple = if (opt_regex) "simple" else NA,
+      gliner = if (opt_gliner) "gliner" else NA
+    ) |>
+      stats::na.omit() |>
+      unname()
+
+    if (length(available_modes) == 0) {
+      stop("At least one anonymization method must be enabled via options.")
+    }
+
+    # Determine the initial mode ------------------------------------
+    initial_mode <- switch(
+      opt_default,
+      none = if ("none" %in% available_modes) "none" else NULL,
+      regex = if ("simple" %in% available_modes) "simple" else NULL,
+      gliner = if ("gliner" %in% available_modes) "gliner" else NULL,
+      NULL
+    )
+    if (is.null(initial_mode)) {
+      # fall‑back order: regex → gliner → none
+      fallback_order <- c("simple", "gliner", "none")
+      initial_mode <- intersect(fallback_order, available_modes)[1]
+    }
 
     # -- 1  Child module: GLiNER ------------------------------------
     gliner <- gliner_server(
@@ -31,7 +102,7 @@ text_management_server <- function(
     )
 
     # -- 2  State ----------------------------------------------------
-    anonymization_mode <- reactiveVal("simple") # default
+    anonymization_mode <- reactiveVal(initial_mode)
 
     texts <- reactiveValues(raw = NULL, preprocessed = NULL, df = NULL)
 
@@ -44,7 +115,7 @@ text_management_server <- function(
       tagList(
         tags$style(HTML(
           "
-          /* --- icon buttons in text-management (GLiNER / Regex / None) --- */
+          /* --- icon buttons in text‑management (GLiNER / Regex / None) --- */
           .tm-icon {
             padding: 2px;              /* same visual feel as .llm-icon */
             border-radius: 2px;
@@ -105,104 +176,98 @@ text_management_server <- function(
     # -- 4  Mode selector icons -------------------------------------
     output$mode_selection <- renderUI({
       cur <- anonymization_mode()
-      div(
-        class = "d-flex justify-content-center gap-3",
-
-        # NONE
+      # Helper to produce one icon div
+      make_icon <- function(id_suffix, icon_name, title_txt, tooltip_txt) {
         div(
-          id = ns("select_none"),
-          class = paste("tm-icon", if (cur == "none") "tm-icon-active"),
-          title = lang()$t("Geen anonimisering"),
+          id = ns(paste0("select_", id_suffix)),
+          class = paste("tm-icon", if (cur == id_suffix) "tm-icon-active"),
+          title = title_txt,
           onclick = sprintf(
             "Shiny.setInputValue('%s', Math.random())",
-            ns("select_none")
+            ns(paste0("select_", id_suffix))
           ),
-          bs_icon("x-square", class = "tm-icon-img", style = "height:20px;")
+          bs_icon(icon_name, class = "tm-icon-img", style = "height:20px;")
         ) |>
-          bslib::tooltip(lang()$t("Geen anonimisering"), placement = "bottom"),
+          bslib::tooltip(tooltip_txt, placement = "bottom")
+      }
 
-        # SIMPLE
-        div(
-          id = ns("select_simple"),
-          class = paste("tm-icon", if (cur == "simple") "tm-icon-active"),
-          title = "Regex",
-          onclick = sprintf(
-            "Shiny.setInputValue('%s', Math.random())",
-            ns("select_simple")
-          ),
-          bs_icon("regex", class = "tm-icon-img", style = "height:20px;")
-        ) |>
-          bslib::tooltip(
-            lang()$t("Eenvoudige anonimisering met regex"),
-            placement = "bottom"
-          ),
-
-        # GLINER
-        div(
-          id = ns("select_gliner"),
-          class = paste("tm-icon", if (cur == "gliner") "tm-icon-active"),
-          title = "GLiNER",
-          onclick = sprintf(
-            "Shiny.setInputValue('%s', Math.random())",
-            ns("select_gliner")
-          ),
-          bs_icon("magic", class = "tm-icon-img", style = "height:20px;")
-        ) |>
-          bslib::tooltip(
-            "Geavanceerde anonimisering met GLiNER-model",
-            placement = "bottom"
+      # Assemble only the icons that are available
+      icon_list <- tagList()
+      if ("none" %in% available_modes)
+        icon_list <- tagAppendChildren(
+          icon_list,
+          make_icon(
+            "none",
+            "x-square",
+            lang()$t("Geen anonimisering"),
+            lang()$t("Geen anonimisering")
           )
-      )
+        )
+      if ("simple" %in% available_modes)
+        icon_list <- tagAppendChildren(
+          icon_list,
+          make_icon(
+            "simple",
+            "regex",
+            "Regex",
+            lang()$t("Eenvoudige anonimisering met regex")
+          )
+        )
+      if ("gliner" %in% available_modes)
+        icon_list <- tagAppendChildren(
+          icon_list,
+          make_icon(
+            "gliner",
+            "magic",
+            "GLiNER",
+            "Geavanceerde anonimisering met GLiNER-model"
+          )
+        )
+
+      div(class = "d-flex justify-content-center gap-3", icon_list)
     })
 
-    # Click observers
-    observeEvent(
-      input$select_none,
-      {
+    # Click observers ------------------------------------------------
+    if ("none" %in% available_modes) {
+      observeEvent(input$select_none, {
         req(!isTRUE(processing()))
         anonymization_mode("none")
-      }
-    )
-    observeEvent(
-      input$select_simple,
-      {
+      })
+    }
+    if ("simple" %in% available_modes) {
+      observeEvent(input$select_simple, {
         req(!isTRUE(processing()))
         anonymization_mode("simple")
-      }
-    )
-    observeEvent(
-      input$select_gliner,
-      {
+      })
+    }
+    if ("gliner" %in% available_modes) {
+      observeEvent(input$select_gliner, {
         req(!isTRUE(processing()))
         anonymization_mode("gliner")
-      }
-    )
+      })
+    }
 
-    # Highlight active icon (add/remove class)
+    # Highlight active icon (add/remove class) ----------------------
     observe({
-      modes <- c("none", "simple", "gliner")
-      lapply(
-        modes,
-        function(m)
-          shinyjs::removeClass(ns(paste0("select_", m)), "tm-icon-active")
-      )
+      lapply(c("none", "simple", "gliner"), function(m) {
+        # skip unavailable modes
+        if (!(m %in% available_modes)) return()
+        shinyjs::removeClass(ns(paste0("select_", m)), "tm-icon-active")
+      })
       shinyjs::addClass(
         ns(paste0("select_", anonymization_mode())),
         "tm-icon-active"
       )
     })
 
-    # Disable selectors while processing (optional)
+    # Disable selectors while processing ----------------------------
     observe({
-      if (isTRUE(processing())) {
-        shinyjs::disable("select_none")
-        shinyjs::disable("select_simple")
-        shinyjs::disable("select_gliner")
-      } else {
-        shinyjs::enable("select_none")
-        shinyjs::enable("select_simple")
-        shinyjs::enable("select_gliner")
-      }
+      lapply(c("none", "simple", "gliner"), function(m) {
+        id <- paste0("select_", m)
+        if (!(m %in% available_modes)) return()
+        if (isTRUE(processing())) glossy <- shinyjs::disable(id) else
+          shinyjs::enable(id)
+      })
     })
 
     # -- 5  Compute/refresh texts -----------------------------------
@@ -251,6 +316,7 @@ text_management_server <- function(
 
       mode <- anonymization_mode()
       if (mode == "simple") {
+        # counts for regex anonymisation -----------------------------------
         txts <- texts$preprocessed
         email <- sum(stringr::str_count(
           txts,
@@ -273,15 +339,13 @@ text_management_server <- function(
           ),
           div(
             class = "small d-flex flex-wrap justify-content-center align-items-center gap-2",
-
             # e-mail
             div(
-              class = "d-flex align-items-center gap-1", # tighter spacing
+              class = "d-flex align-items-center gap-1",
               bs_icon("envelope"),
               span(class = "badge bg-secondary", email),
               span(class = "text-muted", lang()$t("e-mail(s)"))
             ),
-
             # phone
             div(
               class = "d-flex align-items-center gap-1",
@@ -289,7 +353,6 @@ text_management_server <- function(
               span(class = "badge bg-secondary", phone),
               span(class = "text-muted", lang()$t("nummer(s)"))
             ),
-
             # postcode
             div(
               class = "d-flex align-items-center gap-1",
@@ -307,14 +370,15 @@ text_management_server <- function(
           simp_box
         ))
       } else if (mode == "gliner") {
-        if (!getOption("anonymization__gliner_model", FALSE)) {
+        # GLiNER counts ------------------------------------------------------
+        if (!opt_gliner) {
           return(div(
             class = "text-center text-muted small",
             lang()$t("GLiNER-anonimisering is niet beschikbaar")
           ))
         }
 
-        # persistent button
+        # persistent open‑modal button
         open_btn <- div(
           class = "text-center mb-3",
           actionButton(
@@ -325,7 +389,6 @@ text_management_server <- function(
         )
 
         if (!isTRUE(gliner$done)) {
-          ## anonymisation has not been run or not saved yet
           tagList(
             open_btn,
             p(
@@ -334,45 +397,41 @@ text_management_server <- function(
             )
           )
         } else {
-          ## anonymisation finished – show counts *plus* the same button
+          counts_tbl <- gliner$pii_label_counts %||%
+            tibble::tibble(count = integer())
+          total_pii <- if (nrow(counts_tbl) == 0) 0 else
+            sum(counts_tbl$count, na.rm = TRUE)
+
+          counts_ui <- div(
+            class = "d-flex align-items-center justify-content-center gap-2",
+            bs_icon("shield-lock"),
+            span(class = "badge bg-secondary", total_pii)
+          )
+
           tagList(
             open_btn,
             div(
               class = "mx-auto",
               style = "max-width:700px;",
               dup_box,
-
-              # PII summary counts
-              {
-                counts_tbl <- gliner$pii_label_counts %||%
-                  tibble::tibble(count = integer())
-
-                total_pii <- if (nrow(counts_tbl) == 0) 0 else
-                  sum(counts_tbl$count, na.rm = TRUE)
-
-                counts_ui <- div(
-                  class = "d-flex align-items-center justify-content-center gap-2",
-                  bs_icon("shield-lock"),
-                  span(class = "badge bg-secondary", total_pii)
-                )
-
+              div(
+                class = "border rounded p-2 bg-light fade-in",
                 div(
-                  class = "border rounded p-2 bg-light fade-in",
-                  div(
-                    class = "text-muted small mb-1",
-                    lang()$t("Persoonsgegevens geanonimiseerd:")
-                  ),
-                  counts_ui
-                )
-              }
+                  class = "text-muted small mb-1",
+                  lang()$t("Persoonsgegevens geanonimiseerd:")
+                ),
+                counts_ui
+              )
             )
           )
         }
       } else {
-        dup_box # mode "none"
+        # mode == "none"
+        dup_box
       }
     })
 
+    # Open GLiNER modal ---------------------------------------------
     observeEvent(input$open_gliner_modal, {
       req(!isTRUE(processing()))
       isolate({
@@ -398,15 +457,14 @@ text_management_server <- function(
       options = list(pageLength = 5, scrollX = TRUE)
     )
 
-    # 8 Return ---------------------------------------------------------
+    # 8 Return -------------------------------------------------------
     return(texts)
   })
 }
 
 
-#### 2 Helper function for preprocessing texts ####
+#### 2 Helper function for preprocessing texts ######################
 
-# To anonymize texts with regex patterns
 pre_process_texts <- function(
   txts,
   lang = shiny.i18n::Translator$new(
@@ -420,7 +478,7 @@ pre_process_texts <- function(
 
   txts <- stringr::str_squish(txts)
 
-  # Find all e-mail addresses, replace with "<< removed e-mail address >>"
+  # Find all e-mail addresses, replace with "<< e-mailadres verwijderd >>"
   txts <- stringr::str_replace_all(
     txts,
     stringr::regex(
@@ -430,19 +488,7 @@ pre_process_texts <- function(
     lang$t("<< e-mailadres verwijderd >>")
   )
 
-  # Find all Dutch IBAN numbers, replace with "<< removed IBAN number >>"
-  # (e.g., NL91ABNA0417164300)
-  # txts <- stringr::str_replace_all(
-  #   txts,
-  #   stringr::regex(
-  #     "\\bNL\\d{2}[A-Z]{4}\\d{10}\\b",
-  #     ignore_case = TRUE
-  #   ),
-  #   "<< removed IBAN number >>"
-  # )
-
-  # Find all phone numbers, replace with "<< removed phone number >>"
-  # May also find other numbers like BSN, KvK, etc.
+  # Find all phone numbers, replace with "<< (telefoon)nummer verwijderd >>"
   txts <- stringr::str_replace_all(
     txts,
     stringr::regex(
@@ -452,14 +498,10 @@ pre_process_texts <- function(
     lang$t("<< (telefoon)nummer verwijderd >>")
   )
 
-  # Find all Dutch postal codes, replace with "<< removed postal code >>"
-  # (e.g., 1234AB or 1234 ab) - Original regex is good
+  # Find all Dutch postal codes, replace with "<< postcode verwijderd >>"
   txts <- stringr::str_replace_all(
     txts,
-    stringr::regex(
-      "\\b\\d{4}\\s*[a-zA-Z]{2}\\b",
-      ignore_case = TRUE
-    ),
+    stringr::regex("\\b\\d{4}\\s*[a-zA-Z]{2}\\b", ignore_case = TRUE),
     lang$t("<< postcode verwijderd >>")
   )
 
@@ -467,7 +509,7 @@ pre_process_texts <- function(
 }
 
 
-#### 3 Example/development usage ####
+#### 3 Example/development usage ###################################
 
 if (FALSE) {
   library(shiny)
@@ -479,12 +521,16 @@ if (FALSE) {
   # Allows to load Python & interrupt R session without fatal R crash:
   Sys.setenv(FOR_DISABLE_CONSOLE_CTRL_HANDLER = "1")
 
-  # Load model:
-  if (!exists("gliner_model")) gliner_model <- gliner_load_model()
-
+  # Example global options ---------------------------------------------------
   options(
+    anonymization__default = "regex", # "none" | "regex" | "gliner"
+    anonymization__none = TRUE,
+    anonymization__regex = TRUE,
     anonymization__gliner_model = TRUE # Enable GLiNER model usage
   )
+
+  # Load model (use NULL for demo if you don't have it):
+  gliner_model <- NULL # or gliner_load_model()
 
   ui <- bslib::page_fluid(
     shinyjs::useShinyjs(),
@@ -501,8 +547,7 @@ if (FALSE) {
     text_management_server(
       "tm",
       raw_texts = raw,
-      # gliner_model = gliner_model
-      gliner_model = NULL
+      gliner_model = gliner_model
     )
   }
 
