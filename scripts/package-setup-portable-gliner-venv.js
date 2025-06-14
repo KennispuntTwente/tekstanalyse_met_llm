@@ -8,21 +8,31 @@ const VENV_DIR = path.resolve(__dirname, "../portable-gliner-venv");
 
 function tryLoadGlinerFromR() {
   console.log("[INFO] Attempting to load gliner model using R...");
+
+  // CI uses the system Python that’s already on ubuntu-latest
   const rScript = `
+    Sys.setenv(RETICULATE_PYTHON = "/usr/bin/python3") # force system python
     source("R/gliner_load.R")
-    gliner_load_model()
+    gliner_load_model(use_system_python = TRUE)
   `;
 
-  const result = spawnSync("Rscript", ["-e", rScript], {
-    stdio: "inherit",
-    cwd: path.resolve(__dirname, ".."),
-  });
+  const result = spawnSync(
+    "Rscript",
+    ["--vanilla", "-e", rScript],
+    { cwd: path.resolve(__dirname, ".."), encoding: "utf8" }
+  );
 
-  if (result.error) {
-    console.error("[ERROR] Failed to run Rscript:", result.error.message);
-    process.exit(1);
+  // Always dump R’s stdout/stderr to the Action log
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+
+  // Propagate R’s exit status so CI fails immediately
+  if (result.status !== 0) {
+    console.error(`[ERROR] Rscript exited with code ${result.status}`);
+    process.exit(result.status);
   }
 }
+
 
 function ensureGlinerVenvExists() {
   if (!fs.existsSync(VENV_DIR)) {
