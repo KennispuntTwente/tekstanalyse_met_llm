@@ -1,4 +1,4 @@
-name: Build desktop app & draft release
+name: Draft release with a build of the desktop app
 
 on:
   workflow_dispatch:
@@ -10,10 +10,10 @@ on:
         description: "Create release as a draft (recommended)?"
         type: boolean
         default: true
-        
+
 permissions:
-  contents: write 
-  
+  contents: write
+
 jobs:
   win:
     runs-on: windows-latest
@@ -67,8 +67,8 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: "KWALLM ${{ github.event.inputs.version_tag || 'build-' }}${{ github.run_number }} (Windows, 64-bit, x64/AMD64)"
           draft: ${{ github.event.inputs.draft }}
-          generate_release_notes: true          
-          append_body: true                 
+          generate_release_notes: true
+          append_body: true
           body: |
             # ${{ github.event.inputs.version_tag || 'Unreleased build' }} (EN)
             *English version above — Dutch version below (Engelse versie boven — Nederlandse versie onder)*
@@ -77,21 +77,21 @@ jobs:
             **TODO: ADD LIST OF CHANGES HERE**
 
             ## Desktop app
-            The files in this release are for the desktop application (Windows, 64-bit, x64/AMD64).  
-            Usage is simple:  
-            1. Download `kwallm-text-analysis-app-win32-x64.7z` (see ‘Assets’ below)  
+            The files in this release are for the desktop application (Windows, 64-bit, x64/AMD64).
+            Usage is simple:
+            1. Download `kwallm-text-analysis-app-win32-x64.7z` (see ‘Assets’ below)
             2. Unzip this to a folder, open the folder, and launch `kwallm-text-analysis-app.exe`
 
             ### Admin rights & network access
-            Admin rights are not required to use this app. However, the app may ask to access your local network to find a free port for the R (Shiny) process.  
-            If you do not (or cannot) grant permission, port **21471** is chosen by default.  
+            Admin rights are not required to use this app. However, the app may ask to access your local network to find a free port for the R (Shiny) process.
+            If you do not (or cannot) grant permission, port **21471** is chosen by default.
             If that port is busy the app will fail to start. In some cases, the app may not close properly (keeping the port occupied) and therefore cannot restart.
             If that happens: close the R processes on your machine via task manager, or restart your machine.
 
             ## Container app
-            You can use the pre-built container:  
-            1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`  
-            2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`  
+            You can use the pre-built container:
+            1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+            2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
             3. Browse to `http://localhost:3838`
 
             Alternatively build your own image; see the *Dockerfile* and the instructions in the [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#3-container-app).
@@ -100,19 +100,19 @@ jobs:
             See the instructions in the [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#1-r-environment).
 
             ## About this app
-            This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) in collaboration with **GGD Twente**.  
+            This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) in collaboration with **GGD Twente**.
             Together, our organizations work on applying generative AI for the benefit of society.
 
             Ideas or suggestions? [Open an issue](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
 
-            Kennispunt Twente is a (Dutch) non-profit organization for data, insights, and knowledge.  
-            Interested in what we can do for your organisation (e.g., with generative AI)?  
+            Kennispunt Twente is a (Dutch) non-profit organization for data, insights, and knowledge.
+            Interested in what we can do for your organisation (e.g., with generative AI)?
             Visit [our website](https://www.kennispunttwente.nl) or [mail our developers](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
 
             ---
-            
+
             ### Contact
-            - Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)  
+            - Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)
             - Tjark van de Merwe – [t.vandemerwe@kennispunttwente.nl](mailto:t.vandemerwe@kennispunttwente.nl)
 
             ---
@@ -120,25 +120,25 @@ jobs:
             # ${{ github.event.inputs.version_tag || 'Onuitgebrachte build' }} (NL)
             *Engelse versie boven — Nederlandse versie onder (English version above — Dutch version below)*
 
-            *Dit is een nieuwe release van onze app voor tekstanalyse met LLM's! Wijzigingen:*  
+            *Dit is een nieuwe release van onze app voor tekstanalyse met LLM's! Wijzigingen:*
             **TODO: VOEG LIJST VAN WIJZIGINGEN TOE**
 
             ## Desktop-app
-            Bestanden bij deze release zijn voor de desktopapplicatie (Windows, 64-bit, x64/AMD64).  
-            Gebruik is simpel:  
-            1. Download `kwallm-text-analysis-app-win32-x64.7z` (zie ‘Assets’ beneden)  
+            Bestanden bij deze release zijn voor de desktopapplicatie (Windows, 64-bit, x64/AMD64).
+            Gebruik is simpel:
+            1. Download `kwallm-text-analysis-app-win32-x64.7z` (zie ‘Assets’ beneden)
             2. Unzip dit naar een map, open de map, en start `kwallm-text-analysis-app.exe`
 
             ### Adminrechten & netwerktoegang
-            Adminrechten zijn niet nodig voor het gebruik van deze app. De app kan wel toestemming vragen tot je lokale netwerk om een vrije port voor R (Shiny) te vinden.  
-            Geef je geen toestemming, dan wordt standaard de port **21471** gebruikt.  
+            Adminrechten zijn niet nodig voor het gebruik van deze app. De app kan wel toestemming vragen tot je lokale netwerk om een vrije port voor R (Shiny) te vinden.
+            Geef je geen toestemming, dan wordt standaard de port **21471** gebruikt.
             Is die port bezet, dan start de app niet. Soms komt het voor dat de app niet goed afsluit, en de port bezet houdt.
             Sluit in dat geval alle R-processen af via taakbeheer, of restart je machine.
 
             ## Container-app
-            Gebruik de pre-built container:  
-            1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`  
-            2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`  
+            Gebruik de pre-built container:
+            1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+            2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
             3. Open `http://localhost:3838` in je browser
 
             Je kunt ook zelf een image bouwen; zie de *Dockerfile* en instructies in de [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#3-container-applicatie).
@@ -147,19 +147,19 @@ jobs:
             Lees de instructies in de [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#1-r-omgeving).
 
             ## Over deze app
-            Deze app is ontwikkeld door [Kennispunt Twente](https://www.kennispunttwente.nl) in samenwerking met **GGD Twente**.  
+            Deze app is ontwikkeld door [Kennispunt Twente](https://www.kennispunttwente.nl) in samenwerking met **GGD Twente**.
             Samen werken onze organisaties aan toepassingen van generatieve AI ten behoeve van de samenleving.
-            
+
             Ideeën of verbeterpunten? [Open een issue](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
 
-            Kennispunt Twente is een non-profit organisatie voor data, inzicht en kennis.  
-            Interesse in wat wij voor jouw organisatie kunnen doen (bijv. met generatieve AI)?  
+            Kennispunt Twente is een non-profit organisatie voor data, inzicht en kennis.
+            Interesse in wat wij voor jouw organisatie kunnen doen (bijv. met generatieve AI)?
             Bezoek [onze website](https://www.kennispunttwente.nl) of [mail onze ontwikkelaars](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
 
             ---
-            
+
             ### Contact
-            - Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)  
+            - Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)
             - Tjark van de Merwe – [t.vandemerwe@kennispunttwente.nl](mailto:t.vandemerwe@kennispunttwente.nl)
 
             ---
