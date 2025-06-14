@@ -10,7 +10,10 @@ on:
         description: "Create as draft?"
         type: boolean
         default: true
-
+        
+permissions:
+  contents: write 
+  
 jobs:
   win:
     runs-on: windows-latest
