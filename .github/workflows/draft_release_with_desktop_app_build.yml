@@ -24,37 +24,44 @@ jobs:
       # 1 – Checkout repo
       - uses: actions/checkout@v4
 
-      # 2 – Install NodeJS
+      # 2 Trigger container build workflow
+      - name: Trigger container build workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: trigger-container-build
+
+      # 3 – Install NodeJS
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      # 3 – Install R (adds Rscript & Rtools)
+      # 4 – Install R (adds Rscript & Rtools)
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: ${{ env.R_VERSION }}
 
-      # 4 – Restore renv library (so it can be copied to portable-r)
+      # 5 – Restore renv library (so it can be copied to portable-r)
       - uses: r-lib/actions/setup-renv@v2
 
-      # 5 – Install npm packages
+      # 6 – Install npm packages
       - name: Install npm packages
         run: npm ci
 
-      # 6 – Build desktop app (includes setting up portable-r & portable-pandoc)
+      # 7 – Build desktop app (includes setting up portable-r & portable-pandoc)
       - name: Build desktop app (Windows, x64)
         run: npm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 7 – Zip & upload
+      # 8 – Zip & upload
       - name: Zip dist
         run: |
           Compress-Archive -Path dist\kwallm-text-analysis-app-win32-x64 `
                            -DestinationPath kwallm-text-analysis-app-win32-x64.zip
 
-      # 8 – Create/update release + attach asset + auto “What’s Changed”
+      # 9 – Create/update release + attach asset + auto “What’s Changed”
       - name: Draft / update GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -155,10 +162,3 @@ jobs:
           files: kwallm-text-analysis-app-win32-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # 9 Trigger container build workflow
-      - name: Trigger container build workflow
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: trigger-container-build
