@@ -9,6 +9,7 @@ app.log
 /dist
 /portable-pandoc
 /portable-r
+/portable-gliner-venv
 /node_modules
 R-4.4.2.exe
 R/report_Onderwerpextractie.html
@@ -20,4 +21,3 @@ R/report_Scoren_en.html
 R/report_Onderwerpextractie_nl.html
 R/report_Categorisatie_nl.html
 R/report_Scoren_nl.html
-/portable-gliner-venv
