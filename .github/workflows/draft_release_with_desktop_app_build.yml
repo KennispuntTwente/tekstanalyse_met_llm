@@ -38,37 +38,10 @@ jobs:
       # 4 – Restore renv library
       - uses: r-lib/actions/setup-renv@v2
 
-      # 5 – Python (pre-installed CPython for speed)
+      # 5 – Python (for reticulate / gliner venv)
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      # 5b – pyenv-win (CLI & shims on top of the same interpreter)
-      - name: Install pyenv-win and register Python ${{ env.PYTHON_VERSION }}
-        shell: pwsh
-        run: |
-          # Install pyenv-win via Chocolatey
-          choco install pyenv-win -y
-
-          # Persist pyenv to PATH for all later steps
-          Add-Content $env:GITHUB_PATH "$HOME\.pyenv\pyenv-win\bin"
-          Add-Content $env:GITHUB_PATH "$HOME\.pyenv\pyenv-win\shims"
-
-          # Reload env vars in THIS step so we can use pyenv immediately
-          Import-Module "$env:ChocolateyInstall\helpers\chocolateyInstaller.psm1"
-          refreshenv
-
-          # Tell pyenv about the interpreter we already have
-          pyenv install $env:PYTHON_VERSION -s   # -s = skip if present
-          pyenv global  $env:PYTHON_VERSION
-          python --version                       # sanity-check
-
-      # 5c – Cache pyenv versions dir (cold-runner speed-up, optional)
-      - name: Cache pyenv versions
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.HOME }}\.pyenv\pyenv-win\versions
-          key: pyenv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml') }}
+          python-version: 3.11
 
       # 6 – JS deps
       - name: Install npm packages
