@@ -36,8 +36,13 @@ KWALLM is an app (developed with R, Shiny) for (automated) qualitative text anal
 
 - **Human-in-the-loop**: Users can edit topics identified by the model, e.g., merge or delete topics
 
-- **PII redaction**: Email addresses, phone numbers, and postal codes are automatically redacted before texts are sent to the LLM, to protect respondent privacy
+- **PII redaction**: Personally identifiable information (PII) can be automatically redacted before texts are sent to an external LLM API.
+This helps protect respondent privacy:
 
+   - Simple PII detection with regex (email addresses, phone numbers, Dutch postal codes)
+   
+   - Advanced PII detection with a local, specialised model ([GLiNER](https://huggingface.co/urchade/gliner_multi_pii-v1))
+   
 ### Configurable
 
 - Connect to **any LLM provider**, including local ones (e.g., [Ollama](https://ollama.com)) or external APIs like Azure OpenAI
@@ -78,7 +83,7 @@ the zip of the repository and unzip it)
 The application can also be used as a desktop application. This can be useful
 for users who are not familiar with R or Docker.
 
-A pre-built desktop application for Windows 10/11 (64-bit, x64/AMD64) is
+A pre-built desktop application for Windows 10/11 (x64) is
 available under [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases).
 This application contains all necessary dependencies and can be used directly.
 
@@ -222,11 +227,15 @@ zoals categorisatie, scoren op kenmerken, en topic modelling.
     de onderwerpen die het model heeft gevonden, aanpassen. Bijvoorbeeld,
     zelf bepaalde onderwerpen samenvoegen of verwijderen
     
--  **Persoonsgegevens redigeren**: persoonsgegevens zoals e-mailadressen,
-    telefoonnummers en postcodes worden automatisch geredigeerd
-    voordat deze naar het taalmodel worden gestuurd. Hiermee kan
-    de privacy van respondenten extra worden beschermd
-        
+-  **Persoonsgegevens redigeren**: persoonlijk identificeerbare
+    informatie (PII) kan automatisch worden verwijderd voordat de teksten
+    naar een externe LLM API worden gestuurd. Dit helpt om de privacy van
+    respondenten te beschermen:
+    
+      - Eenvoudige PII-detectie met regex (e-mailadressen, telefoonnummers, Nederlandse postcodes)
+   
+      - Geavanceerde PII-detectie met een lokaal, gespecialiseerd model ([GLiNER](https://huggingface.co/urchade/gliner_multi_pii-v1))
+
 ### Configureerbaar
 
 -   Mogelijkheid om aan te sluiten op **elke LLM-provider**, waaronder
@@ -281,7 +290,7 @@ de zip van de repository en unzip deze)
 De applicatie kan ook gebruikt worden als desktop-applicatie. Dit kan handig zijn
 voor gebruikers die niet bekend zijn met R of Docker.
 
-Onder [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases) is een pre-built desktop-applicatie beschikbaar voor Windows 10/11 (64-bit, x64/AMD64).
+Onder [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases) is een pre-built desktop-applicatie beschikbaar voor Windows 10/11 (x64).
 Deze applicatie bevat alle benodigde dependencies en kan direct worden gebruikt.
 
 1. Download de release (`kwallm-text-analysis-app-win32-x64.7z`)
