@@ -48,13 +48,19 @@ if (wantPyenv) {
 }
 
 if (havePyenv) {
-  const versions = runSilent('pyenv versions --bare').stdout.split('\n');
-  if (!versions.includes(opt.pythonVersion)) {
-    log(`Installing Python ${opt.pythonVersion} with pyenv…`);
-    run(`pyenv install -s ${opt.pythonVersion}`);
+  let root;
+  try {
+    // works on Linux/macOS pyenv
+    root = runSilent('pyenv root').stdout.trim();
+  } catch {
+    // pyenv-win has no `root`; fall back to env var or the default location
+    root = process.env.PYENV_ROOT
+        || join(process.env.USERPROFILE || process.env.HOME, '.pyenv', 'pyenv-win');
   }
-  const root = runSilent('pyenv root').stdout.trim();
-  pythonBin = join(root, 'versions', opt.pythonVersion, 'bin', 'python');
+     pythonBin = join(root, 'versions', opt.pythonVersion,
+                   // pyenv-win puts executables at the top level
+                   process.platform === 'win32' ? '' : 'bin',
+                   process.platform === 'win32' ? 'python.exe' : 'python');
 }
 
 log(`Using interpreter: ${pythonBin}`);
@@ -87,9 +93,13 @@ log(`Model cache will live in: ${cacheDir}`);
 
 // ────────────────── 4. download model ──────────────────────────────────────
 const pyCode = `
-from gliner import GLiNER
 import os, sys
+
+# Disable symlinks / hardlinks *before* Hugging Face Hub is imported
 os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
+
+from gliner import GLiNER
+
 try:
     GLiNER.from_pretrained(
         "${opt.modelName}",
