@@ -12,7 +12,7 @@
     "setup-portable-gliner-venv-r": "node scripts/package-setup-portable-gliner-venv-r.js",
     "setup-portable-gliner-venv": "node scripts/package-setup-portable-gliner-venv.js",
     "prebuild": "node scripts/package-prebuild.js",
-    "build": "npm run prebuild && electron-packager . kwallm-text-analysis-app --platform=win32 --arch=x64 --out=dist --overwrite --icon=www/icon.ico --ignore=\"^/(dist|build|example|progress|progress_secondary|renv|scripts|\\.gitignore|\\.Rhistory|\\.Rprofile|app\\.log|app\\.R|Dockerfile|.*\\.Rproj|README|renv\\.lock|run\\.bat)$\""
+    "build": "npm run prebuild && electron-packager . kwallm-text-analysis-app --platform=win32 --arch=x64 --out=dist --overwrite --icon=www/icon.ico --ignore=\"^/(dist|build|example|progress|progress_secondary|renv|portable-gliner-venv|scripts|app_errors|\\.github|\\.Rproj.user|\\.gitignore|\\.Rhistory|\\.dockerignore|\\.Rprofile|app\\.log|app\\.R|Dockerfile|Dockerfile-app\\.R|.*\\.Rproj|README|renv\\.lock|run\\.bat)$\""
   },
   "devDependencies": {
     "@electron/packager": "^18.3.6",
