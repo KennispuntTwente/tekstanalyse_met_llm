@@ -1,4 +1,7 @@
-// This script ensures portable-gliner-venv exists by calling the R setup if needed
+// This script ensures portable-gliner-venv exists by calling the R function
+// which (also) sets up the virtual environment (while loading the model)
+// Had issues in GH actions environment, so it was replaced by a nodeJS script
+// which now does the virtual environment setup (see: package-setup-portable-gliner-venv.js)
 
 const fs = require("fs");
 const path = require("path");

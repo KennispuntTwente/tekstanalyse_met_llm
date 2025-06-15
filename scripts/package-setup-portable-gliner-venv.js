@@ -1,8 +1,19 @@
 /**
- * Bootstrap a GLiNER venv + download model.
+ * Bootstrap a GLiNER venv + download model
  *
- *   npm run setup-gliner            # uses pyenv if available
- *   npm run setup-gliner -- --use-system-python
+ * This script sets up a portable Python virtual environment, with
+ * gliner package installed & a gliner model already downloaded
+ * Intended to be compatible with the way that gliner_load_model() (R/gliner_load.R)
+ * loads the virtual environment & model in R.
+ * That function also sets up the virtual enviroment in the same way,
+ * but did not run well on GH actions. Therefore, this script was made.
+ * Note that this script may need 'pyenv' or a suitable system python installation.
+ * Issues may occur when using a Windows store Python installation;
+ * this may create a unusable virtual environment
+ * If this script does not work for you and you are not running in GitHub actions,
+ * you may also consider using the the R gliner_load_model() function to setup
+ * the environment. See also package-setup-portable-gliner-venv-r.js which
+ * calls that R function from nodeJS (or just run it yourself from R)
  *
  * Prereqs:  npm i commander execa tmp
  */
