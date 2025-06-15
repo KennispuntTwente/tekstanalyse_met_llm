@@ -109,7 +109,12 @@ gliner_load_model <- function(
 
   Sys.setenv(HF_HUB_DISABLE_SYMLINKS = "1")
   cache_dir <- if (docker_env) "/opt/hf-cache" else
-    dirname(reticulate::virtualenv_python(venv_name))
+    reticulate::virtualenv_python(venv_name) |> dirname() |> dirname()
+
+  cli::cli_alert_info(paste0(
+    "Using model cache directory: ",
+    cache_dir
+  ))
 
   model <- gliner$GLiNER$from_pretrained(
     model_name,
