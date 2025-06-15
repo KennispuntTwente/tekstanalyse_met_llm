@@ -1,16 +1,20 @@
-# .github/workflows/build-container-release.yml
-# Build once on every draft / prerelease, push as `preview`.
-# When the release is published, promote the *same* image digest
-# to `<version>` + `latest`.
+# Build once on a repository_dispatch (or manual run), tag it as `preview`,
+# and, when the corresponding release is published, promote the *same* image
+# to <version> and `latest`.
 
-name: Build container with release (draft ➜ preview ➜ publish)
+name: Build container with release (preview ➜ publish)
 
 on:
+  # Fired by the desktop-app workflow below
   repository_dispatch:
     types: [trigger-container-build]
-  release:
-    types: [created, edited, published]
+
+  # Manual run, e.g. from the Actions tab
   workflow_dispatch:
+
+  # Only needed to *promote* a previously built image
+  release:
+    types: [published]
 
 env:
   IMAGE_NAME: ghcr.io/kennispunttwente/tekstanalyse_met_llm
@@ -20,10 +24,12 @@ permissions:
   packages: write     # allow pushes to GHCR
 
 jobs:
-  # ──────────────────────────────
-  # 1  Build the image once and push it under a temporary SHA tag
-  # ──────────────────────────────
+  # ──────────────────────────────────────────────────────
+  # 1. Build the image and push it under a <SHA> tag
+  #    (runs for dispatch / manual, *not* on release events)
+  # ──────────────────────────────────────────────────────
   build:
+    if: github.event_name != 'release'          # skip during publish run
     runs-on: ubuntu-latest
     outputs:
       digest: ${{ steps.build.outputs.digest }}
@@ -41,20 +47,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Build & push image (temp SHA tag) → export digest
+      - name: Build & push image (<SHA> tag) → export digest
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true                              # push to registry
+          push: true
           tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-  # ──────────────────────────────
-  # 2  Retag to **preview** for draft / prerelease
-  # ──────────────────────────────
+  # ──────────────────────────────────────────────────────
+  # 2. Retag that digest as **preview**
+  # ──────────────────────────────────────────────────────
   preview:
+    if: github.event_name != 'release'
     needs: build
-    if: ${{ github.event.release.draft || github.event.release.prerelease }}
     runs-on: ubuntu-latest
 
     steps:
@@ -63,7 +69,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_PAT }}
 
       - name: Retag digest → preview
         run: |
@@ -71,20 +77,14 @@ jobs:
             --tag ${{ env.IMAGE_NAME }}:preview \
             ${{ env.IMAGE_NAME }}@${{ needs.build.outputs.digest }}
 
-  # ──────────────────────────────
-  # 3  Promote to <version> + latest when the release is published
-  # ──────────────────────────────
+  # ──────────────────────────────────────────────────────
+  # 3. When the draft release is *published*, promote the
+  #    **exact same digest** (currently at :preview) to
+  #    <version> and :latest and :stable
+  # ──────────────────────────────────────────────────────
   publish:
-    needs: build
-    if: >-
-      ${{
-        github.event.action == 'published' &&
-        github.event.release.draft == false &&
-        github.event.release.prerelease == false
-      }}
+    if: github.event_name == 'release' && github.event.action == 'published'
     runs-on: ubuntu-latest
-    # Uncomment to require a manual approval gate:
-    # environment: production
 
     steps:
       - name: Log in to ghcr
@@ -92,11 +92,36 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_PAT }}
 
-      - name: Retag digest → <version> + latest
+      - name: Retag :preview → <version> + latest
         run: |
           docker buildx imagetools create \
             --tag ${{ env.IMAGE_NAME }}:${{ github.event.release.tag_name }} \
             --tag ${{ env.IMAGE_NAME }}:latest \
-            ${{ env.IMAGE_NAME }}@${{ needs.build.outputs.digest }}
+            --tag ${{ env.IMAGE_NAME }}:stable \
+            ${{ env.IMAGE_NAME }}:preview
+
+  # ────────────────────────────────────────────────
+  # 4. Prune untagged image digests
+  #    – keeps the last 3 SHA-tagged builds
+  # ────────────────────────────────────────────────
+  prune:
+    if: github.event_name != 'release'
+    needs: preview
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Delete old SHA builds, keep last 3
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: tekstanalyse_met_llm
+          package-type: container
+          # keep the three most recent SHA-only versions
+          min-versions-to-keep: 3
+          # protect anything that has a release-style tag
+          ignore-versions: '^(preview|latest|stable|v[0-9]+\\.[0-9]+\\.[0-9]+)$'
+          token: ${{ secrets.GHCR_PAT }}
+
+

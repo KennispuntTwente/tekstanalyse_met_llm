@@ -1,78 +1,105 @@
 name: Draft release with a build of the desktop app
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      version_tag:
-        description: "Enter a version tag (e.g., v1.0.3) (leave blank to let GitHub create one)"
-        required: false
-      draft:
-        description: "Create release as a draft (recommended)?"
-        type: boolean
-        default: true
 
 permissions:
   contents: write
 
 jobs:
+  check-version-and-release:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Get version from package.json
+        id: get-version
+        run: |
+          echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Get latest *published* release version from GitHub
+        id: get-latest
+        run: |
+          latest=$(gh release list --exclude-drafts --exclude-pre-releases -L 1 \
+                    --json tagName -q '.[0].tagName' || echo "v0.0.0")
+          echo "latest_release=${latest#v}" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compare versions
+        id: check
+        run: |
+          npm install -g semver
+
+          if semver -r ">${{ steps.get-latest.outputs.latest_release }}" \
+                    "${{ steps.get-version.outputs.version }}"; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi                       # ← close the if/else
+        shell: bash
+
   win:
+    needs: check-version-and-release
+    if: needs.check-version-and-release.outputs.should_release == 'true'
     runs-on: windows-latest
     env:
       R_VERSION: "4.4.2"
 
     steps:
-      # 1 – Checkout repo
       - uses: actions/checkout@v4
 
-      # 2 Trigger container build workflow
       - name: Trigger container build workflow
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event-type: trigger-container-build
 
-      # 3 – Install NodeJS
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      # 4 – Install R (adds Rscript & Rtools)
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: ${{ env.R_VERSION }}
 
-      # 5 – Restore renv library (so it can be copied to portable-r)
       - uses: r-lib/actions/setup-renv@v2
 
-      # 6 – Install npm packages
       - name: Install npm packages
         run: npm ci
 
-      # 7 – Build desktop app (includes setting up portable-r & portable-pandoc)
       - name: Build desktop app (Windows, x64)
         run: npm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 8 – Zip & upload
       - name: Zip dist
         run: |
           Compress-Archive -Path dist\kwallm-text-analysis-app-win32-x64 `
                            -DestinationPath kwallm-text-analysis-app-win32-x64.zip
 
-      # 9 – Create/update release + attach asset + auto “What’s Changed”
-      - name: Draft / update GitHub release
-        uses: softprops/action-gh-release@v2
+      - name: Draft GitHub release
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.event.inputs.version_tag || github.run_number }}
+          tag_name: v${{ needs.check-version-and-release.outputs.version }}
           target_commitish: ${{ github.sha }}
-          name: "KWALLM ${{ github.event.inputs.version_tag || 'build-' }}${{ github.run_number }} (Windows, x64)"
-          draft: ${{ github.event.inputs.draft }}
+          name: "KWALLM v${{ needs.check-version-and-release.outputs.version }} (Windows, x64)"
+          draft: true
           generate_release_notes: true
           append_body: true
           body: |
-            # ${{ github.event.inputs.version_tag || 'Unreleased build' }} (EN)
+            # v${{ needs.check-version-and-release.outputs.version }} (EN)
             *English version above — Dutch version below (Engelse versie boven — Nederlandse versie onder)*
 
             *This is a new release of our app for text analysis with LLMs! Changes:*
@@ -104,19 +131,9 @@ jobs:
 
             Ideas or suggestions? [Open an issue](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
 
-            Kennispunt Twente is a (Dutch) non-profit organization for data, insights, and knowledge.
-            Interested in what we can do for your organisation (e.g., with generative AI)?
-            Visit [our website](https://www.kennispunttwente.nl) or [mail our developers](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
-
             ---
 
-            ### Contact
-            - Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)
-            - Tjark van de Merwe – [t.vandemerwe@kennispunttwente.nl](mailto:t.vandemerwe@kennispunttwente.nl)
-
-            ---
-
-            # ${{ github.event.inputs.version_tag || 'Onuitgebrachte build' }} (NL)
+            # v${{ needs.check-version-and-release.outputs.version }} (NL)
             *Engelse versie boven — Nederlandse versie onder (English version above — Dutch version below)*
 
             *Dit is een nieuwe release van onze app voor tekstanalyse met LLM's! Wijzigingen:*
@@ -147,16 +164,6 @@ jobs:
             Samen werken onze organisaties aan toepassingen van generatieve AI ten behoeve van de samenleving.
 
             Ideeën of verbeterpunten? [Open een issue](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
-
-            Kennispunt Twente is een non-profit organisatie voor data, inzicht en kennis.
-            Interesse in wat wij voor jouw organisatie kunnen doen (bijv. met generatieve AI)?
-            Bezoek [onze website](https://www.kennispunttwente.nl) of [mail onze ontwikkelaars](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
-
-            ---
-
-            ### Contact
-            - Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)
-            - Tjark van de Merwe – [t.vandemerwe@kennispunttwente.nl](mailto:t.vandemerwe@kennispunttwente.nl)
 
             ---
           files: kwallm-text-analysis-app-win32-x64.zip
