@@ -220,7 +220,7 @@ text_management_server <- function(
             "gliner",
             "magic",
             "GLiNER",
-            "Geavanceerde anonimisering met GLiNER-model"
+            lang()$t("Geavanceerde anonimisering met GLiNER-model")
           )
         )
 
@@ -383,7 +383,7 @@ text_management_server <- function(
           class = "text-center mb-3",
           actionButton(
             ns("open_gliner_modal"),
-            lang()$t("Open GLiNER"),
+            "Open GLiNER",
             class = "btn btn-primary"
           )
         )

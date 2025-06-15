@@ -716,6 +716,138 @@
       {
         "nl": "Upload (.txt, .csv, .xlsx, of .sav)",
         "en": "Upload (.txt, .csv, .xlsx, or .sav)"
+      },
+      {
+        "nl": "Anonimiseer met GLiNER-model",
+        "en": "Anonymize with GLiNER model"
+      },
+      {
+        "nl": "Voer PII-entiteiten in die je zou willen verwijderen.",
+        "en": "Enter PII entities that you would like to remove."
+      },
+      {
+        "nl": "Bijvoorbeeld: naam, adres, werkgever, telefoonnummer, e-mail, et cetera.",
+        "en": "For example: name, address, employer, phone number, email, etc."
+      },
+      {
+        "nl": "Het lokale GLiNER-model zal deze entities proberen te flaggen in de teksten.",
+        "en": "The local GLiNER model will try to flag these entities in the texts."
+      },
+      {
+        "nl": "Entiteiten (gescheiden door komma's):",
+        "en": "Entities (separated by commas):"
+      },
+      {
+        "nl": "Sluit",
+        "en": "Close"
+      },
+      {
+        "nl": "Start",
+        "en": "Start"
+      },
+      {
+        "nl": "Het model wordt geladen en de teksten worden geanalyseerd. Even geduld...",
+        "en": "The model is being loaded and the texts are being analyzed. Please wait..."
+      },
+      {
+        "nl": "De allereerste keer dat deze machine dit doet, kan het wat langer duren omdat het model moet worden gedownload.",
+        "en": "The very first time this machine does this, it may take a bit longer because the model needs to be downloaded."
+      },
+      {
+        "nl": "Snelheid hangt af van de hardware die gebruikt wordt. Mogelijk is configuratie nodig om de hardware optimaal te benutten.",
+        "en": "Speed depends on the hardware used. Configuration may be needed to optimally utilize the hardware."
+      },
+      {
+        "nl": "Er is een fout opgetreden tijdens het anonimiseren. Probeer het opnieuw.",
+        "en": "An error occurred during anonymization. Please try again."
+      },
+      {
+        "nl": "Reset",
+        "en": "Reset"
+      },
+      {
+        "nl": "Sla op",
+        "en": "Save"
+      },
+      {
+        "nl": "Anonymisatie voltooid!",
+        "en": "Anonymization completed!"
+      },
+      {
+        "nl": "De teksten zijn geanonimiseerd en opgeslagen.",
+        "en": "The texts have been anonymized and saved."
+      },
+      {
+        "nl": "Voer ten minste twee (2) entities in om te verwijderen.",
+        "en": "Enter at least two (2) entities to remove."
+      },
+      {
+        "nl": "Detectie van entiteiten…",
+        "en": "Entity detection…"
+      },
+      {
+        "nl": "0 van %d teksten",
+        "en": "0 of %d texts"
+      },
+      {
+        "nl": "Er is een fout opgetreden bij het anonimiseren: ",
+        "en": "An error occurred during anonymization: "
+      },
+      {
+        "nl": "Geen van de opgegeven PII-entiteiten zijn gevonden in de teksten.",
+        "en": "None of the specified PII entities were found in the texts."
+      },
+      {
+        "nl": "Dat zou kunnen betekenen dat de teksten al anoniem zijn, of dat de entiteiten te beperkt zijn, of dat het model bepaaalde PII niet kan herkennen.",
+        "en": "That could mean that the texts are already anonymized, or that the entities are too limited, or that the model cannot recognize certain PII."
+      },
+      {
+        "nl": "Er zijn ",
+        "en": "There were "
+      },
+      {
+        "nl": " PII-entiteiten gevonden in de teksten.",
+        "en": " PII entities found in the texts."
+      },
+      {
+        "nl": "Alle checkboxes die aangevinkt zijn, worden geanonimiseerd nadat je op 'Sla op' klikt.",
+        "en": "All checkboxes that are checked will be anonymized after you click 'Save'."
+      },
+      {
+        "nl": "Tekst",
+        "en": "Text"
+      },
+      {
+        "nl": "Entiteit",
+        "en": "Entity"
+      },
+      {
+        "nl": "Label",
+        "en": "Label"
+      },
+      {
+        "nl": "Confidence",
+        "en": "Confidence"
+      },
+      {
+        "nl": "Geen anonimisering",
+        "en": "No anonymization"
+      },
+      {
+        "nl": "Eenvoudige anonimisering met regex",
+        "en": "Simple anonymization with regex"
+      },
+      {
+        "nl": "Geavanceerde anonimisering met GLiNER-model",
+        "en": "Advanced anonymization with GLiNER model"
+      },
+      {
+        "nl": "GLiNER-anonimisering is niet beschikbaar",
+        "en": "GLiNER anonymization is not available"
+      },
+      {
+        "nl": "GLiNER-anonimisering nog niet voltooid...",
+        "en": "GLiNER anonymization not yet completed..."
       }
     ]
 }

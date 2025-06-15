@@ -334,7 +334,7 @@ gliner_server <- function(
           n_txt <- length(pii_texts())
           progress <- ipc::AsyncProgress$new(
             message = lang()$t("Detectie van entiteiten…"),
-            detail = sprintf(lang()$t("0 van %d teksten klaar"), n_txt)
+            detail = sprintf(lang()$t("0 van %d teksten"), n_txt)
           )
 
           ## 4 Spawn the future that runs GLiNER model on texts
@@ -695,8 +695,6 @@ gliner_server <- function(
               }
               txt
             })
-
-            print(anonymized_texts)
 
             # Update counts
             return$number_of_pii_entities_removed <- nrow(df)
