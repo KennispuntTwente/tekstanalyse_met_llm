@@ -155,3 +155,10 @@ jobs:
           files: kwallm-text-analysis-app-win32-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 9 Trigger container build workflow
+      - name: Trigger container build workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: trigger-container-build

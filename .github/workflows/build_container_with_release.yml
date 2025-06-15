@@ -6,9 +6,11 @@
 name: Build container with release (draft ➜ preview ➜ publish)
 
 on:
+  repository_dispatch:
+    types: [trigger-container-build]
   release:
-    types: [created, edited, published]   # draft/prerelease/publish events
-  workflow_dispatch:                      # allow manual re-runs
+    types: [created, edited, published]
+  workflow_dispatch:
 
 env:
   IMAGE_NAME: ghcr.io/kennispunttwente/tekstanalyse_met_llm
