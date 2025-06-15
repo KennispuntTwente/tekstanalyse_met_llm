@@ -24,48 +24,43 @@ jobs:
       # 1 – Checkout repo
       - uses: actions/checkout@v4
 
-      # 2 – Node
+      # 2 – Install NodeJS
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      # 3 – R (adds Rscript & Rtools)
+      # 3 – Install R (adds Rscript & Rtools)
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: ${{ env.R_VERSION }}
 
-      # 4 – Restore renv library
+      # 4 – Restore renv library (so it can be copied to portable-r)
       - uses: r-lib/actions/setup-renv@v2
 
-      # 5 – Python (for reticulate / gliner venv)
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.11
-
-      # 6 – JS deps
+      # 5 – Install npm packages
       - name: Install npm packages
         run: npm ci
 
-      # 7 – Build (downloads R installer, packages Electron app)
-      - name: Build portable app
+      # 6 – Build desktop app (includes setting up portable-r & portable-pandoc)
+      - name: Build desktop app (Windows, x64)
         run: npm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 8 – Zip & upload
+      # 7 – Zip & upload
       - name: Zip dist
         run: |
           Compress-Archive -Path dist\kwallm-text-analysis-app-win32-x64 `
                            -DestinationPath kwallm-text-analysis-app-win32-x64.zip
 
-      # 9 – Create/update release + attach asset + auto “What’s Changed”
+      # 8 – Create/update release + attach asset + auto “What’s Changed”
       - name: Draft / update GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.version_tag || github.run_number }}
           target_commitish: ${{ github.sha }}
-          name: "KWALLM ${{ github.event.inputs.version_tag || 'build-' }}${{ github.run_number }} (Windows, 64-bit, x64/AMD64)"
+          name: "KWALLM ${{ github.event.inputs.version_tag || 'build-' }}${{ github.run_number }} (Windows, x64)"
           draft: ${{ github.event.inputs.draft }}
           generate_release_notes: true
           append_body: true
@@ -77,7 +72,7 @@ jobs:
             **TODO: ADD LIST OF CHANGES HERE**
 
             ## Desktop app
-            The files in this release are for the desktop application (Windows, 64-bit, x64/AMD64).
+            The files in this release are for the desktop application (Windows, x64).
             Usage is simple:
             1. Download `kwallm-text-analysis-app-win32-x64.7z` (see ‘Assets’ below)
             2. Unzip this to a folder, open the folder, and launch `kwallm-text-analysis-app.exe`
@@ -124,7 +119,7 @@ jobs:
             **TODO: VOEG LIJST VAN WIJZIGINGEN TOE**
 
             ## Desktop-app
-            Bestanden bij deze release zijn voor de desktopapplicatie (Windows, 64-bit, x64/AMD64).
+            Bestanden bij deze release zijn voor de desktopapplicatie (Windows, x64).
             Gebruik is simpel:
             1. Download `kwallm-text-analysis-app-win32-x64.7z` (zie ‘Assets’ beneden)
             2. Unzip dit naar een map, open de map, en start `kwallm-text-analysis-app.exe`
