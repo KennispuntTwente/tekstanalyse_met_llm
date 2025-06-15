@@ -109,8 +109,13 @@ options(
   anonymization__default = "regex", # Default anonymization method, either "none', "regex", or "gliner"
   anonymization__none = TRUE, # If the "none" anonymization method is available
   anonymization__regex = TRUE, # If the "regex" anonymization method is available
-  anonymization__gliner_model = TRUE # If the "gliner" anonymization method is available
+  anonymization__gliner_model = TRUE, # If the "gliner" anonymization method is available
+  anonymization__gliner_test = FALSE # If gliner model should be tested before launching the app. If test fails, app won't launch
 )
+
+if (getOption("anonymization__gliner_test", FALSE)) {
+  invisible(gliner_load_model(test_model = TRUE))
+}
 
 
 #### 3 Run app ####

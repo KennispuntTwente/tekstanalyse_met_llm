@@ -120,6 +120,7 @@ if (getOption("anonymization__gliner_test", FALSE)) {
   invisible(gliner_load_model(test_model = TRUE))
 }
 
+
 #### 3 Run app ####
 
 # Make images in www folder available to the app
