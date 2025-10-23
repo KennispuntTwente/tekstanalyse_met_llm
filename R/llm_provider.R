@@ -583,14 +583,19 @@ llm_provider_server <- function(
           {
             if (provider_mode == "openai") {
               # For OpenAI url, reduce the URL first to base URL
-              # e.g., "https://api.openai.com/v1/" (remove everything after version)
-              openai_base_url <- sub("(.*?/v[0-9]+/).*", "\\1", openai_url)
+              # e.g., "https://api.openai.com/v1"
+              # (remove everything after version; no trailing slash)
+              openai_base_url <- openai_url |>
+                stringr::str_replace("(.*?/v\\d+).*", "\\1") |>
+                stringr::str_remove("/+$")
+
               res <- httr::GET(
                 paste0(openai_base_url, "/models"),
                 httr::add_headers(
                   Authorization = paste("Bearer", api_key_input)
                 )
               )
+
               if (httr::http_error(res)) {
                 stop(sprintf(
                   "Error (%s): %s",
@@ -598,15 +603,20 @@ llm_provider_server <- function(
                   httr::content(res, as = "text", encoding = "UTF-8")
                 ))
               }
+
               httr::content(res)$data |> purrr::map_chr("id")
             } else if (provider_mode == "ollama") {
               # Make base URL for Ollama too
-              ollama_base_url <- sub("(.*?/api/).*", "\\1", ollama_url)
+              # (also here: no trailing slash)
+              ollama_base_url <- ollama_url |>
+                stringr::str_replace("(.*?/api).*", "\\1") |>
+                stringr::str_remove("/+$")
 
               res <- httr::GET(
                 url = paste0(ollama_base_url, "/tags"),
                 httr::add_headers(`Content-Type` = "application/json")
               )
+
               if (httr::http_error(res)) {
                 stop(sprintf(
                   "Error (%s): %s",
@@ -614,11 +624,13 @@ llm_provider_server <- function(
                   httr::content(res, as = "text", encoding = "UTF-8")
                 ))
               }
+
               content <- httr::content(
                 res,
                 as = "parsed",
                 type = "application/json"
               )
+
               vapply(content$models, function(x) x$name, character(1))
             } else {
               character(0)
