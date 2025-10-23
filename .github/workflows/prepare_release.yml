@@ -127,8 +127,8 @@ jobs:
 
             ## Container app
             You can use the pre-built container:
-            1. `docker pull ghcr.io/kennispunttwente/kwallm:latest`
-            2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/kwallm:latest`
+            1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+            2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
             3. Browse to `http://localhost:3838`
 
             Alternatively build your own image; see the 'Dockerfile' and the instructions in the [README](https://github.com/KennispuntTwente/KWALLM#3-container-app).
@@ -161,8 +161,8 @@ jobs:
 
             ## Container-app
             Gebruik de pre-built container:
-            1. `docker pull ghcr.io/kennispunttwente/kwallm:latest`
-            2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/kwallm:latest`
+            1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+            2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
             3. Open `http://localhost:3838` in je browser
 
             Je kunt ook zelf een image bouwen; zie de 'Dockerfile' en instructies in de [README](https://github.com/KennispuntTwente/KWALLM#3-container-applicatie).
