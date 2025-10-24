@@ -35,7 +35,7 @@ jobs:
         with:
           # ---- what to clean ---------------------------------------------
           owner: kennispunttwente
-          packages: tekstanalyse_met_llm, kwallm
+          packages: tekstanalyse_met_llm
           delete-untagged: true
           delete-partial-images: true
           delete-ghost-images: true
