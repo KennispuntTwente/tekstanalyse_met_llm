@@ -205,7 +205,7 @@ processing_server <- function(
 
             # Turn into data frame
             results <- unlist(results)
-            if (any(is.na(results))) results <- rep(NA, length(texts))
+            if (anyNA(results)) results <- rep(NA, length(texts))
             results <- data.frame(
               text = texts,
               result = results,
@@ -252,7 +252,7 @@ processing_server <- function(
                 # For each category, get the texts assigned to that category
                 for (cat in categories) {
                   categories_texts[[cat]] <- results$text[
-                    results[[cat]] == TRUE
+                    results[[cat]]
                   ]
                 }
               }
@@ -696,7 +696,7 @@ processing_server <- function(
                     # For each category, get the texts assigned to that category
                     for (cat in topics) {
                       topics_texts_list[[cat]] <- texts_with_topics$text[
-                        texts_with_topics[[cat]] == TRUE
+                        texts_with_topics[[cat]]
                       ]
                     }
                   }
@@ -951,7 +951,7 @@ processing_server <- function(
 
         # Verify that df actually has results
         # (sometimes we have API failure, then result/topic contains NA values)
-        if (any(is.na(df$result))) {
+        if (anyNA(df$result)) {
           app_error(
             "Results contain NA values; processing failed",
             when = "processing results",
@@ -1032,7 +1032,7 @@ processing_server <- function(
           result_list <- create_result_list()
 
           # If any in 'result_list$df$result' are NA, show a warning
-          error <- any(is.na(result_list$df$result))
+          error <- anyNA(result_list$df$result)
           if (error) {
             app_error(
               "Results contain NA values; processing failed",

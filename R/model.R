@@ -848,7 +848,7 @@ model_server <- function(
         if (is.null(p)) p <- list()
 
         # Also get JSON mode, URL; add to separate list
-        fields = list(
+        fields <- list(
           json_type = llm_provider$json_type,
           url = llm_provider$url,
           parameters = p

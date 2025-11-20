@@ -25,7 +25,7 @@ prompt_category <- function(
     length(text) == 1,
     length(research_background) == 1,
     length(categories) > 0,
-    !any(duplicated(categories))
+    !anyDuplicated(categories) > 0
   )
 
   numbered_categories <- paste0(
@@ -124,7 +124,7 @@ prompt_multi_category <- function(
     length(text) == 1,
     length(research_background) == 1,
     length(categories) > 0,
-    !any(duplicated(categories)),
+    !anyDuplicated(categories) > 0,
     all(exclusive_categories %in% categories)
   )
 
