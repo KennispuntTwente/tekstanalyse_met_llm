@@ -275,7 +275,7 @@ context_window_server <- function(
                 research_background = research_background(),
                 categories = categories$texts(),
                 exclusive_categories = categories$texts()[
-                  1:length(categories$texts()) %% 2 == 0
+                  seq_along(categories$texts()) %% 2 == 0
                 ]
               )
             } else {
