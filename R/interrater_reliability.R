@@ -696,7 +696,9 @@ format_kappa_result <- function(result) {
     )
   ) {
     # Handle potential sampling error passed through
-    if (!is.null(result$message)) return(paste("Error:", result$message))
+    if (!is.null(result$message)) {
+      return(paste("Error:", result$message))
+    }
     return("Result object does not contain expected Kappa information.")
   }
 

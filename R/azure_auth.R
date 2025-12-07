@@ -86,7 +86,9 @@ get_azure_auth <- function(
   )
 
   opts <- parseQueryString(isolate(session$clientData$url_search))
-  if (is.null(opts$code)) return(NULL)
+  if (is.null(opts$code)) {
+    return(NULL)
+  }
 
   if (!memory_authentication$exists(opts$state)) {
     output$azure_auth_unauthorized_ui <- renderUI({

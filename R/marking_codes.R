@@ -294,9 +294,15 @@ marking_codes_server <- function(
     observeEvent(
       input$generateCodes,
       {
-        if (!isFALSE(processing())) return()
-        if (!isTRUE(mode() %in% c("Markeren"))) return()
-        if (!isTRUE(number_of_texts_under_maximum())) return()
+        if (!isFALSE(processing())) {
+          return()
+        }
+        if (!isTRUE(mode() %in% c("Markeren"))) {
+          return()
+        }
+        if (!isTRUE(number_of_texts_under_maximum())) {
+          return()
+        }
         req(isFALSE(context_window$any_fit_problem))
 
         # Verify we have texts available to read
@@ -599,7 +605,9 @@ generate_codes_by_reading_texts <- function(
   # Determine context window size
   model <- llm_provider$parameters$model
   n_tokens_context_window <- get_context_window_size_in_tokens(model)
-  if (is.null(n_tokens_context_window)) n_tokens_context_window <- 2048
+  if (is.null(n_tokens_context_window)) {
+    n_tokens_context_window <- 2048
+  }
 
   # Create text chunks
   chunks <- create_text_chunks(

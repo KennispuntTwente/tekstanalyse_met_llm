@@ -307,8 +307,9 @@ edit_topics_server <- function(
 
         current_exclusive <- intersect(current_exclusive, new_topics)
         special <- lang()$t("Onbekend/niet van toepassing")
-        if (special %in% new_topics)
+        if (special %in% new_topics) {
           current_exclusive <- union(current_exclusive, special)
+        }
 
         topics_table_data(build_df(new_topics, current_exclusive))
         reduction_in_progress(FALSE)

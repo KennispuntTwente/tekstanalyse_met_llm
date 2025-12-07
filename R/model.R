@@ -163,8 +163,11 @@ model_server <- function(
         main_provider_updated,
         large_provider_updated
       ) {
-        if (which == "main") main_provider_updated(Sys.time()) else
+        if (which == "main") {
+          main_provider_updated(Sys.time())
+        } else {
           large_provider_updated(Sys.time())
+        }
       }
 
       # Read modal inputs for one side (main/large)
@@ -180,25 +183,39 @@ model_server <- function(
       # Build new parameters list from inputs (blank/NA => remove)
       build_parameters <- function(old_params, inps) {
         p <- old_params
-        if (is.null(p)) p <- list()
+        if (is.null(p)) {
+          p <- list()
+        }
 
         # reasoning.effort
-        if (nzchar(inps$effort)) p$reasoning <- list(effort = inps$effort) else
+        if (nzchar(inps$effort)) {
+          p$reasoning <- list(effort = inps$effort)
+        } else {
           p$reasoning <- NULL
+        }
 
         # text.verbosity
-        if (nzchar(inps$verbosity))
-          p$text <- list(verbosity = inps$verbosity) else p$text <- NULL
+        if (nzchar(inps$verbosity)) {
+          p$text <- list(verbosity = inps$verbosity)
+        } else {
+          p$text <- NULL
+        }
 
         # temperature (NA/NULL/length0 => remove)
         tp <- inps$temperature
-        if (length(tp) == 0 || is.null(tp) || is.na(tp))
-          p$temperature <- NULL else p$temperature <- as.numeric(tp)
+        if (length(tp) == 0 || is.null(tp) || is.na(tp)) {
+          p$temperature <- NULL
+        } else {
+          p$temperature <- as.numeric(tp)
+        }
 
         # top_p
         tp_p <- inps$top_p
-        if (length(tp_p) == 0 || is.null(tp_p) || is.na(tp_p))
-          p$top_p <- NULL else p$top_p <- as.numeric(tp_p)
+        if (length(tp_p) == 0 || is.null(tp_p) || is.na(tp_p)) {
+          p$top_p <- NULL
+        } else {
+          p$top_p <- as.numeric(tp_p)
+        }
 
         p
       }
@@ -211,7 +228,9 @@ model_server <- function(
           prov <- models[[which]]
           if (!is.null(prov)) {
             val <- prov$parameters$temperature
-            if (is.null(val)) val <- NA_real_
+            if (is.null(val)) {
+              val <- NA_real_
+            }
             updateNumericInput(session, input_id, value = val)
           }
         }
@@ -224,7 +243,9 @@ model_server <- function(
           prov <- models[[which]]
           if (!is.null(prov)) {
             val <- prov$parameters$top_p
-            if (is.null(val)) val <- NA_real_
+            if (is.null(val)) {
+              val <- NA_real_
+            }
             updateNumericInput(session, input_id, value = val)
           }
         }
@@ -349,7 +370,9 @@ model_server <- function(
 
         # Restore previously chosen item for this mode (if still valid)
         sel <- saved[[mode]]$main_choice
-        if (is.null(sel) || !(sel %in% choices)) sel <- NULL
+        if (is.null(sel) || !(sel %in% choices)) {
+          sel <- NULL
+        }
 
         div(
           class = "selector-container text-center",
@@ -385,7 +408,9 @@ model_server <- function(
         }
 
         sel <- saved[[mode]]$large_choice
-        if (is.null(sel) || !(sel %in% choices)) sel <- NULL
+        if (is.null(sel) || !(sel %in% choices)) {
+          sel <- NULL
+        }
 
         div(
           class = "selector-container text-center",
@@ -423,7 +448,9 @@ model_server <- function(
       # Keep saved selections valid if the configured provider's model list changes
       observe({
         mode <- current_mode()
-        if (mode == "preconfigured") return()
+        if (mode == "preconfigured") {
+          return()
+        }
 
         choices <- llm_provider_rv$configured_models
         req(choices)
@@ -501,19 +528,28 @@ model_server <- function(
 
         selected_effort <- provider$parameters$reasoning$effort
         selected_verbosity <- provider$parameters$text$verbosity
-        if (is.null(selected_effort)) selected_effort <- ""
-        if (is.null(selected_verbosity)) selected_verbosity <- ""
+        if (is.null(selected_effort)) {
+          selected_effort <- ""
+        }
+        if (is.null(selected_verbosity)) {
+          selected_verbosity <- ""
+        }
 
         selected_json_type <- provider$json_type
-        if (is.null(selected_json_type) || !nzchar(selected_json_type))
+        if (is.null(selected_json_type) || !nzchar(selected_json_type)) {
           selected_json_type <- "auto"
+        }
 
         # current temperature (NA renders as blank)
         selected_temperature <- provider$parameters$temperature
-        if (is.null(selected_temperature)) selected_temperature <- NA_real_
+        if (is.null(selected_temperature)) {
+          selected_temperature <- NA_real_
+        }
 
         selected_top_p <- provider$parameters$top_p
-        if (is.null(selected_top_p)) selected_top_p <- NA_real_
+        if (is.null(selected_top_p)) {
+          selected_top_p <- NA_real_
+        }
 
         id_prefix <- if (which == "main") "main" else "large"
 
@@ -845,7 +881,9 @@ model_server <- function(
       get_llm_provider_fields <- function(llm_provider) {
         # Get parameters from the LLM provider
         p <- llm_provider$parameters
-        if (is.null(p)) p <- list()
+        if (is.null(p)) {
+          p <- list()
+        }
 
         # Also get JSON mode, URL; add to separate list
         fields <- list(
@@ -910,7 +948,9 @@ model_server <- function(
           provider <- if (which == "main") models$main else models$large
           if (!is.null(provider)) {
             sel <- provider$json_type
-            if (is.null(sel) || !nzchar(sel)) sel <- "auto"
+            if (is.null(sel) || !nzchar(sel)) {
+              sel <- "auto"
+            }
             updateSelectInput(session, input_id, selected = sel)
           }
         }

@@ -254,8 +254,11 @@ categories_server <- function(
 
     ##  Helper: current exclusivity flags -------------------------------
     exclusive_flags <- reactive({
-      if (!assign_multiple_categories()) rep(TRUE, n_fields()) else
+      if (!assign_multiple_categories()) {
+        rep(TRUE, n_fields())
+      } else {
         exclusive_vals()
+      }
     })
 
     # Vector of texts which are exclusive
@@ -282,7 +285,7 @@ categories_server <- function(
               width = "100%"
             )
           ),
-          if (multi)
+          if (multi) {
             column(
               width = 2,
               checkboxInput(
@@ -291,6 +294,7 @@ categories_server <- function(
                 value = excl_value
               )
             )
+          }
         )
       }))
     })
@@ -373,8 +377,9 @@ categories_server <- function(
 
       txt_in_fields(sapply(
         seq_len(n_fields()),
-        function(i)
-          isolate(input[[paste0("category", i)]]) %||% txt_in_fields()[i],
+        function(i) {
+          isolate(input[[paste0("category", i)]]) %||% txt_in_fields()[i]
+        },
         simplify = TRUE,
         USE.NAMES = FALSE
       ))

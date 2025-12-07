@@ -2,7 +2,9 @@
 
 # This project uses renv to manage package dependencies;
 #   see https://rstudio.github.io/renv/articles/renv.html
-if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
+if (!requireNamespace("renv", quietly = TRUE)) {
+  install.packages("renv")
+}
 
 # Install packages with renv
 renv::restore()
@@ -35,7 +37,9 @@ load_all <- function(except = c()) {
     full.names = TRUE
   )
   for (file in r_files) {
-    if (file %in% except) next
+    if (file %in% except) {
+      next
+    }
     source(file)
   }
 }

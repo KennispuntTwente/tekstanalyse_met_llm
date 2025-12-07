@@ -5,7 +5,9 @@ source(here::here("R", "analysis_marking.R"))
 
 # Deterministic k-substitution mutator used in “property-like” tests
 mutate_k_subs <- function(s, k) {
-  if (k <= 0) return(s)
+  if (k <= 0) {
+    return(s)
+  }
   ch <- unlist(strsplit(s, "", fixed = TRUE))
   pos <- seq(1, length(ch), length.out = min(k, length(ch)))
   pos <- unique(pmin(round(pos), length(ch)))

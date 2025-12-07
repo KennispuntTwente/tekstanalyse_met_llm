@@ -396,8 +396,9 @@ reduce_topics <- function(
     ) |>
       tidyprompt::prompt_wrap(
         extraction_fn = function(result) {
-          if (!is.character(result$topics))
+          if (!is.character(result$topics)) {
             result$topics <- as.character(result$topics)
+          }
           result$topics <- unique(trimws(result$topics[!is.na(result$topics)]))
           if (length(result$topics) < 2) {
             return(tidyprompt::llm_feedback(
@@ -434,7 +435,9 @@ reduce_topics <- function(
   # ---- context window bookkeeping -------------------------------------------
   model <- llm_provider$parameters$model
   n_tokens_context_window <- get_context_window_size_in_tokens(model)
-  if (is.null(n_tokens_context_window)) n_tokens_context_window <- 2048
+  if (is.null(n_tokens_context_window)) {
+    n_tokens_context_window <- 2048
+  }
 
   split_into_chunks <- function(topics_vec) {
     chunks <- list()
@@ -454,7 +457,9 @@ reduce_topics <- function(
       current <- c(current, t)
       cur_tokens <- cur_tokens + add_tokens
     }
-    if (length(current) > 0) chunks[[length(chunks) + 1]] <- current
+    if (length(current) > 0) {
+      chunks[[length(chunks) + 1]] <- current
+    }
     chunks
   }
 
@@ -647,77 +652,77 @@ if (FALSE) {
   # (Ground truth not used during the procedure, but may be used to evaluate the performance)
 
   sentences_df <- tibble::tribble(
-    ~sentence,
-    ~ground_truth_topic,
+    ~sentence                                                ,
+    ~ground_truth_topic                                      ,
 
     # Durability
-    "this product is very durable",
-    "Durability",
-    "You just cant break this product",
-    "Durability",
-    "i barely used it and it already stopped working",
-    "Durability",
-    "it's been working perfectly for over a year now",
-    "Durability",
-    "dropped it several times and it still works",
-    "Durability",
-    "it broke the same day I bought it",
-    "Durability",
+    "this product is very durable"                           ,
+    "Durability"                                             ,
+    "You just cant break this product"                       ,
+    "Durability"                                             ,
+    "i barely used it and it already stopped working"        ,
+    "Durability"                                             ,
+    "it's been working perfectly for over a year now"        ,
+    "Durability"                                             ,
+    "dropped it several times and it still works"            ,
+    "Durability"                                             ,
+    "it broke the same day I bought it"                      ,
+    "Durability"                                             ,
 
     # Ease of use
-    "this product is very easy to use",
-    "Ease of use",
-    "it is impossible to understand how this product works",
-    "Ease of use",
-    "this product is so confusing!!",
-    "Ease of use",
-    "the instructions were super clear",
-    "Ease of use",
-    "i figured it out without even reading the manual",
-    "Ease of use",
-    "even tech-savvy people would struggle with this",
-    "Ease of use",
+    "this product is very easy to use"                       ,
+    "Ease of use"                                            ,
+    "it is impossible to understand how this product works"  ,
+    "Ease of use"                                            ,
+    "this product is so confusing!!"                         ,
+    "Ease of use"                                            ,
+    "the instructions were super clear"                      ,
+    "Ease of use"                                            ,
+    "i figured it out without even reading the manual"       ,
+    "Ease of use"                                            ,
+    "even tech-savvy people would struggle with this"        ,
+    "Ease of use"                                            ,
 
     # Price
-    "this product is cheap",
-    "Price",
-    "incredible value for money!",
-    "Price",
-    "i couldnt afford this after 100 years of working",
-    "Price",
-    "way too expensive for what it offers",
-    "Price",
-    "i got it on sale and it was totally worth it",
-    "Price",
-    "definitely not worth the price tag",
-    "Price",
+    "this product is cheap"                                  ,
+    "Price"                                                  ,
+    "incredible value for money!"                            ,
+    "Price"                                                  ,
+    "i couldnt afford this after 100 years of working"       ,
+    "Price"                                                  ,
+    "way too expensive for what it offers"                   ,
+    "Price"                                                  ,
+    "i got it on sale and it was totally worth it"           ,
+    "Price"                                                  ,
+    "definitely not worth the price tag"                     ,
+    "Price"                                                  ,
 
     # Customer service
-    "the customer service was very helpful",
-    "Customer service",
-    "i sent a message to the company and they never replied",
-    "Customer service",
-    "i made a call asking for help, and they were very rude",
-    "Customer service",
-    "they solved my issue in less than five minutes",
-    "Customer service",
-    "the agent was patient and knowledgeable",
-    "Customer service",
-    "worst customer support experience ever",
-    "Customer service",
+    "the customer service was very helpful"                  ,
+    "Customer service"                                       ,
+    "i sent a message to the company and they never replied" ,
+    "Customer service"                                       ,
+    "i made a call asking for help, and they were very rude" ,
+    "Customer service"                                       ,
+    "they solved my issue in less than five minutes"         ,
+    "Customer service"                                       ,
+    "the agent was patient and knowledgeable"                ,
+    "Customer service"                                       ,
+    "worst customer support experience ever"                 ,
+    "Customer service"                                       ,
 
     # Shipping
-    "the shipping was very fast",
-    "Shipping",
-    "the product was at my door before i blinked!",
-    "Shipping",
-    "the product took 3 months to arrive",
-    "Shipping",
-    "it arrived earlier than expected",
-    "Shipping",
-    "order tracking was inaccurate and confusing",
-    "Shipping",
-    "the package was damaged when it arrived",
+    "the shipping was very fast"                             ,
+    "Shipping"                                               ,
+    "the product was at my door before i blinked!"           ,
+    "Shipping"                                               ,
+    "the product took 3 months to arrive"                    ,
+    "Shipping"                                               ,
+    "it arrived earlier than expected"                       ,
+    "Shipping"                                               ,
+    "order tracking was inaccurate and confusing"            ,
+    "Shipping"                                               ,
+    "the package was damaged when it arrived"                ,
     "Shipping"
   )
 

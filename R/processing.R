@@ -144,12 +144,22 @@ processing_server <- function(
       # Listen for process button click when in categorization or scoring mode
       # Launch processing
       observeEvent(input$process, {
-        if (processing()) return()
+        if (processing()) {
+          return()
+        }
         req(texts$preprocessed)
-        if (!mode() %in% c("Categorisatie", "Scoren")) return()
-        if (!number_of_texts_under_maximum()) return()
-        if (mode() == "Categorisatie" && !categories_are_valid()) return()
-        if (mode() == "Scoren" && !scoring_characteristic_is_valid()) return()
+        if (!mode() %in% c("Categorisatie", "Scoren")) {
+          return()
+        }
+        if (!number_of_texts_under_maximum()) {
+          return()
+        }
+        if (mode() == "Categorisatie" && !categories_are_valid()) {
+          return()
+        }
+        if (mode() == "Scoren" && !scoring_characteristic_is_valid()) {
+          return()
+        }
         req(isFALSE(context_window$any_fit_problem))
 
         # Set processing state
@@ -205,7 +215,9 @@ processing_server <- function(
 
             # Turn into data frame
             results <- unlist(results)
-            if (anyNA(results)) results <- rep(NA, length(texts))
+            if (anyNA(results)) {
+              results <- rep(NA, length(texts))
+            }
             results <- data.frame(
               text = texts,
               result = results,
@@ -387,11 +399,17 @@ processing_server <- function(
       # Listen for process button click when in topic modelling mode
       # Launch processing
       observeEvent(input$process, {
-        if (processing()) return()
+        if (processing()) {
+          return()
+        }
         req(texts$preprocessed)
         req(context_window$text_chunks)
-        if (!mode() %in% c("Onderwerpextractie")) return()
-        if (!number_of_texts_under_maximum()) return()
+        if (!mode() %in% c("Onderwerpextractie")) {
+          return()
+        }
+        if (!number_of_texts_under_maximum()) {
+          return()
+        }
         req(isFALSE(context_window$any_fit_problem))
         req(isFALSE(context_window$too_many_chunks))
 
@@ -578,7 +596,9 @@ processing_server <- function(
       # Listen for definitive topics
       # Launch processing for assigning topics to paragraphs
       observeEvent(topics_definitive(), {
-        if (!isTRUE(topics_definitive())) return()
+        if (!isTRUE(topics_definitive())) {
+          return()
+        }
         req(topics())
 
         if (!assign_multiple_categories()) {
@@ -837,11 +857,19 @@ processing_server <- function(
       # Listen for process button click when in marking mode
       # Launch processing
       observeEvent(input$process, {
-        if (processing()) return()
+        if (processing()) {
+          return()
+        }
         req(texts$preprocessed)
-        if (!mode() %in% c("Markeren")) return()
-        if (!number_of_texts_under_maximum()) return()
-        if (!codes_are_valid()) return()
+        if (!mode() %in% c("Markeren")) {
+          return()
+        }
+        if (!number_of_texts_under_maximum()) {
+          return()
+        }
+        if (!codes_are_valid()) {
+          return()
+        }
         req(isFALSE(context_window$any_fit_problem))
         req(context_window$max_tokens)
         req(context_window$overlap)
@@ -1028,7 +1056,9 @@ processing_server <- function(
       observeEvent(
         irr_done(),
         {
-          if (!isTRUE(irr_done())) return()
+          if (!isTRUE(irr_done())) {
+            return()
+          }
           result_list <- create_result_list()
 
           # If any in 'result_list$df$result' are NA, show a warning
@@ -1196,7 +1226,9 @@ processing_server <- function(
       # Present download button
       # Present restart button
       observeEvent(zip_file(), {
-        if (is.null(zip_file())) return()
+        if (is.null(zip_file())) {
+          return()
+        }
 
         # Create download handler
         output$download_results <- downloadHandler(

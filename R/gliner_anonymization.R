@@ -389,7 +389,9 @@ gliner_server <- function(
               predictions_clean <- purrr::imap_dfr(
                 preds,
                 function(pred, original) {
-                  if (length(pred) == 0) return(NULL)
+                  if (length(pred) == 0) {
+                    return(NULL)
+                  }
                   purrr::map_dfr(pred, function(ent) {
                     data.frame(
                       original_text = original,
@@ -698,7 +700,9 @@ gliner_server <- function(
             # Anonymize the texts by replacing the PII entities with a placeholder
             anonymized_texts <- purrr::imap_chr(pii_texts(), function(txt, i) {
               ents <- df[df$original_text == txt & df$anonymize, ]
-              if (nrow(ents) == 0) return(txt)
+              if (nrow(ents) == 0) {
+                return(txt)
+              }
 
               ## 1. convert GLiNER’s 0-based inclusive indices to R’s 1-based, end-inclusive
               ents <- ents |>

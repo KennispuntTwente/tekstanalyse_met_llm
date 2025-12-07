@@ -160,7 +160,7 @@ write_paragraphs_toggle_server <- function(
         if (isTRUE(processing())) {
           shinyjs::disable("style_prompt_input")
           shinyjs::disable("save_style")
-          shinyjs::disable("discard_style") 
+          shinyjs::disable("discard_style")
         } else {
           shinyjs::enable("style_prompt_input")
           shinyjs::enable("save_style")

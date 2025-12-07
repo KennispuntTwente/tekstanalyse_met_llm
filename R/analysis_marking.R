@@ -68,7 +68,9 @@ mark_texts <- function(
   # Verify that longest text does not exceed token limit
   model <- llm_provider$parameters$model
   n_tokens_context_window <- get_context_window_size_in_tokens(model)
-  if (is.null(n_tokens_context_window)) n_tokens_context_window <- 2048
+  if (is.null(n_tokens_context_window)) {
+    n_tokens_context_window <- 2048
+  }
   longest_prompt_tokens <- mark_text_prompt(
     text = df$sub_text[which.max(count_tokens(df$sub_text))],
     code = codes[which.max(count_tokens(codes))]
@@ -335,9 +337,12 @@ mark_text_prompt <- function(
         text_parts <- x$text_parts
 
         # Empty handling
-        if (length(text_parts) == 0) return(character(0))
-        if (length(text_parts) == 1 && identical(text_parts[1], ""))
+        if (length(text_parts) == 0) {
           return(character(0))
+        }
+        if (length(text_parts) == 1 && identical(text_parts[1], "")) {
+          return(character(0))
+        }
 
         # Find matches
         res <- find_matches(
@@ -411,7 +416,7 @@ find_matches <- function(
 
   rows <- lapply(
     needles,
-    function(nd)
+    function(nd) {
       best_literal_substring(
         needle = nd,
         haystack = haystack,
@@ -419,6 +424,7 @@ find_matches <- function(
         abs = abs,
         step_div = step_div
       )
+    }
   )
 
   tibble::tibble(
@@ -426,8 +432,9 @@ find_matches <- function(
     match = vapply(rows, `[[`, "", "match"),
     distance = vapply(
       rows,
-      function(r)
-        ifelse(is.na(r$distance), NA_integer_, as.integer(r$distance)),
+      function(r) {
+        ifelse(is.na(r$distance), NA_integer_, as.integer(r$distance))
+      },
       integer(1)
     ),
     start = vapply(
@@ -465,15 +472,20 @@ normalize_with_map <- function(s) {
     if (is_space(ch)) {
       # collapse runs of whitespace to a single space
       j <- i
-      while (j <= L && is_space(chars[j])) j <- j + 1L
+      while (j <= L && is_space(chars[j])) {
+        j <- j + 1L
+      }
       add(" ", i, j - 1L)
       i <- j
       next
     }
-    if (ch %in% c("\u2018", "\u2019")) ch <- "'" else if (
-      ch %in% c("\u201C", "\u201D")
-    )
-      ch <- "\"" else if (ch %in% c("\u2013", "\u2014")) ch <- "-"
+    if (ch %in% c("\u2018", "\u2019")) {
+      ch <- "'"
+    } else if (ch %in% c("\u201C", "\u201D")) {
+      ch <- "\""
+    } else if (ch %in% c("\u2013", "\u2014")) {
+      ch <- "-"
+    }
     add(tolower(ch), i, i)
     i <- i + 1L
   }
@@ -582,7 +594,9 @@ best_literal_substring <- function(
     cands <- list()
     for (w in seq.int(minw, maxw)) {
       last_start <- Ln - w + 1L
-      if (last_start <= 0L) next
+      if (last_start <= 0L) {
+        next
+      }
       for (i in seq.int(1L, last_start)) {
         subn <- substr(Hn, i, i + w - 1L)
         d <- stringdist::stringdist(n, subn, method = "lv")

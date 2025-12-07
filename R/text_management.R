@@ -116,8 +116,11 @@ text_management_server <- function(
     # -- 3  UI: main card -------------------------------------------
     output$card <- renderUI({
       req(lang())
-      n_pre <- if (is.null(texts$preprocessed)) 0 else
+      n_pre <- if (is.null(texts$preprocessed)) {
+        0
+      } else {
         length(texts$preprocessed)
+      }
 
       tagList(
         tags$style(HTML(
@@ -219,7 +222,7 @@ text_management_server <- function(
 
       # Assemble only the icons that are available
       icon_list <- tagList()
-      if ("none" %in% available_modes)
+      if ("none" %in% available_modes) {
         icon_list <- tagAppendChildren(
           icon_list,
           make_icon(
@@ -229,7 +232,8 @@ text_management_server <- function(
             lang()$t("Geen anonimisering")
           )
         )
-      if ("simple" %in% available_modes)
+      }
+      if ("simple" %in% available_modes) {
         icon_list <- tagAppendChildren(
           icon_list,
           make_icon(
@@ -239,7 +243,8 @@ text_management_server <- function(
             lang()$t("Eenvoudige anonimisering met regex")
           )
         )
-      if ("gliner" %in% available_modes)
+      }
+      if ("gliner" %in% available_modes) {
         icon_list <- tagAppendChildren(
           icon_list,
           make_icon(
@@ -249,6 +254,7 @@ text_management_server <- function(
             lang()$t("Geavanceerde anonimisering met GLiNER-model")
           )
         )
+      }
 
       div(class = "d-flex justify-content-center gap-3", icon_list)
     })
@@ -277,7 +283,9 @@ text_management_server <- function(
     observe({
       lapply(c("none", "simple", "gliner"), function(m) {
         # skip unavailable modes
-        if (!(m %in% available_modes)) return()
+        if (!(m %in% available_modes)) {
+          return()
+        }
         shinyjs::removeClass(ns(paste0("select_", m)), "tm-icon-active")
       })
       shinyjs::addClass(
@@ -290,9 +298,14 @@ text_management_server <- function(
     observe({
       lapply(c("none", "simple", "gliner"), function(m) {
         id <- paste0("select_", m)
-        if (!(m %in% available_modes)) return()
-        if (isTRUE(processing())) glossy <- shinyjs::disable(id) else
+        if (!(m %in% available_modes)) {
+          return()
+        }
+        if (isTRUE(processing())) {
+          glossy <- shinyjs::disable(id)
+        } else {
           shinyjs::enable(id)
+        }
       })
     })
 
@@ -306,8 +319,11 @@ text_management_server <- function(
         none = raw_texts(),
         simple = pre_process_texts(raw_texts(), lang = lang()),
         gliner = {
-          if (isTRUE(gliner$done)) unname(gliner$anonymized_texts) else
+          if (isTRUE(gliner$done)) {
+            unname(gliner$anonymized_texts)
+          } else {
             raw_texts()
+          }
         }
       )
 
@@ -425,8 +441,11 @@ text_management_server <- function(
         } else {
           counts_tbl <- gliner$pii_label_counts %||%
             tibble::tibble(count = integer())
-          total_pii <- if (nrow(counts_tbl) == 0) 0 else
+          total_pii <- if (nrow(counts_tbl) == 0) {
+            0
+          } else {
             sum(counts_tbl$count, na.rm = TRUE)
+          }
 
           counts_ui <- div(
             class = "d-flex align-items-center justify-content-center gap-2",

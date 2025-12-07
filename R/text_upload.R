@@ -74,8 +74,8 @@ text_upload_server <- function(
                 style = "max-width: 300px;",
                 fileInput(
                   inputId = ns("text_file"),
-                  label   = lang()$t("Upload (.txt, .csv, .xlsx, of .sav)"),
-                  accept  = c(".txt", ".csv", ".xlsx", ".sav")
+                  label = lang()$t("Upload (.txt, .csv, .xlsx, of .sav)"),
+                  accept = c(".txt", ".csv", ".xlsx", ".sav")
                 )
               ),
 
@@ -119,9 +119,13 @@ text_upload_server <- function(
     filter_active <- reactive({
       spec <- filter_spec()
       df <- uploaded_data()
-      if (is.null(spec) || is.null(df)) return(FALSE)
+      if (is.null(spec) || is.null(df)) {
+        return(FALSE)
+      }
       col <- spec$col %||% if (file_type() == "txt") "text" else NULL
-      if (is.null(col) || !col %in% names(df)) return(FALSE)
+      if (is.null(col) || !col %in% names(df)) {
+        return(FALSE)
+      }
       col_vals <- df[[col]]
       filtered <- col_vals %in% spec$vals
       any(filtered) && sum(filtered) < nrow(df)
@@ -131,11 +135,15 @@ text_upload_server <- function(
     filtered_data <- reactive({
       df <- uploaded_data()
       spec <- filter_spec()
-      if (is.null(df) || is.null(spec)) return(df)
+      if (is.null(df) || is.null(spec)) {
+        return(df)
+      }
 
       # Default to "text" column for txt files
       col <- spec$col %||% if (file_type() == "txt") "text" else NULL
-      if (is.null(col) || !col %in% names(df)) return(df)
+      if (is.null(col) || !col %in% names(df)) {
+        return(df)
+      }
 
       df[df[[col]] %in% spec$vals, , drop = FALSE]
     })
@@ -232,7 +240,9 @@ text_upload_server <- function(
 
     # ---- Show / hide column selector depending on file type ---------------
     observe({
-      if (is.null(file_type())) return()
+      if (is.null(file_type())) {
+        return()
+      }
       if (file_type() == "txt") {
         shinyjs::hide(ns("column_container"))
       } else {
@@ -250,9 +260,10 @@ text_upload_server <- function(
           class = "mb-2 text-center"
         ),
         div(
-          class = "d-flex justify-content-center w-100",   # add w-100
+          class = "d-flex justify-content-center w-100", # add w-100
           shinyWidgets::radioGroupButtons(
-            ns("txt_split_lines"), NULL,
+            ns("txt_split_lines"),
+            NULL,
             choices = c(lang()$t("Nee"), lang()$t("Ja")),
             selected = lang()$t("Ja"),
             size = "sm"
@@ -292,7 +303,9 @@ text_upload_server <- function(
     # ---- Column selector ----------------------------------------------------
     output$column_selector <- renderUI({
       req(filtered_data())
-      if (file_type() == "txt") return(NULL)
+      if (file_type() == "txt") {
+        return(NULL)
+      }
       cols <- names(filtered_data())
       # if (length(cols) <= 1) return(NULL)
       selectInput(
@@ -388,7 +401,9 @@ text_upload_server <- function(
     # Dynamic values selector -------------------------------------------------
     output$filter_col_selector <- renderUI({
       req(uploaded_data())
-      if (file_type() == "txt") return(NULL) # Hide if plain text file
+      if (file_type() == "txt") {
+        return(NULL)
+      } # Hide if plain text file
 
       shinyWidgets::pickerInput(
         ns("filter_col"),
@@ -470,11 +485,12 @@ text_upload_server <- function(
 
     # Apply / clear filter ----------------------------------------------------
     observeEvent(input$apply_filter, {
-      if (!length(input$filter_vals))
+      if (!length(input$filter_vals)) {
         return(showNotification(
           lang()$t("Selecteer minstens één waarde om te behouden."),
           type = "error"
         ))
+      }
 
       filter_spec(list(
         col = if (file_type() == "txt") "text" else input$filter_col,

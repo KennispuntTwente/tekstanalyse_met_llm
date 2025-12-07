@@ -42,8 +42,11 @@ tiktoken_load_tokenizer <- function(
   ## ── Load tokenizer ───────────────────────────────────────────────
   tok <- tryCatch(
     {
-      if (grepl("^gpt[-0-9]", encoding, ignore.case = TRUE))
-        tk$encoding_for_model(encoding) else tk$get_encoding(encoding)
+      if (grepl("^gpt[-0-9]", encoding, ignore.case = TRUE)) {
+        tk$encoding_for_model(encoding)
+      } else {
+        tk$get_encoding(encoding)
+      }
     },
     error = function(e) {
       stop("Failed to create tokenizer: ", e$message, call. = FALSE)

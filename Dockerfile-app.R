@@ -20,7 +20,9 @@ load_all <- function(except = c()) {
     full.names = TRUE
   )
   for (file in r_files) {
-    if (file %in% except) next
+    if (file %in% except) {
+      next
+    }
     source(file)
   }
 }
