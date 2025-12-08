@@ -72,21 +72,12 @@ marking_codes_server <- function(
       if (mode() == "Markeren") {
         bslib::card(
           class = "card",
-          card_header(
+          card_header_with_tooltip(
             lang()$t("Codes"),
-            tooltip(
-              bs_icon("info-circle"),
-              paste0(
-                lang()$t(
-                  "Bewerk hier de codes waarnaar het taalmodel relevante delen van de teksten zal markeren."
-                ),
-                lang()$t(
-                  " Gebruik de '+'- en '-'-knoppen om codes toe te voegen of te verwijderen."
-                ),
-                lang()$t(
-                  " Gebruik tenslotte de save/edit-knop om de codes op te slaan (of weer te kunnen bewerken)."
-                )
-              )
+            paste0(
+              lang()$t("Bewerk hier de codes waarnaar het taalmodel relevante delen van de teksten zal markeren."),
+              lang()$t(" Gebruik de '+'- en '-'-knoppen om codes toe te voegen of te verwijderen."),
+              lang()$t(" Gebruik tenslotte de save/edit-knop om de codes op te slaan (of weer te kunnen bewerken).")
             )
           ),
           card_body(

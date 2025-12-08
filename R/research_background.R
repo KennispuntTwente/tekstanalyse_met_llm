@@ -37,21 +37,12 @@ research_background_server <- function(
       output$card <- renderUI({
         bslib::card(
           class = "card",
-          card_header(
+          card_header_with_tooltip(
             lang()$t("Onderzoeksachtergrond"),
-            tooltip(
-              bs_icon("info-circle"),
-              paste0(
-                lang()$t(
-                  "Hier kan je een korte beschrijving van je onderzoek geven, zodat het LLM de teksten beter kan begrijpen."
-                ),
-                lang()$t(
-                  " De beschrijving wordt meegegeven in alle prompts die naar het LLM worden gestuurd."
-                ),
-                lang()$t(
-                  " Je kan bijvoorbeeld aangeven wat je onderzoekt en waar de teksten uit voortkomen (bijv., welke vraag hebben respondenten hebben beantwoord)."
-                )
-              )
+            paste0(
+              lang()$t("Hier kan je een korte beschrijving van je onderzoek geven, zodat het LLM de teksten beter kan begrijpen."),
+              lang()$t(" De beschrijving wordt meegegeven in alle prompts die naar het LLM worden gestuurd."),
+              lang()$t(" Je kan bijvoorbeeld aangeven wat je onderzoekt en waar de teksten uit voortkomen (bijv., welke vraag hebben respondenten hebben beantwoord).")
             )
           ),
           card_body(

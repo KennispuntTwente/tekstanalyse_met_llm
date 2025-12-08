@@ -94,16 +94,9 @@ score_server <- function(
         if (mode() == "Scoren") {
           bslib::card(
             class = "card",
-            card_header(
+            card_header_with_tooltip(
               lang()$t("Karakteristiek"),
-              tooltip(
-                bs_icon("info-circle"),
-                paste0(
-                  lang()$t(
-                    "Voer hier een karakteristiek (kenmerk) in."
-                  )
-                )
-              )
+              lang()$t("Voer hier een karakteristiek (kenmerk) in.")
             ),
             card_body(
               paste0(lang()$t(

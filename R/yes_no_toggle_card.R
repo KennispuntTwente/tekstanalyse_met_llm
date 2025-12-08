@@ -145,22 +145,11 @@ yes_no_toggle_card_server <- function(
         header_extra
       }
 
-      # Build header content
-      header_content <- if (!is.null(final_header_extra)) {
-        div(
-          class = "d-flex justify-content-between align-items-center w-100",
-          span(title, bslib::tooltip(bsicons::bs_icon("info-circle"), tooltip_text)),
-          final_header_extra
-        )
-      } else {
-        tagList(title, bslib::tooltip(bsicons::bs_icon("info-circle"), tooltip_text))
-      }
-
       tagList(
         shinyjs::useShinyjs(),
         bslib::card(
           class = "card",
-          card_header(header_content),
+          card_header_with_tooltip(title, tooltip_text, extra = final_header_extra),
           card_body(
             p(question_text, class = "mb-2 text-center"),
             div(

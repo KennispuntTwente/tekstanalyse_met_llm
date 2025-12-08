@@ -294,24 +294,13 @@ model_server <- function(
       output$card <- renderUI({
         bslib::card(
           class = "card",
-          card_header(
+          card_header_with_tooltip(
             "Model",
-            bslib::tooltip(
-              bsicons::bs_icon("info-circle"),
-              paste0(
-                lang()$t(
-                  "Kies hier het LLM (large language model) dat je wilt gebruiken."
-                ),
-                lang()$t(
-                  " Verschillende modellen hebben verschillende kwaliteiten; het ene model is sneller/goedkoper,",
-                ),
-                lang()$t(
-                  " terwijl het andere model bijvoorbeeld duurder/langzamer is maar wel betere resultaten oplevert."
-                ),
-                lang()$t(
-                  " Hoe goed het model moet zijn is afhankelijk van de complexiteit van de analysevraag die je hebt."
-                )
-              )
+            paste0(
+              lang()$t("Kies hier het LLM (large language model) dat je wilt gebruiken."),
+              lang()$t(" Verschillende modellen hebben verschillende kwaliteiten; het ene model is sneller/goedkoper,"),
+              lang()$t(" terwijl het andere model bijvoorbeeld duurder/langzamer is maar wel betere resultaten oplevert."),
+              lang()$t(" Hoe goed het model moet zijn is afhankelijk van de complexiteit van de analysevraag die je hebt.")
             )
           ),
           card_body(

@@ -32,14 +32,9 @@ mode_server <- function(
       output$card <- renderUI({
         bslib::card(
           class = "card",
-          card_header(
+          card_header_with_tooltip(
             lang()$t("Modus"),
-            tooltip(
-              bs_icon("info-circle"),
-              lang()$t(
-                "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren."
-              )
-            )
+            lang()$t("Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren.")
           ),
           card_body(
             div(

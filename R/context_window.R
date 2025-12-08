@@ -95,24 +95,13 @@ context_window_server <- function(
       output$card <- renderUI({
         bslib::card(
           class = "card",
-          card_header(
+          card_header_with_tooltip(
             lang()$t("Context-window"),
-            tooltip(
-              bs_icon("info-circle"),
-              paste0(
-                lang()$t(
-                  "Het context-window is de hoeveelheid tekst die het taalmodel kan verwerken in één keer."
-                ),
-                lang()$t(
-                  " Er moet voor worden gezorgd dat de onderzoeksachtergrond met de (langste) tekst die je invoert binnen het context-window van het model past."
-                ),
-                lang()$t(
-                  " Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen."
-                ),
-                lang()$t(
-                  " Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen."
-                )
-              )
+            paste0(
+              lang()$t("Het context-window is de hoeveelheid tekst die het taalmodel kan verwerken in één keer."),
+              lang()$t(" Er moet voor worden gezorgd dat de onderzoeksachtergrond met de (langste) tekst die je invoert binnen het context-window van het model past."),
+              lang()$t(" Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen."),
+              lang()$t(" Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen.")
             )
           ),
           card_body(
