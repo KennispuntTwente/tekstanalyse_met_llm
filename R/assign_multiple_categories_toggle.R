@@ -1,11 +1,15 @@
 # Module for toggling if multiple categories can be assigned to a text
+#
+# This module uses the reusable yes_no_toggle_card component
 
-#### 1 Functions
+#### 1 UI ####
 
 assign_multiple_categories_toggle_ui <- function(id) {
-  ns <- NS(id)
-  uiOutput(ns("ui_toggle"))
+  yes_no_toggle_card_ui(id)
 }
+
+
+#### 2 Server ####
 
 assign_multiple_categories_toggle_server <- function(
   id,
@@ -17,87 +21,25 @@ assign_multiple_categories_toggle_server <- function(
     )
   )
 ) {
-  moduleServer(
-    id,
-    function(input, output, session) {
-      ns <- session$ns
-
-      toggle <- reactiveVal(FALSE)
-
-      # Only show in Categorisatie/Onderwerpextractie
-      output$ui_toggle <- renderUI({
-        req(mode() %in% c("Onderwerpextractie", "Categorisatie"))
-        tagList(
-          shinyjs::useShinyjs(),
-          bslib::card(
-            class = "card",
-            card_header(
-              lang()$t("Meerdere categorieën"),
-              tooltip(
-                bs_icon("info-circle"),
-                paste0(
-                  lang()$t(
-                    "Mag het model meerdere categorieën toekennen aan een tekst, of slechts één categorie?"
-                  ),
-                  lang()$t(
-                    " Indien je het model meerdere categorieën laat toewijzen, kan je alsnog specifieke categorieën als 'exclusief' aanmerken."
-                  ),
-                  lang()$t(
-                    " Als een exlusieve categorie wordt toegewezen aan een tekst, mogen daarnaast geen andere categorieën worden toegewezen aan de tekst."
-                  ),
-                  lang()$t(
-                    " Je kunt categorieën exclusief maken in de categorie-editor (modus 'categorisatie') of bij het bewerken van de onderwerpen (modus 'onderwerpextractie'; zet 'human-in-the-loop' aan)."
-                  )
-                )
-              )
-            ),
-            card_body(
-              # Toggle for inter-rater reliability
-              p(
-                lang()$t("Meerdere categorieën per tekst toegestaan?"),
-                class = "mb-2 text-center"
-              ),
-              div(
-                class = "d-flex justify-content-center",
-                shinyWidgets::radioGroupButtons(
-                  ns("toggle"),
-                  NULL,
-                  choices = c(
-                    lang()$t("Nee"),
-                    lang()$t("Ja")
-                  ),
-                  selected = lang()$t("Ja"),
-                  size = "sm"
-                )
-              )
-            )
-          )
-        )
-      })
-
-      # Observe the toggle input and update the reactive value
-      observeEvent(input$toggle, {
-        toggle(input$toggle == lang()$t("Ja"))
-      })
-
-      # Disable when processing
-      observeEvent(
-        processing(),
-        {
-          shinyjs::toggleState(
-            "toggle",
-            condition = !processing()
-          )
-        },
-        ignoreInit = TRUE
-      )
-
-      return(toggle)
-    }
+  yes_no_toggle_card_server(
+    id = id,
+    title = lang()$t("Meerdere categorieën"),
+    tooltip_text = paste0(
+      lang()$t("Mag het model meerdere categorieën toekennen aan een tekst, of slechts één categorie?"),
+      lang()$t(" Indien je het model meerdere categorieën laat toewijzen, kan je alsnog specifieke categorieën als 'exclusief' aanmerken."),
+      lang()$t(" Als een exlusieve categorie wordt toegewezen aan een tekst, mogen daarnaast geen andere categorieën worden toegewezen aan de tekst."),
+      lang()$t(" Je kunt categorieën exclusief maken in de categorie-editor (modus 'categorisatie') of bij het bewerken van de onderwerpen (modus 'onderwerpextractie'; zet 'human-in-the-loop' aan).")
+    ),
+    question_text = lang()$t("Meerdere categorieën per tekst toegestaan?"),
+    default_value = TRUE,
+    show_when = reactive(mode() %in% c("Onderwerpextractie", "Categorisatie")),
+    processing = processing,
+    lang = lang
   )
 }
 
-#### 2 Example/development usage ####
+
+#### 3 Example/development usage ####
 
 if (FALSE) {
   library(shiny)

@@ -1,4 +1,6 @@
 # Module for toggling inter-rater reliability
+#
+# This module uses the reusable yes_no_toggle_card component
 
 #### 1 UI ####
 
@@ -6,7 +8,7 @@ interrater_toggle_ui <- function(id) {
   ns <- NS(id)
   tagList(
     shinyjs::useShinyjs(),
-    uiOutput(ns("card"))
+    yes_no_toggle_card_ui(id)
   )
 }
 
@@ -23,84 +25,21 @@ interrater_toggle_server <- function(
     )
   )
 ) {
-  moduleServer(
-    id,
-    function(input, output, session) {
-      ns <- session$ns
-      interrater_reliability_toggle <- reactiveVal(FALSE)
-
-      output$card <- renderUI({
-        req(isTRUE(
-          mode() %in%
-            c(
-              "Categorisatie",
-              "Scoren",
-              "Onderwerpextractie"
-            )
-        ))
-
-        bslib::card(
-          class = "card",
-          card_header(
-            lang()$t("Inter-rater reliability"),
-            tooltip(
-              bs_icon("info-circle"),
-              paste0(
-                lang()$t(
-                  "Wil je een steekproef trekken van de teksten om interrater-reliability te berekenen?"
-                ),
-                lang()$t(
-                  " Nadat het model de teksten heeft geanalyseerd, zal een venster openen waarin je zelf teksten kunt beoordelen."
-                ),
-                lang()$t(
-                  " Je beoordelingen worden vergeleken met die van het taalmodel (bij categorisatie/onderwerpextractie wordt Cohen's Kappa berekend; bij scoren wordt een paired t-test uitgevoerd)."
-                )
-              )
-            )
-          ),
-          card_body(
-            # Toggle for inter-rater reliability
-            p(
-              lang()$t("Zelf steekproef beoordelen?"),
-              class = "mb-2 text-center"
-            ),
-            div(
-              class = "d-flex justify-content-center",
-              shinyWidgets::radioGroupButtons(
-                ns("interrater_reliability"),
-                NULL,
-                choices = c(
-                  lang()$t("Nee"),
-                  lang()$t("Ja")
-                ),
-                selected = lang()$t("Nee"),
-                size = "sm"
-              )
-            )
-          )
-        )
-      })
-
-      observeEvent(input$interrater_reliability, {
-        interrater_reliability_toggle(
-          input$interrater_reliability == lang()$t("Ja")
-        )
-      })
-
-      # Disable when processing
-      observeEvent(
-        processing(),
-        {
-          shinyjs::toggleState(
-            "interrater_reliability",
-            condition = !processing()
-          )
-        },
-        ignoreInit = TRUE
-      )
-
-      return(interrater_reliability_toggle)
-    }
+  yes_no_toggle_card_server(
+    id = id,
+    title = lang()$t("Inter-rater reliability"),
+    tooltip_text = paste0(
+      lang()$t("Wil je een steekproef trekken van de teksten om interrater-reliability te berekenen?"),
+      lang()$t(" Nadat het model de teksten heeft geanalyseerd, zal een venster openen waarin je zelf teksten kunt beoordelen."),
+      lang()$t(" Je beoordelingen worden vergeleken met die van het taalmodel (bij categorisatie/onderwerpextractie wordt Cohen's Kappa berekend; bij scoren wordt een paired t-test uitgevoerd).")
+    ),
+    question_text = lang()$t("Zelf steekproef beoordelen?"),
+    default_value = FALSE,
+    show_when = reactive(
+      isTRUE(mode() %in% c("Categorisatie", "Scoren", "Onderwerpextractie"))
+    ),
+    processing = processing,
+    lang = lang
   )
 }
 
@@ -118,8 +57,9 @@ if (FALSE) {
 
   server <- function(input, output, session) {
     processing <- reactiveVal(FALSE)
+    mode <- reactiveVal("Categorisatie")
 
-    interrater_toggle_server("interrater_toggle", processing)
+    interrater_toggle_server("interrater_toggle", processing, mode)
   }
 
   shinyApp(ui, server)

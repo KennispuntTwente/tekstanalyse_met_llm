@@ -1,0 +1,237 @@
+# Reusable Yes/No toggle card component
+# This component provides a standardized card with a Yes/No toggle button
+# Used by: human_in_the_loop, interrater_reliability, assign_multiple_categories,
+#          write_paragraphs, etc.
+
+#### 1 UI ####
+
+yes_no_toggle_card_ui <- function(id) {
+  ns <- NS(id)
+  uiOutput(ns("ui_toggle"))
+}
+
+
+#### 2 Server ####
+
+#' Yes/No Toggle Card Server
+#'
+#' @param id Module ID
+#' @param title Card title (pre-translated)
+#' @param tooltip_text Tooltip text (pre-translated)
+#' @param question_text Question shown above buttons (pre-translated)
+#' @param default_value Default toggle value: TRUE = "Ja", FALSE = "Nee"
+#' @param show_when Reactive condition for when to show the card
+#' @param header_extra Optional UI to add in the card header (right side)
+#' @param modal_config Optional list for a modal button in header:
+#'   - icon: FontAwesome icon name (e.g., "palette")
+#'   - tooltip: Tooltip text for the button
+#'   - title: Modal title
+#'   - body: Modal body content (can be reactive)
+#'   - on_save: Function to call when save is clicked, receives input value
+#'   - on_reset: Function to call when reset is clicked
+#'   - input_label: Label for the textarea
+#'   - input_placeholder: Placeholder for the textarea
+#'   - get_value: Function that returns current value (for textarea default)
+#' @param extra_disable_ids Additional input IDs to disable when processing
+#' @param processing Reactive value for processing state
+#' @param lang Language translator reactive
+#'
+#' @return Reactive value containing the toggle state (TRUE/FALSE),
+#'         or a list with toggle and modal_value if modal_config is provided
+yes_no_toggle_card_server <- function(
+  id,
+  title,
+  tooltip_text,
+  question_text,
+  default_value = FALSE,
+  show_when = reactive(TRUE),
+  header_extra = NULL,
+  modal_config = NULL,
+  extra_disable_ids = character(0),
+  processing = reactiveVal(FALSE),
+  lang = reactiveVal(
+    shiny.i18n::Translator$new(
+      translation_json_path = "language/language.json"
+    )
+  )
+) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+
+    toggle <- reactiveVal(default_value)
+    modal_value <- reactiveVal("")
+
+    # Render modal button if modal_config is provided
+    output$modal_button <- renderUI({
+      req(modal_config)
+      has_value <- nzchar(modal_value())
+      style <- if (has_value) "color:#0d6efd;" else "color:#6c757d;"
+      style <- paste0(style, "font-size:1rem; border:none; background:transparent;")
+
+      actionLink(
+        ns("show_modal"),
+        icon(modal_config$icon, lib = "font-awesome"),
+        style = style
+      ) |>
+        bslib::tooltip(modal_config$tooltip)
+    })
+
+    # Show modal when button is clicked
+    observeEvent(input$show_modal, {
+      req(modal_config)
+      showModal(
+        modalDialog(
+          title = tagList(icon(modal_config$icon), " ", modal_config$title),
+          div(
+            if (!is.null(modal_config$body)) modal_config$body,
+            textAreaInput(
+              ns("modal_input"),
+              modal_config$input_label,
+              value = modal_value(),
+              rows = 4,
+              width = "100%",
+              placeholder = modal_config$input_placeholder
+            )
+          ),
+          footer = tagList(
+            tags$div(
+              style = "display:flex; width:100%; align-items:center;",
+              tags$div(
+                style = "flex:1; text-align:left;",
+                modalButton(lang()$t("Sluiten"))
+              ),
+              tags$div(
+                style = "flex:1; text-align:center;",
+                actionButton(ns("modal_reset"), lang()$t("Reset"), class = "btn-danger")
+              ),
+              tags$div(
+                style = "flex:1; text-align:right;",
+                actionButton(ns("modal_save"), lang()$t("Sla op"), class = "btn-primary")
+              )
+            )
+          ),
+          size = "m",
+          easyClose = TRUE
+        )
+      )
+
+      if (isTRUE(processing())) {
+        shinyjs::disable("modal_input")
+        shinyjs::disable("modal_save")
+        shinyjs::disable("modal_reset")
+      }
+    })
+
+    # Modal save/reset
+    observeEvent(input$modal_save, {
+      modal_value(input$modal_input)
+      removeModal()
+    })
+
+    observeEvent(input$modal_reset, {
+      modal_value("")
+      updateTextAreaInput(session, "modal_input", value = "")
+      removeModal()
+    })
+
+    # Render main UI
+    output$ui_toggle <- renderUI({
+      req(show_when())
+
+      # Build header extra: use provided header_extra OR modal button if modal_config
+      final_header_extra <- if (!is.null(modal_config)) {
+        uiOutput(ns("modal_button"))
+      } else {
+        header_extra
+      }
+
+      # Build header content
+      header_content <- if (!is.null(final_header_extra)) {
+        div(
+          class = "d-flex justify-content-between align-items-center w-100",
+          span(title, bslib::tooltip(bsicons::bs_icon("info-circle"), tooltip_text)),
+          final_header_extra
+        )
+      } else {
+        tagList(title, bslib::tooltip(bsicons::bs_icon("info-circle"), tooltip_text))
+      }
+
+      tagList(
+        shinyjs::useShinyjs(),
+        bslib::card(
+          class = "card",
+          card_header(header_content),
+          card_body(
+            p(question_text, class = "mb-2 text-center"),
+            div(
+              class = "d-flex justify-content-center",
+              shinyWidgets::radioGroupButtons(
+                ns("toggle"), NULL,
+                choices = c(lang()$t("Nee"), lang()$t("Ja")),
+                selected = if (default_value) lang()$t("Ja") else lang()$t("Nee"),
+                size = "sm"
+              )
+            )
+          )
+        )
+      )
+    })
+
+    # Observe toggle
+    observeEvent(input$toggle, {
+      toggle(input$toggle == lang()$t("Ja"))
+    })
+
+    # Disable when processing
+    observeEvent(processing(), {
+      shinyjs::toggleState("toggle", condition = !processing())
+      if (!is.null(modal_config)) {
+        shinyjs::toggleState("show_modal", condition = !processing())
+      }
+      for (id in extra_disable_ids) {
+        shinyjs::toggleState(id, condition = !processing())
+      }
+    }, ignoreInit = TRUE)
+
+    # Return
+    if (!is.null(modal_config)) {
+      return(list(toggle = toggle, modal_value = modal_value))
+    } else {
+      return(toggle)
+    }
+  })
+}
+
+
+#### 3 Example/development usage ####
+
+if (FALSE) {
+  library(shiny)
+  library(shinyjs)
+  library(shinyWidgets)
+  library(bslib)
+  library(bsicons)
+
+  ui <- bslib::page(
+    useShinyjs(),
+    yes_no_toggle_card_ui("test_toggle")
+  )
+
+  server <- function(input, output, session) {
+    processing <- reactiveVal(FALSE)
+
+    result <- yes_no_toggle_card_server(
+      id = "test_toggle",
+      title = "Test Toggle",
+      tooltip_text = "This is a tooltip.",
+      question_text = "Enable this feature?",
+      default_value = FALSE,
+      show_when = reactive(TRUE),
+      processing = processing
+    )
+
+    observe({ print(paste("Toggle:", result())) })
+  }
+
+  shinyApp(ui, server)
+}
