@@ -16,9 +16,9 @@ yes_no_toggle_card_ui <- function(id) {
 #' Yes/No Toggle Card Server
 #'
 #' @param id Module ID
-#' @param title Card title (pre-translated)
-#' @param tooltip_text Tooltip text (pre-translated)
-#' @param question_text Question shown above buttons (pre-translated)
+#' @param title Card title (pre-translated, or raw if translate_texts = TRUE)
+#' @param tooltip_text Tooltip text (pre-translated, or raw if translate_texts = TRUE)
+#' @param question_text Question shown above buttons (pre-translated, or raw if translate_texts = TRUE)
 #' @param default_value Default toggle value: TRUE = "Ja", FALSE = "Nee"
 #' @param show_when Reactive condition for when to show the card
 #' @param header_extra Optional UI to add in the card header (right side)
@@ -26,12 +26,10 @@ yes_no_toggle_card_ui <- function(id) {
 #'   - icon: FontAwesome icon name (e.g., "palette")
 #'   - tooltip: Tooltip text for the button
 #'   - title: Modal title
-#'   - body: Modal body content (can be reactive)
-#'   - on_save: Function to call when save is clicked, receives input value
-#'   - on_reset: Function to call when reset is clicked
+#'   - body_text: Text for modal body (will be wrapped in p() and translated)
 #'   - input_label: Label for the textarea
 #'   - input_placeholder: Placeholder for the textarea
-#'   - get_value: Function that returns current value (for textarea default)
+#' @param translate_texts If TRUE, translate title/tooltip_text/question_text/modal_config texts
 #' @param extra_disable_ids Additional input IDs to disable when processing
 #' @param processing Reactive value for processing state
 #' @param lang Language translator reactive
@@ -47,6 +45,7 @@ yes_no_toggle_card_server <- function(
   show_when = reactive(TRUE),
   header_extra = NULL,
   modal_config = NULL,
+  translate_texts = FALSE,
   extra_disable_ids = character(0),
   processing = reactiveVal(FALSE),
   lang = reactiveVal(
@@ -61,6 +60,11 @@ yes_no_toggle_card_server <- function(
     toggle <- reactiveVal(default_value)
     modal_value <- reactiveVal("")
 
+    # Helper to translate text if translate_texts is TRUE
+    t <- function(text) {
+      if (translate_texts) lang()$t(text) else text
+    }
+
     # Render modal button if modal_config is provided
     output$modal_button <- renderUI({
       req(modal_config)
@@ -73,7 +77,7 @@ yes_no_toggle_card_server <- function(
         icon(modal_config$icon, lib = "font-awesome"),
         style = style
       ) |>
-        bslib::tooltip(modal_config$tooltip)
+        bslib::tooltip(t(modal_config$tooltip))
     })
 
     # Show modal when button is clicked
@@ -81,16 +85,22 @@ yes_no_toggle_card_server <- function(
       req(modal_config)
       showModal(
         modalDialog(
-          title = tagList(icon(modal_config$icon), " ", modal_config$title),
+          title = tagList(icon(modal_config$icon), " ", t(modal_config$title)),
           div(
+            if (!is.null(modal_config$body_text1) || !is.null(modal_config$body_text2)) {
+              p(paste0(
+                if (!is.null(modal_config$body_text1)) t(modal_config$body_text1) else "",
+                if (!is.null(modal_config$body_text2)) t(modal_config$body_text2) else ""
+              ))
+            },
             if (!is.null(modal_config$body)) modal_config$body,
             textAreaInput(
               ns("modal_input"),
-              modal_config$input_label,
+              t(modal_config$input_label),
               value = modal_value(),
               rows = 4,
               width = "100%",
-              placeholder = modal_config$input_placeholder
+              placeholder = t(modal_config$input_placeholder)
             )
           ),
           footer = tagList(
@@ -149,9 +159,9 @@ yes_no_toggle_card_server <- function(
         shinyjs::useShinyjs(),
         bslib::card(
           class = "card",
-          card_header_with_tooltip(title, tooltip_text, extra = final_header_extra),
+          card_header_with_tooltip(t(title), t(tooltip_text), extra = final_header_extra),
           card_body(
-            p(question_text, class = "mb-2 text-center"),
+            p(t(question_text), class = "mb-2 text-center"),
             div(
               class = "d-flex justify-content-center",
               shinyWidgets::radioGroupButtons(

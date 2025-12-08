@@ -23,33 +23,30 @@ write_paragraphs_toggle_server <- function(
     )
   )
 ) {
-  moduleServer(id, function(input, output, session) {
-    # Use the reusable component with modal configuration
-    result <- yes_no_toggle_card_server(
-      id = id,
-      title = lang()$t("Rapport schrijven"),
-      tooltip_text = lang()$t(
-        "Indien je dit aanzet, zal het model per categorie een samenvattende paragraaf schrijven met quotes uit de bijbehorende teksten."
-      ),
-      question_text = lang()$t("Rapport schrijven over categorieën?"),
-      default_value = TRUE,
-      show_when = reactive(mode() %in% c("Onderwerpextractie", "Categorisatie", "Markeren")),
-      modal_config = list(
-        icon = "palette",
-        tooltip = lang()$t("Stijlprompt voor samenvattingen"),
-        title = lang()$t("Stijlprompt voor samenvattingen"),
-        body = p(paste0(
-          lang()$t("Hier kan je aangeven hoe het LLM de samenvattingen moet schrijven."),
-          lang()$t(" Deze instructies worden meegegeven wanneer het LLM samenvattingen schrijft over categorieën of onderwerpen.")
-        )),
-        input_label = lang()$t("Geef aan hoe de samenvattingen geschreven moeten worden. Welke stijl of focus wil je?"),
-        input_placeholder = lang()$t("Bijvoorbeeld: 'Schrijf in een formele, academische stijl' of 'Focus op emotionele aspecten van de teksten'")
-      ),
-      processing = processing,
-      lang = lang
-    )
+  # Call the reusable component - note: passing raw strings, component will translate
+  result <- yes_no_toggle_card_server(
+    id = id,
+    title = "Rapport schrijven",
+    tooltip_text = "Indien je dit aanzet, zal het model per categorie een samenvattende paragraaf schrijven met quotes uit de bijbehorende teksten.",
+    question_text = "Rapport schrijven over categorieën?",
+    default_value = TRUE,
+    show_when = reactive(mode() %in% c("Onderwerpextractie", "Categorisatie", "Markeren")),
+    modal_config = list(
+      icon = "palette",
+      tooltip = "Stijlprompt voor samenvattingen",
+      title = "Stijlprompt voor samenvattingen",
+      body_text1 = "Hier kan je aangeven hoe het LLM de samenvattingen moet schrijven.",
+      body_text2 = " Deze instructies worden meegegeven wanneer het LLM samenvattingen schrijft over categorieën of onderwerpen.",
+      input_label = "Geef aan hoe de samenvattingen geschreven moeten worden. Welke stijl of focus wil je?",
+      input_placeholder = "Bijvoorbeeld: 'Schrijf in een formele, academische stijl' of 'Focus op emotionele aspecten van de teksten'"
+    ),
+    translate_texts = TRUE,  # Tell component to translate the texts
+    processing = processing,
+    lang = lang
+  )
 
-    # Return in expected format
+  # Return in expected format (wrapped in moduleServer to get proper scoping)
+  moduleServer(id, function(input, output, session) {
     return(list(
       write_paragraphs = reactive({
         if (isTRUE(mode() %in% c("Onderwerpextractie", "Categorisatie", "Markeren"))) {
