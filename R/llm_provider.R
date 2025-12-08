@@ -232,72 +232,39 @@ llm_provider_server <- function(
           class = "d-flex justify-content-center gap-3",
 
           if (has_preconfigured_llm_provider) {
-            div(
-              id = ns("select_preconfigured"),
-              class = paste(
-                "llm-icon",
-                if (current_mode == "preconfigured") "llm-icon-active"
-              ),
+            icon_toggle_button(
+              ns = ns,
+              id_suffix = "preconfigured",
+              icon_name = "arrow-90deg-left",
               title = lang()$t("Pregeconfigureerd"),
-              onclick = sprintf(
-                "Shiny.setInputValue('%s', Math.random())",
-                ns("select_preconfigured")
-              ),
-              bs_icon(
-                "arrow-90deg-left",
-                class = "llm-icon-img",
-                style = "height: 20px;"
-              )
-            ) |>
-              bslib::tooltip(
-                lang()$t("Pregeconfigureerd"),
-                placement = "bottom"
-              )
+              tooltip_text = lang()$t("Pregeconfigureerd"),
+              is_active = (current_mode == "preconfigured"),
+              css_prefix = "llm-icon"
+            )
           },
 
           if (can_configure_oai) {
-            div(
-              id = ns("select_openai"),
-              class = paste(
-                "llm-icon",
-                if (current_mode == "openai") "llm-icon-active"
-              ),
+            icon_toggle_button(
+              ns = ns,
+              id_suffix = "openai",
+              img_src = "www/openai_avatar.svg",
               title = "OpenAI",
-              onclick = sprintf(
-                "Shiny.setInputValue('%s', Math.random())",
-                ns("select_openai")
-              ),
-              tags$img(
-                src = "www/openai_avatar.svg",
-                height = "20",
-                alt = "OpenAI"
-              )
-            ) |>
-              bslib::tooltip(
-                lang()$t("OpenAI-compatible"),
-                placement = "bottom"
-              )
+              tooltip_text = lang()$t("OpenAI-compatible"),
+              is_active = (current_mode == "openai"),
+              css_prefix = "llm-icon"
+            )
           },
 
           if (can_configure_ollama) {
-            div(
-              id = ns("select_ollama"),
-              class = paste(
-                "llm-icon",
-                if (current_mode == "ollama") "llm-icon-active"
-              ),
+            icon_toggle_button(
+              ns = ns,
+              id_suffix = "ollama",
+              img_src = "www/ollama_avatar.png",
               title = "Ollama",
-              onclick = sprintf(
-                "Shiny.setInputValue('%s', Math.random())",
-                ns("select_ollama")
-              ),
-              tags$img(
-                src = "www/ollama_avatar.png",
-                height = "20",
-                alt = "Ollama"
-              )
-            ) |>
-              bslib::tooltip("Ollama", placement = "bottom")
+              tooltip_text = "Ollama",
+              is_active = (current_mode == "ollama"),
+              css_prefix = "llm-icon"
+            )
           }
         )
       })

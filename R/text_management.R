@@ -205,58 +205,40 @@ text_management_server <- function(
     # -- 4  Mode selector icons -------------------------------------
     output$mode_selection <- renderUI({
       cur <- anonymization_mode()
-      # Helper to produce one icon div
-      make_icon <- function(id_suffix, icon_name, title_txt, tooltip_txt) {
-        div(
-          id = ns(paste0("select_", id_suffix)),
-          class = paste("tm-icon", if (cur == id_suffix) "tm-icon-active"),
-          title = title_txt,
-          onclick = sprintf(
-            "Shiny.setInputValue('%s', Math.random())",
-            ns(paste0("select_", id_suffix))
-          ),
-          bs_icon(icon_name, class = "tm-icon-img", style = "height:20px;")
-        ) |>
-          bslib::tooltip(tooltip_txt, placement = "bottom")
-      }
-
-      # Assemble only the icons that are available
-      icon_list <- tagList()
+      
+      # Build list of available buttons
+      buttons <- list()
       if ("none" %in% available_modes) {
-        icon_list <- tagAppendChildren(
-          icon_list,
-          make_icon(
-            "none",
-            "x-square",
-            lang()$t("Geen anonimisering"),
-            lang()$t("Geen anonimisering")
-          )
-        )
+        buttons <- c(buttons, list(list(
+          id = "none",
+          icon = "x-square",
+          title = lang()$t("Geen anonimisering"),
+          tooltip = lang()$t("Geen anonimisering")
+        )))
       }
       if ("simple" %in% available_modes) {
-        icon_list <- tagAppendChildren(
-          icon_list,
-          make_icon(
-            "simple",
-            "regex",
-            "Regex",
-            lang()$t("Eenvoudige anonimisering met regex")
-          )
-        )
+        buttons <- c(buttons, list(list(
+          id = "simple",
+          icon = "regex",
+          title = "Regex",
+          tooltip = lang()$t("Eenvoudige anonimisering met regex")
+        )))
       }
       if ("gliner" %in% available_modes) {
-        icon_list <- tagAppendChildren(
-          icon_list,
-          make_icon(
-            "gliner",
-            "magic",
-            "GLiNER",
-            lang()$t("Geavanceerde anonimisering met GLiNER-model")
-          )
-        )
+        buttons <- c(buttons, list(list(
+          id = "gliner",
+          icon = "magic",
+          title = "GLiNER",
+          tooltip = lang()$t("Geavanceerde anonimisering met GLiNER-model")
+        )))
       }
-
-      div(class = "d-flex justify-content-center gap-3", icon_list)
+      
+      icon_toggle_group(
+        ns = ns,
+        buttons = buttons,
+        active_id = cur,
+        css_prefix = "tm-icon"
+      )
     })
 
     # Click observers ------------------------------------------------
