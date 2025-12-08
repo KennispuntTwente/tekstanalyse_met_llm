@@ -10,7 +10,7 @@
 #' @return A div element with consistent styling
 description_box <- function(content, use_html = FALSE, extra_class = NULL) {
   classes <- c("llm-narrow-container", extra_class)
-  
+
   div(
     class = paste(classes, collapse = " "),
     style = "
