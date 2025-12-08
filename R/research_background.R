@@ -18,11 +18,7 @@ research_background_ui <- function(id) {
 research_background_server <- function(
   id,
   processing,
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   moduleServer(
     id,

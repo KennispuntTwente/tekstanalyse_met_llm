@@ -26,9 +26,7 @@ text_management_server <- function(
   raw_texts, # reactive vector with raw texts
   gliner_model, # pre‑loaded GLiNER model object (or NULL)
   processing = reactiveVal(FALSE),
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(translation_json_path = "language/language.json")
-  )
+  lang = default_lang()
 ) {
   # Ensure at least one anonymization method is enabled
   if (

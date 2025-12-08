@@ -11,9 +11,7 @@ text_split_server <- function(
   id,
   raw_texts, # reactive vector with raw texts (provided by text_upload module)
   processing = reactiveVal(FALSE),
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(translation_json_path = "language/language.json")
-  ),
+  lang = default_lang(),
   enabled = getOption("text_split__enabled", TRUE)
 ) {
   moduleServer(id, function(input, output, session) {

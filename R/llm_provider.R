@@ -20,11 +20,7 @@ llm_provider_server <- function(
   has_preconfigured_llm_provider = TRUE,
   can_configure_oai = getOption("llm_provider__can_configure_oai", TRUE),
   can_configure_ollama = getOption("llm_provider__can_configure_ollama", TRUE),
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   moduleServer(
     id,

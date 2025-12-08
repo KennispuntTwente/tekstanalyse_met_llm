@@ -7,11 +7,7 @@ edit_topics_server <- function(
   research_background = reactiveVal("this is my research"),
   assign_multiple_categories = reactiveVal(TRUE),
   llm_provider = tidyprompt::llm_provider_openai(),
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   moduleServer(
     id,

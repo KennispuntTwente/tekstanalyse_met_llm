@@ -43,11 +43,7 @@ processing_server <- function(
   assign_multiple_categories = reactiveVal(TRUE),
   write_paragraphs = reactiveVal(TRUE),
   context_window,
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   ns <- NS(id)
 

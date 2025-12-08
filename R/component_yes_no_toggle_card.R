@@ -48,11 +48,7 @@ yes_no_toggle_card_server <- function(
   translate_texts = FALSE,
   extra_disable_ids = character(0),
   processing = reactiveVal(FALSE),
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns

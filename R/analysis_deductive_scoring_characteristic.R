@@ -73,11 +73,7 @@ score_server <- function(
   id,
   mode,
   processing,
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   ns <- NS(id)
   moduleServer(

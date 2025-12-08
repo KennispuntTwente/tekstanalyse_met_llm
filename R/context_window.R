@@ -61,11 +61,7 @@ context_window_server <- function(
     )
   ),
   processing = reactiveVal(FALSE),
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  ),
+  lang = default_lang(),
   chunk_size_default = getOption(
     "topic_modelling__chunk_size_default",
     25

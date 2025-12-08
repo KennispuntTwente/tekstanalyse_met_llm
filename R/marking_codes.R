@@ -17,11 +17,7 @@ marking_codes_server <- function(
   context_window,
   llm_provider_rv,
   models,
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns

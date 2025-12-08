@@ -17,11 +17,7 @@ write_paragraphs_toggle_server <- function(
   id,
   processing,
   mode,
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   # Call the reusable component - note: passing raw strings, component will translate
   result <- yes_no_toggle_card_server(

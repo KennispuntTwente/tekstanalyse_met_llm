@@ -31,11 +31,7 @@ editable_field_list_server <- function(
   initial_count = 3,
   show_exclusive = reactiveVal(FALSE),
   processing = reactiveVal(FALSE),
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns

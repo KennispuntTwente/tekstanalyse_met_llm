@@ -230,11 +230,7 @@ categories_server <- function(
   mode,
   processing,
   assign_multiple_categories = reactiveVal(FALSE),
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns

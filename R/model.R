@@ -72,11 +72,7 @@ model_server <- function(
     configured_models = c("gpt-4o", "gpt-4o-mini")
   ),
 
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   moduleServer(
     id,

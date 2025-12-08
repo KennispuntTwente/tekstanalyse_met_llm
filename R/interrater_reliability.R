@@ -22,11 +22,7 @@ interrater_server <- function(
   all_categories = c("A", "B", "C"),
   assign_multiple_categories = TRUE,
   rater1_col = "result",
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  )
+  lang = default_lang()
 ) {
   mode <- match.arg(mode)
 

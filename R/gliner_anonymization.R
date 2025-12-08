@@ -28,11 +28,7 @@ gliner_server <- function(
       " im gay and i live in amsterdam"
     )
   ),
-  lang = reactiveVal(
-    shiny.i18n::Translator$new(
-      translation_json_path = "language/language.json"
-    )
-  ),
+  lang = default_lang(),
   # If gliner model is NULL, the gliner model will be
   #   loaded in the async process. This takes some exra time but is required
   #   for true async, as the reticulate object cannot be passed to an

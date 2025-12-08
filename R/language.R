@@ -1,6 +1,32 @@
-# Toggle for having LLM write paragraphs about categorized texts
-# Input of this toggle is used in categorization & topic modelling modes,
-#   to determine if the LLM should write summarizing texts about each category
+# Language toggle module and default translator factory
+# Used across all modules for internationalization
+
+#### 0 Default translator factory ####
+
+#' Create default language translator reactiveVal
+#'
+#' Factory function to create a reactiveVal with the default translator.
+#' Use this instead of repeating the full reactiveVal(...) pattern.
+#'
+#' @param reactive Logical, whether the returned Translator object should be reactive
+#'
+#' @return A reactiveVal containing a shiny.i18n::Translator
+#' @export
+#'
+#' @examples
+#' # In module server signature:
+#' my_module_server <- function(id, lang = default_lang()) { ... }
+default_lang <- function(reactive = TRUE) {
+  lang <- shiny.i18n::Translator$new(
+    translation_json_path = "language/language.json"
+  )
+
+  if (reactive) {
+    return(shiny::reactiveVal(lang))
+  } else {
+    return(lang)
+  }
+}
 
 #### 1 UI ####
 
