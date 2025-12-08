@@ -573,31 +573,9 @@ context_window_server <- function(
       })
 
       # Disable when processing
-      observeEvent(
-        processing(),
-        {
-          shinyjs::toggleState(
-            "context_window",
-            condition = !processing()
-          )
-          shinyjs::toggleState(
-            "chunk_size",
-            condition = !processing()
-          )
-          shinyjs::toggleState(
-            "draws",
-            condition = !processing()
-          )
-          shinyjs::toggleState(
-            "max_tokens",
-            condition = !processing()
-          )
-          shinyjs::toggleState(
-            "overlap",
-            condition = !processing()
-          )
-        },
-        ignoreInit = TRUE
+      disable_when_processing(
+        processing,
+        c("context_window", "chunk_size", "draws", "max_tokens", "overlap")
       )
 
       return(rv)

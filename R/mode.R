@@ -107,13 +107,7 @@ mode_server <- function(
       })
 
       # When processing, disable the mode selection
-      observeEvent(processing(), {
-        if (processing()) {
-          shinyjs::disable("mode")
-        } else {
-          shinyjs::enable("mode")
-        }
-      })
+      disable_when_processing(processing, "mode")
 
       return(mode)
     }

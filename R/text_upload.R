@@ -518,15 +518,10 @@ text_upload_server <- function(
     })
 
     # ---- Disable inputs while processing -----------------------------------
-    observe({
-      if (processing()) {
-        shinyjs::disable("text_file")
-        shinyjs::disable("sheet")
-        shinyjs::disable("column")
-        shinyjs::disable("filter_btn")
-        shinyjs::disable("txt_split_lines")
-      }
-    })
+    disable_when_processing(
+      processing,
+      c("text_file", "sheet", "column", "filter_btn", "txt_split_lines")
+    )
 
     # ---- Reset fileInput on new session ------------------------------------
     shinyjs::reset("text_file")

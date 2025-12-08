@@ -637,17 +637,11 @@ llm_provider_server <- function(
 
       # Disable inputs when processing -----------------------------------------
 
-      observe({
-        if (isTRUE(processing())) {
-          shinyjs::disable("openai_url")
-          shinyjs::disable("ollama_url")
-          shinyjs::disable("api_key_text")
-          shinyjs::disable("get_models")
-          shinyjs::disable("select_preconfigured")
-          shinyjs::disable("select_openai")
-          shinyjs::disable("select_ollama")
-        }
-      })
+      disable_when_processing(
+        processing,
+        c("openai_url", "ollama_url", "api_key_text", "get_models",
+          "select_preconfigured", "select_openai", "select_ollama")
+      )
 
       # Return reactive values --------------------------------------------------
 

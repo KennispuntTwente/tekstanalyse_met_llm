@@ -69,16 +69,7 @@ research_background_server <- function(
       })
 
       # Disable when processing
-      observeEvent(
-        processing(),
-        {
-          shinyjs::toggleState(
-            "research_background",
-            condition = !processing()
-          )
-        },
-        ignoreInit = TRUE
-      )
+      disable_when_processing(processing, "research_background")
 
       return(research_background)
     }

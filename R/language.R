@@ -60,13 +60,7 @@ language_server <- function(
       })
 
       # Disable during processing
-      observeEvent(
-        processing(),
-        {
-          shinyjs::toggleState("toggle", condition = !processing())
-        },
-        ignoreInit = TRUE
-      )
+      disable_when_processing(processing, "toggle")
 
       return(lang)
     }

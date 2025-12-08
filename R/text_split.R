@@ -326,13 +326,7 @@ text_split_server <- function(
 
     # Disable inputs when processing -------------------------------
 
-    observe({
-      # Disable the toggle and inputs when processing
-      shinyjs::toggleState("toggle", condition = !processing())
-      shinyjs::toggleState("max_tokens", condition = !processing())
-      shinyjs::toggleState("overlap", condition = !processing())
-      shinyjs::toggleState("split_texts", condition = !processing())
-    })
+    disable_when_processing(processing, c("toggle", "max_tokens", "overlap", "split_texts"))
 
     # Return -------------------------------------------------------
     return(texts)

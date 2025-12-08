@@ -1,8 +1,8 @@
-#### 1 Processing UI & server ####
-
-# Responsible for launching the process & showing progress
+# Module responsible for launching the process & showing progress
 # Will also stop the app and return the results once done
 # See start of moduleServer for more details about the process
+
+# 1 UI ----------------------------------------------------------------------
 
 processing_ui <- function(id) {
   ns <- NS(id)
@@ -24,6 +24,8 @@ processing_ui <- function(id) {
   )
 }
 
+
+# 2 Server ----------------------------------------------------------------
 
 processing_server <- function(
   id,
@@ -1689,7 +1691,32 @@ processing_server <- function(
 }
 
 
-#### 2 Example/development usage ####
+# 3 Helpers ---------------------------------------------------------------
+
+# In other places this helper function can be called to efficiently
+# disable multiple inputs when processing is active
+
+#' Disable inputs when processing is active
+#'
+#' Creates an observer that disables/enables the specified input IDs
+#' based on the processing state. Uses shinyjs::toggleState internally.
+#'
+#' @param processing Reactive value indicating processing state (TRUE = processing)
+#' @param input_ids Character vector of input IDs to toggle
+#'
+#' @return An observer (invisible)
+#' @examples
+#' disable_when_processing(processing, c("toggle", "submit_btn", "text_input"))
+disable_when_processing <- function(processing, input_ids) {
+  observe({
+    for (id in input_ids) {
+      shinyjs::toggleState(id, condition = !processing())
+    }
+  })
+}
+
+
+# 4 Example/development usage ---------------------------------------------
 
 if (FALSE) {
   library(shiny)
