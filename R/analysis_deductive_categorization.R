@@ -237,78 +237,26 @@ categories_server <- function(
   )
 ) {
   moduleServer(id, function(input, output, session) {
-    ns <- NS(id)
+    ns <- session$ns
 
-    ## State/reactive values ---------------------------------------------
-    n_fields <- reactiveVal(3)
-    txt_in_fields <- reactiveVal(rep("", 3))
-    exclusive_vals <- reactiveVal(rep(FALSE, 3))
-    isEditing <- reactiveVal(TRUE)
-
-    shiny::exportTestValues(
-      n_fields = n_fields(),
-      txt_in_fields = txt_in_fields(),
-      exclusive_sel = exclusive_vals(),
-      isEditing = isEditing()
+    # Use the reusable editable field list module
+    fields <- editable_field_list_server(
+      id = "fields",
+      field_label = "Categorie",
+      initial_count = 3,
+      show_exclusive = assign_multiple_categories,
+      processing = processing,
+      lang = lang
     )
 
-    ##  Helper: current exclusivity flags -------------------------------
-    exclusive_flags <- reactive({
-      if (!assign_multiple_categories()) {
-        rep(TRUE, n_fields())
-      } else {
-        exclusive_vals()
-      }
-    })
+    # Re-export test values from child module
+    shiny::exportTestValues(
+      n_fields = fields$unique_non_empty_count(),
+      txt_in_fields = fields$texts(),
+      isEditing = fields$editing()
+    )
 
-    # Vector of texts which are exclusive
-    exclusive_texts <- reactive({
-      txt_in_fields()[exclusive_flags()]
-    })
-
-    ## UI ---------------------------------------------------------------
-    output$category_fields <- renderUI({
-      multi <- assign_multiple_categories()
-
-      tagList(lapply(seq_len(n_fields()), function(i) {
-        value <- txt_in_fields()[i] %||% ""
-        excl_value <- exclusive_vals()[i] %||% FALSE
-
-        fluidRow(
-          column(
-            width = if (multi) 10 else 12,
-            textAreaInput(
-              ns(paste0("category", i)),
-              label = paste(lang()$t("Categorie"), i),
-              value = value,
-              rows = 1,
-              width = "100%"
-            )
-          ),
-          if (multi) {
-            column(
-              width = 2,
-              checkboxInput(
-                ns(paste0("exclusive", i)),
-                label = lang()$t("Exclusief"),
-                value = excl_value
-              )
-            )
-          }
-        )
-      }))
-    })
-
-    output$editButtonUI <- renderUI({
-      button_label <- if (isEditing()) icon("save") else icon("pencil")
-      actionButton(
-        ns("toggleEdit"),
-        label = tagList(button_label, ""),
-        class = "btn btn-primary",
-        style = "min-width: 75px;"
-      )
-    })
-
+    ## UI: Card wrapper ####
     output$categories <- renderUI({
       if (mode() == "Categorisatie") {
         bslib::card(
@@ -328,162 +276,17 @@ categories_server <- function(
             p(lang()$t(
               "Geef beknopte, duidelijke omschrijvingen. Overweeg een categorie 'Overig'/'Onbekend'/'Geen antwoord'."
             )),
-            div(
-              class = "category-button-container",
-              actionButton(
-                ns("addCategory"),
-                label = icon("plus"),
-                class = "btn btn-success category-button",
-                style = "min-width: 75px;"
-              ),
-              actionButton(
-                ns("removeCategory"),
-                label = icon("minus"),
-                class = "btn btn-danger category-button",
-                style = "min-width: 75px;"
-              ),
-              uiOutput(ns("editButtonUI"))
-            ),
-            uiOutput(ns("category_fields"))
+            editable_field_list_ui(ns("fields"))
           )
         )
       }
     })
 
-    ## Remember check-box changes while editing ------------------------
-    observe({
-      req(assign_multiple_categories(), isEditing())
-      exclusive_vals(sapply(
-        seq_len(n_fields()),
-        function(i) input[[paste0("exclusive", i)]] %||% exclusive_vals()[i],
-        simplify = TRUE,
-        USE.NAMES = FALSE
-      ))
-
-      txt_in_fields(sapply(
-        seq_len(n_fields()),
-        function(i) {
-          isolate(input[[paste0("category", i)]]) %||% txt_in_fields()[i]
-        },
-        simplify = TRUE,
-        USE.NAMES = FALSE
-      ))
-    })
-
-    ## Add/remove categories -----------------------------------------
-    observeEvent(input$addCategory, {
-      req(isEditing())
-      txt_in_fields(c(txt_in_fields(), ""))
-      exclusive_vals(c(exclusive_vals(), FALSE))
-      n_fields(n_fields() + 1)
-    })
-
-    observeEvent(input$removeCategory, {
-      req(isEditing(), n_fields() > 1)
-      txt_in_fields(utils::head(txt_in_fields(), -1))
-      exclusive_vals(utils::head(exclusive_vals(), -1))
-      n_fields(n_fields() - 1)
-    })
-
-    ##  Toggle edit/save ----------------------------------------------
-    observeEvent(input$toggleEdit, {
-      if (isEditing()) {
-        # ----> SAVE
-        txt_in_fields(sapply(
-          seq_len(n_fields()),
-          function(i) input[[paste0("category", i)]] %||% txt_in_fields()[i]
-        ))
-        if (assign_multiple_categories()) {
-          exclusive_vals(sapply(
-            seq_len(n_fields()),
-            function(i) input[[paste0("exclusive", i)]] %||% exclusive_vals()[i]
-          ))
-        }
-        isEditing(FALSE)
-        # Disable + & - buttons when not editing
-        shinyjs::disable("addCategory")
-        shinyjs::enable("removeCategory")
-      } else {
-        # ----> EDIT
-        isEditing(TRUE)
-        # Enable + & - buttons when editing
-        shinyjs::enable("addCategory")
-        shinyjs::enable("removeCategory")
-      }
-    })
-
-    ##  Unified input-state updater (always in sync) -----------------
-    update_input_state <- function() {
-      lapply(seq_len(n_fields()), function(i) {
-        txt_id <- paste0("category", i)
-        ex_id <- paste0("exclusive", i)
-        if (!isEditing() || processing()) {
-          shinyjs::disable(txt_id)
-          if (assign_multiple_categories()) shinyjs::disable(ex_id)
-        } else {
-          shinyjs::enable(txt_id)
-          if (assign_multiple_categories()) shinyjs::enable(ex_id)
-        }
-      })
-      if (!isEditing()) {
-        shinyjs::disable("addCategory")
-        shinyjs::disable("removeCategory")
-      } else if (!processing()) {
-        shinyjs::enable("addCategory")
-        shinyjs::enable("removeCategory")
-      }
-    }
-
-    ## Trigger updater whenever any relevant reactive changes -----------
-    observe({
-      assign_multiple_categories()
-      isEditing()
-      processing()
-      lang()
-      n_fields()
-      shinyjs::delay(50, update_input_state())
-    })
-
-    ##  Reactives returned to caller ------------------------------------
-    nonEmptyTexts <- reactive({
-      vals <- txt_in_fields()
-      unique(trimws(vals))[nzchar(trimws(vals))]
-    })
-
-    nonEmptyUniqueCount <- reactive({
-      sum(nzchar(nonEmptyTexts()))
-    })
-
-    ## Disable inputs when processing
-    observe({
-      if (isTRUE(processing())) {
-        shinyjs::disable("addCategory")
-        shinyjs::disable("removeCategory")
-        shinyjs::disable("toggleEdit")
-        lapply(seq_len(n_fields()), function(i) {
-          shinyjs::disable(paste0("category", i))
-          if (assign_multiple_categories()) {
-            shinyjs::disable(paste0("exclusive", i))
-          }
-        })
-      } else {
-        shinyjs::enable("addCategory")
-        shinyjs::enable("removeCategory")
-        shinyjs::enable("toggleEdit")
-        lapply(seq_len(n_fields()), function(i) {
-          shinyjs::enable(paste0("category", i))
-          if (assign_multiple_categories()) {
-            shinyjs::enable(paste0("exclusive", i))
-          }
-        })
-      }
-    })
-
     return(list(
-      texts = nonEmptyTexts,
-      editing = isEditing,
-      unique_non_empty_count = nonEmptyUniqueCount,
-      exclusive_texts = exclusive_texts
+      texts = fields$texts,
+      editing = fields$editing,
+      unique_non_empty_count = fields$unique_non_empty_count,
+      exclusive_texts = fields$exclusive_texts
     ))
   })
 }
