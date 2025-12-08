@@ -1,87 +1,12 @@
-#### 1 Load dependencies ####
+# 1 Load dependencies ----------------------------------------------------------
 
-# Set library path explicitly to portable R library
-portable_lib <- file.path(dirname(R.home()), "library")
-.libPaths(portable_lib)
-print(paste("Using library path:", portable_lib))
-
-# Download portable WinPython
-try({
-  url <- "https://github.com/winpython/winpython/releases/download/16.6.20250620final/Winpython64-3.12.10.1dot.zip"
-  expected_sha256 <- "7a1f004aec39615977b2b245423a50115530d16af3418df77977186a555d0a40"
-  zip_file <- "WinPython.zip"
-  extract_dir <- "winpython"
-
-  if (!file.exists(extract_dir)) {
-    download.file(url, zip_file, mode = "wb")
-    actual_sha256 <- digest::digest(file = zip_file, algo = "sha256")
-
-    cat("WinPython: downloaded SHA-256:", actual_sha256, "\n")
-    if (tolower(actual_sha256) != tolower(expected_sha256)) {
-      stop("SHA-256 hash mismatch! File may be corrupted or tampered")
-    }
-
-    dir.create(extract_dir, showWarnings = FALSE)
-    unzip(zip_file, exdir = extract_dir)
-  }
-
-  python_paths <- list.files(
-    extract_dir,
-    pattern = "python.exe$",
-    recursive = TRUE,
-    full.names = TRUE
-  )
-
-  # Filter out venv-related paths
-  valid_python_paths <- python_paths[
-    !grepl("venv|scripts|nt", tolower(python_paths))
-  ]
-
-  # Pick the first valid path (or throw an error if none found)
-  if (length(valid_python_paths) == 0) {
-    stop("No valid base python.exe found")
-  }
-
-  python_path <- valid_python_paths[1]
-
-  if (is.na(python_path) || !file.exists(python_path)) {
-    stop("WinPython: executable not found")
-  }
-
-  cat("WinPython: using Python at", python_path, "\n")
-  Sys.setenv(UV_PYTHON = normalizePath(python_path))
-})
-
-# Load core packages
-library(tidyverse)
-library(tidyprompt)
-library(shiny)
-library(shinyjs)
-library(bslib)
-library(bsicons)
-library(htmltools)
-library(future)
-library(promises)
-library(DT)
-
-# Load components in R/-folder
-load_all <- function(except = c()) {
-  r_files <- list.files(
-    path = "R",
-    pattern = "\\.R$",
-    full.names = TRUE
-  )
-  for (file in r_files) {
-    if (file %in% except) {
-      next
-    }
-    source(file)
-  }
-}
-load_all()
+source("R/load_dependencies.R")
+load_dependencies("electron")
 
 
-#### 2 Settings ####
+# 2 Settings -------------------------------------------------------------------
+
+# 2.1 Asynchronous processing --------------------------------------------------
 
 # Set asynchronous processing
 # - Asynchronous processing is recommended when deploying the app to a server,
@@ -95,6 +20,9 @@ load_all()
 if (!getOption("shiny.testmode", FALSE)) {
   future::plan(multisession, .skip = TRUE)
 }
+
+
+# 2.2 Set LLM provider & models ------------------------------------------------
 
 # Set preconfigured LLM provider and available models (optional)
 # - You can preconfigure the LLM provider and available models here
@@ -145,7 +73,9 @@ if (FALSE) {
   )
 }
 
-# Optionally set other options
+
+## 2.3 Other options -----------------------------------------------------------
+
 options(
   # - How the Shiny app is served;
   # shiny.port = 8100,
@@ -219,6 +149,11 @@ options(
   topic_modelling__draws_limit = 5
 )
 
+
+## 2.4 Handle test settings -----------------------------------------------------
+
+# These settings are mainly intended for automated testing of the app
+
 if (getOption("anonymization__gliner_test", FALSE)) {
   invisible(gliner_load_model(test_model = TRUE))
 }
@@ -228,9 +163,9 @@ if (!getOption("shiny.testmode", FALSE)) {
 }
 
 
-#### 3 Run app ####
+# 3 Run app -----------------------------------------------------------------
 
-# Make images in www folder available to the app
+# Make images in 'www/' folder available to the app
 shiny::addResourcePath("www", "www")
 
 # Set Shiny port; read from arguments passed to this script

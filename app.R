@@ -1,52 +1,12 @@
-#### 1 Load dependencies ####
+# 1 Load dependencies ----------------------------------------------------------
 
-# This project uses renv to manage package dependencies;
-#   see https://rstudio.github.io/renv/articles/renv.html
-if (!requireNamespace("renv", quietly = TRUE)) {
-  install.packages("renv")
-}
-
-# Install packages with renv
-renv::restore()
-
-# Setup Python with reticulate & uv
-try({
-  Sys.unsetenv("RETICULATE_PYTHON")
-  reticulate:::uv_exec("sync")
-  reticulate::use_virtualenv("./.venv")
-})
-
-# Load core packages
-library(rlang)
-library(tidyverse)
-library(tidyprompt)
-library(shiny)
-library(shinyjs)
-library(bslib)
-library(bsicons)
-library(htmltools)
-library(future)
-library(promises)
-library(DT)
-
-# Load components in R/-folder
-load_all <- function(except = c()) {
-  r_files <- list.files(
-    path = "R",
-    pattern = "\\.R$",
-    full.names = TRUE
-  )
-  for (file in r_files) {
-    if (file %in% except) {
-      next
-    }
-    source(file)
-  }
-}
-load_all()
+source("R/load_dependencies.R")
+load_dependencies("regular")
 
 
-#### 2 Settings ####
+# 2 Settings -------------------------------------------------------------------
+
+# 2.1 Asynchronous processing --------------------------------------------------
 
 # Set asynchronous processing
 # - Asynchronous processing is recommended when deploying the app to a server,
@@ -60,6 +20,9 @@ load_all()
 if (!getOption("shiny.testmode", FALSE)) {
   future::plan(multisession, .skip = TRUE)
 }
+
+
+# 2.2 Set LLM provider & models ------------------------------------------------
 
 # Set preconfigured LLM provider and available models (optional)
 # - You can preconfigure the LLM provider and available models here
@@ -106,7 +69,9 @@ preconfigured_models_large <- list(
   ))
 )
 
-# Optionally set other options
+
+## 2.3 Other options -----------------------------------------------------------
+
 options(
   # - Optionally set a port and host for the Shiny app;
   #   this is useful when deploying the app to a server
@@ -182,6 +147,11 @@ options(
   topic_modelling__draws_limit = 5
 )
 
+
+## 2.4 Handle test settings -----------------------------------------------------
+
+# These settings are mainly intended for automated testing of the app
+
 if (getOption("anonymization__gliner_test", FALSE)) {
   invisible(gliner_load_model(test_model = TRUE))
 }
@@ -191,9 +161,9 @@ if (!getOption("shiny.testmode", FALSE)) {
 }
 
 
-#### 3 Run app ####
+# 3 Run app -----------------------------------------------------------------
 
-# Make images in www folder available to the app
+# Make images in 'www/' folder available to the app
 shiny::addResourcePath("www", "www")
 
 shiny::shinyApp(
