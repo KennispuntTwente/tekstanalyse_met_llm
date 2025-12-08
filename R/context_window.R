@@ -444,23 +444,8 @@ context_window_server <- function(
           if (mode() == "Onderwerpextractie") {
             list(
               # Add subtle text to explain chunking parameters
-              div(
-                class = "llm-narrow-container",
-                style = "
-                  margin: 10px auto 15px auto;
-                  padding: 15px 20px;
-                  background-color: #f8f9fa;
-                  border: 1px solid #dee2e6;
-                  border-radius: 5px;
-                  font-size: 0.9em;
-                  color: #495057;
-                  text-align: center;
-                  word-break: normal;
-                  overflow-wrap: normal;
-                ",
-                lang()$t(
-                  "Onderstaande parameters bepalen hoe de teksten worden verdeeld in chunks voor het genereren van onderwerpen in de 'onderwerpextractie'-modus."
-                )
+              description_box(
+                lang()$t("Onderstaande parameters bepalen hoe de teksten worden verdeeld in chunks voor het genereren van onderwerpen in de 'onderwerpextractie'-modus.")
               ),
               numericInput(
                 ns("chunk_size"),
@@ -481,23 +466,8 @@ context_window_server <- function(
           if (mode() == "Markeren") {
             list(
               # Add subtle text to explain chunking parameters
-              div(
-                class = "llm-narrow-container",
-                style = "
-                  margin: 10px auto 15px auto;
-                  padding: 15px 20px;
-                  background-color: #f8f9fa;
-                  border: 1px solid #dee2e6;
-                  border-radius: 5px;
-                  font-size: 0.9em;
-                  color: #495057;
-                  text-align: center;
-                  word-break: normal;
-                  overflow-wrap: normal;
-                ",
-                lang()$t(
-                  "Onderstaande parameters bepalen of en hoe de teksten worden gesplitst naar kleinere stukken in de 'markeren'-modus."
-                )
+              description_box(
+                lang()$t("Onderstaande parameters bepalen of en hoe de teksten worden gesplitst naar kleinere stukken in de 'markeren'-modus.")
               ),
               # Ask text split size & allowed overlap size (in tokens)
               numericInput(

@@ -86,22 +86,7 @@ mode_server <- function(
           )
         )
 
-        div(
-          class = "llm-narrow-container",
-          style = "
-            margin: 10px auto 15px auto;
-            padding: 15px 20px;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            font-size: 0.9em;
-            color: #495057;
-            text-align: center;
-            word-break: normal;
-            overflow-wrap: normal;
-          ",
-          HTML(msg)
-        )
+        description_box(msg, use_html = TRUE)
       })
 
       # When selecting input, update reactiveVal
