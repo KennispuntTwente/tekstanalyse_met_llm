@@ -327,13 +327,13 @@ text_upload_server <- function(
 
     # ---- Filter icon (dynamic colour) --------------------------------------
     output$filter_icon <- renderUI({
-      style <- if (filter_active()) "color:#0d6efd;" else "color:#6c757d;"
-      actionLink(
-        ns("filter_btn"),
-        icon("filter", lib = "font-awesome"),
-        style = paste0(style, "font-size:1.25rem;")
-      ) |>
-        bslib::tooltip(lang()$t("Filter data"))
+      modal_trigger_icon(
+        ns = ns,
+        input_id = "filter_btn",
+        icon_name = "filter",
+        tooltip_text = lang()$t("Filter data"),
+        is_active = filter_active()
+      )
     })
 
     # ---- Filter modal -------------------------------------------------------

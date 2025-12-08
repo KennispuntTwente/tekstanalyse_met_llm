@@ -120,3 +120,36 @@ icon_toggle_css <- function(prefix = "llm-icon") {
     }
   ", prefix, prefix, prefix)))
 }
+
+
+#' Create an icon button that triggers a modal
+#'
+#' A simple icon button with dynamic color that opens a modal when clicked.
+#' Color changes based on whether the associated value is "active" (has content).
+#'
+#' @param ns Namespace function from the module
+#' @param input_id Input ID for the action link
+#' @param icon_name FontAwesome icon name (e.g., "filter", "palette")
+#' @param tooltip_text Tooltip text to display on hover
+#' @param is_active Whether the icon should be highlighted (e.g., has value)
+#' @param font_size Icon font size (default "1.25rem")
+#'
+#' @return An actionLink element with tooltip
+modal_trigger_icon <- function(
+  ns,
+  input_id,
+  icon_name,
+  tooltip_text,
+  is_active = FALSE,
+  font_size = "1.25rem"
+) {
+  style <- if (is_active) "color:#0d6efd;" else "color:#6c757d;"
+  style <- paste0(style, "font-size:", font_size, "; border:none; background:transparent;")
+  
+  actionLink(
+    ns(input_id),
+    icon(icon_name, lib = "font-awesome"),
+    style = style
+  ) |>
+    bslib::tooltip(tooltip_text)
+}

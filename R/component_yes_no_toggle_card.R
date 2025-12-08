@@ -68,16 +68,14 @@ yes_no_toggle_card_server <- function(
     # Render modal button if modal_config is provided
     output$modal_button <- renderUI({
       req(modal_config)
-      has_value <- nzchar(modal_value())
-      style <- if (has_value) "color:#0d6efd;" else "color:#6c757d;"
-      style <- paste0(style, "font-size:1rem; border:none; background:transparent;")
-
-      actionLink(
-        ns("show_modal"),
-        icon(modal_config$icon, lib = "font-awesome"),
-        style = style
-      ) |>
-        bslib::tooltip(t(modal_config$tooltip))
+      modal_trigger_icon(
+        ns = ns,
+        input_id = "show_modal",
+        icon_name = modal_config$icon,
+        tooltip_text = t(modal_config$tooltip),
+        is_active = nzchar(modal_value()),
+        font_size = "1rem"
+      )
     })
 
     # Show modal when button is clicked
