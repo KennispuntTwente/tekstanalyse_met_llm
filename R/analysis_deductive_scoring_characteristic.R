@@ -123,12 +123,8 @@ score_server <- function(
         scoring_characteristic(input$scoring_characteristic)
       })
 
-      # When processing, disable all input fields
-      observe({
-        if (processing()) {
-          shinyjs::disable("scoring_characteristic")
-        }
-      })
+      # Disable input when processing
+      disable_when_processing(processing, "scoring_characteristic")
 
       # Return reactive value with the scoring characteristic
       return(scoring_characteristic)
