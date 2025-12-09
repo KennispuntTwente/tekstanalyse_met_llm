@@ -420,7 +420,7 @@ context_window_server <- function(
             label = span(
               HTML(paste0(lang()$t("Context-window grootte (tokens)"))),
               tooltip(
-                bs_icon("info-circle"),
+                bsicons::bs_icon("info-circle"),
                 paste0(
                   lang()$t(
                     "Dit is de context-window grootte waarmee gerekend wordt om te bepalen of de verschillende prompts & teksten in het context-window passen."
@@ -481,7 +481,7 @@ context_window_server <- function(
                 label = span(
                   lang()$t("Overlap tussen teksten (tokens)"),
                   tooltip(
-                    bs_icon("info-circle"),
+                    bsicons::bs_icon("info-circle"),
                     paste0(
                       lang()$t(
                         "Waarde die de toegestane overlap tussen de teksten bepaalt."
@@ -510,7 +510,7 @@ context_window_server <- function(
         req(rv$n_chunks)
         return(div(
           class = "alert alert-info d-flex align-items-center mt-2",
-          bs_icon("blockquote-left"),
+          bsicons::bs_icon("blockquote-left"),
           span(
             class = "ms-2 fw",
             paste(lang()$t("Aantal chunks:"), rv$n_chunks)
@@ -524,7 +524,7 @@ context_window_server <- function(
         req(isTRUE(rv$too_many_chunks))
         return(div(
           class = "alert alert-danger d-flex align-items-center mt-2",
-          bs_icon("exclamation-triangle-fill"),
+          bsicons::bs_icon("exclamation-triangle-fill"),
           span(
             class = "ms-2",
             paste0(
@@ -548,7 +548,7 @@ context_window_server <- function(
         if (isTRUE(rv$any_fit_problem)) {
           return(div(
             class = "alert alert-danger d-flex align-items-center mt-2",
-            bs_icon("exclamation-triangle-fill"),
+            bsicons::bs_icon("exclamation-triangle-fill"),
             span(
               class = "ms-2",
               lang()$t("Sommige teksten zijn te lang voor het context-window")
@@ -559,7 +559,7 @@ context_window_server <- function(
         if (isFALSE(rv$any_fit_problem)) {
           return(div(
             class = "alert alert-success d-flex align-items-center mt-2",
-            bs_icon("check-circle-fill"),
+            bsicons::bs_icon("check-circle-fill"),
             span(
               class = "ms-2",
               lang()$t("Alle teksten passen binnen het context-window")

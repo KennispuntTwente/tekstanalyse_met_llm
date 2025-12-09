@@ -37,7 +37,7 @@ text_upload_server <- function(
             span(
               lang()$t("Upload teksten"),
               tooltip(
-                bs_icon("info-circle"),
+                bsicons::bs_icon("info-circle"),
                 paste0(
                   lang()$t(
                     "Upload de teksten die je wilt analyseren. Je kunt een platte tekstbestand (.txt), een CSV-bestand (.csv), een Excel-bestand (.xlsx) of een SPSS-bestand (.sav) uploaden."

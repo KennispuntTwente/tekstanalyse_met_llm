@@ -94,7 +94,6 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   library(shiny)
   library(shinyjs)
   library(bslib)
-  library(bsicons)
   library(htmltools)
   library(future)
   library(promises)

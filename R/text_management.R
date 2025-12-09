@@ -154,7 +154,7 @@ text_management_server <- function(
               span(
                 lang()$t('Teksten'),
                 tooltip(
-                  bs_icon("info-circle"),
+                  bsicons::bs_icon("info-circle"),
                   paste0(
                     lang()$t(
                       "Hier kun je de teksten bekijken die zullen worden verwerkt."
@@ -330,7 +330,7 @@ text_management_server <- function(
           ),
           div(
             class = "d-flex align-items-center justify-content-center gap-2",
-            bs_icon("trash"),
+            bsicons::bs_icon("trash"),
             span(class = "badge bg-secondary", total - uniq)
           )
         )
@@ -364,21 +364,21 @@ text_management_server <- function(
             # e-mail
             div(
               class = "d-flex align-items-center gap-1",
-              bs_icon("envelope"),
+              bsicons::bs_icon("envelope"),
               span(class = "badge bg-secondary", email),
               span(class = "text-muted", lang()$t("e-mail(s)"))
             ),
             # phone
             div(
               class = "d-flex align-items-center gap-1",
-              bs_icon("telephone"),
+              bsicons::bs_icon("telephone"),
               span(class = "badge bg-secondary", phone),
               span(class = "text-muted", lang()$t("nummer(s)"))
             ),
             # postcode
             div(
               class = "d-flex align-items-center gap-1",
-              bs_icon("mailbox"),
+              bsicons::bs_icon("mailbox"),
               span(class = "badge bg-secondary", postal),
               span(class = "text-muted", lang()$t("postcode(s)"))
             )
@@ -429,7 +429,7 @@ text_management_server <- function(
 
           counts_ui <- div(
             class = "d-flex align-items-center justify-content-center gap-2",
-            bs_icon("shield-lock"),
+            bsicons::bs_icon("shield-lock"),
             span(class = "badge bg-secondary", total_pii)
           )
 

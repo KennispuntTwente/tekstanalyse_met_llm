@@ -114,7 +114,7 @@ llm_provider_server <- function(
                 span(
                   lang()$t("LLM-provider"),
                   tooltip(
-                    bs_icon("info-circle"),
+                    bsicons::bs_icon("info-circle"),
                     paste0(
                       lang()$t(
                         "Hier staan details over de geconfigureerde LLM-provider.",
@@ -325,7 +325,7 @@ llm_provider_server <- function(
               label = span(
                 lang()$t("OpenAI-API-compatible endpoint URL:"),
                 tooltip(
-                  bs_icon("info-circle"),
+                  bsicons::bs_icon("info-circle"),
                   paste0(
                     lang()$t(
                       "Dit is de URL van de OpenAI-compatibele API om te gebruiken."
@@ -425,7 +425,7 @@ llm_provider_server <- function(
                     ns_btn
                   ),
                   `data-state` = "hidden",
-                  bs_icon("eye-slash", id = ns("eye_icon"))
+                  bsicons::bs_icon("eye-slash", id = ns("eye_icon"))
                 )
               )
             )

@@ -173,7 +173,7 @@ text_split_server <- function(
           label = span(
             lang()$t("Overlap tussen teksten (tokens)"),
             tooltip(
-              bs_icon("info-circle"),
+              bsicons::bs_icon("info-circle"),
               paste0(
                 lang()$t(
                   "Waarde die de toegestane overlap tussen de teksten bepaalt."
