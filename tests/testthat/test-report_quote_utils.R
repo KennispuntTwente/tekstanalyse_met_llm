@@ -1,5 +1,5 @@
 test_that("extract_quotes_matrix finds straight and curly quotes", {
-  source(here::here("R", "report_quote_utils.R"), local = TRUE)
+  source(here::here("R", "utils_quotes.R"), local = TRUE)
   txt <- 'He said "hello" and then “bye”. Also: \'cya\''
   m <- extract_quotes_matrix(txt)
   expect_true(is.matrix(m))
@@ -9,7 +9,7 @@ test_that("extract_quotes_matrix finds straight and curly quotes", {
 })
 
 test_that("verify_and_decorate_quotes decorates found/missing with icons (en)", {
-  source(here::here("R", "report_quote_utils.R"), local = TRUE)
+  source(here::here("R", "utils_quotes.R"), local = TRUE)
   paragraph <- 'Contains "alpha" and "beta".'
   supporting <- 'The document mentions Alpha clearly.'
   out <- verify_and_decorate_quotes(
@@ -27,7 +27,7 @@ test_that("verify_and_decorate_quotes decorates found/missing with icons (en)", 
 })
 
 test_that("verify_and_decorate_quotes escapes remainder when requested", {
-  source(here::here("R", "report_quote_utils.R"), local = TRUE)
+  source(here::here("R", "utils_quotes.R"), local = TRUE)
   paragraph <- 'Text with <b>tag</b> and "safe".'
   supporting <- 'safe'
   out <- verify_and_decorate_quotes(

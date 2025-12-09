@@ -385,7 +385,7 @@ if (FALSE) {
   library(future)
   library(promises)
 
-  source("R/semchunk_load.R")
+  source("R/utils_semchunk.R")
 
   ui <- bslib::page(
     useShinyjs(),

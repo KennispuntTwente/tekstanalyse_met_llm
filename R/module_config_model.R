@@ -1061,7 +1061,7 @@ if (FALSE) {
   library(bslib)
   library(bsicons)
 
-  source("R/llm_provider.R")
+  source("R/module_config_llm_provider.R")
 
   shiny::addResourcePath("www", "www")
 

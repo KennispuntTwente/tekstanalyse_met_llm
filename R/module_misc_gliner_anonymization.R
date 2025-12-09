@@ -806,7 +806,7 @@ if (FALSE) {
 
   if (!exists("gliner_model")) {
     if (!exists("gliner_load_model")) {
-      source("R/gliner_load.R")
+      source("R/utils_gliner.R")
     }
 
     # Allows to load Python & interrupt R session without fatal R crash:
