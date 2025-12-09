@@ -1059,7 +1059,7 @@ verify_unique_llm_provider_model_names <- function(
 
 #### 4 Example/development usage ####
 
-if (TRUE) {
+if (FALSE) {
   library(shiny)
   library(shinyjs)
   library(bslib)

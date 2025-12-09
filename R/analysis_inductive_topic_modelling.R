@@ -6,9 +6,9 @@
 #   and assign each text to a topic
 # Performance said to be better than 'Bertopic' strategy with embeddings & clustering
 
-#### 1 Define functions ####
+# 1 Define functions ------------------------------------------------------
 
-##### 1.1 Candidate topic creation #####
+## 1.1 Candidate topic creation --------------------------------------------
 
 # Presenting the texts to the LLM (in chunks);
 #   asking to return all potential topics
@@ -228,7 +228,7 @@ prompt_candidate_topics <- function(
 }
 
 
-##### 1.2 Topic reduction ####
+## 1.2 Topic reduction ------------------------------------------------------
 
 #' Reduce the number of topics
 #'
@@ -520,7 +520,7 @@ reduce_topics <- function(
     current_topics <- combined # otherwise iterate again
   }
 
-  # ---- post-processing -------------------------------------------------------
+  # post-processing -------------------------------------------------------
 
   # Set to sentence case
   current_topics <- stringr::str_to_sentence(current_topics)
@@ -569,7 +569,7 @@ reduce_topics <- function(
 }
 
 
-##### 1.3 Topic assignment ####
+## 1.3 Topic assignment ----------------------------------------------------
 
 # Note: prompt_category() is loaded from 'deducitve__categorization_scoring.R'
 
@@ -643,10 +643,10 @@ assign_topics <- function(
 }
 
 
-#### 2 Example usage ####
+# 2 Example/development usage ----------------------------------------------
 
 if (FALSE) {
-  ##### 2.1 Load example data ####
+  ## 2.1 Load example data -------------------------------------------------
 
   # Generate some sample data with ground truth
   # (Ground truth not used during the procedure, but may be used to evaluate the performance)
@@ -726,7 +726,8 @@ if (FALSE) {
     "Shipping"
   )
 
-  ##### 2.2 Perform example procedure ####
+
+  ## 2.2 Perform example procedure -----------------------------------------
 
   # See function arguments for the various options for the procedure,
   #   e.g., which model to use, how to chunk texts, etc.
