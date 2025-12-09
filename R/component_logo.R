@@ -2,6 +2,8 @@
 # Returns UI elements for logos, with clickable links to their respective websites
 # Tooltip is added to the logo to show the name of the logo
 
+# 1 Logo components -------------------------------------------------------
+
 kpt_logo_ui <- function(
   id,
   logo_src = "www/kennispunttwente_avatar.png"
@@ -119,7 +121,8 @@ github_logo_ui <- function(
   )
 }
 
-#### 2 Example/development usage ####
+
+# 2 Example/development usage ---------------------------------------------
 
 if (FALSE) {
   library(shiny)

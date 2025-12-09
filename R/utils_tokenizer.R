@@ -1,5 +1,4 @@
-#### 1 Load tokenizer ####
-
+# 1 Load tokenizer -----------------------------------------------------
 # Allows you to interrupt Python without an R crash
 Sys.setenv(FOR_DISABLE_CONSOLE_CTRL_HANDLER = "1")
 
@@ -68,8 +67,7 @@ tiktoken_load_tokenizer <- function(
 }
 
 
-#### 2 Count tokens with tokenizer ####
-
+# 2 Count tokens with tokenizer ------------------------------------
 count_tokens <- function(
   text,
   tokenizer = NULL

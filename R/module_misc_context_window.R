@@ -1,8 +1,7 @@
 # Module for context window and chunking parameters
 # Ensures that the texts fit within the context window of the LLM
 
-#### 1 UI ####
-
+# 1 UI ---------------------------------------------------------------
 context_window_ui <- function(id) {
   ns <- NS(id)
 
@@ -16,8 +15,7 @@ context_window_ui <- function(id) {
 }
 
 
-#### 2 Server ####
-
+# 2 Server ---------------------------------------------------------
 context_window_server <- function(
   id,
   mode = reactiveVal("Categorisatie"),
@@ -120,7 +118,7 @@ context_window_server <- function(
         )
       })
 
-      #### Reactive values ####
+      # Reactive values ----------------------------------------------
       rv <- reactiveValues(
         # State
         text_chunks = NULL,
@@ -144,7 +142,7 @@ context_window_server <- function(
         overlap = 64
       )
 
-      #### Sync user input to internal state ####
+      # Sync user input to internal state ----------------------------
       observe({
         is_valid_number <- function(input) {
           if (is.null(input)) {
@@ -221,7 +219,7 @@ context_window_server <- function(
         }
       })
 
-      #### Obtain context window size based on model ####
+      # Obtain context window size based on model --------------------
       observe({
         req(models$main)
         size <- get_context_window_size_in_tokens(models$main$parameters$model)
@@ -237,7 +235,7 @@ context_window_server <- function(
         rv$context_window_known <- context_window_known
       })
 
-      #### Enable/disable input based on if context window is known ####
+      # Enable/disable input based on if context window is known -----
       # observe({
       #   req(models$main)
       #
@@ -250,7 +248,7 @@ context_window_server <- function(
       #   )
       # })
 
-      #### Obtain number of characters in the base prompt, based on parameters ####
+      # Obtain number of characters in the base prompt, based on parameters ----
       # This is for categorization & scoring
       # (not candidate topic generation or writing paragraphs)
       observe({
@@ -318,7 +316,7 @@ context_window_server <- function(
         }
       })
 
-      #### Check if longest text + base prompt fit ####
+      # Check if longest text + base prompt fit ----------------------
       observe({
         req(
           mode() %in%
@@ -352,7 +350,7 @@ context_window_server <- function(
         }
       })
 
-      #### Make chunks & check if they fit ####
+      # Make chunks & check if they fit ------------------------------
       observe({
         req(mode() == "Onderwerpextractie")
         req(texts$preprocessed)
@@ -393,7 +391,7 @@ context_window_server <- function(
         rv$n_chunks <- length(rv$text_chunks)
       })
 
-      #### Check for presence of any fit problem ####
+      # Check for presence of any fit problem ------------------------
       observe({
         if (isTRUE(mode() == "Onderwerpextractie")) {
           if (
@@ -415,7 +413,7 @@ context_window_server <- function(
         }
       })
 
-      #### Show inputs (context window, chunking parameters), based on mode ####
+      # Show inputs (context window, chunking parameters), based on mode ----
       output$context_window_ui <- renderUI({
         req(
           mode() %in%
@@ -514,8 +512,7 @@ context_window_server <- function(
         ))
       })
 
-      #### Show number of chunks and warnings, based on mode ####
-
+      # Show number of chunks and warnings, based on mode ------------
       # Show number of chunks
       output$n_chunks_display <- renderUI({
         req(mode() == "Onderwerpextractie")
@@ -668,8 +665,7 @@ create_text_chunks <- function(
 }
 
 
-#### 3 Helper functions ####
-
+# 3 Helper functions -----------------------------------------------
 # Helper function with some hardcoded context window sizes for common models
 # Will default to 2048 if the model is not recognized
 # Better approach may be to retrieve via API or configuration file
@@ -745,8 +741,7 @@ get_context_window_size_in_tokens <- function(model) {
   return(NULL)
 }
 
-#### 4 Example/development usage ####
-
+# 4 Example/development usage ----------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

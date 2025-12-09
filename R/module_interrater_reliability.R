@@ -2,8 +2,7 @@
 # User gets presented a modal dialog to rate a sample of texts
 # Module calculates Cohen's Kappa (categories data) or paired t-test (score data)
 
-#### 1 Server ####
-
+# 1 Server -----------------------------------------------------------
 # (Note, server is fully responsible for UI rendering, there is no separate UI function)
 
 interrater_server <- function(
@@ -659,8 +658,7 @@ interrater_server <- function(
 }
 
 
-#### 2 Helper functions ####
-
+# 2 Helper functions -----------------------------------------------
 # Helper to format the interrater result
 #   (note: only used in the testing app for debugging)
 format_kappa_result <- function(result) {
@@ -734,8 +732,7 @@ format_kappa_result <- function(result) {
 }
 
 
-#### 3 Example/development usage ####
-
+# 3 Example/development usage --------------------------------------
 if (FALSE) {
   ui <- fluidPage(
     useShinyjs(),

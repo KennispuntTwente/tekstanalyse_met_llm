@@ -2,15 +2,13 @@
 #
 # This module uses the reusable yes_no_toggle_card component
 
-#### 1 UI ####
-
+# 1 UI ---------------------------------------------------------------
 assign_multiple_categories_toggle_ui <- function(id) {
   yes_no_toggle_card_ui(id)
 }
 
 
-#### 2 Server ####
-
+# 2 Server ---------------------------------------------------------
 assign_multiple_categories_toggle_server <- function(
   id,
   processing,
@@ -43,8 +41,7 @@ assign_multiple_categories_toggle_server <- function(
 }
 
 
-#### 3 Example/development usage ####
-
+# 3 Example/development usage --------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

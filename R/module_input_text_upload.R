@@ -5,8 +5,7 @@
 # Note: pre-processing of texts is handled in the text_management module,
 #   this module only uploads the raw data
 
-#### 1 UI ####
-
+# 1 UI ---------------------------------------------------------------
 text_upload_ui <- function(id) {
   ns <- NS(id)
   tagList(
@@ -18,8 +17,7 @@ text_upload_ui <- function(id) {
 }
 
 
-#### 2 Server ####
-
+# 2 Server ---------------------------------------------------------
 text_upload_server <- function(
   id,
   processing,
@@ -510,8 +508,7 @@ text_upload_server <- function(
 }
 
 
-#### 3 Example/development usage ####
-
+# 3 Example/development usage --------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

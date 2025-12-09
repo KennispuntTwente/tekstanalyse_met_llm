@@ -2,8 +2,7 @@
 # This module displays the preconfigured LLM provider or allows the user to
 #   configure a new one (OpenAI-API compatible API or Ollama)
 
-#### 1 UI ####
-
+# 1 UI ---------------------------------------------------------------
 llm_provider_ui <- function(
   id
 ) {
@@ -12,8 +11,7 @@ llm_provider_ui <- function(
 }
 
 
-#### 2 Server ####
-
+# 2 Server ---------------------------------------------------------
 llm_provider_server <- function(
   id,
   processing = reactiveVal(FALSE),
@@ -654,8 +652,7 @@ llm_provider_server <- function(
 }
 
 
-#### 3 Example/development usage ####
-
+# 3 Example/development usage --------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

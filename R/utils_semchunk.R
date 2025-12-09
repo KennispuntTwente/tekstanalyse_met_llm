@@ -1,5 +1,4 @@
-#### 1 Load semantic chunker ####
-
+# 1 Load semantic chunker ----------------------------------------------
 # Allows to load Python & then interrupt R without fatal R crash:
 Sys.setenv(FOR_DISABLE_CONSOLE_CTRL_HANDLER = "1")
 
@@ -56,8 +55,7 @@ semchunk_load_chunker <- function(
   invisible(chunker)
 }
 
-#### 2 Example/development usage ####
-
+# 2 Example/development usage ----------------------------------------
 if (FALSE) {
   chunker <- semchunk_load_chunker(chunk_size = 32)
 

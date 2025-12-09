@@ -1,5 +1,5 @@
-# Modal Layout Helpers
-# Consistent footer button positioning for modal dialogs
+# Modal footer layout helpers
+# Helps with consistent footer button positioning for modal dialogs
 
 #' Create a modal footer with left/center/right button layout
 #'

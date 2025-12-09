@@ -9,8 +9,7 @@
 #       the llm_provider module. In this module, user can configure the model
 #       and some further settings
 
-#### 1 UI ####
-
+# 1 UI ---------------------------------------------------------------
 model_ui <- function(
   id
 ) {
@@ -22,8 +21,7 @@ model_ui <- function(
 }
 
 
-#### 2 Server ####
-
+# 2 Server ---------------------------------------------------------
 model_server <- function(
   id,
 
@@ -990,8 +988,7 @@ model_server <- function(
 }
 
 
-#### 3 Helpers ####
-
+# 3 Helpers --------------------------------------------------------
 # Helper to add names to preconfigured llm_provider_model list
 # If item already has a name in the list, keep that
 # If unnamed, use the model name as the name
@@ -1057,8 +1054,7 @@ verify_unique_llm_provider_model_names <- function(
 }
 
 
-#### 4 Example/development usage ####
-
+# 4 Example/development usage --------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

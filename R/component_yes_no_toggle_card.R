@@ -3,7 +3,7 @@
 # Used by: human_in_the_loop, interrater_reliability, assign_multiple_categories,
 #          write_paragraphs, etc.
 
-#### 1 UI ####
+# 1 UI --------------------------------------------------------------------
 
 yes_no_toggle_card_ui <- function(id) {
   ns <- NS(id)
@@ -11,7 +11,7 @@ yes_no_toggle_card_ui <- function(id) {
 }
 
 
-#### 2 Server ####
+# 2 Server ----------------------------------------------------------------
 
 #' Yes/No Toggle Card Server
 #'
@@ -228,7 +228,7 @@ yes_no_toggle_card_server <- function(
 }
 
 
-#### 3 Example/development usage ####
+# 3 Example/development usage ---------------------------------------------
 
 if (FALSE) {
   library(shiny)

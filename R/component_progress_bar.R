@@ -1,7 +1,7 @@
 # Progress bar module; this module provides a progress bar UI and server logic
 # Progress bar can be updated with a value and text, and can be shown or hidden
 
-#### 1 UI ####
+# 1 UI --------------------------------------------------------------------
 
 progress_bar_ui <- function(
   id,
@@ -66,7 +66,7 @@ progress_bar_ui <- function(
 }
 
 
-#### 2 Server ####
+# 2 Server ----------------------------------------------------------------
 
 progress_bar_server <- function(
   id,
@@ -177,7 +177,7 @@ progress_bar_server <- function(
 }
 
 
-#### 3 Helpers ####
+# 3 Helpers ---------------------------------------------------------------
 
 AsyncProgressBarController <- R6::R6Class(
   "AsyncProgressBarController",
@@ -248,7 +248,7 @@ AsyncProgressBarController <- R6::R6Class(
 )
 
 
-#### 4 Example/development usage ####
+# 4 Example/development usage ---------------------------------------------
 
 if (FALSE) {
   library(shiny)

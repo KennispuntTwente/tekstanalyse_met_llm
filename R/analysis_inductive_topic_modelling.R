@@ -297,7 +297,7 @@ reduce_topics <- function(
   language <- match.arg(language)
   desired_number_type <- match.arg(desired_number_type)
 
-  # ---- argument checks -------------------------------------------------------
+  ### argument checks -------------------------------------------------------
   stopifnot(
     is.character(candidate_topics),
     length(candidate_topics) > 0,
@@ -309,7 +309,7 @@ reduce_topics <- function(
     max_groups >= 1
   )
 
-  # ---- helper: create a reduce prompt with tidyprompt ------------------------
+  ### helper: create a reduce prompt with tidyprompt ------------------------
   create_prompt <- function(
     topics_vec
   ) {
@@ -416,7 +416,7 @@ reduce_topics <- function(
     tidyprompt::construct_prompt_text() |>
     count_tokens()
 
-  # ---- helper: run a single reduce prompt ------------------------------------
+  ### helper: run a single reduce prompt ------------------------------------
   reduce_once <- function(topics_vec) {
     prompt <- create_prompt(topics_vec)
     result <- send_prompt_with_retries(prompt, llm_provider)
@@ -432,7 +432,7 @@ reduce_topics <- function(
     return(result$topics)
   }
 
-  # ---- context window bookkeeping -------------------------------------------
+  ### context window bookkeeping -------------------------------------------
   model <- llm_provider$parameters$model
   n_tokens_context_window <- get_context_window_size_in_tokens(model)
   if (is.null(n_tokens_context_window)) {
@@ -463,7 +463,7 @@ reduce_topics <- function(
     chunks
   }
 
-  # ---- first split guard -----------------------------------------------------
+  ### first split guard -----------------------------------------------------
   chunks <- split_into_chunks(candidate_topics)
   if (length(chunks) > max_groups) {
     stop(
@@ -475,7 +475,7 @@ reduce_topics <- function(
     )
   }
 
-  # ---- iterative reduction loop ---------------------------------------------
+  ### iterative reduction loop ---------------------------------------------
   current_topics <- unique(trimws(candidate_topics))
   iteration <- 0
 
@@ -495,7 +495,7 @@ reduce_topics <- function(
 
     chunks <- split_into_chunks(current_topics)
 
-    # guard at *each* iteration ----------------------------------------------
+    #### guard at each iteration ------------------------------------------
     if (length(chunks) > max_groups) {
       stop(
         "reduce_topics(): Reduction step ",
@@ -520,7 +520,7 @@ reduce_topics <- function(
     current_topics <- combined # otherwise iterate again
   }
 
-  # post-processing -------------------------------------------------------
+  ### post-processing -------------------------------------------------------
 
   # Set to sentence case
   current_topics <- stringr::str_to_sentence(current_topics)
@@ -646,8 +646,6 @@ assign_topics <- function(
 # 2 Example/development usage ----------------------------------------------
 
 if (FALSE) {
-  ## 2.1 Load example data -------------------------------------------------
-
   # Generate some sample data with ground truth
   # (Ground truth not used during the procedure, but may be used to evaluate the performance)
 
@@ -725,8 +723,6 @@ if (FALSE) {
     "the package was damaged when it arrived"                ,
     "Shipping"
   )
-
-  ## 2.2 Perform example procedure -----------------------------------------
 
   # See function arguments for the various options for the procedure,
   #   e.g., which model to use, how to chunk texts, etc.

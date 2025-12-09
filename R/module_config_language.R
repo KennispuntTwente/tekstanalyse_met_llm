@@ -1,7 +1,7 @@
 # Language toggle module and default translator factory
 # Used across all modules for internationalization
 
-#### 0 Default translator factory ####
+# 1 Default translator ----------------------------------------------------
 
 #' Create default language translator reactiveVal
 #'
@@ -28,7 +28,8 @@ default_lang <- function(reactive = TRUE) {
   }
 }
 
-#### 1 UI ####
+
+# 1 UI --------------------------------------------------------------------
 
 language_ui <- function(id) {
   ns <- NS(id)
@@ -36,7 +37,7 @@ language_ui <- function(id) {
 }
 
 
-##### 2 Server ####
+# 2 Server ----------------------------------------------------------------
 
 language_server <- function(
   id,
@@ -94,7 +95,7 @@ language_server <- function(
 }
 
 
-#### 3 Example/development usage ####
+# 3 Example/development usage ---------------------------------------------
 
 if (FALSE) {
   library(shiny)

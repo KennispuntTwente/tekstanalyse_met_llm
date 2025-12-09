@@ -14,8 +14,7 @@
 # gracefully fall back to the first available method in the order
 # regex → gliner → none.
 
-#### 1 UI & server ###################################################
-
+# 1 UI & server ------------------------------------------------------
 text_management_ui <- function(id) {
   ns <- NS(id)
   uiOutput(ns("card"))
@@ -527,8 +526,7 @@ text_management_server <- function(
 }
 
 
-#### 2 Helper function for preprocessing texts ######################
-
+# 2 Helper function for preprocessing texts ------------------------
 pre_process_texts <- function(
   txts,
   lang = shiny.i18n::Translator$new(
@@ -573,8 +571,7 @@ pre_process_texts <- function(
 }
 
 
-#### 3 Example/development usage ###################################
-
+# 3 Example/development usage --------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

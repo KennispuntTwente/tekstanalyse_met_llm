@@ -1,5 +1,4 @@
-#### 1 Server ####
-
+# 1 Server -------------------------------------------------------------
 edit_topics_server <- function(
   id,
   topics = reactiveVal(NULL),
@@ -159,7 +158,7 @@ edit_topics_server <- function(
         topics_table_data(rhandsontable::hot_to_r(input$topics_table))
       })
 
-      ## ── add / delete-empty / reset rows -------------------------------
+      # add / delete-empty / reset rows -------------------------------
       observeEvent(input$add_topic, {
         df <- topics_table_data()
         topics_table_data(dplyr::bind_rows(
@@ -186,7 +185,7 @@ edit_topics_server <- function(
         )
       })
 
-      ## ── confirm (unchanged) -------------------------------------------
+      # confirm -------------------------------------------------------
       observeEvent(input$confirm_topics, {
         req(!reduction_in_progress())
         df <- topics_table_data()
@@ -214,7 +213,7 @@ edit_topics_server <- function(
         edited_topics(updated_topics)
       })
 
-      ## ── re-reduce (unchanged) -----------------------------------------
+      # re-reduce  ----------------------------------------------------
       observeEvent(input$reduce_again, {
         req(!reduction_in_progress())
         updated_topics <- trimws(topics_table_data()$topic)
@@ -286,7 +285,7 @@ edit_topics_server <- function(
           }
       })
 
-      ## ── apply re-reduced topics ---------------------------------------
+      # apply re-reduced topics --------------------------------------
       observeEvent(rereduced_topics(), ignoreNULL = TRUE, ignoreInit = TRUE, {
         new_topics <- rereduced_topics()
 
@@ -304,7 +303,7 @@ edit_topics_server <- function(
         reduction_in_progress(FALSE)
       })
 
-      ## ── global enable/disable during re-reduce ------------------------
+      # global enable/disable during re-reduce ----------------------
       observe({
         ids <- c(
           "add_topic",
@@ -319,14 +318,13 @@ edit_topics_server <- function(
         )
       })
 
-      ## ── output --------------------------------------------------------
+      # output -------------------------------------------------------
       return(edited_topics)
     }
   )
 }
 
-#### 2 Example/development usage ####
-
+# 2 Example/development usage ----------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

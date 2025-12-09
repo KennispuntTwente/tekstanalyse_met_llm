@@ -1,5 +1,4 @@
-#### 1 Server ####
-
+# 1 Server -------------------------------------------------------------
 # Shiny module for text anonymization using GLiNER model
 #   Used to anonymize personally identifiable information (PII) in texts,
 #     before sending it to an external (LLM) API for processing
@@ -44,8 +43,7 @@ gliner_server <- function(
     function(input, output, session) {
       ns <- session$ns
 
-      #### 1 Manage state ####
-
+      # 1 Manage state -----------------------------------------------
       # To start/initialize the module from the main server:
       start <- function() {
         if (
@@ -93,8 +91,7 @@ gliner_server <- function(
       #   "finished" (user finished the anonymization process)
       module_state <- reactiveVal("defining")
 
-      #### 2 Modal UI ####
-
+      # 2 Modal UI ---------------------------------------------------
       output$modal_content <- renderUI({
         switch(
           module_state(),
@@ -294,10 +291,8 @@ gliner_server <- function(
         )
       })
 
-      #### 3 Process handlers ####
-
-      ##### 3.1 Run model to detect PII entities #####
-
+      # 3 Process handlers -------------------------------------------
+      ## 3.1 Run model to detect PII entities --------------------------
       # Reactive value to store the PII entities predictions
       pii_predictions <- reactiveVal(NULL)
 
@@ -465,8 +460,7 @@ gliner_server <- function(
         )
       })
 
-      ##### 3.2 User evaluation of PII entities #####
-
+      ## 3.2 User evaluation of PII entities -------------------------
       # Reactive dataframe with entities + if user wants to anonymize them
       # Column 'anonymize' is TRUE by default, meaning the entity will be anonymized
       # User can uncheck the box to skip anonymization for that entity (setting to FALSE)
@@ -668,8 +662,7 @@ gliner_server <- function(
         ignoreInit = TRUE
       )
 
-      ##### 3.3 Save anonymized texts #####
-
+      ## 3.3 Save anonymized texts -----------------------------------
       # User clicks the save anonymization button
       observeEvent(
         input$save_anonymization,
@@ -736,8 +729,7 @@ gliner_server <- function(
         ignoreInit = TRUE
       )
 
-      #### 3.4 Reset, quit, retry ####
-
+      # 3.4 Reset, quit, retry ---------------------------------------
       # Function to reset module state
       reset_state <- function(close_modal = FALSE) {
         module_state("defining")
@@ -784,8 +776,7 @@ gliner_server <- function(
 }
 
 
-#### 2 Example/development usage ####
-
+# 2 Example/development usage --------------------------------------
 if (FALSE) {
   # Load core packages
   library(tidyverse)

@@ -50,8 +50,7 @@ processing_server <- function(
   moduleServer(
     id,
     function(input, output, session) {
-      #### Processing state management ####
-
+      # Processing state management ------------------------------------
       # Basic overview of the process:
       #   > Listen for start button click
       #   > Start processing based on mode (categorization/scoring/topic modelling)
@@ -109,8 +108,7 @@ processing_server <- function(
       # UUID for the current processing task
       uuid <- uuid::UUIDgenerate()
 
-      #### Launch processing ####
-
+      # Launch processing --------------------------------------------
       # Launch processing when button is clicked;
       #   set reactive values to keep track of processing state
       #   and store the UUID of the current processing task
@@ -137,8 +135,7 @@ processing_server <- function(
         return(TRUE)
       }
 
-      ###### Categorisation & scoring ######
-
+      ## Categorisation & scoring ------------------------------------
       # Listen for process button click when in categorization or scoring mode
       # Launch processing
       observeEvent(input$process, {
@@ -390,10 +387,8 @@ processing_server <- function(
         return(TRUE)
       }
 
-      ###### Topic modelling (onderwerpextractie) #####
-
-      ####### >> Topic generation ####
-
+      ## Topic modelling (onderwerpextractie) ------------------------
+      ## >> Topic generation -------------------------------------------
       # Listen for process button click when in topic modelling mode
       # Launch processing
       observeEvent(input$process, {
@@ -530,8 +525,7 @@ processing_server <- function(
         print("Started async processing for topic modelling (step 1-2)")
       })
 
-      ####### >> Topics generated; editing ####
-
+      ## >> Topics generated; editing --------------------------------
       # Listen for topics completion
       # Present modal dialog to edit/confirm topics
       ## Updated observeEvent for topics() with Add/Remove buttons in the modal
@@ -589,8 +583,7 @@ processing_server <- function(
         )
       })
 
-      ####### >> Topics definitive; assigning ######
-
+      ## >> Topics definitive; assigning -----------------------------
       # Listen for definitive topics
       # Launch processing for assigning topics to paragraphs
       observeEvent(topics_definitive(), {
@@ -817,8 +810,7 @@ processing_server <- function(
         print("Started async processing for topic modelling (step 3-4)")
       })
 
-      ###### Markeren #####
-
+      ## Markeren ----------------------------------------------------
       codes_are_valid <- function() {
         # User must be done editing codes
         if (codes$editing()) {
@@ -949,8 +941,7 @@ processing_server <- function(
         NULL # Avoid blocking the app with the promise
       })
 
-      #### Post-processing: interrater-reliability, download files ####
-
+      # Post-processing: interrater-reliability, download files ------
       # Listen for processing completion
       # Join results with original texts
       # Launch interrater reliability module if required
@@ -1296,8 +1287,7 @@ processing_server <- function(
         session$reload()
       })
 
-      #### Helper functions ####
-
+      # Helper functions ---------------------------------------------
       # Handle error details
       handle_detailed_error <- function(context = "An operation") {
         function(e) {
@@ -1530,16 +1520,14 @@ processing_server <- function(
         return(result)
       }
 
-      #### Progress bars ####
-
+      # Progress bars ------------------------------------------------
       progress_primary <- progress_bar_server("progress_primary")
       progress_secondary <- progress_bar_server(
         "progress_secondary",
         initially_hidden = TRUE
       )
 
-      #### Processing button ####
-
+      # Processing button --------------------------------------------
       output$process_button <- renderUI({
         req(mode(), lang(), is.null(results_df()))
 
@@ -1575,8 +1563,7 @@ processing_server <- function(
         )
       })
 
-      #### Process button update ####
-
+      # Process button update ----------------------------------------
       # Upon selecting mode, change text in process button
       observe({
         req(mode())
@@ -1616,8 +1603,7 @@ processing_server <- function(
         }
       })
 
-      #### Interruption ####
-
+      # Interruption -------------------------------------------------
       # Interrupter can stop async processing if user quits
       interrupter <- ipc::AsyncInterruptor$new()
 

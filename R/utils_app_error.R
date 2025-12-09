@@ -4,8 +4,7 @@
 #   fatal error
 # Also shows contact details to report the error
 
-#### 1 Functions ####
-
+# 1 Functions --------------------------------------------------------
 app_error <- function(
   error,
   when = "unknown",
@@ -145,8 +144,7 @@ app_error <- function(
 }
 
 
-#### 2 Example/development usage ####
-
+# 2 Example/development usage --------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

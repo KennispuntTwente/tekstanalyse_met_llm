@@ -1,7 +1,6 @@
 # Module for selecting mode; categorization/scoring/topic modelling
 
-#### 1 UI ####
-
+# 1 UI ---------------------------------------------------------------
 mode_ui <- function(id) {
   ns <- NS(id)
   tagList(
@@ -10,8 +9,7 @@ mode_ui <- function(id) {
 }
 
 
-#### 2 Server ####
-
+# 2 Server ---------------------------------------------------------
 mode_server <- function(
   id,
   processing,
@@ -113,8 +111,7 @@ mode_server <- function(
 }
 
 
-#### 3 Example/development usage ####
-
+# 3 Example/development usage --------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

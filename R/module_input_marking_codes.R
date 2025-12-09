@@ -1,5 +1,4 @@
-#### 1 UI & server ####
-
+# 1 UI & server --------------------------------------------------------
 marking_codes_ui <- function(id) {
   ns <- NS(id)
   tagList(
@@ -327,8 +326,7 @@ marking_codes_server <- function(
   })
 }
 
-#### 2 Helpers ####
-
+# 2 Helpers ----------------------------------------------------------
 # Function to generate potential codes by having the LLM read all texts
 generate_codes_by_reading_texts <- function(
   texts = c("hi", "hello world", "i like this product"),
@@ -499,8 +497,7 @@ generate_codes_by_reading_texts <- function(
 }
 
 
-#### 3 Example/development usage ####
-
+# 3 Example/development usage --------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

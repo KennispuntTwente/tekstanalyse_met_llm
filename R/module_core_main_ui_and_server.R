@@ -8,8 +8,7 @@
 #   and stopping the app when done
 # To run, see 'app.R'
 
-##### Main UI #####
-
+## Main UI -----------------------------------------------------------
 main_ui <- function() {
   bslib::page(
     theme = bs_theme(
@@ -23,8 +22,7 @@ main_ui <- function() {
 }
 
 
-#### Main server ####
-
+# Main server ------------------------------------------------------
 # Here we build the main server for the Shiny app
 
 main_server <- function(
@@ -34,8 +32,7 @@ main_server <- function(
   gliner_model = NULL
 ) {
   server <- function(input, output, session) {
-    #### UI ####
-
+    # UI ---------------------------------------------------------------
     output$main_ui <- renderUI({
       base_ui <- tagList(
         # Main header area with user/admin UI and title
@@ -218,8 +215,7 @@ main_server <- function(
       )
     })
 
-    #### 0 Authentication ####
-
+    # 0 Authentication -----------------------------------------------
     # When deploying to server, you could implement, e.g.,
     #   Azure AD authentication here
     # See for example R/azure_auth.R
@@ -229,8 +225,7 @@ main_server <- function(
       if (is.null(user_info)) return()
     }
 
-    #### 1 Text management ####
-
+    # 1 Text management ----------------------------------------------
     # Text upload
     raw_texts <- text_upload_server("text_upload", processing, lang)
 
@@ -273,8 +268,7 @@ main_server <- function(
       lang = lang
     )
 
-    #### 2 Mode management ####
-
+    # 2 Mode management ----------------------------------------------
     # Obtain mode
     mode <- mode_server("mode", processing, lang)
 
@@ -313,8 +307,7 @@ main_server <- function(
       lang
     )
 
-    #### 3 Model management ####
-
+    # 3 Model management ---------------------------------------------
     # Determine if we have preconfigured LLM providers or not
     # Are both preconfigured_llm_provider and preconfigured_main_models provided?
     has_preconfigured_llm_provider <- if (
@@ -343,8 +336,7 @@ main_server <- function(
       preconfigured_llm_provider_model_large = preconfigured_large_models
     )
 
-    #### 4 Category & score fields ####
-
+    # 4 Category & score fields --------------------------------------
     categories <- categories_server(
       "categories",
       mode = mode,
@@ -366,8 +358,7 @@ main_server <- function(
       lang = lang
     )
 
-    #### 5 Processing ####
-
+    # 5 Processing ---------------------------------------------------
     processing <- processing_server(
       id = "processing",
       mode = mode,
@@ -387,8 +378,7 @@ main_server <- function(
       lang = lang
     )
 
-    #### 6 Language ####
-
+    # 6 Language -----------------------------------------------------
     lang <- language_server("language", processing)
   }
 

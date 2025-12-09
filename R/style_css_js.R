@@ -1,8 +1,7 @@
 # Define CSS & JS to include in the head of the Shiny app;
 #   applies some styling to make the app look better
 
-#### 1 Function ####
-
+# 1 Function ---------------------------------------------------------
 css_js_head <- function() {
   tags$head(
     tags$style(HTML(
@@ -248,8 +247,7 @@ css_js_head <- function() {
   )
 }
 
-#### 2 Example/development usage ####
-
+# 2 Example/development usage ----------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

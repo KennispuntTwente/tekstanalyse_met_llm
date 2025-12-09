@@ -21,8 +21,7 @@ gliner_load_model <- function(
     reactive_value_name = "gliner_load_message"
   )
 
-  ##### 1 Load Python, GLiNER ####
-
+  ## 1 Load Python, GLiNER -------------------------------------------
   print_message("Loading Python and GLiNER module...")
 
   Sys.unsetenv("RETICULATE_PYTHON")
@@ -30,8 +29,7 @@ gliner_load_model <- function(
   reticulate::use_virtualenv("./.venv")
   gliner <- reticulate::import("gliner")
 
-  #### 4 Load model ####
-
+  # 4 Load model -----------------------------------------------------
   Sys.setenv(HF_HUB_DISABLE_SYMLINKS = "1")
   cache_dir <- "./.venv"
 
@@ -49,8 +47,7 @@ gliner_load_model <- function(
     cache_dir = cache_dir
   )
 
-  #### 5 Test model ####
-
+  # 5 Test model -----------------------------------------------------
   if (test_model) {
     print_message("Testing GLiNER model...")
 
@@ -69,8 +66,7 @@ gliner_load_model <- function(
     )
   }
 
-  #### 6 Return model ####
-
+  # 6 Return model ---------------------------------------------------
   print_message("GLiNER model loaded successfully!", type = "success")
   return(model)
 }

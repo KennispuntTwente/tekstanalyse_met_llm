@@ -1,7 +1,6 @@
 # Module for splitting long texts into shorter texts via semantic chunking
 
-#### 1 UI & server ###################################################
-
+# 1 UI & server ------------------------------------------------------
 text_split_ui <- function(id) {
   ns <- NS(id)
   uiOutput(ns("card"))
@@ -343,8 +342,7 @@ text_split_server <- function(
 }
 
 
-#### 2 Helpers ####
-
+# 2 Helpers --------------------------------------------------------
 split_texts_with_semchunk <- function(
   texts,
   chunk_size = 128,
@@ -377,8 +375,7 @@ split_texts_with_semchunk <- function(
   return(result)
 }
 
-#### 3 Example/development usage ####
-
+# 3 Example/development usage ----------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

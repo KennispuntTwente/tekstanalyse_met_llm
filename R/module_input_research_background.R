@@ -2,8 +2,7 @@
 # Research background is a short description of the research context,
 #   which will be used to provide context to the LLM in the prompts
 
-#### 1 UI ####
-
+# 1 UI ---------------------------------------------------------------
 research_background_ui <- function(id) {
   ns <- NS(id)
   tagList(
@@ -13,8 +12,7 @@ research_background_ui <- function(id) {
 }
 
 
-#### 2 Server ####
-
+# 2 Server ---------------------------------------------------------
 research_background_server <- function(
   id,
   processing,
@@ -79,8 +77,7 @@ research_background_server <- function(
 }
 
 
-#### 3 Example/development usage ####
-
+# 3 Example/development usage --------------------------------------
 if (FALSE) {
   library(shiny)
   library(shinyjs)

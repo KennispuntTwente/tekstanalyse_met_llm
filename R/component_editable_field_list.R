@@ -2,7 +2,7 @@
 # Reusable Shiny module for dynamic text input fields with add/remove/edit functionality
 # Used by: categories (categorization mode), codes (marking mode)
 
-#### 1 UI ####
+# 1 UI --------------------------------------------------------------------
 
 editable_field_list_ui <- function(id) {
   ns <- NS(id)
@@ -13,7 +13,7 @@ editable_field_list_ui <- function(id) {
 }
 
 
-#### 2 Server ####
+# 2 Server ----------------------------------------------------------------
 
 #' Editable Field List Server
 #'
@@ -36,8 +36,7 @@ editable_field_list_server <- function(
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    #### State ####
-
+    # State ----------------------------------------------------------
     n_fields <- reactiveVal(initial_count)
     txt_in_fields <- reactiveVal(rep("", initial_count))
     exclusive_vals <- reactiveVal(rep(FALSE, initial_count))
@@ -50,8 +49,7 @@ editable_field_list_server <- function(
       isEditing = isEditing()
     )
 
-    #### UI rendering ####
-
+    # UI rendering ---------------------------------------------------
     # Individual fields
     output$field_inputs <- renderUI({
       show_excl <- isTRUE(show_exclusive()) || identical(show_exclusive, TRUE)
@@ -119,8 +117,7 @@ editable_field_list_server <- function(
       )
     })
 
-    #### Sync state from inputs ####
-
+    # Sync state from inputs -----------------------------------------
     observe({
       req(isEditing())
       show_excl <- isTRUE(show_exclusive()) || identical(show_exclusive, TRUE)
@@ -146,8 +143,7 @@ editable_field_list_server <- function(
       }
     })
 
-    #### Add/remove fields ####
-
+    # Add/remove fields ----------------------------------------------
     observeEvent(input$addField, {
       req(isEditing())
       txt_in_fields(c(txt_in_fields(), ""))
@@ -162,8 +158,7 @@ editable_field_list_server <- function(
       n_fields(n_fields() - 1)
     })
 
-    #### Toggle edit/save ####
-
+    # Toggle edit/save -----------------------------------------------
     observeEvent(input$toggleEdit, {
       if (isEditing()) {
         # SAVE
@@ -189,8 +184,7 @@ editable_field_list_server <- function(
       }
     })
 
-    #### Disable when processing ####
-
+    # Disable when processing ----------------------------------------
     update_input_state <- function() {
       show_excl <- isTRUE(show_exclusive()) || identical(show_exclusive, TRUE)
 
@@ -225,8 +219,7 @@ editable_field_list_server <- function(
       shinyjs::delay(50, update_input_state())
     })
 
-    #### Return values ####
-
+    # Return values --------------------------------------------------
     # Non-empty unique texts
     nonEmptyTexts <- reactive({
       vals <- txt_in_fields()
@@ -284,7 +277,7 @@ editable_field_list_server <- function(
 }
 
 
-#### 3 Example/development usage ####
+# 3 Example/development usage ---------------------------------------------
 
 if (FALSE) {
   library(shiny)
