@@ -1,8 +1,8 @@
 {
   "export": {
-    "categories-isEditing": false,
-    "categories-n_fields": 3,
-    "categories-txt_in_fields": [
+    "categories-fields-isEditing": false,
+    "categories-fields-n_fields": 3,
+    "categories-fields-txt_in_fields": [
       "a",
       "b",
       ""
