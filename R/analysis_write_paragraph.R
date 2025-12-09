@@ -15,7 +15,8 @@ write_paragraph <- function(
     parameters = list(model = "gpt-4o-mini")
   ),
   language = c("nl", "en"),
-  focus_on_highlighted_text = FALSE
+  focus_on_highlighted_text = FALSE,
+  stream_callback = NULL
 ) {
   language <- match.arg(language)
   stopifnot(
@@ -111,7 +112,8 @@ write_paragraph <- function(
     {
       send_prompt_with_retries(
         prompt,
-        llm_provider = llm_provider
+        llm_provider = llm_provider,
+        stream_callback = stream_callback
       )
     },
     error = function(e) {

@@ -11,6 +11,9 @@ load_dependencies("docker")
 # Set asynchronous processing
 # - Asynchronous processing is recommended when deploying the app to a server,
 #     where multiple users can use the app simultaneously
+# - Asynchronous processing also enables progress bar updates in the UI
+#     during the analysis of texts, and live streaming of LLM output
+#     when the LLM is writing summarizing paragraphs
 # - To enable asynchronous processing, you need to use `future::plan()`, e.g.,
 #     `future::plan(multisession)`
 # - When you asynchronous processing is not needed, you can use
@@ -43,6 +46,9 @@ if (!getOption("shiny.testmode", FALSE)) {
 #     the model names will be shown. Names must be unique. If you want to use
 #     a specific model twice but with different settings, a named list is
 #     then required
+# - Note: most LLM providers are configured with stream = TRUE by default
+#     (see R/module_config_llm_provider.R); when writing paragraphs & under asynchronous
+#     processing, this enables live streaming of LLM output in the UI
 preconfigured_models_main <- NULL
 preconfigured_models_large <- NULL
 if (FALSE) {

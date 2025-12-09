@@ -24,7 +24,8 @@ mark_texts <- function(
     translation_json_path = "language/language.json"
   ),
   write_paragraphs = TRUE,
-  max_interactions = getOption("send_prompt_with_retries__max_interaction", 10)
+  max_interactions = getOption("send_prompt_with_retries__max_interaction", 10),
+  llm_stream_async = NULL
 ) {
   stopifnot(
     is.character(texts),
@@ -236,6 +237,16 @@ mark_texts <- function(
       progress_secondary$show()
     })
 
+    # Create streaming callback if we have the async controller
+    stream_callback <- NULL
+    if (!is.null(llm_stream_async)) {
+      try(llm_stream_async$show())
+      stream_callback <- function(token, meta) {
+        llm_stream_async$set(meta$partial_response %||% "")
+        invisible(TRUE)
+      }
+    }
+
     i <- -1
     paragraphs <- purrr::imap(
       text_list,
@@ -257,6 +268,11 @@ mark_texts <- function(
           )
         })
 
+        # Clear streaming panel before this paragraph
+        if (!is.null(llm_stream_async)) {
+          try(llm_stream_async$clear())
+        }
+
         paragraph <- write_paragraph(
           texts = texts,
           topic = code,
@@ -264,7 +280,8 @@ mark_texts <- function(
           style_prompt = style_prompt,
           llm_provider = llm_provider,
           language = lang$get_translation_language(),
-          focus_on_highlighted_text = TRUE
+          focus_on_highlighted_text = TRUE,
+          stream_callback = stream_callback
         )
 
         return(paragraph)
