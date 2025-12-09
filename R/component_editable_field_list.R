@@ -128,7 +128,9 @@ editable_field_list_server <- function(
       # Sync text values
       txt_in_fields(sapply(
         seq_len(n_fields()),
-        function(i) isolate(input[[paste0("field", i)]]) %||% txt_in_fields()[i],
+        function(i) {
+          isolate(input[[paste0("field", i)]]) %||% txt_in_fields()[i]
+        },
         simplify = TRUE,
         USE.NAMES = FALSE
       ))
@@ -252,11 +254,13 @@ editable_field_list_server <- function(
 
     # Method to programmatically set field values (e.g., after code generation)
     set_values <- function(values) {
-      if (length(values) == 0) return()
+      if (length(values) == 0) {
+        return()
+      }
       txt_in_fields(values)
       n_fields(length(values))
       isEditing(TRUE)
-      
+
       # Update UI inputs to match
       shinyjs::delay(100, {
         lapply(seq_along(values), function(i) {

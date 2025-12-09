@@ -25,9 +25,15 @@ interrater_toggle_server <- function(
     id = id,
     title = lang()$t("Inter-rater reliability"),
     tooltip_text = paste0(
-      lang()$t("Wil je een steekproef trekken van de teksten om interrater-reliability te berekenen?"),
-      lang()$t(" Nadat het model de teksten heeft geanalyseerd, zal een venster openen waarin je zelf teksten kunt beoordelen."),
-      lang()$t(" Je beoordelingen worden vergeleken met die van het taalmodel (bij categorisatie/onderwerpextractie wordt Cohen's Kappa berekend; bij scoren wordt een paired t-test uitgevoerd).")
+      lang()$t(
+        "Wil je een steekproef trekken van de teksten om interrater-reliability te berekenen?"
+      ),
+      lang()$t(
+        " Nadat het model de teksten heeft geanalyseerd, zal een venster openen waarin je zelf teksten kunt beoordelen."
+      ),
+      lang()$t(
+        " Je beoordelingen worden vergeleken met die van het taalmodel (bij categorisatie/onderwerpextractie wordt Cohen's Kappa berekend; bij scoren wordt een paired t-test uitgevoerd)."
+      )
     ),
     question_text = lang()$t("Zelf steekproef beoordelen?"),
     default_value = FALSE,

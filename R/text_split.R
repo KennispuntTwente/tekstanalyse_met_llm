@@ -105,10 +105,18 @@ text_split_server <- function(
             lang()$t('Splits teksten'),
             paste0(
               lang()$t("Wil je teksten splitsen naar kortere teksten?"),
-              lang()$t(" Als je teksten erg lang zijn (bijv., interviews) kan een taalmodel hier mogelijk minder goed mee omgaan."),
-              lang()$t(" Het kan dan nuttig zijn om je teksten op te splitsen in kortere teksten. (Let op: dit is niet nodig als je de 'markeren'-modus gebruikt.)"),
-              lang()$t(" Splitsen kan gedaan worden met behulp van semantische chunking, waarbij teksten worden gesplitst op basis van hun inhoud."),
-              lang()$t(" De teksten worden hier met Python package 'semchunk' gesplitst in stukken van een opgegeven maximale lengte (in tokens, naar OpenAI's gpt-4; een token is ongeveer 4 karakters).")
+              lang()$t(
+                " Als je teksten erg lang zijn (bijv., interviews) kan een taalmodel hier mogelijk minder goed mee omgaan."
+              ),
+              lang()$t(
+                " Het kan dan nuttig zijn om je teksten op te splitsen in kortere teksten. (Let op: dit is niet nodig als je de 'markeren'-modus gebruikt.)"
+              ),
+              lang()$t(
+                " Splitsen kan gedaan worden met behulp van semantische chunking, waarbij teksten worden gesplitst op basis van hun inhoud."
+              ),
+              lang()$t(
+                " De teksten worden hier met Python package 'semchunk' gesplitst in stukken van een opgegeven maximale lengte (in tokens, naar OpenAI's gpt-4; een token is ongeveer 4 karakters)."
+              )
             )
           ),
           card_body(
@@ -324,7 +332,10 @@ text_split_server <- function(
 
     # Disable inputs when processing -------------------------------
 
-    disable_when_processing(processing, c("toggle", "max_tokens", "overlap", "split_texts"))
+    disable_when_processing(
+      processing,
+      c("toggle", "max_tokens", "overlap", "split_texts")
+    )
 
     # Return -------------------------------------------------------
     return(texts)

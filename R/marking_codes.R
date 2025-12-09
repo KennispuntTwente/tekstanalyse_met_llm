@@ -48,9 +48,15 @@ marking_codes_server <- function(
           card_header_with_tooltip(
             lang()$t("Codes"),
             paste0(
-              lang()$t("Bewerk hier de codes waarnaar het taalmodel relevante delen van de teksten zal markeren."),
-              lang()$t(" Gebruik de '+'- en '-'-knoppen om codes toe te voegen of te verwijderen."),
-              lang()$t(" Gebruik tenslotte de save/edit-knop om de codes op te slaan (of weer te kunnen bewerken).")
+              lang()$t(
+                "Bewerk hier de codes waarnaar het taalmodel relevante delen van de teksten zal markeren."
+              ),
+              lang()$t(
+                " Gebruik de '+'- en '-'-knoppen om codes toe te voegen of te verwijderen."
+              ),
+              lang()$t(
+                " Gebruik tenslotte de save/edit-knop om de codes op te slaan (of weer te kunnen bewerken)."
+              )
             )
           ),
           card_body(

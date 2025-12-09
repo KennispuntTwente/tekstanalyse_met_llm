@@ -81,10 +81,21 @@ yes_no_toggle_card_server <- function(
         modalDialog(
           title = tagList(icon(modal_config$icon), " ", t(modal_config$title)),
           div(
-            if (!is.null(modal_config$body_text1) || !is.null(modal_config$body_text2)) {
+            if (
+              !is.null(modal_config$body_text1) ||
+                !is.null(modal_config$body_text2)
+            ) {
               p(paste0(
-                if (!is.null(modal_config$body_text1)) t(modal_config$body_text1) else "",
-                if (!is.null(modal_config$body_text2)) t(modal_config$body_text2) else ""
+                if (!is.null(modal_config$body_text1)) {
+                  t(modal_config$body_text1)
+                } else {
+                  ""
+                },
+                if (!is.null(modal_config$body_text2)) {
+                  t(modal_config$body_text2)
+                } else {
+                  ""
+                }
               ))
             },
             if (!is.null(modal_config$body)) modal_config$body,
@@ -106,11 +117,19 @@ yes_no_toggle_card_server <- function(
               ),
               tags$div(
                 style = "flex:1; text-align:center;",
-                actionButton(ns("modal_reset"), lang()$t("Reset"), class = "btn-danger")
+                actionButton(
+                  ns("modal_reset"),
+                  lang()$t("Reset"),
+                  class = "btn-danger"
+                )
               ),
               tags$div(
                 style = "flex:1; text-align:right;",
-                actionButton(ns("modal_save"), lang()$t("Sla op"), class = "btn-primary")
+                actionButton(
+                  ns("modal_save"),
+                  lang()$t("Sla op"),
+                  class = "btn-primary"
+                )
               )
             )
           ),
@@ -153,15 +172,24 @@ yes_no_toggle_card_server <- function(
         shinyjs::useShinyjs(),
         bslib::card(
           class = "card",
-          card_header_with_tooltip(t(title), t(tooltip_text), extra = final_header_extra),
+          card_header_with_tooltip(
+            t(title),
+            t(tooltip_text),
+            extra = final_header_extra
+          ),
           card_body(
             p(t(question_text), class = "mb-2 text-center"),
             div(
               class = "d-flex justify-content-center",
               shinyWidgets::radioGroupButtons(
-                ns("toggle"), NULL,
+                ns("toggle"),
+                NULL,
                 choices = c(lang()$t("Nee"), lang()$t("Ja")),
-                selected = if (default_value) lang()$t("Ja") else lang()$t("Nee"),
+                selected = if (default_value) {
+                  lang()$t("Ja")
+                } else {
+                  lang()$t("Nee")
+                },
                 size = "sm"
               )
             )
@@ -176,15 +204,19 @@ yes_no_toggle_card_server <- function(
     })
 
     # Disable when processing
-    observeEvent(processing(), {
-      shinyjs::toggleState("toggle", condition = !processing())
-      if (!is.null(modal_config)) {
-        shinyjs::toggleState("show_modal", condition = !processing())
-      }
-      for (id in extra_disable_ids) {
-        shinyjs::toggleState(id, condition = !processing())
-      }
-    }, ignoreInit = TRUE)
+    observeEvent(
+      processing(),
+      {
+        shinyjs::toggleState("toggle", condition = !processing())
+        if (!is.null(modal_config)) {
+          shinyjs::toggleState("show_modal", condition = !processing())
+        }
+        for (id in extra_disable_ids) {
+          shinyjs::toggleState(id, condition = !processing())
+        }
+      },
+      ignoreInit = TRUE
+    )
 
     # Return
     if (!is.null(modal_config)) {
@@ -223,7 +255,9 @@ if (FALSE) {
       processing = processing
     )
 
-    observe({ print(paste("Toggle:", result())) })
+    observe({
+      print(paste("Toggle:", result()))
+    })
   }
 
   shinyApp(ui, server)

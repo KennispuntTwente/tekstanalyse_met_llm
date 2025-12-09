@@ -26,7 +26,9 @@ write_paragraphs_toggle_server <- function(
     tooltip_text = "Indien je dit aanzet, zal het model per categorie een samenvattende paragraaf schrijven met quotes uit de bijbehorende teksten.",
     question_text = "Rapport schrijven over categorieën?",
     default_value = TRUE,
-    show_when = reactive(mode() %in% c("Onderwerpextractie", "Categorisatie", "Markeren")),
+    show_when = reactive(
+      mode() %in% c("Onderwerpextractie", "Categorisatie", "Markeren")
+    ),
     modal_config = list(
       icon = "palette",
       tooltip = "Stijlprompt voor samenvattingen",
@@ -36,7 +38,7 @@ write_paragraphs_toggle_server <- function(
       input_label = "Geef aan hoe de samenvattingen geschreven moeten worden. Welke stijl of focus wil je?",
       input_placeholder = "Bijvoorbeeld: 'Schrijf in een formele, academische stijl' of 'Focus op emotionele aspecten van de teksten'"
     ),
-    translate_texts = TRUE,  # Tell component to translate the texts
+    translate_texts = TRUE, # Tell component to translate the texts
     processing = processing,
     lang = lang
   )
@@ -45,7 +47,11 @@ write_paragraphs_toggle_server <- function(
   moduleServer(id, function(input, output, session) {
     return(list(
       write_paragraphs = reactive({
-        if (isTRUE(mode() %in% c("Onderwerpextractie", "Categorisatie", "Markeren"))) {
+        if (
+          isTRUE(
+            mode() %in% c("Onderwerpextractie", "Categorisatie", "Markeren")
+          )
+        ) {
           result$toggle()
         } else {
           FALSE

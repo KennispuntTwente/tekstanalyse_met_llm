@@ -29,9 +29,9 @@ icon_toggle_button <- function(
     !is.null(icon_name) || !is.null(img_src),
     is.function(ns)
   )
-  
+
   full_id <- ns(paste0("select_", id_suffix))
-  
+
   # Build the icon/image content
   icon_content <- if (!is.null(img_src)) {
     tags$img(
@@ -46,7 +46,7 @@ icon_toggle_button <- function(
       style = paste0("height:", icon_height, ";")
     )
   }
-  
+
   div(
     id = full_id,
     class = paste(css_prefix, if (is_active) paste0(css_prefix, "-active")),
@@ -86,7 +86,7 @@ icon_toggle_group <- function(
       css_prefix = css_prefix
     )
   })
-  
+
   div(class = container_class, tagList(button_elements))
 }
 
@@ -98,7 +98,8 @@ icon_toggle_group <- function(
 #' @param prefix CSS class prefix: "llm-icon" or "tm-icon"
 #' @return HTML style tag
 icon_toggle_css <- function(prefix = "llm-icon") {
-  tags$style(HTML(sprintf("
+  tags$style(HTML(sprintf(
+    "
     .%s {
       padding: 2px;
       border-radius: 2px;
@@ -118,7 +119,11 @@ icon_toggle_css <- function(prefix = "llm-icon") {
       transform: scale(1.05);
       cursor: default;
     }
-  ", prefix, prefix, prefix)))
+  ",
+    prefix,
+    prefix,
+    prefix
+  )))
 }
 
 
@@ -144,8 +149,13 @@ modal_trigger_icon <- function(
   font_size = "1.25rem"
 ) {
   style <- if (is_active) "color:#0d6efd;" else "color:#6c757d;"
-  style <- paste0(style, "font-size:", font_size, "; border:none; background:transparent;")
-  
+  style <- paste0(
+    style,
+    "font-size:",
+    font_size,
+    "; border:none; background:transparent;"
+  )
+
   actionLink(
     ns(input_id),
     icon(icon_name, lib = "font-awesome"),

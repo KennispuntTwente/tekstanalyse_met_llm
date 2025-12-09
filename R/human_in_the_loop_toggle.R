@@ -23,9 +23,15 @@ human_in_the_loop_toggle_server <- function(
     id = id,
     title = lang()$t("Human-in-the-loop"),
     tooltip_text = paste0(
-      lang()$t("Indien je dit aanzet, kun je de de onderwerpen die het taalmodel heeft geïdentificeerd in de teksten bekijken en bewerken."),
-      lang()$t(" Dit kan je dan doen dan voordat de onderwerpen worden toegewezen aan de teksten."),
-      lang()$t(" Je kan bijvoorbeeld zelf bepaalde onderwerpen toevoegen, verwijderen, samenvoegen, of uitsplitsen.")
+      lang()$t(
+        "Indien je dit aanzet, kun je de de onderwerpen die het taalmodel heeft geïdentificeerd in de teksten bekijken en bewerken."
+      ),
+      lang()$t(
+        " Dit kan je dan doen dan voordat de onderwerpen worden toegewezen aan de teksten."
+      ),
+      lang()$t(
+        " Je kan bijvoorbeeld zelf bepaalde onderwerpen toevoegen, verwijderen, samenvoegen, of uitsplitsen."
+      )
     ),
     question_text = lang()$t("Zelf onderwerpen bewerken?"),
     default_value = FALSE,

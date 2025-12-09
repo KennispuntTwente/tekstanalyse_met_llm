@@ -260,12 +260,24 @@ categories_server <- function(
           card_header_with_tooltip(
             lang()$t("Categorieën"),
             paste0(
-              lang()$t("Bewerk hier de categorieën waarin het taalmodel de teksten kan indelen."),
-              lang()$t(" Gebruik de '+'- en '-'-knoppen om categorieën toe te voegen of te verwijderen."),
-              lang()$t(" Gebruik tenslotte de save/edit-knop om de categorieën op te slaan (of weer te kunnen bewerken)."),
-              lang()$t(" In een verder blok hieronder kun je kiezen of het model meerdere categorieën mag toewijzen aan een tekst, of slechts één categorie."),
-              lang()$t(" Indien je het model meerdere categorieën laat toewijzen, kan je alsnog specifieke categorieën als 'exclusief' aanmerken."),
-              lang()$t(" Als een exlusieve categorie wordt toegewezen aan een tekst, mogen daarnaast geen andere categorieën worden toegewezen aan de tekst.")
+              lang()$t(
+                "Bewerk hier de categorieën waarin het taalmodel de teksten kan indelen."
+              ),
+              lang()$t(
+                " Gebruik de '+'- en '-'-knoppen om categorieën toe te voegen of te verwijderen."
+              ),
+              lang()$t(
+                " Gebruik tenslotte de save/edit-knop om de categorieën op te slaan (of weer te kunnen bewerken)."
+              ),
+              lang()$t(
+                " In een verder blok hieronder kun je kiezen of het model meerdere categorieën mag toewijzen aan een tekst, of slechts één categorie."
+              ),
+              lang()$t(
+                " Indien je het model meerdere categorieën laat toewijzen, kan je alsnog specifieke categorieën als 'exclusief' aanmerken."
+              ),
+              lang()$t(
+                " Als een exlusieve categorie wordt toegewezen aan een tekst, mogen daarnaast geen andere categorieën worden toegewezen aan de tekst."
+              )
             )
           ),
           card_body(

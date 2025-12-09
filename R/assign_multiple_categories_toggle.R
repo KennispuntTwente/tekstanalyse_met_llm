@@ -21,10 +21,18 @@ assign_multiple_categories_toggle_server <- function(
     id = id,
     title = lang()$t("Meerdere categorieën"),
     tooltip_text = paste0(
-      lang()$t("Mag het model meerdere categorieën toekennen aan een tekst, of slechts één categorie?"),
-      lang()$t(" Indien je het model meerdere categorieën laat toewijzen, kan je alsnog specifieke categorieën als 'exclusief' aanmerken."),
-      lang()$t(" Als een exlusieve categorie wordt toegewezen aan een tekst, mogen daarnaast geen andere categorieën worden toegewezen aan de tekst."),
-      lang()$t(" Je kunt categorieën exclusief maken in de categorie-editor (modus 'categorisatie') of bij het bewerken van de onderwerpen (modus 'onderwerpextractie'; zet 'human-in-the-loop' aan).")
+      lang()$t(
+        "Mag het model meerdere categorieën toekennen aan een tekst, of slechts één categorie?"
+      ),
+      lang()$t(
+        " Indien je het model meerdere categorieën laat toewijzen, kan je alsnog specifieke categorieën als 'exclusief' aanmerken."
+      ),
+      lang()$t(
+        " Als een exlusieve categorie wordt toegewezen aan een tekst, mogen daarnaast geen andere categorieën worden toegewezen aan de tekst."
+      ),
+      lang()$t(
+        " Je kunt categorieën exclusief maken in de categorie-editor (modus 'categorisatie') of bij het bewerken van de onderwerpen (modus 'onderwerpextractie'; zet 'human-in-the-loop' aan)."
+      )
     ),
     question_text = lang()$t("Meerdere categorieën per tekst toegestaan?"),
     default_value = TRUE,

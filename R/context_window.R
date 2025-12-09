@@ -94,10 +94,18 @@ context_window_server <- function(
           card_header_with_tooltip(
             lang()$t("Context-window"),
             paste0(
-              lang()$t("Het context-window is de hoeveelheid tekst die het taalmodel kan verwerken in één keer."),
-              lang()$t(" Er moet voor worden gezorgd dat de onderzoeksachtergrond met de (langste) tekst die je invoert binnen het context-window van het model past."),
-              lang()$t(" Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen."),
-              lang()$t(" Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen.")
+              lang()$t(
+                "Het context-window is de hoeveelheid tekst die het taalmodel kan verwerken in één keer."
+              ),
+              lang()$t(
+                " Er moet voor worden gezorgd dat de onderzoeksachtergrond met de (langste) tekst die je invoert binnen het context-window van het model past."
+              ),
+              lang()$t(
+                " Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen."
+              ),
+              lang()$t(
+                " Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen."
+              )
             )
           ),
           card_body(
@@ -441,7 +449,9 @@ context_window_server <- function(
             list(
               # Add subtle text to explain chunking parameters
               description_box(
-                lang()$t("Onderstaande parameters bepalen hoe de teksten worden verdeeld in chunks voor het genereren van onderwerpen in de 'onderwerpextractie'-modus.")
+                lang()$t(
+                  "Onderstaande parameters bepalen hoe de teksten worden verdeeld in chunks voor het genereren van onderwerpen in de 'onderwerpextractie'-modus."
+                )
               ),
               numericInput(
                 ns("chunk_size"),
@@ -463,7 +473,9 @@ context_window_server <- function(
             list(
               # Add subtle text to explain chunking parameters
               description_box(
-                lang()$t("Onderstaande parameters bepalen of en hoe de teksten worden gesplitst naar kleinere stukken in de 'markeren'-modus.")
+                lang()$t(
+                  "Onderstaande parameters bepalen of en hoe de teksten worden gesplitst naar kleinere stukken in de 'markeren'-modus."
+                )
               ),
               # Ask text split size & allowed overlap size (in tokens)
               numericInput(

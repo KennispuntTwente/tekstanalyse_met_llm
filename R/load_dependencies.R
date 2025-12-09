@@ -12,7 +12,6 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
 
   cat("Loading dependencies for mode:", mode, "\n")
 
-
   # 1 Environment-specific setup ----------------------------------------------
 
   if (mode == "regular") {
@@ -86,7 +85,6 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
 
   # Docker mode: no special environment setup needed (pre-installed)
 
-
   # 2 Load core packages ----------------------------------------------------
 
   # Note: generally functions from packages are & should be called with
@@ -102,7 +100,6 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   library(htmltools)
   library(future)
   library(promises)
-
 
   # 3 Load R functions ------------------------------------------------------
 
@@ -120,7 +117,6 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
     }
   }
   load_all()
-
 
   # 4 Done ------------------------------------------------------------------
 

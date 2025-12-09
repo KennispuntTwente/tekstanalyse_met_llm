@@ -30,7 +30,9 @@ mode_server <- function(
           class = "card",
           card_header_with_tooltip(
             lang()$t("Modus"),
-            lang()$t("Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren.")
+            lang()$t(
+              "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren."
+            )
           ),
           card_body(
             div(

@@ -203,34 +203,43 @@ text_management_server <- function(
     # -- 4  Mode selector icons -------------------------------------
     output$mode_selection <- renderUI({
       cur <- anonymization_mode()
-      
+
       # Build list of available buttons
       buttons <- list()
       if ("none" %in% available_modes) {
-        buttons <- c(buttons, list(list(
-          id = "none",
-          icon = "x-square",
-          title = lang()$t("Geen anonimisering"),
-          tooltip = lang()$t("Geen anonimisering")
-        )))
+        buttons <- c(
+          buttons,
+          list(list(
+            id = "none",
+            icon = "x-square",
+            title = lang()$t("Geen anonimisering"),
+            tooltip = lang()$t("Geen anonimisering")
+          ))
+        )
       }
       if ("simple" %in% available_modes) {
-        buttons <- c(buttons, list(list(
-          id = "simple",
-          icon = "regex",
-          title = "Regex",
-          tooltip = lang()$t("Eenvoudige anonimisering met regex")
-        )))
+        buttons <- c(
+          buttons,
+          list(list(
+            id = "simple",
+            icon = "regex",
+            title = "Regex",
+            tooltip = lang()$t("Eenvoudige anonimisering met regex")
+          ))
+        )
       }
       if ("gliner" %in% available_modes) {
-        buttons <- c(buttons, list(list(
-          id = "gliner",
-          icon = "magic",
-          title = "GLiNER",
-          tooltip = lang()$t("Geavanceerde anonimisering met GLiNER-model")
-        )))
+        buttons <- c(
+          buttons,
+          list(list(
+            id = "gliner",
+            icon = "magic",
+            title = "GLiNER",
+            tooltip = lang()$t("Geavanceerde anonimisering met GLiNER-model")
+          ))
+        )
       }
-      
+
       icon_toggle_group(
         ns = ns,
         buttons = buttons,

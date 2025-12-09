@@ -635,8 +635,15 @@ llm_provider_server <- function(
 
       disable_when_processing(
         processing,
-        c("openai_url", "ollama_url", "api_key_text", "get_models",
-          "select_preconfigured", "select_openai", "select_ollama")
+        c(
+          "openai_url",
+          "ollama_url",
+          "api_key_text",
+          "get_models",
+          "select_preconfigured",
+          "select_openai",
+          "select_ollama"
+        )
       )
 
       # Return reactive values --------------------------------------------------
