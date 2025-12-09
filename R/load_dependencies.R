@@ -16,31 +16,40 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
     install.packages("cli")
   }
 
+  cli::cli_rule()
+  cli::cli_h2("Loading dependencies")
   cli::cli_alert_info("Loading dependencies for mode {.emph {mode}}...")
-
 
   # 1 Environment-specific setup ----------------------------------------------
 
   if (mode == "regular") {
+    cli::cli_rule()
+    cli::cli_h2("Setting up R & Python environments")
+
     # renv package management
     if (!requireNamespace("renv", quietly = TRUE)) {
       install.packages("renv")
     }
 
     # Setup R with renv
+    cli::cli_h3("R")
     cli::cli_alert_info("Executing `renv::restore()` to sync R packages...")
     renv::restore()
 
     # Setup Python with reticulate & uv
+    cli::cli_h3("Python")
     cli::cli_alert_info("Executing `uv sync` to sync Python packages...")
     try({
       Sys.unsetenv("RETICULATE_PYTHON")
       reticulate:::uv_exec("sync")
-      reticulate::use_virtualenv("./.venv")
+      suppressWarnings(reticulate::use_virtualenv("./.venv"))
     })
   }
 
   if (mode == "electron") {
+    cli::cli_rule()
+    cli::cli_h2("Setting up portable R & WinPython environments")
+
     # Set library path explicitly to portable R library
     portable_lib <- file.path(dirname(R.home()), "library")
     .libPaths(portable_lib)
@@ -59,10 +68,14 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
         download.file(url, zip_file, mode = "wb")
         actual_sha256 <- digest::digest(file = zip_file, algo = "sha256")
 
-        cli::cli_alert_info("WinPython: download SHA-256:\n{.emph {actual_sha256}}")
+        cli::cli_alert_info(
+          "WinPython: download SHA-256:\n{.emph {actual_sha256}}"
+        )
 
         if (tolower(actual_sha256) != tolower(expected_sha256)) {
-          stop("WinPython: downloaded file is corrupted/tampered with (SHA-256 mismatch)")
+          stop(
+            "WinPython: downloaded file is corrupted/tampered with (SHA-256 mismatch)"
+          )
         }
 
         dir.create(extract_dir, showWarnings = FALSE)
@@ -100,13 +113,15 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
 
   # Docker mode: no special environment setup needed (pre-installed)
 
-
   # 2 Load core packages ----------------------------------------------------
 
   # Note: generally functions from packages are & should be called with
   # `package::function()` for safety, but loading here for convenience
   # For 'shiny' & 'htmltools' functions we make an exception as they are used
   # extensively and using `::` everywhere would be overly verbose
+
+  cli::cli_rule()
+  cli::cli_h2("Loading core R packages...")
 
   library(tidyverse)
   library(tidyprompt)
@@ -117,8 +132,12 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   library(future)
   library(promises)
 
+  cli::cli_alert_success("R packages loaded")
 
   # 3 Load R functions ------------------------------------------------------
+
+  cli::cli_rule()
+  cli::cli_h2("Loading files in {.path R/} folder...")
 
   load_all <- function(except = c("R/load_dependencies.R")) {
     r_files <- list.files(
@@ -135,10 +154,14 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   }
   load_all()
 
+  cli::cli_alert_success("R files loaded")
 
   # 4 Done ------------------------------------------------------------------
 
-  cli::cli_alert_success("Dependencies loaded for mode {.emph {mode}}")
+  cli::cli_rule()
+  cli::cli_h2("Dependencies loaded")
+  cli::cli_alert_success("All dependencies loaded for mode {.emph {mode}}")
+  cli::cli_rule()
 
   invisible(mode)
 }
