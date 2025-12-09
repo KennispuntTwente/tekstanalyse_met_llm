@@ -356,6 +356,7 @@ processing_server <- function(
           {
             # Clean up async controllers before error handling
             llm_stream_async$stop()
+            llm_stream$hide()
             app_error(
               .,
               when = "main processing of categorization/scoring",
@@ -533,6 +534,7 @@ processing_server <- function(
         ) %...>%
           topics() %...!%
           {
+            llm_stream$hide()
             app_error(
               .,
               when = "main processing (step 1-2) of topic modelling",
@@ -835,6 +837,7 @@ processing_server <- function(
           {
             # Clean up async controllers before error handling
             llm_stream_async$stop()
+            llm_stream$hide()
             app_error(
               .,
               when = "main processing (step 3-4) of topic modelling",
@@ -969,6 +972,7 @@ processing_server <- function(
           {
             # Clean up async controllers before error handling
             llm_stream_async$stop()
+            llm_stream$hide()
             app_error(
               .,
               when = "main processing of marking",

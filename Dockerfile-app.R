@@ -16,7 +16,7 @@ load_dependencies("docker")
 #     when the LLM is writing summarizing paragraphs
 # - To enable asynchronous processing, you need to use `future::plan()`, e.g.,
 #     `future::plan(multisession)`
-# - When you asynchronous processing is not needed, you can use
+# - When asynchronous processing is not needed, you can use
 #     `future::plan("sequential")`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
 # - See the documentation for `future::plan()` for more details
