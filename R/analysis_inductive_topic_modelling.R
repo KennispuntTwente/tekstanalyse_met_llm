@@ -726,7 +726,6 @@ if (FALSE) {
     "Shipping"
   )
 
-
   ## 2.2 Perform example procedure -----------------------------------------
 
   # See function arguments for the various options for the procedure,

@@ -210,4 +210,3 @@ prompt_multi_category <- function(
 
   return(prompt)
 }
-

@@ -13,10 +13,10 @@ score_ui <- function(id) {
 # 2 Server ----------------------------------------------------------------
 
 score_server <- function(
-    id,
-    mode,
-    processing,
-    lang = default_lang()
+  id,
+  mode,
+  processing,
+  lang = default_lang()
 ) {
   ns <- NS(id)
   moduleServer(
