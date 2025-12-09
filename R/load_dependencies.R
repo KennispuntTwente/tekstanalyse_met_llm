@@ -97,7 +97,6 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   library(htmltools)
   library(future)
   library(promises)
-  library(DT)
 
 
   # 3 Load R functions ------------------------------------------------------
