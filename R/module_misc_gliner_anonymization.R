@@ -625,7 +625,7 @@ gliner_server <- function(
       })
 
       # Use data table proxy to update the table without re-rendering
-      proxy_dt <- dataTableProxy(ns("pii_entities_table"))
+      proxy_dt <- DT::dataTableProxy(ns("pii_entities_table"))
 
       # Handle checkbox with which user can choose to not anonymize a specific entity
       observeEvent(
