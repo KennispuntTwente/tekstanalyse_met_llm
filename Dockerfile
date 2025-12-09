@@ -81,8 +81,8 @@ USER appuser
 ENV HF_HUB_OFFLINE=0
 RUN Rscript -e "\
   reticulate:::uv_exec('sync');\
-  source('R/gliner_load_model.R');\
-  source('R/async_message_printer.R');\
+  source('R/utils_gliner.R');\
+  source('R/utils_async_message_printer.R');\
   gliner_load_model();\
   reticulate:::uv_exec('cache clean');\
 "

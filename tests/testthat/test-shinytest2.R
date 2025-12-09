@@ -41,16 +41,16 @@ test_that("{shinytest2} recording: standard process - marking", {
   app$set_inputs(`model-main_model` = "gpt-4.1-nano-2025-04-14")
 
   # Generate codes & save them
-  app$set_inputs(`marking_codes-code1` = "Product feedback")
+  app$set_inputs(`marking_codes-fields-field1` = "Product feedback")
   # app$click("marking_codes-generateCodes")
   # app$wait_for_value(
   #   export = "marking_codes-generated_codes",
   #   timeout = 15000
   # )
   Sys.sleep(3)
-  app$click("marking_codes-toggleEdit")
+  app$click("marking_codes-fields-toggleEdit")
   app$wait_for_value(
-    export = "marking_codes-isEditing",
+    export = "marking_codes-fields-isEditing",
     timeout = 5000,
     ignore = c(NULL, TRUE)
   )
@@ -319,9 +319,9 @@ test_that("{shinytest2} recording: standard process - categorization", {
 
   # Enter categories
   app$set_inputs(`research_background-research_background` = "no clue!")
-  app$set_inputs(`categories-category1` = "a")
-  app$set_inputs(`categories-category2` = "b")
-  app$click("categories-toggleEdit")
+  app$set_inputs(`categories-fields-field1` = "a")
+  app$set_inputs(`categories-fields-field2` = "b")
+  app$click("categories-fields-toggleEdit")
 
   # Set model
   app$set_inputs(
@@ -357,9 +357,9 @@ test_that("{shinytest2} recording: standard process - categorization", {
       "text_management-texts__df",
 
       # Categories works
-      "categories-n_fields",
-      "categories-txt_in_fields",
-      "categories-isEditing",
+      "categories-fields-n_fields",
+      "categories-fields-txt_in_fields",
+      "categories-fields-isEditing",
 
       # Processing was successful
       "processing-processing",

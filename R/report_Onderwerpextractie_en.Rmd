@@ -12,8 +12,8 @@ params:
 ```{r include=FALSE, error=TRUE}
 library(stringr)
 rl <- params$result_list
-source(here::here("R", "report_datatable_config.R"), local = TRUE)
-source(here::here("R", "report_quote_utils.R"), local = TRUE)
+source(here::here("R", "style_datatable_config.R"), local = TRUE)
+source(here::here("R", "utils_quotes.R"), local = TRUE)
 ```
 
 ## Method

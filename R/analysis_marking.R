@@ -1,3 +1,9 @@
+# Defines a function to mark texts based on qualitative codes using an LLM.
+# The function splits texts into semantic chunks, sends prompts to the LLM to identify
+# relevant sections for each qualitative cod (e.g., 'it is raining' gets marked for code 'weather'),
+# and optionally generates summary paragraphs highlighting the marked sections
+# Function can take progress indicators and an interrupter for Shiny app integration
+
 mark_texts <- function(
   texts = c(
     "hi my super boi, its raining!",
