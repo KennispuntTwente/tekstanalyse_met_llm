@@ -127,7 +127,7 @@ edit_topics_server <- function(
 
         data <- topics_table_data()
         if (!assign_multiple_categories()) {
-          data <- data |> select(topic)
+          data <- data |> dplyr::select(topic)
         }
 
         table <- rhandsontable::rhandsontable(

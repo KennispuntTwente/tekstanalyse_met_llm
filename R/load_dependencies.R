@@ -89,6 +89,11 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
 
   # 2 Load core packages ----------------------------------------------------
 
+  # Note: generally functions from packages are & should be called with
+  # `package::function()` for safety, but loading here for convenience
+  # For 'shiny' & 'htmltools' functions we make an exception as they are used
+  # extensively and using `::` everywhere would be overly verbose
+
   library(tidyverse)
   library(tidyprompt)
   library(shiny)

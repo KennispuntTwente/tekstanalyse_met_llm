@@ -104,20 +104,20 @@ if (FALSE) {
     "Interviewer: What’s one project you’re proud of?\nInterviewee: A survey tool I built in Shiny to collect real-time feedback from field teams. It synced to a database and auto-generated reports. Made life easier for everyone."
   )
 
-  interview_df <- tibble(
+  interview_df <- tibble::tibble(
     id = paste0("resp_", seq_along(interview_texts)),
     text = interview_texts
   )
 
   # Apply chunking to each text row
   chunked_df <- interview_df %>%
-    mutate(
-      chunks = map(text, function(x) {
+    dplyr::mutate(
+      chunks = purrr::map(text, function(x) {
         chunker(x, overlap = TRUE)
       })
     ) %>%
-    select(id, chunks) %>%
-    unnest_longer(chunks, values_to = "chunk_text")
+    dplyr::select(id, chunks) %>%
+    tidyr::unnest_longer(chunks, values_to = "chunk_text")
 
   # View the chunked result
   print(chunked_df)
