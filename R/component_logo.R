@@ -1,6 +1,6 @@
-# Module for showing logos for Kennispunt Twente and GitHub
-
-#### 1 UI ####
+# Component functions for showing logos for Kennispunt Twente and GitHub
+# Returns UI elements for logos, with clickable links to their respective websites
+# Tooltip is added to the logo to show the name of the logo
 
 kpt_logo_ui <- function(
   id,
