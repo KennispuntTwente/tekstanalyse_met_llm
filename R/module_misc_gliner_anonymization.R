@@ -562,7 +562,7 @@ gliner_server <- function(
       }
 
       # Render the data table with PII entities, plus check-boxes for anonymization
-      output$pii_entities_table <- renderDT(server = TRUE, {
+      output$pii_entities_table <- DT::renderDT(server = TRUE, {
         req(isTRUE(module_state() == "evaluating"))
         df <- isolate(pii_eval())
         req(nrow(df) > 0)
