@@ -1280,13 +1280,11 @@ processing_server <- function(
         showModal(modalDialog(
           title = lang()$t("Nieuwe analyse starten?"),
           lang()$t("Zorg dat je eerst de resultaten downloadt."),
-          footer = tagList(
-            modalButton(lang()$t("Annuleren")),
-            actionButton(
-              ns("confirm_restart"),
-              lang()$t("Ja, nieuwe analyse"),
-              class = "btn btn-danger"
-            )
+          footer = modal_footer_confirm(
+            cancel_label = lang()$t("Annuleren"),
+            confirm_id = "confirm_restart",
+            confirm_label = lang()$t("Ja, nieuwe analyse"),
+            ns = ns
           )
         ))
       })
@@ -1662,14 +1660,11 @@ processing_server <- function(
         showModal(modalDialog(
           title = lang()$t("Annuleren?"),
           lang()$t("Weet je zeker dat je de analyse wilt annuleren?"),
-          footer = tags$div(
-            style = "display: flex; justify-content: space-between; width: 100%;",
-            modalButton(lang()$t("Nee, niet annuleren")),
-            actionButton(
-              ns("confirm_cancel"),
-              label = lang()$t("Ja, annuleren"),
-              class = "btn btn-danger"
-            )
+          footer = modal_footer_confirm(
+            cancel_label = lang()$t("Nee, niet annuleren"),
+            confirm_id = "confirm_cancel",
+            confirm_label = lang()$t("Ja, annuleren"),
+            ns = ns
           )
         ))
       })

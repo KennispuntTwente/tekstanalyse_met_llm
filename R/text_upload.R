@@ -358,36 +358,18 @@ text_upload_server <- function(
           ),
           hr(),
 
-          ## ------------------------------------------------------------------
-          ##  L E F T                |                R I G H T
-          ## ------------------------------------------------------------------
-          div(
-            class = "d-flex justify-content-between align-items-stretch gap-2",
-
-            # Left: Sluiten
-            div(
-              class = "d-flex align-items-stretch",
-              div(class = "h-100", modalButton(lang()$t("Sluiten")))
+          ## Footer buttons
+          modal_footer_buttons(
+            left = modalButton(lang()$t("Sluiten")),
+            center = actionButton(
+              ns("clear_filter"),
+              label = tagList(icon("rotate-left"), lang()$t("Filter wissen")),
+              class = "btn btn-warning"
             ),
-
-            # Center: Filter wissen
-            div(
-              class = "d-flex justify-content-center flex-grow-1 align-items-stretch",
-              actionButton(
-                ns("clear_filter"),
-                label = tagList(icon("rotate-left"), lang()$t("Filter wissen")),
-                class = "btn btn-warning h-100 w-100"
-              )
-            ),
-
-            # Right: Toepassen
-            div(
-              class = "d-flex align-items-stretch",
-              actionButton(
-                ns("apply_filter"),
-                label = tagList(icon("filter"), lang()$t("Toepassen")),
-                class = "btn btn-primary h-100"
-              )
+            right = actionButton(
+              ns("apply_filter"),
+              label = tagList(icon("filter"), lang()$t("Toepassen")),
+              class = "btn btn-primary"
             )
           )
         )

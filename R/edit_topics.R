@@ -90,25 +90,18 @@ edit_topics_server <- function(
               width = "100%"
             ),
             hr(),
-            div(
-              class = "clearfix",
-              div(
-                style = "float:left;margin:0;",
-                actionButton(
-                  ns("reset_topics"),
-                  "Reset",
-                  icon = icon("undo"),
-                  class = "btn-warning"
-                )
+            modal_footer_buttons(
+              left = actionButton(
+                ns("reset_topics"),
+                "Reset",
+                icon = icon("undo"),
+                class = "btn-warning"
               ),
-              div(
-                style = "float:right;margin:0;",
-                actionButton(
-                  ns("confirm_topics"),
-                  lang()$t("Bevestig"),
-                  icon = icon("arrow-right"),
-                  class = "btn btn-primary"
-                )
+              right = actionButton(
+                ns("confirm_topics"),
+                lang()$t("Bevestig"),
+                icon = icon("arrow-right"),
+                class = "btn btn-primary"
               )
             )
           ),
