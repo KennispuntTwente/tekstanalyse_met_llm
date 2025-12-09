@@ -354,6 +354,8 @@ processing_server <- function(
         ) %...>%
           results_df() %...!%
           {
+            # Clean up async controllers before error handling
+            llm_stream_async$stop()
             app_error(
               .,
               when = "main processing of categorization/scoring",
@@ -831,6 +833,8 @@ processing_server <- function(
         ) %...>%
           results_df() %...!%
           {
+            # Clean up async controllers before error handling
+            llm_stream_async$stop()
             app_error(
               .,
               when = "main processing (step 3-4) of topic modelling",
@@ -963,6 +967,8 @@ processing_server <- function(
         ) %...>%
           results_df() %...!%
           {
+            # Clean up async controllers before error handling
+            llm_stream_async$stop()
             app_error(
               .,
               when = "main processing of marking",
@@ -1021,6 +1027,7 @@ processing_server <- function(
         )
         progress_secondary$async$stop()
         progress_secondary$hide()
+        llm_stream$async$stop()
         llm_stream$hide()
 
         if (interrater_reliability_toggle()) {
