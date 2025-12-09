@@ -7,10 +7,17 @@
 #'
 #' @param mode Character string: "regular", "docker", or "electron"
 #'
+#' @return The mode used (invisible)
 load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   mode <- match.arg(mode)
 
-  cat("Loading dependencies for mode:", mode, "\n")
+  if (!requireNamespace("cli", quietly = TRUE)) {
+    message("Installing 'cli' package...")
+    install.packages("cli")
+  }
+
+  cli::cli_alert_info("Loading dependencies for mode {.emph {mode}}...")
+
 
   # 1 Environment-specific setup ----------------------------------------------
 
@@ -19,9 +26,13 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
     if (!requireNamespace("renv", quietly = TRUE)) {
       install.packages("renv")
     }
+
+    # Setup R with renv
+    cli::cli_alert_info("Executing `renv::restore()` to sync R packages...")
     renv::restore()
 
     # Setup Python with reticulate & uv
+    cli::cli_alert_info("Executing `uv sync` to sync Python packages...")
     try({
       Sys.unsetenv("RETICULATE_PYTHON")
       reticulate:::uv_exec("sync")
@@ -33,7 +44,9 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
     # Set library path explicitly to portable R library
     portable_lib <- file.path(dirname(R.home()), "library")
     .libPaths(portable_lib)
-    print(paste("Using library path:", portable_lib))
+
+    cli::cli_alert_info("Setting R library path to portable R library...")
+    cli::cli_alert_info("Using R library path: {.path {portable_lib}}")
 
     # Download portable WinPython
     try({
@@ -46,9 +59,10 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
         download.file(url, zip_file, mode = "wb")
         actual_sha256 <- digest::digest(file = zip_file, algo = "sha256")
 
-        cat("WinPython: downloaded SHA-256:", actual_sha256, "\n")
+        cli::cli_alert_info("WinPython: download SHA-256:\n{.emph {actual_sha256}}")
+
         if (tolower(actual_sha256) != tolower(expected_sha256)) {
-          stop("SHA-256 hash mismatch! File may be corrupted or tampered")
+          stop("WinPython: downloaded file is corrupted/tampered with (SHA-256 mismatch)")
         }
 
         dir.create(extract_dir, showWarnings = FALSE)
@@ -78,12 +92,14 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
         stop("WinPython: executable not found")
       }
 
-      cat("WinPython: using Python at", python_path, "\n")
+      cli::cli_alert_info("WinPython: using Python at {.path {python_path}}")
+
       Sys.setenv(UV_PYTHON = normalizePath(python_path))
     })
   }
 
   # Docker mode: no special environment setup needed (pre-installed)
+
 
   # 2 Load core packages ----------------------------------------------------
 
@@ -100,6 +116,7 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   library(htmltools)
   library(future)
   library(promises)
+
 
   # 3 Load R functions ------------------------------------------------------
 
@@ -118,9 +135,10 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   }
   load_all()
 
+
   # 4 Done ------------------------------------------------------------------
 
-  cli::cli_alert_success("Dependencies loaded for mode {mode}")
+  cli::cli_alert_success("Dependencies loaded for mode {.emph {mode}}")
 
   invisible(mode)
 }
