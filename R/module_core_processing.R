@@ -354,6 +354,8 @@ processing_server <- function(
         ) %...>%
           results_df() %...!%
           {
+            # Clean up async controllers before error handling
+            llm_stream_async$stop()
             llm_stream$hide()
             app_error(
               .,
@@ -833,6 +835,8 @@ processing_server <- function(
         ) %...>%
           results_df() %...!%
           {
+            # Clean up async controllers before error handling
+            llm_stream_async$stop()
             llm_stream$hide()
             app_error(
               .,
@@ -966,6 +970,8 @@ processing_server <- function(
         ) %...>%
           results_df() %...!%
           {
+            # Clean up async controllers before error handling
+            llm_stream_async$stop()
             llm_stream$hide()
             app_error(
               .,
@@ -1025,6 +1031,7 @@ processing_server <- function(
         )
         progress_secondary$async$stop()
         progress_secondary$hide()
+        llm_stream$async$stop()
         llm_stream$hide()
 
         if (interrater_reliability_toggle()) {
