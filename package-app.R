@@ -11,9 +11,12 @@ load_dependencies("electron")
 # Set asynchronous processing
 # - Asynchronous processing is recommended when deploying the app to a server,
 #     where multiple users can use the app simultaneously
+# - Asynchronous processing also enables progress bar updates in the UI
+#     during the analysis of texts, and live streaming of LLM output
+#     when the LLM is writing summarizing paragraphs
 # - To enable asynchronous processing, you need to use `future::plan()`, e.g.,
 #     `future::plan(multisession)`
-# - When you asynchronous processing is not needed, you can use
+# - When asynchronous processing is not needed, you can use
 #     `future::plan("sequential")`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
 # - See the documentation for `future::plan()` for more details
@@ -43,6 +46,9 @@ if (!getOption("shiny.testmode", FALSE)) {
 #     the model names will be shown. Names must be unique. If you want to use
 #     a specific model twice but with different settings, a named list is
 #     then required
+# - Note: LLM providers are configured with stream = TRUE by default
+#     (see R/module_config_llm_provider.R); this enables live streaming
+#     when writing paragraphs (see paragraph_streaming option below)
 preconfigured_models_main <- NULL
 preconfigured_models_large <- NULL
 if (FALSE) {
@@ -120,6 +126,11 @@ options(
   #   see R/language.R
   language = "en", # Default language
   language__can_toggle = TRUE, # If user can switch language in the app
+
+  # - Enable live streaming of LLM output when writing paragraphs;
+  #   only works when LLM provider has stream = TRUE;
+  #     see R/component_llm_streaming.R
+  paragraph_streaming = TRUE,
 
   # - Default setting for anonymization of texts, and if user
   #   can toggle this setting;

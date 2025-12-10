@@ -184,7 +184,7 @@ llm_provider_server <- function(
         NULL
       } else if (initial_provider_mode == "openai") {
         tidyprompt::llm_provider_openai(
-          parameters = list(model = "gpt-4o-mini", stream = FALSE),
+          parameters = list(model = "gpt-4o-mini", stream = TRUE),
           verbose = getOption("tidyprompt.verbose", TRUE),
           url = paste0(
             getOption(
@@ -196,7 +196,7 @@ llm_provider_server <- function(
         )
       } else {
         tidyprompt::llm_provider_ollama(
-          parameters = list(model = "llama3.1:8b", stream = FALSE),
+          parameters = list(model = "llama3.1:8b", stream = TRUE),
           verbose = getOption("tidyprompt.verbose", TRUE),
           url = paste0(
             getOption(
@@ -292,7 +292,7 @@ llm_provider_server <- function(
           req(openai_url())
 
           llm_provider_rv$llm_provider_configured <- tidyprompt::llm_provider_openai(
-            parameters = list(model = "gpt-4o-mini", stream = FALSE),
+            parameters = list(model = "gpt-4o-mini", stream = TRUE),
             verbose = getOption("tidyprompt.verbose", TRUE),
             url = paste0(
               openai_url()
@@ -304,7 +304,7 @@ llm_provider_server <- function(
           req(ollama_url())
 
           llm_provider_rv$llm_provider_configured <- tidyprompt::llm_provider_ollama(
-            parameters = list(model = "llama3.1:8b", stream = FALSE),
+            parameters = list(model = "llama3.1:8b", stream = TRUE),
             verbose = getOption("tidyprompt.verbose", TRUE),
             url = paste0(
               ollama_url()
@@ -454,7 +454,7 @@ llm_provider_server <- function(
       observeEvent(api_key_input(), {
         if (llm_provider_rv$provider_mode == "openai") {
           llm_provider_rv$llm_provider_configured <- tidyprompt::llm_provider_openai(
-            parameters = list(model = "gpt-4o-mini", stream = FALSE),
+            parameters = list(model = "gpt-4o-mini", stream = TRUE),
             verbose = getOption("tidyprompt.verbose", TRUE),
             url = paste0(openai_url()),
             api_key = api_key_input()

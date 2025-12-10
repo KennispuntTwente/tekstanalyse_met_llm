@@ -10,6 +10,7 @@ processing_ui <- function(id) {
     shinyjs::useShinyjs(),
     progress_bar_ui("progress_primary", visible = TRUE),
     progress_bar_ui("progress_secondary", visible = FALSE),
+    llm_streaming_ui("llm_stream", visible = FALSE),
     br(),
     div(
       class = "text-center",
@@ -276,6 +277,17 @@ processing_server <- function(
                 length(categories_texts),
                 "..."
               )
+
+              # Show streaming panel for paragraph writing (if enabled)
+              stream_callback <- NULL
+              if (streaming_enabled) {
+                llm_stream_async$show()
+                stream_callback <- function(token, meta) {
+                  llm_stream_async$set(meta$partial_response %||% "")
+                  invisible(TRUE)
+                }
+              }
+
               paragraphs <- purrr::map(
                 seq_along(categories_texts),
                 function(i) {
@@ -289,6 +301,11 @@ processing_server <- function(
                     paste0(lang$t("Schrijven over '"), cat_name, "'...")
                   )
 
+                  # Clear streaming panel before this paragraph
+                  if (streaming_enabled) {
+                    llm_stream_async$clear()
+                  }
+
                   # Write paragraph about the category
                   write_paragraph(
                     texts = cat_texts,
@@ -296,7 +313,8 @@ processing_server <- function(
                     research_background = research_background,
                     style_prompt = style_prompt,
                     llm_provider = llm_provider,
-                    language = lang$get_translation_language()
+                    language = lang$get_translation_language(),
+                    stream_callback = stream_callback
                   )
                 }
               )
@@ -331,13 +349,19 @@ processing_server <- function(
             lang = lang(),
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
-            interrupter = interrupter
+            interrupter = interrupter,
+            llm_stream_async = llm_stream$async,
+            streaming_enabled = getOption("paragraph_streaming", TRUE) &&
+              isTRUE(models$main$parameters$stream)
           ),
           packages = c("tidyprompt", "tidyverse", "glue", "fs", "uuid"),
           seed = NULL
         ) %...>%
           results_df() %...!%
           {
+            # Clean up async controllers before error handling
+            llm_stream_async$stop()
+            llm_stream$hide()
             app_error(
               .,
               when = "main processing of categorization/scoring",
@@ -515,6 +539,7 @@ processing_server <- function(
         ) %...>%
           topics() %...!%
           {
+            llm_stream$hide()
             app_error(
               .,
               when = "main processing (step 1-2) of topic modelling",
@@ -724,6 +749,17 @@ processing_server <- function(
                     length(topics_texts_list),
                     "..."
                   )
+
+                  # Show streaming panel for paragraph writing (if enabled)
+                  stream_callback <- NULL
+                  if (streaming_enabled) {
+                    llm_stream_async$show()
+                    stream_callback <- function(token, meta) {
+                      llm_stream_async$set(meta$partial_response %||% "")
+                      invisible(TRUE)
+                    }
+                  }
+
                   paragraphs <- purrr::map(
                     seq_along(topics_texts_list),
                     function(i) {
@@ -741,13 +777,19 @@ processing_server <- function(
                         )
                       )
 
+                      # Clear streaming panel before this paragraph
+                      if (streaming_enabled) {
+                        llm_stream_async$clear()
+                      }
+
                       paragraph <- write_paragraph(
                         texts = topic_texts,
                         topic = topic_name,
                         research_background = research_background,
                         style_prompt = style_prompt,
                         llm_provider = llm_provider,
-                        language = lang$get_translation_language()
+                        language = lang$get_translation_language(),
+                        stream_callback = stream_callback
                       )
 
                       paragraph
@@ -793,13 +835,19 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
-            exclusive_topics = exclusive_topics()
+            exclusive_topics = exclusive_topics(),
+            llm_stream_async = llm_stream$async,
+            streaming_enabled = getOption("paragraph_streaming", TRUE) &&
+              isTRUE(models$main$parameters$stream)
           ),
           packages = c("tidyprompt", "tidyverse", "glue", "fs", "uuid"),
           seed = NULL
         ) %...>%
           results_df() %...!%
           {
+            # Clean up async controllers before error handling
+            llm_stream_async$stop()
+            llm_stream$hide()
             app_error(
               .,
               when = "main processing (step 3-4) of topic modelling",
@@ -887,7 +935,9 @@ processing_server <- function(
               lang = lang,
               write_paragraphs = write_paragraphs,
               text_size_tokens = text_size_tokens,
-              overlap_size_tokens = overlap_size_tokens
+              overlap_size_tokens = overlap_size_tokens,
+              llm_stream_async = llm_stream_async,
+              streaming_enabled = streaming_enabled
             )
           },
           globals = list(
@@ -916,7 +966,10 @@ processing_server <- function(
             normalize_with_map = normalize_with_map,
             best_literal_substring = best_literal_substring,
             fuzzy_threshold = fuzzy_threshold,
-            normalize_for_dist = normalize_for_dist
+            normalize_for_dist = normalize_for_dist,
+            llm_stream_async = llm_stream$async,
+            streaming_enabled = getOption("paragraph_streaming", TRUE) &&
+              isTRUE(models$main$parameters$stream)
           ),
           packages = c(
             "tidyprompt",
@@ -930,6 +983,9 @@ processing_server <- function(
         ) %...>%
           results_df() %...!%
           {
+            # Clean up async controllers before error handling
+            llm_stream_async$stop()
+            llm_stream$hide()
             app_error(
               .,
               when = "main processing of marking",
@@ -988,6 +1044,8 @@ processing_server <- function(
         )
         progress_secondary$async$stop()
         progress_secondary$hide()
+        llm_stream$async$stop()
+        llm_stream$hide()
 
         if (interrater_reliability_toggle()) {
           all_categories <-
@@ -1524,6 +1582,12 @@ processing_server <- function(
       progress_primary <- progress_bar_server("progress_primary")
       progress_secondary <- progress_bar_server(
         "progress_secondary",
+        initially_hidden = TRUE
+      )
+
+      # LLM Streaming ------------------------------------------------
+      llm_stream <- llm_streaming_server(
+        "llm_stream",
         initially_hidden = TRUE
       )
 

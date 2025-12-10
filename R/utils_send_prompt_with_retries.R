@@ -11,6 +11,9 @@
 #'  (this is the maximum number of messages that will be sent to the LLM
 #'  before stopping an interaction; this is used to prevent indefinite
 #'  loops in case the LLM does not respond in the expected format)
+#' @param stream_callback Optional callback function for streaming. If provided,
+#'  will be attached to a cloned provider. The callback receives (token, meta)
+#'  where meta$partial_response contains accumulated text.
 #' @return The response from the LLM
 #' @export
 send_prompt_with_retries <- function(
@@ -25,10 +28,18 @@ send_prompt_with_retries <- function(
     "send_prompt_with_retries__max_interactions",
     10
   ),
-  debug_logging = getOption("send_prompt_with_retries__log_prompts", FALSE)
+  debug_logging = getOption("send_prompt_with_retries__log_prompts", FALSE),
+  stream_callback = NULL
 ) {
   tries <- 0
   result <- NULL
+
+  # If stream_callback is provided, clone provider and attach callback
+  if (!is.null(stream_callback) && is.function(stream_callback)) {
+    llm_provider <- llm_provider$clone()
+    llm_provider$parameters$stream <- TRUE
+    llm_provider$stream_callback <- stream_callback
+  }
 
   while (tries < max_tries) {
     tries <- tries + 1
