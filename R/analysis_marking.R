@@ -25,7 +25,8 @@ mark_texts <- function(
   ),
   write_paragraphs = TRUE,
   max_interactions = getOption("send_prompt_with_retries__max_interaction", 10),
-  llm_stream_async = NULL
+  llm_stream_async = NULL,
+  streaming_enabled = getOption("paragraph_streaming", TRUE)
 ) {
   stopifnot(
     is.character(texts),
@@ -237,9 +238,9 @@ mark_texts <- function(
       progress_secondary$show()
     })
 
-    # Create streaming callback if we have the async controller
+    # Create streaming callback if streaming is enabled
     stream_callback <- NULL
-    if (!is.null(llm_stream_async)) {
+    if (streaming_enabled && !is.null(llm_stream_async)) {
       try(llm_stream_async$show())
       stream_callback <- function(token, meta) {
         llm_stream_async$set(meta$partial_response %||% "")
@@ -269,7 +270,7 @@ mark_texts <- function(
         })
 
         # Clear streaming panel before this paragraph
-        if (!is.null(llm_stream_async)) {
+        if (streaming_enabled && !is.null(llm_stream_async)) {
           try(llm_stream_async$clear())
         }
 

@@ -46,9 +46,9 @@ if (!getOption("shiny.testmode", FALSE)) {
 #     the model names will be shown. Names must be unique. If you want to use
 #     a specific model twice but with different settings, a named list is
 #     then required
-# - Note: most LLM providers are configured with stream = TRUE by default
-#     (see R/module_config_llm_provider.R); when writing paragraphs & under asynchronous
-#     processing, this enables live streaming of LLM output in the UI
+# - Note: LLM providers are configured with stream = TRUE by default
+#     (see R/module_config_llm_provider.R); this enables live streaming
+#     when writing paragraphs (see paragraph_streaming option below)
 preconfigured_models_main <- list(
   tidyprompt::llm_provider_openai()$set_parameters(list(
     model = "gpt-5-mini",
@@ -124,6 +124,11 @@ options(
   #     see R/language.R
   language = "en", # Default language
   language__can_toggle = TRUE, # If user can switch language in the app
+
+  # - Enable live streaming of LLM output when writing paragraphs;
+  #   only works when LLM provider has stream = TRUE;
+  #     see R/component_llm_streaming.R
+  paragraph_streaming = TRUE,
 
   # - Default setting for anonymization of texts, and if user
   #   can toggle this setting;

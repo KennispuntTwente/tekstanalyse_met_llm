@@ -278,13 +278,14 @@ processing_server <- function(
                 "..."
               )
 
-              # Show streaming panel for paragraph writing
-              llm_stream_async$show()
-
-              # Create streaming callback
-              stream_callback <- function(token, meta) {
-                llm_stream_async$set(meta$partial_response %||% "")
-                invisible(TRUE)
+              # Show streaming panel for paragraph writing (if enabled)
+              stream_callback <- NULL
+              if (streaming_enabled) {
+                llm_stream_async$show()
+                stream_callback <- function(token, meta) {
+                  llm_stream_async$set(meta$partial_response %||% "")
+                  invisible(TRUE)
+                }
               }
 
               paragraphs <- purrr::map(
@@ -301,7 +302,9 @@ processing_server <- function(
                   )
 
                   # Clear streaming panel before this paragraph
-                  llm_stream_async$clear()
+                  if (streaming_enabled) {
+                    llm_stream_async$clear()
+                  }
 
                   # Write paragraph about the category
                   write_paragraph(
@@ -347,7 +350,9 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
-            llm_stream_async = llm_stream$async
+            llm_stream_async = llm_stream$async,
+            streaming_enabled = getOption("paragraph_streaming", TRUE) &&
+              isTRUE(models$main$parameters$stream)
           ),
           packages = c("tidyprompt", "tidyverse", "glue", "fs", "uuid"),
           seed = NULL
@@ -745,13 +750,14 @@ processing_server <- function(
                     "..."
                   )
 
-                  # Show streaming panel for paragraph writing
-                  llm_stream_async$show()
-
-                  # Create streaming callback
-                  stream_callback <- function(token, meta) {
-                    llm_stream_async$set(meta$partial_response %||% "")
-                    invisible(TRUE)
+                  # Show streaming panel for paragraph writing (if enabled)
+                  stream_callback <- NULL
+                  if (streaming_enabled) {
+                    llm_stream_async$show()
+                    stream_callback <- function(token, meta) {
+                      llm_stream_async$set(meta$partial_response %||% "")
+                      invisible(TRUE)
+                    }
                   }
 
                   paragraphs <- purrr::map(
@@ -772,7 +778,9 @@ processing_server <- function(
                       )
 
                       # Clear streaming panel before this paragraph
-                      llm_stream_async$clear()
+                      if (streaming_enabled) {
+                        llm_stream_async$clear()
+                      }
 
                       paragraph <- write_paragraph(
                         texts = topic_texts,
@@ -828,7 +836,9 @@ processing_server <- function(
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
             exclusive_topics = exclusive_topics(),
-            llm_stream_async = llm_stream$async
+            llm_stream_async = llm_stream$async,
+            streaming_enabled = getOption("paragraph_streaming", TRUE) &&
+              isTRUE(models$main$parameters$stream)
           ),
           packages = c("tidyprompt", "tidyverse", "glue", "fs", "uuid"),
           seed = NULL
@@ -926,7 +936,8 @@ processing_server <- function(
               write_paragraphs = write_paragraphs,
               text_size_tokens = text_size_tokens,
               overlap_size_tokens = overlap_size_tokens,
-              llm_stream_async = llm_stream_async
+              llm_stream_async = llm_stream_async,
+              streaming_enabled = streaming_enabled
             )
           },
           globals = list(
@@ -956,7 +967,9 @@ processing_server <- function(
             best_literal_substring = best_literal_substring,
             fuzzy_threshold = fuzzy_threshold,
             normalize_for_dist = normalize_for_dist,
-            llm_stream_async = llm_stream$async
+            llm_stream_async = llm_stream$async,
+            streaming_enabled = getOption("paragraph_streaming", TRUE) &&
+              isTRUE(models$main$parameters$stream)
           ),
           packages = c(
             "tidyprompt",
