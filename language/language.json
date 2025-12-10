@@ -1392,6 +1392,10 @@
       {
         "nl": " Raadpleeg de documentatie van je LLM-provider.",
         "en": " Consult the documentation of your LLM provider."
+      },
+      {
+        "nl": "Splitsing resulteerde niet in meer teksten",
+        "en": "Splitting did not result in more texts"
       }
     ]
 }
