@@ -360,7 +360,7 @@ processing_server <- function(
           results_df() %...!%
           {
             # Clean up async controllers before error handling
-            llm_stream_async$stop()
+            llm_stream$async$stop()
             llm_stream$hide()
             app_error(
               .,
@@ -846,7 +846,7 @@ processing_server <- function(
           results_df() %...!%
           {
             # Clean up async controllers before error handling
-            llm_stream_async$stop()
+            llm_stream$async$stop()
             llm_stream$hide()
             app_error(
               .,
@@ -984,7 +984,7 @@ processing_server <- function(
           results_df() %...!%
           {
             # Clean up async controllers before error handling
-            llm_stream_async$stop()
+            llm_stream$async$stop()
             llm_stream$hide()
             app_error(
               .,
