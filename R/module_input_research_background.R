@@ -66,6 +66,8 @@ research_background_server <- function(
       # Observe input
       observeEvent(input$research_background, {
         research_background(input$research_background)
+        log_action("research_background_changed", 
+                   details = sprintf("length=%d", nchar(input$research_background)))
       })
 
       # Disable when processing

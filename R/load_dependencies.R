@@ -156,7 +156,18 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
 
   cli::cli_alert_success("R files loaded")
 
-  # 4 Done ------------------------------------------------------------------
+  # 4 Initialize logger -------------------------------------------------------
+
+  tryCatch({
+    log_init(mode = mode)
+    log_info(paste("Application starting in", mode, "mode"), component = "startup")
+    log_info(paste("R version:", R.version.string), component = "startup")
+    cli::cli_alert_success("Logger initialized")
+  }, error = function(e) {
+    cli::cli_alert_warning(paste("Logger init failed:", e$message))
+  })
+
+  # 5 Done ------------------------------------------------------------------
 
   cli::cli_rule()
   cli::cli_h2("Dependencies loaded")

@@ -252,18 +252,21 @@ text_management_server <- function(
       observeEvent(input$select_none, {
         req(!isTRUE(processing()))
         anonymization_mode("none")
+        log_action("anonymization_mode_changed", details = "none")
       })
     }
     if ("simple" %in% available_modes) {
       observeEvent(input$select_simple, {
         req(!isTRUE(processing()))
         anonymization_mode("simple")
+        log_action("anonymization_mode_changed", details = "regex")
       })
     }
     if ("gliner" %in% available_modes) {
       observeEvent(input$select_gliner, {
         req(!isTRUE(processing()))
         anonymization_mode("gliner")
+        log_action("anonymization_mode_changed", details = "gliner")
       })
     }
 
@@ -298,6 +301,9 @@ text_management_server <- function(
     })
 
     # -- 5  Compute/refresh texts -----------------------------------
+    # Track previous state to avoid duplicate logs
+    prev_text_state <- reactiveVal(list(raw = 0, unique = 0, mode = ""))
+    
     observe({
       req(raw_texts())
       mode <- anonymization_mode()
@@ -322,6 +328,25 @@ text_management_server <- function(
         preprocessed = out,
         stringsAsFactors = FALSE
       )
+      
+      # Only log when there's an actual change in counts
+      new_state <- list(
+        raw = length(texts$raw),
+        unique = length(texts$preprocessed),
+        mode = mode
+      )
+      old_state <- prev_text_state()
+      
+      if (new_state$raw != old_state$raw || 
+          new_state$unique != old_state$unique || 
+          new_state$mode != old_state$mode) {
+        log_info(
+          sprintf("Text count changed: raw=%d, unique=%d, mode=%s",
+                  new_state$raw, new_state$unique, mode),
+          component = "text"
+        )
+        prev_text_state(new_state)
+      }
     })
 
     # -- 6  Summary counts ------------------------------------------
@@ -474,6 +499,7 @@ text_management_server <- function(
 
     # -- 7  Modal: text table ---------------------------------------
     observeEvent(input$open_text_table_modal, {
+      log_action("text_table_modal_opened", details = sprintf("n_texts=%d", length(texts$preprocessed)))
       showModal(modalDialog(
         title = lang()$t("Teksten"),
         DT::dataTableOutput(ns("text_table")),
@@ -493,10 +519,16 @@ text_management_server <- function(
                 placement = "top"
               )
           ),
-          modalButton(lang()$t("Sluiten"))
+          actionButton(ns("close_text_table_modal"), lang()$t("Sluiten"), class = "btn-secondary")
         ),
         size = "l"
       ))
+    })
+    
+    # Log text table modal close
+    observeEvent(input$close_text_table_modal, {
+      log_action("text_table_modal_closed")
+      removeModal()
     })
 
     output$text_table <- DT::renderDataTable(
@@ -506,12 +538,23 @@ text_management_server <- function(
       options = list(pageLength = 5, scrollX = TRUE)
     )
 
+    observeEvent(anonymization_mode(), {
+      log_info(
+        sprintf("Anonymization mode changed to: %s", anonymization_mode()),
+        component = "anonymization_mode"
+      )
+    })
+
     output$download_preprocessed <- downloadHandler(
       filename = function() {
         paste0("preprocessed_texts", Sys.Date(), ".csv")
       },
       content = function(file) {
         req(texts$df)
+        log_info(
+          sprintf("Preprocessed texts downloaded: n_texts=%d", nrow(texts$df)),
+          component = "download"
+        )
         vroom::vroom_write(
           x = texts$df,
           file = file,

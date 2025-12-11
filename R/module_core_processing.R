@@ -160,6 +160,12 @@ processing_server <- function(
 
         # Set processing state
         processing(TRUE)
+        analysis_start_time <- Sys.time()
+        log_analysis_start(
+          mode = mode(),
+          n_texts = length(texts$preprocessed),
+          model = models$main$parameters$model %||% "unknown"
+        )
         # Set initial progress
         progress_primary$set_with_total(0, length(texts$preprocessed), "...")
 
@@ -167,8 +173,21 @@ processing_server <- function(
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
 
+        log_opts <- list(
+          level = getOption("logger__level", "INFO"),
+          dir = getOption("logger__dir", "logs"),
+          retention = getOption("logger__retention")
+        )
+
         future_promise(
           {
+            options(
+              logger__level = log_opts$level,
+              logger__dir = log_opts$dir,
+              logger__retention = log_opts$retention
+            )
+            try(log_init(), silent = TRUE)
+
             results <- vector("list", length(texts))
 
             for (i in seq_along(texts)) {
@@ -205,6 +224,12 @@ processing_server <- function(
               results[[i]] <- result
 
               progress_primary$set_with_total(i, length(texts), text)
+              if (i == 1 || i %% 5 == 0 || i == length(texts)) {
+                log_info(
+                  sprintf("Categorization/Scoring progress: %d/%d", i, length(texts)),
+                  component = "analysis"
+                )
+              }
 
               if (is.na(result)) break
             }
@@ -350,6 +375,9 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
+            log_opts = log_opts,
+            log_init = log_init,
+            get_session_id = get_session_id,
             llm_stream_async = llm_stream$async,
             streaming_enabled = getOption("paragraph_streaming", TRUE) &&
               isTRUE(models$main$parameters$stream)
@@ -369,7 +397,7 @@ processing_server <- function(
               lang = lang()
             )
           }
-        print("Started async processing for categorization/scoring")
+        log_debug("Started async processing for categorization/scoring", component = "analysis")
       })
 
       # Helper function to check if categories are valid
@@ -432,12 +460,19 @@ processing_server <- function(
 
         # Set processing state
         processing(TRUE)
+        analysis_start_time <- Sys.time()
+        log_analysis_start(
+          mode = mode(),
+          n_texts = length(texts$preprocessed),
+          model = models$main$parameters$model %||% "unknown"
+        )
 
         # Disable button
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
 
         # Step 1: Generate candidate topics
+        log_info("Step 1/5: Generating candidate topics...", component = "analysis")
         progress_primary$set_with_total(
           1,
           5,
@@ -450,8 +485,21 @@ processing_server <- function(
           lang()$t("...")
         )
 
+        log_opts <- list(
+          level = getOption("logger__level", "INFO"),
+          dir = getOption("logger__dir", "logs"),
+          retention = getOption("logger__retention")
+        )
+
         future_promise(
           {
+            options(
+              logger__level = log_opts$level,
+              logger__dir = log_opts$dir,
+              logger__retention = log_opts$retention
+            )
+            try(log_init(), silent = TRUE)
+
             candidate_topics <- tryCatch(
               {
                 results <- c()
@@ -483,6 +531,7 @@ processing_server <- function(
 
             # Step 2: Reduce topics
             interrupter$execInterrupts()
+            log_info("Step 2/5: Reducing topics...", component = "analysis")
             progress_primary$set_with_total(
               2,
               5,
@@ -524,7 +573,11 @@ processing_server <- function(
             lang = lang(),
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
-            interrupter = interrupter
+            interrupter = interrupter,
+            log_opts = log_opts,
+            log_init = log_init,
+            get_session_id = get_session_id,
+            log_info = log_info
           ),
           packages = c(
             "tidyprompt",
@@ -547,7 +600,7 @@ processing_server <- function(
               lang = lang()
             )
           }
-        print("Started async processing for topic modelling (step 1-2)")
+        log_debug("Started async processing for topic modelling (step 1-2)", component = "analysis")
       })
 
       ## >> Topics generated; editing --------------------------------
@@ -622,10 +675,11 @@ processing_server <- function(
           exclusive_topics(topics())
         }
 
-        print(paste0(
-          "Starting topic assignment with topics: ",
-          paste(topics(), collapse = ", ")
-        ))
+        log_info(
+          sprintf("Starting topic assignment: n_topics=%d, topics=%s",
+                  length(topics()), paste(topics(), collapse = ", ")),
+          component = "analysis"
+        )
 
         # Write progress
         progress_primary$set_with_total(
@@ -641,8 +695,21 @@ processing_server <- function(
           "..."
         )
 
+        log_opts <- list(
+          level = getOption("logger__level", "INFO"),
+          dir = getOption("logger__dir", "logs"),
+          retention = getOption("logger__retention")
+        )
+
         future_promise(
           {
+            options(
+              logger__level = log_opts$level,
+              logger__dir = log_opts$dir,
+              logger__retention = log_opts$retention
+            )
+            try(log_init(), silent = TRUE)
+
             # Step 4: Assign topics
             # Writing progress on secondary progress file
             texts_with_topics <- tryCatch(
@@ -709,6 +776,7 @@ processing_server <- function(
             )
 
             ## Step 5: Write paragraphs about the topics
+            log_info("Step 5/5: Writing paragraphs...", component = "analysis")
             progress_primary$set_with_total(
               4,
               5,
@@ -835,6 +903,10 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
+            log_opts = log_opts,
+            log_init = log_init,
+            get_session_id = get_session_id,
+            log_info = log_info,
             exclusive_topics = exclusive_topics(),
             llm_stream_async = llm_stream$async,
             streaming_enabled = getOption("paragraph_streaming", TRUE) &&
@@ -855,7 +927,7 @@ processing_server <- function(
               lang = lang()
             )
           }
-        print("Started async processing for topic modelling (step 3-4)")
+        log_debug("Started async processing for topic modelling (step 3-4)", component = "analysis")
       })
 
       ## Markeren ----------------------------------------------------
@@ -914,6 +986,12 @@ processing_server <- function(
 
         # Set processing state
         processing(TRUE)
+        analysis_start_time <- Sys.time()
+        log_analysis_start(
+          mode = mode(),
+          n_texts = length(texts$preprocessed),
+          model = models$main$parameters$model %||% "unknown"
+        )
         # Set initial progress
         progress_primary$set_with_total(0, length(texts$preprocessed), "...")
 
@@ -921,8 +999,21 @@ processing_server <- function(
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
 
+        log_opts <- list(
+          level = getOption("logger__level", "INFO"),
+          dir = getOption("logger__dir", "logs"),
+          retention = getOption("logger__retention")
+        )
+
         future_promise(
           {
+            options(
+              logger__level = log_opts$level,
+              logger__dir = log_opts$dir,
+              logger__retention = log_opts$retention
+            )
+            try(log_init(), silent = TRUE)
+
             mark_texts(
               texts = texts,
               codes = codes,
@@ -958,6 +1049,9 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
+            log_opts = log_opts,
+            log_init = log_init,
+            get_session_id = get_session_id,
             write_paragraph = write_paragraph,
             write_paragraphs = write_paragraphs(),
             text_size_tokens = context_window$max_tokens,
@@ -1003,7 +1097,10 @@ processing_server <- function(
       # Launch interrater reliability module if required
       observeEvent(results_df(), {
         req(results_df())
-        print(results_df())
+        log_debug(
+          sprintf("Results received: n_rows=%d", nrow(results_df())),
+          component = "analysis"
+        )
 
         # Join results of preprocessed texts to raw texts
         df <- texts$df
@@ -1035,6 +1132,18 @@ processing_server <- function(
 
         # Update UI to show finished processing
         progress_primary$async$stop()
+        
+        # Log analysis completion
+        if (exists("analysis_start_time")) {
+          duration_secs <- as.numeric(difftime(Sys.time(), analysis_start_time, units = "secs"))
+          log_analysis_complete(
+            mode = mode(),
+            duration_secs = duration_secs,
+            n_texts = nrow(df),
+            success = TRUE
+          )
+        }
+        
         progress_primary$set(
           100,
           paste0(
@@ -1276,6 +1385,13 @@ processing_server <- function(
         if (is.null(zip_file())) {
           return()
         }
+        
+        # Log that output files are ready
+        log_info(
+          sprintf("Output files ready: mode=%s, n_texts=%d, file=%s", 
+                  mode(), nrow(results_df()), basename(zip_file())),
+          component = "output"
+        )
 
         # Create download handler
         output$download_results <- downloadHandler(
@@ -1283,6 +1399,10 @@ processing_server <- function(
             paste0(uuid, ".zip")
           },
           content = function(file) {
+            log_info(
+              sprintf("Results downloaded: file=%s.zip, mode=%s", uuid, mode()),
+              component = "download"
+            )
             file.copy(zip_file(), file)
           },
           contentType = "application/zip; charset=utf-8"
@@ -1341,6 +1461,7 @@ processing_server <- function(
       # Confirm restart button listener
       # Reloads the app
       observeEvent(input$confirm_restart, {
+        log_action("analysis_restart", details = mode())
         removeModal()
         session$reload()
       })
@@ -1722,6 +1843,7 @@ processing_server <- function(
       # Confirm cancel button observer
       observeEvent(input$confirm_cancel, {
         req(isTRUE(processing()))
+        log_analysis_interrupted(mode = mode(), reason = "user cancelled")
         removeModal()
         session$reload()
       })

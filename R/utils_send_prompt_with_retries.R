@@ -28,11 +28,21 @@ send_prompt_with_retries <- function(
     "send_prompt_with_retries__max_interactions",
     10
   ),
-  debug_logging = getOption("send_prompt_with_retries__log_prompts", FALSE),
   stream_callback = NULL
 ) {
   tries <- 0
   result <- NULL
+  call_start_time <- Sys.time()
+  model_name <- llm_provider$parameters$model %||% "unknown"
+  
+  # Log LLM call start
+  tryCatch(
+    log_debug(
+      sprintf("LLM call started: model=%s", model_name),
+      component = "llm"
+    ),
+    error = function(e) NULL
+  )
 
   # If stream_callback is provided, clone provider and attach callback
   if (!is.null(stream_callback) && is.function(stream_callback)) {
@@ -52,20 +62,32 @@ send_prompt_with_retries <- function(
             max_interactions = max_interactions
           )
 
-        if (debug_logging) {
-          dir.create("prompt_logs", showWarnings = FALSE)
-          # Create timestamped filename
-          timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
-          log_file <- paste0("prompt_logs/log_", timestamp, ".json")
-          # Convert to JSON and write to file
-          result |>
-            jsonlite::toJSON(pretty = TRUE, force = TRUE, auto_unbox = TRUE) |>
-            writeLines(con = log_file)
+        if (tries == 1) {
+          # Log initial prompt (debug only)
+          tryCatch(
+             log_debug(
+               sprintf("Sending prompt to %s", model_name),
+               component = "llm_trace"
+             ),
+             error = function(e) NULL
+          )
         }
 
         result
       },
       error = function(e) {
+        # Log retry attempt
+        tryCatch(
+          log_warn(
+            sprintf(
+              "LLM call failed (attempt %d/%d): %s",
+              tries, max_tries, conditionMessage(e)
+            ),
+            component = "llm"
+          ),
+          error = function(e2) NULL
+        )
+        
         if (tries == max_tries) {
           stop(sprintf(
             "Error in LLM call after %d attempts: %s\nFinal error:\n%s",
@@ -85,6 +107,14 @@ send_prompt_with_retries <- function(
   }
 
   if (is.null(result)) {
+    # Log final failure
+    tryCatch(
+      log_error(
+        sprintf("LLM call failed after %d attempts: model=%s", max_tries, model_name),
+        component = "llm"
+      ),
+      error = function(e) NULL
+    )
     stop(paste0(
       "Failed to get a response from the LLM after ",
       max_tries,
@@ -93,6 +123,14 @@ send_prompt_with_retries <- function(
   }
 
   if (is.null(result$response)) {
+    # Log invalid response
+    tryCatch(
+      log_error(
+        sprintf("LLM returned NULL response: model=%s", model_name),
+        component = "llm"
+      ),
+      error = function(e) NULL
+    )
     stop(paste0(
       "Reached the LLM, but failed to get a valid reply",
       "\n\n--- Chat history: ---\n\n",
@@ -103,6 +141,19 @@ send_prompt_with_retries <- function(
       }
     ))
   }
+  
+  # Log successful LLM call
+  duration_ms <- as.numeric(difftime(Sys.time(), call_start_time, units = "secs")) * 1000
+  tryCatch(
+    log_debug(
+      sprintf(
+        "LLM call success: model=%s, attempts=%d, duration=%.0fms",
+        model_name, tries, duration_ms
+      ),
+      component = "llm"
+    ),
+    error = function(e) NULL
+  )
 
   return(result$response)
 }

@@ -230,12 +230,33 @@ text_split_server <- function(
       shinyjs::disable("split_texts")
       # Set message
       semchunk_message(lang()$t("..."))
+      
+      # Log split action start
+      log_info(
+        sprintf("Text split started: max_tokens=%d, overlap=%d, n_texts=%d",
+                input$max_tokens, input$overlap %||% 0, length(raw_texts())),
+        component = "split"
+      )
+      
       # Start queue consumer
       queue$consumer$start(millis = 50)
 
       # Async text splitting
+      log_opts <- list(
+        level = getOption("logger__level", "INFO"),
+        dir = getOption("logger__dir", "logs"),
+        retention = getOption("logger__retention")
+      )
+
       promises::future_promise(
         {
+          options(
+            logger__level = log_opts$level,
+            logger__dir = log_opts$dir,
+            logger__retention = log_opts$retention
+          )
+          try(log_init(), silent = TRUE)
+
           split_texts_with_semchunk(
             texts = raw_texts,
             chunk_size = chunk_size,
@@ -250,7 +271,11 @@ text_split_server <- function(
           queue = queue,
           split_texts_with_semchunk = split_texts_with_semchunk,
           semchunk_load_chunker = semchunk_load_chunker,
-          async_message_printer = async_message_printer
+          semchunk_load_chunker = semchunk_load_chunker,
+          async_message_printer = async_message_printer,
+          log_opts = log_opts,
+          log_init = log_init,
+          get_session_id = get_session_id
         ),
         seed = NULL
       ) %...>%
@@ -263,6 +288,7 @@ text_split_server <- function(
             semchunk_message(lang()$t(
               "Splitsing resulteerde niet in meer teksten"
             ))
+            log_info("Text split: no change", component = "split")
           } else {
             n <- length(raw_texts())
             m <- length(split_texts())
@@ -274,6 +300,10 @@ text_split_server <- function(
               m,
               lang()$t(" teksten")
             ))
+            log_info(
+              sprintf("Text split complete: %d -> %d texts", n, m),
+              component = "split"
+            )
           }
 
           shinyjs::enable("split_texts")
@@ -281,7 +311,7 @@ text_split_server <- function(
         } %...!%
         {
           error <- .
-          print(error)
+          log_error(paste("Text split error:", error$message %||% as.character(error)), component = "split")
 
           split_in_progress(FALSE)
           split_texts(NULL)

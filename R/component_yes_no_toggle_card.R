@@ -77,6 +77,7 @@ yes_no_toggle_card_server <- function(
     # Show modal when button is clicked
     observeEvent(input$show_modal, {
       req(modal_config)
+      log_action("style_prompt_modal_opened")
       showModal(
         modalDialog(
           title = tagList(icon(modal_config$icon), " ", t(modal_config$title)),
@@ -113,7 +114,7 @@ yes_no_toggle_card_server <- function(
               style = "display:flex; width:100%; align-items:center;",
               tags$div(
                 style = "flex:1; text-align:left;",
-                modalButton(lang()$t("Sluiten"))
+                actionButton(ns("modal_close"), lang()$t("Sluiten"), class = "btn-secondary")
               ),
               tags$div(
                 style = "flex:1; text-align:center;",
@@ -148,12 +149,19 @@ yes_no_toggle_card_server <- function(
     # Modal save/reset
     observeEvent(input$modal_save, {
       modal_value(input$modal_input)
+      log_action("modal_saved", details = sprintf("id=%s", id))
       removeModal()
     })
 
     observeEvent(input$modal_reset, {
       modal_value("")
       updateTextAreaInput(session, "modal_input", value = "")
+      log_action("modal_reset", details = sprintf("id=%s", id))
+      removeModal()
+    })
+
+    observeEvent(input$modal_close, {
+      log_action("modal_closed", details = sprintf("id=%s", id))
       removeModal()
     })
 
@@ -200,7 +208,9 @@ yes_no_toggle_card_server <- function(
 
     # Observe toggle
     observeEvent(input$toggle, {
-      toggle(input$toggle == lang()$t("Ja"))
+      new_value <- input$toggle == lang()$t("Ja")
+      toggle(new_value)
+      log_action("toggle_changed", details = sprintf("id=%s, value=%s", id, new_value))
     })
 
     # Disable when processing

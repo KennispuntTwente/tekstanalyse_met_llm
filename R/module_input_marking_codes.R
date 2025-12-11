@@ -181,6 +181,12 @@ marking_codes_server <- function(
         # Set generation message
         generate_codes_message(lang()$t("Codes genereren..."))
         shiny::showNotification(lang()$t("Codes genereren..."))
+        
+        # Log code generation start
+        log_info(
+          sprintf("Code generation started: n_texts=%d", length(texts$preprocessed)),
+          component = "codes"
+        )
 
         # Empty all previously generated codes
         generated_codes(NULL)
@@ -195,8 +201,21 @@ marking_codes_server <- function(
 
         # Async generate codes
         queue$consumer$start()
+        log_opts <- list(
+          level = getOption("logger__level", "INFO"),
+          dir = getOption("logger__dir", "logs"),
+          retention = getOption("logger__retention")
+        )
+
         future_promise(
           {
+            options(
+              logger__level = log_opts$level,
+              logger__dir = log_opts$dir,
+              logger__retention = log_opts$retention
+            )
+            try(log_init(), silent = TRUE)
+
             generate_codes_by_reading_texts(
               texts = texts,
               research_background = research_background,
@@ -220,7 +239,12 @@ marking_codes_server <- function(
             create_candidate_topics = create_candidate_topics,
             prompt_candidate_topics = prompt_candidate_topics,
             reduce_topics = reduce_topics,
+            reduce_topics = reduce_topics,
             semchunk_load_chunker = semchunk_load_chunker,
+            log_opts = log_opts,
+            log_init = log_init,
+            get_session_id = get_session_id,
+            log_info = log_info,
             tiktoken_load_tokenizer = tiktoken_load_tokenizer,
             count_tokens = count_tokens,
             async_message_printer = async_message_printer
@@ -236,6 +260,10 @@ marking_codes_server <- function(
           {
             generated_codes(.)
             code_generation_in_progress(FALSE)
+            log_info(
+              sprintf("Code generation complete: n_codes=%d", length(.)),
+              component = "codes"
+            )
             shinyjs::delay(500, queue$consumer$stop())
           } %...!%
           {

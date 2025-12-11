@@ -379,6 +379,15 @@ interrater_server <- function(
         current_item_index(1)
         return$result <- NULL
         module_state("rating")
+        
+        # Log IRR session start
+        log_info(
+          sprintf(
+            "IRR session started: mode=%s, sample_size=%d, total_items=%d, assign_multiple=%s",
+            mode, n_sample, total_n, assign_multiple_categories
+          ),
+          component = "irr"
+        )
       })
 
       # Reset button; returns to configuration state
@@ -569,6 +578,17 @@ interrater_server <- function(
 
                 # Combine everything into one list
                 result_list <- c(as.list(t_test_summary), summary_stats)
+                
+                # Log IRR t-test results
+                log_info(
+                  sprintf(
+                    "IRR completed (t-test): n=%d, user_mean=%.2f, llm_mean=%.2f, p=%.4f",
+                    length(user_scores), summary_stats$user_mean, 
+                    summary_stats$llm_mean, t_test_summary$p.value[[1]]
+                  ),
+                  component = "irr"
+                )
+                
                 result_list
               } else {
                 # Kappa for categorical data
@@ -628,6 +648,16 @@ interrater_server <- function(
 
                 # Make suitable object type
                 class(kappa_output) <- "list"
+                
+                # Log IRR Kappa results
+                log_info(
+                  sprintf(
+                    "IRR completed (Kappa): n=%d, kappa=%.3f, z=%.3f, p=%.4f",
+                    kappa_output$subjects, kappa_output$value,
+                    kappa_output$statistic, kappa_output$p.value
+                  ),
+                  component = "irr"
+                )
 
                 # Return
                 kappa_output
@@ -648,6 +678,7 @@ interrater_server <- function(
 
           return$result <- calculation_result
           return$done <- TRUE
+          log_action("irr_calculation_finished")
           removeModal()
         }
       })

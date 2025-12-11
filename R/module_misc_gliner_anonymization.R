@@ -320,10 +320,19 @@ gliner_server <- function(
           if (!is.vector(labels)) {
             labels <- c(labels)
           }
-          print(labels)
+          log_debug(sprintf("GLiNER labels: %s", paste(labels, collapse = ", ")), component = "gliner")
 
           ## 2 Switch the modal to the “running” state
           module_state("running")
+          
+          # Log GLiNER start with configured labels
+          log_info(
+            sprintf(
+              "GLiNER detection started: n_texts=%d, n_labels=%d",
+              length(pii_texts()), length(labels)
+            ),
+            component = "gliner"
+          )
 
           ## 3 Build a progress bar that the worker can update
           n_txt <- length(pii_texts())
@@ -417,10 +426,19 @@ gliner_server <- function(
                 tibble::rowid_to_column(".row_id") |>
                 dplyr::mutate(anonymize = TRUE)
 
-              # Hand the data to the rest of the module
               pii_predictions(predictions_clean)
               pii_eval(predictions_clean)
               module_state("evaluating")
+              
+              # Log detection results
+              log_info(
+                sprintf(
+                  "GLiNER detection complete: n_entities_found=%d, n_unique_labels=%d",
+                  nrow(predictions_clean),
+                  length(unique(predictions_clean$label))
+                ),
+                component = "gliner"
+              )
 
               progress$close()
               queue$consumer$stop()
@@ -431,7 +449,7 @@ gliner_server <- function(
               progress$close()
               queue$consumer$stop()
 
-              print(err)
+              log_error(paste("GLiNER error:", err$message), component = "gliner")
 
               shiny::showNotification(
                 paste0(
@@ -722,8 +740,18 @@ gliner_server <- function(
           # Set the result and done status
           return$anonymized_texts <- anonymized_texts
           return$done <- TRUE
+          
+          # Log anonymization saved
+          log_info(
+            sprintf(
+              "GLiNER anonymization saved: n_texts=%d, n_entities_removed=%d",
+              length(anonymized_texts), return$number_of_pii_entities_removed
+            ),
+            component = "gliner"
+          )
 
           # Finished; close modal
+          log_action("gliner_modal_closed", details = "saved")
           shiny::removeModal()
         },
         ignoreInit = TRUE
@@ -755,6 +783,7 @@ gliner_server <- function(
         input$quit,
         {
           # Just close the modal, no state reset
+          log_action("gliner_modal_closed", details = "quit")
           shiny::removeModal()
         },
         ignoreInit = TRUE

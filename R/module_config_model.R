@@ -480,6 +480,7 @@ model_server <- function(
         update_temperature_ui(session, input, models, "main")
         update_top_p_ui(session, input, models, "large")
         main_provider_updated(Sys.time())
+        log_action("model_selected", details = sprintf("main=%s", input$main_model))
       })
 
       observeEvent(input$large_model, {
@@ -502,6 +503,7 @@ model_server <- function(
         update_temperature_ui(session, input, models, "large")
         update_top_p_ui(session, input, models, "large")
         large_provider_updated(Sys.time())
+        log_action("model_selected", details = sprintf("large=%s", input$large_model))
       })
 
       # Advanced model configuration modal -------------------------------------
@@ -814,6 +816,10 @@ model_server <- function(
         ) %...>%
           (function(res) {
             removeNotification(nid)
+            log_info(
+              sprintf("Provider test success: which=%s, json=%s", which, use_json),
+              component = "llm"
+            )
             showNotification(
               paste0("Provider responded (success):\n'", res, "'"),
               type = "message",
@@ -824,6 +830,10 @@ model_server <- function(
           }) %...!%
           (function(e) {
             removeNotification(nid)
+            log_warn(
+              sprintf("Provider test failed: which=%s, json=%s, error=%s", which, use_json, e$message %||% as.character(e)),
+              component = "llm"
+            )
             app_error(
               e,
               when = "sending test message to provider",
@@ -861,9 +871,11 @@ model_server <- function(
 
       # Open modals
       observeEvent(input$main_cog, ignoreInit = TRUE, {
+        log_action("model_settings_modal_opened", details = "main")
         open_settings_modal("main")
       })
       observeEvent(input$large_cog, ignoreInit = TRUE, {
+        log_action("model_settings_modal_opened", details = "large")
         open_settings_modal("large")
       })
 

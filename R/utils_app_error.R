@@ -30,7 +30,7 @@ app_error <- function(
   error <- capture.output(print(error)) |> paste0(collapse = "\n")
 
   current_time <- Sys.time()
-  formatted_time <- format(current_time, "%Y-%m-%d %H:%M:%S")
+  formatted_time <- format(current_time, "%Y-%m-%d %H:%M:%S%z")
   log_message <- paste0(
     "Error: ",
     error,
@@ -42,19 +42,13 @@ app_error <- function(
     formatted_time,
     "\n"
   )
-  print(log_message)
-
-  # Define subdirectory based on error type
-  log_dir <- if (fatal) "app_errors/fatal" else "app_errors/nonfatal"
-  if (!dir.exists(log_dir)) {
-    dir.create(log_dir, recursive = TRUE)
-  }
-
-  log_file <- file.path(
-    log_dir,
-    paste0("error_", format(current_time, "%Y%m%d_%H%M%S"), ".log")
+  
+  # Log error using the centralized logger
+  log_error(
+    sprintf("Error occurred: %s | When: %s", error, when),
+    component = "error",
+    fatal = fatal
   )
-  write(log_message, file = log_file, append = TRUE)
 
   if (is.null(shiny_session)) {
     stop(error)

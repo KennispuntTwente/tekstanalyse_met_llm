@@ -32,6 +32,13 @@ main_server <- function(
   gliner_model = NULL
 ) {
   server <- function(input, output, session) {
+    # Session logging -------------------------------------------------------
+    session_id <- session$token
+    log_session_start(session_id)
+    session$onSessionEnded(function() {
+      log_session_end(session_id)
+    })
+
     # UI ---------------------------------------------------------------
     output$main_ui <- renderUI({
       base_ui <- tagList(

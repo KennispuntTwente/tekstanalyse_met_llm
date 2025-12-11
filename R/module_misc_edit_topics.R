@@ -40,6 +40,8 @@ edit_topics_server <- function(
         req(is.null(edited_topics()))
 
         topics_table_data(build_df(topics(), exclusive_topics()))
+        
+        log_action("edit_topics_modal_opened", details = sprintf("n_topics=%d", length(topics())))
 
         showModal(modalDialog(
           title = lang()$t("Onderwerpen"),
@@ -209,8 +211,20 @@ edit_topics_server <- function(
         }
 
         exclusive_topics(updated_exclusive)
+        log_action("edit_topics_modal_closed")
         removeModal()
         edited_topics(updated_topics)
+        
+        # Log topic editing result
+        log_info(
+          sprintf(
+            "Topics edited (human-in-loop): n_original=%d, n_final=%d, n_exclusive=%d",
+            length(initial_topics()),
+            length(updated_topics),
+            length(updated_exclusive)
+          ),
+          component = "topics"
+        )
       })
 
       # re-reduce  ----------------------------------------------------
@@ -234,9 +248,28 @@ edit_topics_server <- function(
         )
         reduction_in_progress(TRUE)
         rereduced_topics(NULL)
+        
+        # Log topic re-reduction start
+        log_info(
+          sprintf("Topics re-reduction started: n_topics=%d", length(updated_topics)),
+          component = "topics"
+        )
+
+        log_opts <- list(
+          level = getOption("logger__level", "INFO"),
+          dir = getOption("logger__dir", "logs"),
+          retention = getOption("logger__retention")
+        )
 
         future_promise(
           {
+            options(
+              logger__level = log_opts$level,
+              logger__dir = log_opts$dir,
+              logger__retention = log_opts$retention
+            )
+            try(log_init(), silent = TRUE)
+            
             reduce_topics(
               updated_topics,
               research_background,
@@ -255,7 +288,11 @@ edit_topics_server <- function(
             get_context_window_size_in_tokens = get_context_window_size_in_tokens,
             tiktoken_load_tokenizer = tiktoken_load_tokenizer,
             count_tokens = count_tokens,
-            async_message_printer = async_message_printer
+            count_tokens = count_tokens,
+            async_message_printer = async_message_printer,
+            log_opts = log_opts,
+            log_init = log_init,
+            get_session_id = get_session_id
           ),
           seed = NULL
         ) %...>%
@@ -301,6 +338,12 @@ edit_topics_server <- function(
 
         topics_table_data(build_df(new_topics, current_exclusive))
         reduction_in_progress(FALSE)
+        
+        # Log topic re-reduction result
+        log_info(
+          sprintf("Topics re-reduction complete: n_final=%d", length(new_topics)),
+          component = "topics"
+        )
       })
 
       # global enable/disable during re-reduce ----------------------

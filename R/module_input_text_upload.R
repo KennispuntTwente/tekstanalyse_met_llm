@@ -145,6 +145,13 @@ text_upload_server <- function(
     # ---- File upload --------------------------------------------------------
     observe({
       req(input$text_file)
+      
+      # Log file upload
+      log_info(
+        sprintf("File uploaded: name=%s, type=%s", 
+                input$text_file$name, tools::file_ext(input$text_file$name)),
+        component = "upload"
+      )
 
       # Reset all state -------------------------------------------------------
       raw_texts(NULL)
@@ -284,6 +291,7 @@ text_upload_server <- function(
         {
           df <- readxl::read_excel(file_path, sheet = input$sheet)
           uploaded_data(df)
+          log_action("sheet_selected", details = input$sheet)
         },
         error = function(e) {
           showNotification(
@@ -314,6 +322,7 @@ text_upload_server <- function(
       req(filtered_data())
       col <- input$column
       if (!is.null(col) && nzchar(col)) {
+        log_action("column_selected", details = col)
         txt <- filtered_data()[[col]]
         raw_texts(discard_empty(txt))
       }
@@ -334,6 +343,8 @@ text_upload_server <- function(
     observeEvent(input$filter_btn, {
       req(uploaded_data())
       req(!isTRUE(processing()))
+      
+      log_action("filter_modal_opened")
 
       showModal(modalDialog(
         title = lang()$t("Filter data"),
@@ -472,11 +483,16 @@ text_upload_server <- function(
         col = if (file_type() == "txt") "text" else input$filter_col,
         vals = input$filter_vals
       ))
+      log_action("filter_applied", details = sprintf("col=%s, n_vals=%d", 
+                 if (file_type() == "txt") "text" else input$filter_col,
+                 length(input$filter_vals)))
+      log_action("filter_modal_closed")
       removeModal()
     })
 
     observeEvent(input$clear_filter, {
       filter_spec(NULL)
+      log_action("filter_cleared")
       removeModal()
     })
 

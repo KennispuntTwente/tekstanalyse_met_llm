@@ -268,17 +268,20 @@ llm_provider_server <- function(
         req(has_preconfigured_llm_provider)
         req(!isTRUE(processing()))
         llm_provider_rv$provider_mode <- "preconfigured"
+        log_action("llm_provider_changed", details = "preconfigured")
       })
       observeEvent(input$select_openai, {
         req(can_configure_oai)
         req(!isTRUE(processing()))
         llm_provider_rv$provider_mode <- "openai"
+        log_action("llm_provider_changed", details = "openai")
       })
 
       observeEvent(input$select_ollama, {
         req(can_configure_ollama)
         req(!isTRUE(processing()))
         llm_provider_rv$provider_mode <- "ollama"
+        log_action("llm_provider_changed", details = "ollama")
       })
       observe({
         req(llm_provider_rv$provider_mode)
@@ -508,8 +511,10 @@ llm_provider_server <- function(
         # Update reactive values for URL only when button is clicked
         if (provider_mode == "openai") {
           openai_url(input$openai_url)
+          log_action("llm_url_changed", details = sprintf("provider=openai, url=%s", input$openai_url))
         } else if (provider_mode == "ollama") {
           ollama_url(input$ollama_url)
+          log_action("llm_url_changed", details = sprintf("provider=ollama, url=%s", input$ollama_url))
         }
 
         # Disable button, set available models to empty, show notification
@@ -601,8 +606,16 @@ llm_provider_server <- function(
               type = "message",
               duration = 3
             )
+            log_info(
+              sprintf("Models fetched: provider=%s, n_models=%d", provider_mode, length(models)),
+              component = "llm"
+            )
           }) %...!%
           (function(e) {
+            log_warn(
+              sprintf("Models fetch failed: provider=%s, error=%s", provider_mode, conditionMessage(e)),
+              component = "llm"
+            )
             showNotification(
               paste(
                 lang()$t("Error: modellen niet opgehaald -"),
