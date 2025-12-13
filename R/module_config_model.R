@@ -22,53 +22,20 @@ model_ui <- function(
 
 
 # 2 Server ---------------------------------------------------------
+
+#' Model selector + configuration UI.
+#'
+#' @param preconfigured_llm_provider_model_main Named list of tidyprompt providers (main model choices).
+#' @param preconfigured_llm_provider_model_large Named list of tidyprompt providers (large model choices).
+#' @param mode Reactive returning current analysis mode (character scalar).
+#' @param llm_provider_rv reactiveValues from the provider module.
 model_server <- function(
   id,
-
-  preconfigured_llm_provider_model_main = list(
-    "gpt 4.1 mini" = tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-4.1-mini"
-    )),
-    tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-4.1-nano"
-    )),
-    tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-4-turbo"
-    )),
-    tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-5"
-    ))
-  ),
-
-  preconfigured_llm_provider_model_large = list(
-    "gpt 4.1 mini" = tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-4.1-mini"
-    )),
-    tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-4.1-nano"
-    )),
-    tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-4-turbo"
-    )),
-    tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-5-mini"
-    )),
-    tidyprompt::llm_provider_mistral()
-  ),
-
+  preconfigured_llm_provider_model_main,
+  preconfigured_llm_provider_model_large,
   processing = reactiveVal(FALSE),
-  mode = reactiveVal("Onderwerpextractie"),
-
-  # From the LLM provider module:
-  llm_provider_rv = reactiveValues(
-    # Reactive value for the LLM provider mode
-    provider_mode = "preconfigured",
-    # OpenAI provider or Ollama provider as configured in UI:
-    llm_provider_configured = tidyprompt::llm_provider_openai(),
-    # Vector of models available for the configured LLM provider
-    #   (= result from sending request to the configured provider)
-    configured_models = c("gpt-4o", "gpt-4o-mini")
-  ),
+  mode,
+  llm_provider_rv,
 
   lang = default_lang()
 ) {
@@ -993,14 +960,7 @@ model_server <- function(
 # If item already has a name in the list, keep that
 # If unnamed, use the model name as the name
 add_names_to_llm_provider_model_list <- function(
-  llm_provider_model_list = list(
-    "gpt 4.1 mini" = tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-4.1-mini"
-    )),
-    tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-4.1-nano"
-    ))
-  )
+  llm_provider_model_list = list()
 ) {
   if (length(llm_provider_model_list) == 0) {
     return(llm_provider_model_list)
@@ -1023,14 +983,7 @@ add_names_to_llm_provider_model_list <- function(
 
 # Helper to verify that names of model list are unique
 verify_unique_llm_provider_model_names <- function(
-  llm_provider_model_list = list(
-    "gpt 4.1 mini" = tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-4.1-mini"
-    )),
-    tidyprompt::llm_provider_openai()$set_parameters(list(
-      model = "gpt-4.1-nano"
-    ))
-  )
+  llm_provider_model_list = list()
 ) {
   # Check if the list is empty
   if (length(llm_provider_model_list) == 0) {
@@ -1089,10 +1042,26 @@ if (FALSE) {
       can_configure_ollama = TRUE
     )
 
+    mode <- reactiveVal("Onderwerpextractie")
+
+    preconfigured_main_models <- list(
+      "gpt-4o-mini" = tidyprompt::llm_provider_openai()$set_parameters(list(
+        model = "gpt-4o-mini"
+      ))
+    )
+    preconfigured_large_models <- list(
+      "gpt-4o-mini" = tidyprompt::llm_provider_openai()$set_parameters(list(
+        model = "gpt-4o-mini"
+      ))
+    )
+
     model <- model_server(
       "model",
       lang = lang,
-      llm_provider_rv = llm_provider
+      llm_provider_rv = llm_provider,
+      mode = mode,
+      preconfigured_llm_provider_model_main = preconfigured_main_models,
+      preconfigured_llm_provider_model_large = preconfigured_large_models
     )
 
     output$main_model <- renderText({

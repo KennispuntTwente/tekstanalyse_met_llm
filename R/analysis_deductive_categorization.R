@@ -101,18 +101,10 @@ prompt_category <- function(
 #' @return A prompt object that can be used with `tidyprompt::send_prompt`
 #' @export
 prompt_multi_category <- function(
-  text = "this product is red",
+  text,
   research_background = "",
-  categories = c(
-    "positive review",
-    "negative review",
-    "mentions color",
-    "does not mention color",
-    "unclear/not applicable"
-  ),
-  exclusive_categories = c(
-    "unclear/not applicable"
-  )
+  categories,
+  exclusive_categories
 ) {
   stopifnot(
     is.character(text),

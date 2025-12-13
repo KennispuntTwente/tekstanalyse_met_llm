@@ -5,18 +5,13 @@
 # Function can take progress indicators and an interrupter for Shiny app integration
 
 mark_texts <- function(
-  texts = c(
-    "hi my super boi, its raining!",
-    "hello my mister man, the sky is blue",
-    "hello to the world, its a hot day today",
-    "for sure! i like cake"
-  ),
-  codes = c("greeting", "weather"),
+  texts,
+  codes,
   text_size_tokens = 128,
   overlap_size_tokens = 64,
   research_background = "",
   style_prompt = "",
-  llm_provider = tidyprompt::llm_provider_openai(),
+  llm_provider,
   progress_primary = NULL,
   progress_secondary = NULL,
   interrupter = NULL,

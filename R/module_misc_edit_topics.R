@@ -1,11 +1,19 @@
 # 1 Server -------------------------------------------------------------
+
+#' Modal for editing/reducing topics.
+#'
+#' @param topics Reactive returning a character vector of topics.
+#' @param exclusive_topics Reactive returning a character vector of exclusive topics.
+#' @param research_background Reactive returning a character scalar.
+#' @param assign_multiple_categories Reactive returning a logical scalar.
+#' @param llm_provider A tidyprompt provider used for reduction calls.
 edit_topics_server <- function(
   id,
-  topics = reactiveVal(NULL),
-  exclusive_topics = reactiveVal(NULL),
-  research_background = reactiveVal("this is my research"),
-  assign_multiple_categories = reactiveVal(TRUE),
-  llm_provider = tidyprompt::llm_provider_openai(),
+  topics,
+  exclusive_topics,
+  research_background,
+  assign_multiple_categories,
+  llm_provider,
   lang = default_lang()
 ) {
   moduleServer(
@@ -342,11 +350,19 @@ if (FALSE) {
   server <- function(input, output, session) {
     topics <- reactiveVal(c("Onderwerp 1", "Onderwerp 2", "Onderwerp 3"))
     exclusive_topics <- reactiveVal(c("Onderwerp 2"))
+    research_background <- reactiveVal("My research background")
+    assign_multiple_categories <- reactiveVal(TRUE)
+    llm_provider <- tidyprompt::llm_provider_openai()$set_parameters(list(
+      model = "gpt-4o-mini"
+    ))
 
     edited_topics <- edit_topics_server(
       "edit_topics",
       topics = topics,
-      exclusive_topics = exclusive_topics
+      exclusive_topics = exclusive_topics,
+      research_background = research_background,
+      assign_multiple_categories = assign_multiple_categories,
+      llm_provider = llm_provider
     )
 
     output$selected_topics <- renderText({

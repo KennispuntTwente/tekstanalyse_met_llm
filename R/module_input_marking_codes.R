@@ -327,13 +327,17 @@ marking_codes_server <- function(
 }
 
 # 2 Helpers ----------------------------------------------------------
-# Function to generate potential codes by having the LLM read all texts
+
+#' Generate potential marking codes by letting the LLM read all texts.
+#'
+#' @param texts Character vector of texts to analyze.
+#' @param llm_provider tidyprompt provider to call.
 generate_codes_by_reading_texts <- function(
-  texts = c("hi", "hello world", "i like this product"),
+  texts,
   text_size_tokens = 256,
   overlap_size_tokens = 64,
   research_background = "",
-  llm_provider = tidyprompt::llm_provider_openai(),
+  llm_provider,
   queue = NULL,
   interrupter = NULL,
   language = c("nl", "en")
