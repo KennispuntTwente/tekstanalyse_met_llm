@@ -246,24 +246,11 @@ text_split_server <- function(
       queue$consumer$start(millis = 50)
 
       # Async text splitting
-      log_opts <- list(
-        level = getOption("logger__level", "INFO"),
-        dir = getOption("logger__dir", "logs"),
-        retention = getOption("logger__retention")
-      )
-
-      session_id <- get_session_id()
+      log_ctx <- log_context_capture(is_async = TRUE)
 
       promises::future_promise(
         {
-          options(
-            logger__level = log_opts$level,
-            logger__dir = log_opts$dir,
-            logger__retention = log_opts$retention,
-            kwallm__log_session_id = session_id,
-            kwallm__log_is_async = TRUE
-          )
-          try(log_init(), silent = TRUE)
+          log_context_apply(log_ctx)
 
           split_texts_with_semchunk(
             texts = raw_texts,
@@ -280,10 +267,8 @@ text_split_server <- function(
           split_texts_with_semchunk = split_texts_with_semchunk,
           semchunk_load_chunker = semchunk_load_chunker,
           async_message_printer = async_message_printer,
-          log_opts = log_opts,
-          session_id = session_id,
-          log_init = log_init,
-          get_session_id = get_session_id
+          log_ctx = log_ctx,
+          log_context_apply = log_context_apply
         ),
         seed = NULL
       ) %...>%

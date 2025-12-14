@@ -309,24 +309,11 @@ edit_topics_server <- function(
           component = "topics"
         )
 
-        log_opts <- list(
-          level = getOption("logger__level", "INFO"),
-          dir = getOption("logger__dir", "logs"),
-          retention = getOption("logger__retention")
-        )
-
-        session_id <- get_session_id()
+        log_ctx <- log_context_capture(is_async = TRUE)
 
         future_promise(
           {
-            options(
-              logger__level = log_opts$level,
-              logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention,
-              kwallm__log_session_id = session_id,
-              kwallm__log_is_async = TRUE
-            )
-            try(log_init(), silent = TRUE)
+            log_context_apply(log_ctx)
 
             reduce_topics(
               updated_topics,
@@ -347,10 +334,8 @@ edit_topics_server <- function(
             tiktoken_load_tokenizer = tiktoken_load_tokenizer,
             count_tokens = count_tokens,
             async_message_printer = async_message_printer,
-            log_opts = log_opts,
-            session_id = session_id,
-            log_init = log_init,
-            get_session_id = get_session_id
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply
           ),
           seed = NULL
         ) %...>%

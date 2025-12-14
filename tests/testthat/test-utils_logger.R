@@ -4,11 +4,11 @@ source(here::here("R", "utils_logger.R"), local = TRUE)
 
 
 reset_logger_state <- function() {
-  .logger_env$initialized <- FALSE
-  .logger_env$log_dir <- NULL
-  .logger_env$retention <- NULL
-  .logger_env$use_logger_pkg <- NULL
-  .logger_env$level <- NULL
+  options(
+    kwallm__logger_state = NULL,
+    kwallm__log_session_id = NULL,
+    kwallm__log_is_async = NULL
+  )
 }
 
 
@@ -31,10 +31,15 @@ test_that("fallback logging writes to file and emits a message", {
 
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-")
 
-  .logger_env$initialized <- TRUE
-  .logger_env$use_logger_pkg <- FALSE
-  .logger_env$level <- "DEBUG"
-  .logger_env$log_dir <- log_dir
+  options(kwallm__logger_state = list(
+    initialized = TRUE,
+    use_logger_pkg = FALSE,
+    level = "DEBUG",
+    log_dir = log_dir,
+    log_dir_abs = log_dir,
+    retention = NULL,
+    app_mode = "test"
+  ))
 
   expect_message(
     log_info("hello world", component = "unit"),
@@ -55,10 +60,15 @@ test_that("log_error(fatal = TRUE) prefixes message", {
 
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-")
 
-  .logger_env$initialized <- TRUE
-  .logger_env$use_logger_pkg <- FALSE
-  .logger_env$level <- "DEBUG"
-  .logger_env$log_dir <- log_dir
+  options(kwallm__logger_state = list(
+    initialized = TRUE,
+    use_logger_pkg = FALSE,
+    level = "DEBUG",
+    log_dir = log_dir,
+    log_dir_abs = log_dir,
+    retention = NULL,
+    app_mode = "test"
+  ))
 
   expect_message(
     log_error("boom", component = "unit", fatal = TRUE),
@@ -80,10 +90,15 @@ test_that("analysis progress uses DEBUG level and analysis component", {
 
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-")
 
-  .logger_env$initialized <- TRUE
-  .logger_env$use_logger_pkg <- FALSE
-  .logger_env$level <- "DEBUG"
-  .logger_env$log_dir <- log_dir
+  options(kwallm__logger_state = list(
+    initialized = TRUE,
+    use_logger_pkg = FALSE,
+    level = "DEBUG",
+    log_dir = log_dir,
+    log_dir_abs = log_dir,
+    retention = NULL,
+    app_mode = "test"
+  ))
 
   expect_message(
     log_analysis_progress(current = 1, total = 3, step = "categorizing"),
@@ -169,12 +184,13 @@ test_that("log_init creates the log directory and initializes state", {
     mode = "test"
   ))
   expect_true(dir.exists(log_dir))
-  expect_true(.logger_env$initialized)
-  expect_identical(.logger_env$log_dir, log_dir)
+  st <- getOption("kwallm__logger_state")
+  expect_true(isTRUE(st$initialized))
+  expect_identical(st$log_dir, log_dir)
 })
 
 
-test_that("log_worker_init bootstraps logger in multisession future worker", {
+test_that("log_context_apply bootstraps logger in multisession future worker", {
   testthat::skip_if_not_installed("future")
 
   # Multisession plans can fail in constrained environments.
@@ -196,47 +212,28 @@ test_that("log_worker_init bootstraps logger in multisession future worker", {
 
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-worker-")
   session_id <- "deadbeef"
-  logger_path <- tryCatch(
-    normalizePath(
-      here::here("R", "utils_logger.R"),
-      winslash = "/",
-      mustWork = FALSE
+  log_ctx <- structure(
+    list(
+      level = "INFO",
+      dir = log_dir,
+      retention = NULL,
+      mode = "test",
+      session_id = session_id,
+      is_async = TRUE
     ),
-    error = function(e) here::here("R", "utils_logger.R")
+    class = "kwallm_log_context"
   )
 
   f <- future::future(
     {
-      options(
-        logger__level = "INFO",
-        logger__dir = log_dir,
-        logger__retention = NULL,
-        app__mode = "test",
-        kwallm__log_session_id = session_id,
-        kwallm__log_is_async = TRUE
-      )
-
-      # Simulate the situation that caused the bug: log_* exists but .write_log
-      # may not be present in the worker.
-      if (exists(".write_log", envir = .GlobalEnv, inherits = FALSE)) {
-        rm(list = ".write_log", envir = .GlobalEnv)
-      }
-
-      log_worker_init(
-        logger_path = logger_path,
-        mode = "test",
-        session_id = session_id,
-        is_async = TRUE
-      )
+      log_context_apply(log_ctx)
       log_info("hello from worker", component = "unit")
       TRUE
     },
     globals = list(
-      log_worker_init = log_worker_init,
       log_info = log_info,
-      logger_path = logger_path,
-      log_dir = log_dir,
-      session_id = session_id
+      log_context_apply = log_context_apply,
+      log_ctx = log_ctx
     ),
     seed = NULL
   )

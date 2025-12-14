@@ -33,10 +33,47 @@
 
 # 1 Internal state ------------------------------------------------------------
 
-# Store logger state in an environment to avoid global variables
-.logger_env <- new.env(parent = emptyenv())
-.logger_env$initialized <- FALSE
-.logger_env$log_dir <- NULL
+# NOTE: This file must work inside `future::multisession` workers.
+# Environments (including R6 objects) are not serializable across processes,
+# so we keep the logger state in `options()` as a plain list.
+
+.logger_state_default <- function() {
+  list(
+    initialized = FALSE,
+    use_logger_pkg = NA,
+    level = NA_character_,
+    log_dir = NULL,
+    log_dir_abs = NULL,
+    retention = NULL,
+    app_mode = "unknown"
+  )
+}
+
+.logger_state_get <- function() {
+  st <- getOption("kwallm__logger_state", NULL)
+  if (is.null(st) || !is.list(st)) {
+    st <- .logger_state_default()
+    options(kwallm__logger_state = st)
+  }
+  # Ensure all keys exist (forward-compatible)
+  defaults <- .logger_state_default()
+  for (nm in names(defaults)) {
+    if (is.null(st[[nm]])) st[[nm]] <- defaults[[nm]]
+  }
+  st
+}
+
+.logger_state_set <- function(st) {
+  if (is.null(st) || !is.list(st)) {
+    st <- .logger_state_default()
+  }
+  options(kwallm__logger_state = st)
+  invisible(NULL)
+}
+
+.null_coalesce <- function(x, y) {
+  if (is.null(x)) y else x
+}
 
 
 # 2 Initialization ------------------------------------------------------------
@@ -58,6 +95,8 @@ log_init <- function(
   retention = getOption("logger__retention", NULL),
   mode = "unknown"
 ) {
+  st <- .logger_state_get()
+
   log_dir_abs <- tryCatch(
     normalizePath(log_dir, winslash = "/", mustWork = FALSE),
     error = function(e) log_dir
@@ -68,10 +107,10 @@ log_init <- function(
     dir.create(log_dir_abs, recursive = TRUE, showWarnings = FALSE)
   }
 
-  .logger_env$log_dir <- log_dir
-  .logger_env$log_dir_abs <- log_dir_abs
-  .logger_env$retention <- retention
-  .logger_env$app_mode <- mode
+  st$log_dir <- log_dir
+  st$log_dir_abs <- log_dir_abs
+  st$retention <- retention
+  st$app_mode <- mode
 
   # Check if logger package is available
   if (requireNamespace("logger", quietly = TRUE)) {
@@ -145,14 +184,16 @@ log_init <- function(
       namespace = "global"
     )
 
-    .logger_env$initialized <- TRUE
-    .logger_env$use_logger_pkg <- TRUE
+    st$initialized <- TRUE
+    st$use_logger_pkg <- TRUE
   } else {
     # Fallback to simple file logging
-    .logger_env$initialized <- TRUE
-    .logger_env$use_logger_pkg <- FALSE
-    .logger_env$level <- toupper(level)
+    st$initialized <- TRUE
+    st$use_logger_pkg <- FALSE
+    st$level <- toupper(level)
   }
+
+  .logger_state_set(st)
 
   # Apply retention policy (clean old logs)
   if (!is.null(retention) && is.numeric(retention) && retention > 0) {
@@ -184,40 +225,16 @@ log_worker_init <- function(
 ) {
   tryCatch(
     {
-      if (
-        !is.null(session_id) &&
-          is.character(session_id) &&
-          length(session_id) == 1 &&
-          nzchar(session_id)
-      ) {
+      # Kept for backward-compat: this used to `source()` utils_logger.R.
+      # The new implementation is worker-safe without sourcing.
+      if (!is.null(session_id) && is.character(session_id) && length(session_id) == 1 && nzchar(session_id)) {
         options(kwallm__log_session_id = substr(session_id, 1, 8))
       }
-      if (!is.null(is_async)) {
-        options(kwallm__log_is_async = isTRUE(is_async))
-      }
+      if (!is.null(is_async)) options(kwallm__log_is_async = isTRUE(is_async))
 
-      # Always (re)source the logger file in workers when available.
-      # Future globals serialization can make existence checks misleading.
-      if (
-        !is.null(logger_path) &&
-          is.character(logger_path) &&
-          length(logger_path) == 1 &&
-          nzchar(logger_path) &&
-          file.exists(logger_path)
-      ) {
-        source(logger_path, local = FALSE)
-      }
-
-      if (exists("log_init", mode = "function", inherits = TRUE)) {
-        initialized <- FALSE
-        env <- get0(".logger_env", inherits = TRUE)
-        if (is.environment(env) && isTRUE(env$initialized)) {
-          initialized <- TRUE
-        }
-
-        if (!isTRUE(initialized)) {
-          log_init(mode = mode)
-        }
+      st <- .logger_state_get()
+      if (!isTRUE(st$initialized)) {
+        log_init(mode = mode)
       }
     },
     error = function(e) {
@@ -233,9 +250,8 @@ log_worker_init <- function(
 #' @keywords internal
 get_app_mode <- function() {
   mode <- NULL
-  if (exists("app_mode", envir = .logger_env, inherits = FALSE)) {
-    mode <- .logger_env$app_mode
-  }
+  st <- .logger_state_get()
+  mode <- st$app_mode
 
   if (
     !is.null(mode) && is.character(mode) && length(mode) == 1 && nzchar(mode)
@@ -288,6 +304,81 @@ get_log_async_label <- function() {
 }
 
 
+#' Capture a serializable logging context
+#'
+#' This returns a plain list (safe to pass into `future()` workers) containing
+#' the relevant logging configuration and identifiers.
+#'
+#' @param session_id Optional session id; defaults to `get_session_id()`.
+#' @param is_async Whether the context is for an async worker.
+#' @param mode App mode string; defaults to `getOption("app__mode", "unknown")`.
+#' @return A list with class `kwallm_log_context`.
+#' @export
+log_context_capture <- function(
+  session_id = NULL,
+  is_async = FALSE,
+  mode = getOption("app__mode", "unknown")
+) {
+  if (is.null(session_id)) {
+    session_id <- tryCatch(get_session_id(), error = function(e) "system")
+  }
+
+  structure(
+    list(
+      level = getOption("logger__level", "INFO"),
+      dir = getOption("logger__dir", "logs"),
+      retention = getOption("logger__retention", NULL),
+      mode = mode,
+      session_id = substr(as.character(.null_coalesce(session_id, "system")), 1, 8),
+      is_async = isTRUE(is_async)
+    ),
+    class = "kwallm_log_context"
+  )
+}
+
+
+#' Apply a logging context
+#'
+#' Intended to be called at the start of async workers (or anywhere you want to
+#' ensure a consistent logger configuration). Best-effort and must never crash.
+#'
+#' @param ctx A `kwallm_log_context` returned by `log_context_capture()`.
+#' @return Invisible NULL.
+#' @export
+log_context_apply <- function(ctx) {
+  tryCatch(
+    {
+      if (is.null(ctx) || !is.list(ctx)) return(invisible(NULL))
+
+      if (!is.null(ctx$session_id)) {
+        options(kwallm__log_session_id = substr(as.character(ctx$session_id), 1, 8))
+      }
+      if (!is.null(ctx$is_async)) {
+        options(kwallm__log_is_async = isTRUE(ctx$is_async))
+      }
+
+      # Ensure log_init sees the same config in any session.
+      if (!is.null(ctx$level)) options(logger__level = ctx$level)
+      if (!is.null(ctx$dir)) options(logger__dir = ctx$dir)
+      if (!is.null(ctx$retention)) options(logger__retention = ctx$retention)
+
+      st <- .logger_state_get()
+      if (!isTRUE(st$initialized)) {
+        log_init(
+          level = .null_coalesce(ctx$level, getOption("logger__level", "INFO")),
+          log_dir = .null_coalesce(ctx$dir, getOption("logger__dir", "logs")),
+          retention = .null_coalesce(ctx$retention, getOption("logger__retention", NULL)),
+          mode = .null_coalesce(ctx$mode, getOption("app__mode", "unknown"))
+        )
+      }
+    },
+    error = function(e) invisible(NULL)
+  )
+
+  invisible(NULL)
+}
+
+
 #' Apply log retention policy
 #'
 #' @param log_dir Log directory
@@ -321,17 +412,16 @@ get_log_async_label <- function() {
 #' @param component Component name for namespacing
 #' @keywords internal
 .write_log <- function(level, message, component = "app") {
-  if (!.logger_env$initialized) {
-    # Auto-initialize with defaults if not done
+  st <- .logger_state_get()
+  if (!isTRUE(st$initialized)) {
     log_init()
+    st <- .logger_state_get()
   }
 
-  if (.logger_env$use_logger_pkg) {
+  if (isTRUE(st$use_logger_pkg)) {
     # Use logger package
     log_dir_abs <- NULL
-    if (exists("log_dir_abs", envir = .logger_env, inherits = FALSE)) {
-      log_dir_abs <- .logger_env$log_dir_abs
-    }
+    log_dir_abs <- st$log_dir_abs
     if (
       !is.null(log_dir_abs) &&
         is.character(log_dir_abs) &&
@@ -355,7 +445,7 @@ get_log_async_label <- function() {
   } else {
     # Fallback: simple file logging
     levels <- c("DEBUG" = 1, "INFO" = 2, "WARN" = 3, "ERROR" = 4)
-    current_level <- levels[.logger_env$level]
+    current_level <- levels[st$level]
     msg_level <- levels[toupper(level)]
 
     if (is.na(msg_level)) {
@@ -381,7 +471,7 @@ get_log_async_label <- function() {
 
       # Write to file
       log_file <- file.path(
-        .logger_env$log_dir,
+        st$log_dir,
         paste0(format(Sys.Date(), "%Y-%m-%d"), ".log")
       )
       cat(log_line, "\n", file = log_file, append = TRUE)
@@ -399,24 +489,23 @@ get_log_async_label <- function() {
 #' @param component Component name (e.g., "startup", "session", "processing")
 #' @export
 log_info <- function(message, component = "app") {
-  write_log_fn <- get0(".write_log", mode = "function", inherits = TRUE)
-  if (!is.null(write_log_fn)) {
-    write_log_fn("INFO", message, component)
-    return(invisible(NULL))
-  }
-
-  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
-  session_id <- tryCatch(get_session_id(), error = function(e) "system")
-  async_label <- tryCatch(get_log_async_label(), error = function(e) "sync")
-  message(sprintf(
-    "[%s] [%s] [%s] [%s] [%s] %s",
-    timestamp,
-    session_id,
-    async_label,
-    "INFO",
-    component,
-    message
-  ))
+  tryCatch(
+    .write_log("INFO", message, component),
+    error = function(e) {
+      timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
+      session_id <- tryCatch(get_session_id(), error = function(e2) "system")
+      async_label <- tryCatch(get_log_async_label(), error = function(e2) "sync")
+      base::message(sprintf(
+        "[%s] [%s] [%s] [%s] [%s] %s",
+        timestamp,
+        session_id,
+        async_label,
+        "INFO",
+        component,
+        message
+      ))
+    }
+  )
   invisible(NULL)
 }
 
@@ -427,25 +516,23 @@ log_info <- function(message, component = "app") {
 #' @param component Component name
 #' @export
 log_debug <- function(message, component = "app") {
-  write_log_fn <- get0(".write_log", mode = "function", inherits = TRUE)
-  if (!is.null(write_log_fn)) {
-    write_log_fn("DEBUG", message, component)
-    return(invisible(NULL))
-  }
-
-  # In async worker sessions we may not have logger initialized; debug is best-effort.
-  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
-  session_id <- tryCatch(get_session_id(), error = function(e) "system")
-  async_label <- tryCatch(get_log_async_label(), error = function(e) "sync")
-  message(sprintf(
-    "[%s] [%s] [%s] [%s] [%s] %s",
-    timestamp,
-    session_id,
-    async_label,
-    "DEBUG",
-    component,
-    message
-  ))
+  tryCatch(
+    .write_log("DEBUG", message, component),
+    error = function(e) {
+      timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
+      session_id <- tryCatch(get_session_id(), error = function(e2) "system")
+      async_label <- tryCatch(get_log_async_label(), error = function(e2) "sync")
+      base::message(sprintf(
+        "[%s] [%s] [%s] [%s] [%s] %s",
+        timestamp,
+        session_id,
+        async_label,
+        "DEBUG",
+        component,
+        message
+      ))
+    }
+  )
   invisible(NULL)
 }
 
@@ -456,24 +543,23 @@ log_debug <- function(message, component = "app") {
 #' @param component Component name
 #' @export
 log_warn <- function(message, component = "app") {
-  write_log_fn <- get0(".write_log", mode = "function", inherits = TRUE)
-  if (!is.null(write_log_fn)) {
-    write_log_fn("WARN", message, component)
-    return(invisible(NULL))
-  }
-
-  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
-  session_id <- tryCatch(get_session_id(), error = function(e) "system")
-  async_label <- tryCatch(get_log_async_label(), error = function(e) "sync")
-  message(sprintf(
-    "[%s] [%s] [%s] [%s] [%s] %s",
-    timestamp,
-    session_id,
-    async_label,
-    "WARN",
-    component,
-    message
-  ))
+  tryCatch(
+    .write_log("WARN", message, component),
+    error = function(e) {
+      timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
+      session_id <- tryCatch(get_session_id(), error = function(e2) "system")
+      async_label <- tryCatch(get_log_async_label(), error = function(e2) "sync")
+      base::message(sprintf(
+        "[%s] [%s] [%s] [%s] [%s] %s",
+        timestamp,
+        session_id,
+        async_label,
+        "WARN",
+        component,
+        message
+      ))
+    }
+  )
   invisible(NULL)
 }
 
@@ -487,24 +573,23 @@ log_warn <- function(message, component = "app") {
 log_error <- function(message, component = "app", fatal = FALSE) {
   level <- if (fatal) "ERROR" else "ERROR"
   prefix <- if (fatal) "[FATAL] " else ""
-  write_log_fn <- get0(".write_log", mode = "function", inherits = TRUE)
-  if (!is.null(write_log_fn)) {
-    write_log_fn(level, paste0(prefix, message), component)
-    return(invisible(NULL))
-  }
-
-  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
-  session_id <- tryCatch(get_session_id(), error = function(e) "system")
-  async_label <- tryCatch(get_log_async_label(), error = function(e) "sync")
-  message(sprintf(
-    "[%s] [%s] [%s] [%s] [%s] %s",
-    timestamp,
-    session_id,
-    async_label,
-    level,
-    component,
-    paste0(prefix, message)
-  ))
+  tryCatch(
+    .write_log(level, paste0(prefix, message), component),
+    error = function(e) {
+      timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
+      session_id <- tryCatch(get_session_id(), error = function(e2) "system")
+      async_label <- tryCatch(get_log_async_label(), error = function(e2) "sync")
+      base::message(sprintf(
+        "[%s] [%s] [%s] [%s] [%s] %s",
+        timestamp,
+        session_id,
+        async_label,
+        level,
+        component,
+        paste0(prefix, message)
+      ))
+    }
+  )
   invisible(NULL)
 }
 

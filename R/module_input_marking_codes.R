@@ -207,24 +207,11 @@ marking_codes_server <- function(
 
         # Async generate codes
         queue$consumer$start()
-        log_opts <- list(
-          level = getOption("logger__level", "INFO"),
-          dir = getOption("logger__dir", "logs"),
-          retention = getOption("logger__retention")
-        )
-
-        session_id <- get_session_id()
+        log_ctx <- log_context_capture(is_async = TRUE)
 
         future_promise(
           {
-            options(
-              logger__level = log_opts$level,
-              logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention,
-              kwallm__log_session_id = session_id,
-              kwallm__log_is_async = TRUE
-            )
-            try(log_init(), silent = TRUE)
+            log_context_apply(log_ctx)
 
             generate_codes_by_reading_texts(
               texts = texts,
@@ -242,6 +229,8 @@ marking_codes_server <- function(
             queue = queue,
             interrupter = interrupter,
             language = lang()$get_translation_language(),
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply,
             generate_codes_by_reading_texts = generate_codes_by_reading_texts,
             send_prompt_with_retries = send_prompt_with_retries,
             get_context_window_size_in_tokens = get_context_window_size_in_tokens,
@@ -250,11 +239,6 @@ marking_codes_server <- function(
             prompt_candidate_topics = prompt_candidate_topics,
             reduce_topics = reduce_topics,
             semchunk_load_chunker = semchunk_load_chunker,
-            log_opts = log_opts,
-            session_id = session_id,
-            log_init = log_init,
-            get_session_id = get_session_id,
-            log_info = log_info,
             tiktoken_load_tokenizer = tiktoken_load_tokenizer,
             count_tokens = count_tokens,
             async_message_printer = async_message_printer

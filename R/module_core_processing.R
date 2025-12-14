@@ -188,35 +188,14 @@ processing_server <- function(
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
 
-        log_opts <- list(
-          level = getOption("logger__level", "INFO"),
-          dir = getOption("logger__dir", "logs"),
-          retention = getOption("logger__retention")
+        log_ctx <- log_context_capture(
+          is_async = TRUE,
+          mode = getOption("app__mode", "unknown")
         )
-
-        session_id <- get_session_id()
-
-        utils_logger_path <- tryCatch(
-          normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
-          error = function(e) "R/utils_logger.R"
-        )
-        app_mode <- getOption("app__mode", "unknown")
 
         future_promise(
           {
-            options(
-              logger__level = log_opts$level,
-              logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention,
-              kwallm__log_session_id = session_id,
-              kwallm__log_is_async = TRUE
-            )
-            log_worker_init(
-              logger_path = utils_logger_path,
-              mode = app_mode,
-              session_id = session_id,
-              is_async = TRUE
-            )
+            log_context_apply(log_ctx)
 
             results <- vector("list", length(texts))
 
@@ -552,35 +531,14 @@ processing_server <- function(
           lang()$t("...")
         )
 
-        log_opts <- list(
-          level = getOption("logger__level", "INFO"),
-          dir = getOption("logger__dir", "logs"),
-          retention = getOption("logger__retention")
+        log_ctx <- log_context_capture(
+          is_async = TRUE,
+          mode = getOption("app__mode", "unknown")
         )
-
-        session_id <- get_session_id()
-
-        utils_logger_path <- tryCatch(
-          normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
-          error = function(e) "R/utils_logger.R"
-        )
-        app_mode <- getOption("app__mode", "unknown")
 
         future_promise(
           {
-            options(
-              logger__level = log_opts$level,
-              logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention,
-              kwallm__log_session_id = session_id,
-              kwallm__log_is_async = TRUE
-            )
-            log_worker_init(
-              logger_path = utils_logger_path,
-              mode = app_mode,
-              session_id = session_id,
-              is_async = TRUE
-            )
+            log_context_apply(log_ctx)
 
             candidate_topics <- tryCatch(
               {
@@ -800,35 +758,14 @@ processing_server <- function(
           "..."
         )
 
-        log_opts <- list(
-          level = getOption("logger__level", "INFO"),
-          dir = getOption("logger__dir", "logs"),
-          retention = getOption("logger__retention")
+        log_ctx <- log_context_capture(
+          is_async = TRUE,
+          mode = getOption("app__mode", "unknown")
         )
-
-        session_id <- get_session_id()
-
-        utils_logger_path <- tryCatch(
-          normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
-          error = function(e) "R/utils_logger.R"
-        )
-        app_mode <- getOption("app__mode", "unknown")
 
         future_promise(
           {
-            options(
-              logger__level = log_opts$level,
-              logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention,
-              kwallm__log_session_id = session_id,
-              kwallm__log_is_async = TRUE
-            )
-            log_worker_init(
-              logger_path = utils_logger_path,
-              mode = app_mode,
-              session_id = session_id,
-              is_async = TRUE
-            )
+            log_context_apply(log_ctx)
 
             # Step 4: Assign topics
             # Writing progress on secondary progress file
@@ -1149,35 +1086,14 @@ processing_server <- function(
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
 
-        log_opts <- list(
-          level = getOption("logger__level", "INFO"),
-          dir = getOption("logger__dir", "logs"),
-          retention = getOption("logger__retention")
+        log_ctx <- log_context_capture(
+          is_async = TRUE,
+          mode = getOption("app__mode", "unknown")
         )
-
-        session_id <- get_session_id()
-
-        utils_logger_path <- tryCatch(
-          normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
-          error = function(e) "R/utils_logger.R"
-        )
-        app_mode <- getOption("app__mode", "unknown")
 
         future_promise(
           {
-            options(
-              logger__level = log_opts$level,
-              logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention,
-              kwallm__log_session_id = session_id,
-              kwallm__log_is_async = TRUE
-            )
-            log_worker_init(
-              logger_path = utils_logger_path,
-              mode = app_mode,
-              session_id = session_id,
-              is_async = TRUE
-            )
+            log_context_apply(log_ctx)
 
             mark_texts(
               texts = texts,
@@ -1202,6 +1118,8 @@ processing_server <- function(
             research_background = research_background(),
             style_prompt = style_prompt(),
             codes = codes$texts(),
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply,
             mark_texts = mark_texts,
             mark_text_prompt = mark_text_prompt,
             get_context_window_size_in_tokens = get_context_window_size_in_tokens,
@@ -1214,10 +1132,6 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
-            log_opts = log_opts,
-            log_worker_init = log_worker_init,
-            utils_logger_path = utils_logger_path,
-            app_mode = app_mode,
             write_paragraph = write_paragraph,
             write_paragraphs = write_paragraphs(),
             text_size_tokens = context_window$max_tokens,
