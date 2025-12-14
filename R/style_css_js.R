@@ -246,8 +246,8 @@ css_js_head <- function() {
       // ---- KWALLM: modal open/close auto logging -------------------------
       // Shiny renders modals using Bootstrap's .modal. We attach a marker element
       // inside each modal with attributes:
-      //   data-kwallm-modal-id="filter_modal" (required)
-      //   data-kwallm-modal-details="..." (optional)
+      //   data-kwallm-modal-id=\"filter_modal\" (required)
+      //   data-kwallm-modal-details=\"...\" (optional)
       // This handler forwards modal show/hide events to the server.
       (function() {
         function getKwallmModalMeta(modalEl) {
