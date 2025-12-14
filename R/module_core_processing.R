@@ -386,10 +386,8 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
-            log_opts = log_opts,
-            log_worker_init = log_worker_init,
-            utils_logger_path = utils_logger_path,
-            app_mode = app_mode,
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply,
             llm_stream_async = llm_stream$async,
             streaming_enabled = getOption("paragraph_streaming", TRUE) &&
               isTRUE(models$main$parameters$stream)
@@ -612,10 +610,8 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
-            log_opts = log_opts,
-            log_worker_init = log_worker_init,
-            utils_logger_path = utils_logger_path,
-            app_mode = app_mode,
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply,
             log_info = log_info
           ),
           packages = c(
@@ -958,10 +954,8 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
-            log_opts = log_opts,
-            log_worker_init = log_worker_init,
-            utils_logger_path = utils_logger_path,
-            app_mode = app_mode,
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply,
             log_info = log_info,
             exclusive_topics = exclusive_topics(),
             llm_stream_async = llm_stream$async,
