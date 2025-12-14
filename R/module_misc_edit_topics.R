@@ -178,6 +178,10 @@ edit_topics_server <- function(
       # add / delete-empty / reset rows -------------------------------
       observeEvent(input$add_topic, {
         df <- topics_table_data()
+        log_action(
+          "topic_added",
+          details = sprintf("n_rows_before=%d", nrow(df))
+        )
         topics_table_data(dplyr::bind_rows(
           df,
           data.frame(topic = "", exclusive = FALSE)
@@ -186,11 +190,24 @@ edit_topics_server <- function(
 
       observeEvent(input$delete_empty, {
         df <- topics_table_data()
+        n_before <- nrow(df)
         df$topic <- trimws(df$topic)
-        topics_table_data(df[df$topic != "", , drop = FALSE])
+        df2 <- df[df$topic != "", , drop = FALSE]
+        log_action(
+          "topic_empty_rows_deleted",
+          details = sprintf("n_rows_before=%d n_rows_after=%d", n_before, nrow(df2))
+        )
+        topics_table_data(df2)
       })
 
       observeEvent(input$reset_topics, {
+        log_action(
+          "topics_reset",
+          details = sprintf(
+            "n_topics_initial=%d",
+            length(initial_topics() %||% character(0))
+          )
+        )
         topics_table_data(build_df(initial_topics(), initial_exclusive()))
       })
 
@@ -209,6 +226,15 @@ edit_topics_server <- function(
 
         updated_topics <- trimws(df$topic[df$topic != ""])
         updated_exclusive <- trimws(df$topic[df$exclusive & df$topic != ""])
+
+        log_action(
+          "topics_confirmed",
+          details = sprintf(
+            "n_topics=%d n_exclusive=%d",
+            length(updated_topics),
+            length(updated_exclusive)
+          )
+        )
 
         if (anyDuplicated(updated_topics)) {
           shiny::showNotification(

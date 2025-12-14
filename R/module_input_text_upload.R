@@ -95,6 +95,14 @@ text_upload_server <- function(
       )
     })
 
+    observeEvent(input$txt_split_lines, {
+      req(file_type() == "txt")
+      req(input$txt_split_lines %in% c(lang()$t("Nee"), lang()$t("Ja")))
+      log_action(
+        "txt_split_lines_changed",
+        details = sprintf("value=%s", input$txt_split_lines)
+      )
+    }, ignoreInit = TRUE)
     # ---- Helpers ------------------------------------------------------------
     discard_empty <- function(x) {
       x <- x[!is.na(x)]
@@ -182,6 +190,13 @@ text_upload_server <- function(
             raw_texts(df$text)
           },
           error = function(e) {
+            log_error(
+              sprintf(
+                "Upload read error: file_type=txt, error=%s",
+                conditionMessage(e)
+              ),
+              component = "upload"
+            )
             showNotification(
               paste(lang()$t("Error bij lezen van tekstbestand:"), e$message),
               type = "error"
@@ -195,6 +210,14 @@ text_upload_server <- function(
             uploaded_data(df)
           },
           error = function(e) {
+            log_error(
+              sprintf(
+                "Upload read error: file_type=%s, error=%s",
+                file_ext,
+                conditionMessage(e)
+              ),
+              component = "upload"
+            )
             showNotification(
               paste(
                 lang()$t("Error bij lezen van CSV/TSV bestand:"),
@@ -212,6 +235,13 @@ text_upload_server <- function(
             # Wait for user to choose sheet before loading data
           },
           error = function(e) {
+            log_error(
+              sprintf(
+                "Upload read error: file_type=xlsx, error=%s",
+                conditionMessage(e)
+              ),
+              component = "upload"
+            )
             showNotification(
               paste(lang()$t("Error bij lezen van Excel-bestand:"), e$message),
               type = "error"
@@ -225,6 +255,13 @@ text_upload_server <- function(
             uploaded_data(df)
           },
           error = function(e) {
+            log_error(
+              sprintf(
+                "Upload read error: file_type=sav, error=%s",
+                conditionMessage(e)
+              ),
+              component = "upload"
+            )
             showNotification(
               paste(lang()$t("Error bij lezen van SAV-bestand:"), e$message),
               type = "error"
@@ -232,6 +269,14 @@ text_upload_server <- function(
           }
         )
       } else {
+        log_warn(
+          sprintf(
+            "Unsupported upload file type: name=%s, file_type=%s",
+            input$text_file$name,
+            file_ext
+          ),
+          component = "upload"
+        )
         showNotification(
           lang()$t("Niet ondersteund bestandstype"),
           type = "error"

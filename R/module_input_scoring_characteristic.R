@@ -24,6 +24,7 @@ score_server <- function(
     function(input, output, session) {
       # Reactive values to store the scoring characteristic
       scoring_characteristic <- reactiveVal("")
+      last_logged_scoring_characteristic <- reactiveVal(NULL)
       shiny::exportTestValues(
         scoring_characteristic = scoring_characteristic()
       )
@@ -60,6 +61,39 @@ score_server <- function(
       # Update scoring characteristic when input changes
       observeEvent(input$scoring_characteristic, {
         scoring_characteristic(input$scoring_characteristic)
+      })
+
+      # Log changes, but avoid log spam: debounce and only log length
+      scoring_characteristic_debounced <- shiny::debounce(
+        reactive({
+          if (is.null(input$scoring_characteristic)) {
+            ""
+          } else {
+            input$scoring_characteristic
+          }
+        }),
+        millis = 800
+      )
+
+      observeEvent(scoring_characteristic_debounced(), ignoreInit = TRUE, {
+        if (!isTRUE(mode() == "Scoren")) {
+          return()
+        }
+
+        val <- scoring_characteristic_debounced()
+        if (is.null(val)) {
+          val <- ""
+        }
+
+        if (identical(val, last_logged_scoring_characteristic())) {
+          return()
+        }
+        last_logged_scoring_characteristic(val)
+
+        log_action(
+          "scoring_characteristic_set",
+          details = sprintf("length=%d", nchar(val))
+        )
       })
 
       # Disable input when processing

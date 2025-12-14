@@ -493,6 +493,14 @@ text_management_server <- function(
     observeEvent(input$open_gliner_modal, {
       req(!isTRUE(processing()))
       isolate({
+        log_action(
+          "gliner_open_clicked",
+          details = sprintf(
+            "n_texts=%d mode=%s",
+            length(texts$preprocessed %||% character(0)),
+            anonymization_mode() %||% "unknown"
+          )
+        )
         if (is.function(gliner$start)) gliner$start()
       })
     })
@@ -551,6 +559,10 @@ text_management_server <- function(
       },
       content = function(file) {
         req(texts$df)
+        log_action(
+          "preprocessed_texts_download_started",
+          details = sprintf("n_texts=%d", nrow(texts$df))
+        )
         log_info(
           sprintf("Preprocessed texts downloaded: n_texts=%d", nrow(texts$df)),
           component = "download"

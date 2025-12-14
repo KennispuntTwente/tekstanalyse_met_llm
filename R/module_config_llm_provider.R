@@ -387,9 +387,42 @@ llm_provider_server <- function(
       # API key  ---------------------------------------------------------------
 
       api_key_input <- reactiveVal(Sys.getenv("OPENAI_API_KEY"))
+      prev_api_key_has_value <- reactiveVal(nchar(api_key_input() %||% "") > 0)
 
       # Reactively update API key (updating URLs only when 'get models' is clicked)
       observeEvent(input$api_key_text, api_key_input(input$api_key_text))
+
+      # Log set/cleared transitions (avoid per-keystroke logging)
+      observeEvent(api_key_input(), {
+        api_key_len <- nchar(api_key_input() %||% "")
+        has_value <- api_key_len > 0
+
+        # Ignore initialization; only record transitions after first user interaction
+        prev_has_value <- prev_api_key_has_value()
+        if (isTRUE(has_value != prev_has_value)) {
+          if (isTRUE(has_value)) {
+            log_action(
+              "api_key_set",
+              details = sprintf(
+                "provider=%s has_key=%s key_len=%d",
+                llm_provider_rv$provider_mode %||% "unknown",
+                has_value,
+                api_key_len
+              )
+            )
+          } else {
+            log_action(
+              "api_key_cleared",
+              details = sprintf(
+                "provider=%s has_key=%s",
+                llm_provider_rv$provider_mode %||% "unknown",
+                has_value
+              )
+            )
+          }
+          prev_api_key_has_value(has_value)
+        }
+      }, ignoreInit = TRUE)
 
       output$api_key_input <- renderUI({
         req(llm_provider_rv$provider_mode == "openai")
@@ -466,6 +499,10 @@ llm_provider_server <- function(
       })
 
       observeEvent(input$toggle_api_key_visibility, {
+        log_action(
+          "api_key_visibility_toggled",
+          details = sprintf("provider=%s", llm_provider_rv$provider_mode %||% "unknown")
+        )
         session$sendCustomMessage(
           type = paste0(ns("api_key_text"), "-togglePassword"),
           message = paste0(ns("api_key_text"))
@@ -512,10 +549,20 @@ llm_provider_server <- function(
         if (provider_mode == "openai") {
           openai_url(input$openai_url)
           log_action("llm_url_changed", details = sprintf("provider=openai, url=%s", input$openai_url))
+
+          api_key_len <- nchar(api_key_input() %||% "")
+          log_action(
+            "api_key_used_for_models_ping",
+            details = sprintf("provider=openai has_key=%s key_len=%d", api_key_len > 0, api_key_len)
+          )
         } else if (provider_mode == "ollama") {
           ollama_url(input$ollama_url)
           log_action("llm_url_changed", details = sprintf("provider=ollama, url=%s", input$ollama_url))
         }
+
+        log_action("models_ping_clicked", details = sprintf("provider=%s", provider_mode %||% "unknown"))
+
+        request_started_at <- Sys.time()
 
         # Disable button, set available models to empty, show notification
         shinyjs::disable("get_models")
@@ -601,6 +648,17 @@ llm_provider_server <- function(
               available_models_ollama(models)
             }
 
+            elapsed_ms <- as.integer(round(1000 * as.numeric(difftime(Sys.time(), request_started_at, units = "secs"))))
+            log_action(
+              "models_ping_succeeded",
+              details = sprintf(
+                "provider=%s n_models=%d elapsed_ms=%d",
+                provider_mode %||% "unknown",
+                length(models),
+                elapsed_ms
+              )
+            )
+
             showNotification(
               lang()$t("Succes: modellen opgehaald"),
               type = "message",
@@ -612,6 +670,20 @@ llm_provider_server <- function(
             )
           }) %...!%
           (function(e) {
+            elapsed_ms <- as.integer(round(1000 * as.numeric(difftime(Sys.time(), request_started_at, units = "secs"))))
+            err_msg <- tryCatch(conditionMessage(e), error = function(.) as.character(e))
+            err_msg <- substr(err_msg, 1, 200)
+            err_class <- paste(class(e), collapse = "|")
+            log_action(
+              "models_ping_failed",
+              details = sprintf(
+                "provider=%s elapsed_ms=%d error_class=%s error=%s",
+                provider_mode %||% "unknown",
+                elapsed_ms,
+                err_class,
+                err_msg
+              )
+            )
             log_warn(
               sprintf("Models fetch failed: provider=%s, error=%s", provider_mode, conditionMessage(e)),
               component = "llm"

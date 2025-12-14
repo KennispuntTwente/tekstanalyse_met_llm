@@ -340,24 +340,38 @@ text_split_server <- function(
     # Ensure max_tokens value stays valid
     observeEvent(input$max_tokens, {
       req(input$max_tokens)
-      max_tokens_val(input$max_tokens)
+      req(isTRUE(enabled))
 
-      # Ensure minimum value
-      if (input$max_tokens < 1) {
-        updateNumericInput(session, "max_tokens", value = 1)
+      new_val <- max(1, input$max_tokens)
+      max_tokens_val(new_val)
+
+      if (input$max_tokens != new_val) {
+        updateNumericInput(session, "max_tokens", value = new_val)
       }
-    })
+
+      log_action(
+        "max_tokens_changed",
+        details = sprintf("splitting=%s value=%d", isTRUE(splitting()), new_val)
+      )
+    }, ignoreInit = TRUE)
 
     # Ensure overlap value stays valid
     observeEvent(input$overlap, {
       req(input$overlap)
-      overlap_val(input$overlap)
+      req(isTRUE(enabled))
 
-      # Ensure minimum value
-      if (input$overlap < 0) {
-        updateNumericInput(session, "overlap", value = 0)
+      new_val <- max(0, input$overlap)
+      overlap_val(new_val)
+
+      if (input$overlap != new_val) {
+        updateNumericInput(session, "overlap", value = new_val)
       }
-    })
+
+      log_action(
+        "overlap_changed",
+        details = sprintf("splitting=%s value=%d", isTRUE(splitting()), new_val)
+      )
+    }, ignoreInit = TRUE)
 
     # Disable inputs when processing -------------------------------
 

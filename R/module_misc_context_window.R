@@ -114,6 +114,15 @@ context_window_server <- function(
         n_chunks = NULL
       )
 
+      prev_params <- reactiveVal(NULL)
+      prev_states <- reactiveVal(list(
+        any_fit_problem = NULL,
+        too_many_chunks = NULL,
+        n_chunks = NULL,
+        fit_context_window_assigning = NULL,
+        fit_context_window_chunks = NULL
+      ))
+
       # Keep rv in sync with numeric inputs
       observe({
         if (is_valid_number(input$chunk_size)) {
@@ -137,6 +146,43 @@ context_window_server <- function(
 
         if (is_valid_number(input$overlap)) {
           rv$overlap <- input$overlap
+        }
+      })
+
+      # Log parameter changes (debounced by diffing previous values)
+      observe({
+        req(!isTRUE(processing()))
+        req(mode())
+
+        current <- list(
+          mode = mode() %||% "unknown",
+          context_window = rv$n_tokens_context_window,
+          chunk_size = rv$chunk_size,
+          draws = rv$draws,
+          max_tokens = rv$max_tokens,
+          overlap = rv$overlap
+        )
+
+        prev <- prev_params()
+        if (is.null(prev)) {
+          prev_params(current)
+          return()
+        }
+
+        if (!identical(current, prev)) {
+          log_action(
+            "context_window_params_changed",
+            details = sprintf(
+              "mode=%s context_window=%s chunk_size=%s draws=%s max_tokens=%s overlap=%s",
+              as.character(current$mode),
+              as.character(current$context_window),
+              as.character(current$chunk_size),
+              as.character(current$draws),
+              as.character(current$max_tokens),
+              as.character(current$overlap)
+            )
+          )
+          prev_params(current)
         }
       })
 
@@ -360,6 +406,59 @@ context_window_server <- function(
             rv$any_fit_problem <- FALSE
           }
         }
+      })
+
+      # Log warning state transitions (once per change)
+      observe({
+        req(mode())
+
+        current_states <- list(
+          any_fit_problem = rv$any_fit_problem,
+          too_many_chunks = rv$too_many_chunks,
+          n_chunks = rv$n_chunks,
+          fit_context_window_assigning = rv$fit_context_window_assigning,
+          fit_context_window_chunks = rv$fit_context_window_chunks
+        )
+
+        prev <- prev_states()
+        if (!identical(current_states$any_fit_problem, prev$any_fit_problem) && !is.null(current_states$any_fit_problem)) {
+          log_action(
+            "context_window_fit_problem_changed",
+            details = sprintf(
+              "mode=%s any_fit_problem=%s fit_assigning=%s fit_chunks=%s",
+              mode() %||% "unknown",
+              as.character(current_states$any_fit_problem),
+              as.character(current_states$fit_context_window_assigning),
+              as.character(current_states$fit_context_window_chunks)
+            )
+          )
+        }
+
+        if (!identical(current_states$too_many_chunks, prev$too_many_chunks) && !is.null(current_states$too_many_chunks)) {
+          log_action(
+            "too_many_chunks_changed",
+            details = sprintf(
+              "mode=%s too_many_chunks=%s n_chunks=%s limit=%d",
+              mode() %||% "unknown",
+              as.character(current_states$too_many_chunks),
+              as.character(current_states$n_chunks),
+              number_of_chunks_limit
+            )
+          )
+        }
+
+        if (!identical(current_states$n_chunks, prev$n_chunks) && !is.null(current_states$n_chunks)) {
+          log_action(
+            "n_chunks_changed",
+            details = sprintf(
+              "mode=%s n_chunks=%s",
+              mode() %||% "unknown",
+              as.character(current_states$n_chunks)
+            )
+          )
+        }
+
+        prev_states(current_states)
       })
 
       # Show inputs (context window, chunking parameters), based on mode ----

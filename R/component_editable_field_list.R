@@ -42,6 +42,8 @@ editable_field_list_server <- function(
     exclusive_vals <- reactiveVal(rep(FALSE, initial_count))
     isEditing <- reactiveVal(TRUE)
 
+    prev_exclusive_vals <- reactiveVal(exclusive_vals())
+
     shiny::exportTestValues(
       n_fields = n_fields(),
       txt_in_fields = txt_in_fields(),
@@ -134,12 +136,33 @@ editable_field_list_server <- function(
 
       # Sync exclusive checkboxes
       if (show_excl) {
-        exclusive_vals(sapply(
+        new_exclusive <- sapply(
           seq_len(n_fields()),
           function(i) input[[paste0("exclusive", i)]] %||% exclusive_vals()[i],
           simplify = TRUE,
           USE.NAMES = FALSE
-        ))
+        )
+
+        prev <- prev_exclusive_vals() %||% rep(FALSE, length(new_exclusive))
+        if (length(prev) != length(new_exclusive)) {
+          prev <- rep(FALSE, length(new_exclusive))
+        }
+
+        changed_idx <- which(prev != new_exclusive)
+        if (length(changed_idx) > 0) {
+          log_action(
+            "exclusive_changed",
+            details = sprintf(
+              "field=%s indices=%s values=%s",
+              field_label,
+              paste(changed_idx, collapse = ","),
+              paste(new_exclusive[changed_idx], collapse = ",")
+            )
+          )
+        }
+
+        exclusive_vals(new_exclusive)
+        prev_exclusive_vals(new_exclusive)
       }
     })
 
@@ -149,6 +172,13 @@ editable_field_list_server <- function(
       txt_in_fields(c(txt_in_fields(), ""))
       exclusive_vals(c(exclusive_vals(), FALSE))
       n_fields(n_fields() + 1)
+
+      prev_exclusive_vals(exclusive_vals())
+
+      log_action(
+        "field_added",
+        details = sprintf("field=%s n_fields=%d", field_label, n_fields())
+      )
     })
 
     observeEvent(input$removeField, {
@@ -156,6 +186,13 @@ editable_field_list_server <- function(
       txt_in_fields(utils::head(txt_in_fields(), -1))
       exclusive_vals(utils::head(exclusive_vals(), -1))
       n_fields(n_fields() - 1)
+
+      prev_exclusive_vals(exclusive_vals())
+
+      log_action(
+        "field_removed",
+        details = sprintf("field=%s n_fields=%d", field_label, n_fields())
+      )
     })
 
     # Toggle edit/save -----------------------------------------------
@@ -186,6 +223,11 @@ editable_field_list_server <- function(
         isEditing(TRUE)
         shinyjs::enable("addField")
         shinyjs::enable("removeField")
+
+        log_action(
+          "config_edit_enabled",
+          details = sprintf("field=%s n_fields=%d", field_label, n_fields())
+        )
       }
     })
 

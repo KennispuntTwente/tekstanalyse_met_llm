@@ -158,6 +158,9 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
 
   # 4 Initialize logger -------------------------------------------------------
 
+  # Make app mode available to other modules/logging
+  options(app__mode = mode)
+
   tryCatch({
     log_init(mode = mode)
     log_info(paste("Application starting in", mode, "mode"), component = "startup")

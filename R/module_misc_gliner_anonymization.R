@@ -57,6 +57,11 @@ gliner_server <- function(
           uiOutput(ns("modal_content"))
         ))
 
+        log_action(
+          "gliner_modal_opened",
+          details = sprintf("n_texts=%d", length(pii_texts() %||% character(0)))
+        )
+
         pii_entities_ui_rerender(Sys.time())
 
         return$enabled <- TRUE
@@ -314,6 +319,15 @@ gliner_server <- function(
           }
           log_debug(sprintf("GLiNER labels: %s", paste(labels, collapse = ", ")), component = "gliner")
 
+          log_action(
+            "gliner_start_clicked",
+            details = sprintf(
+              "n_texts=%d n_labels=%d",
+              length(pii_texts() %||% character(0)),
+              length(labels)
+            )
+          )
+
           ## 2 Switch the modal to the “running” state
           module_state("running")
           
@@ -552,7 +566,6 @@ gliner_server <- function(
           $(tbl.table().body()).on('change', 'input.anon-box', function() {
             var rowId = $(this).data('rowid');
             var val   = this.checked;
-            console.log('⇢ anon_toggle', rowId, val);          // DEBUG browser
             Shiny.setInputValue('%s',
               {row: rowId, val: val, ts: Date.now()}, {priority:'event'});
           });
@@ -646,6 +659,18 @@ gliner_server <- function(
           df <- pii_eval()
           df$anonymize[df$.row_id == info$row] <- info$val
           pii_eval(df)
+
+          n_total <- nrow(df)
+          n_selected <- sum(df$anonymize, na.rm = TRUE)
+          log_action(
+            "gliner_entity_toggle",
+            details = sprintf(
+              "val=%s n_selected=%d n_total=%d",
+              as.character(isTRUE(info$val)),
+              n_selected,
+              n_total
+            )
+          )
 
           # Rebuild check-box HTML for the changed row(s)
           df$checkbox <- mapply(
@@ -781,11 +806,22 @@ gliner_server <- function(
         ignoreInit = TRUE
       )
 
+      # Close button (finished state)
+      observeEvent(
+        input$close_modal,
+        {
+          log_action("gliner_modal_closed", details = "closed")
+          shiny::removeModal()
+        },
+        ignoreInit = TRUE
+      )
+
       # Retry/reset button
       observeEvent(
         input$retry,
         {
           # State reset, but keep modal open
+          log_action("gliner_reset_clicked")
           reset_state(close_modal = FALSE) # keep modal open so user can hit Start again
         },
         ignoreInit = TRUE

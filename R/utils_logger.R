@@ -66,6 +66,7 @@ log_init <- function(
 
   .logger_env$log_dir <- log_dir
   .logger_env$retention <- retention
+  .logger_env$app_mode <- mode
 
   # Check if logger package is available
   if (requireNamespace("logger", quietly = TRUE)) {
@@ -112,6 +113,37 @@ log_init <- function(
   }
 
   invisible(NULL)
+}
+
+
+#' Get current app mode safely
+#' @keywords internal
+get_app_mode <- function() {
+  mode <- NULL
+  if (exists("app_mode", envir = .logger_env, inherits = FALSE)) {
+    mode <- .logger_env$app_mode
+  }
+
+  if (!is.null(mode) && is.character(mode) && length(mode) == 1 && nzchar(mode)) {
+    return(mode)
+  }
+
+  opt <- getOption("app__mode", NULL)
+  if (!is.null(opt) && is.character(opt) && length(opt) == 1 && nzchar(opt)) {
+    return(opt)
+  }
+
+  env <- Sys.getenv("KWALLM_APP_MODE", "")
+  if (nzchar(env)) {
+    return(env)
+  }
+
+  # Fallback heuristic: detect Docker on Linux
+  if (.Platform$OS.type == "unix" && file.exists("/.dockerenv")) {
+    return("docker")
+  }
+
+  return("unknown")
 }
 
 
@@ -254,7 +286,11 @@ log_error <- function(message, component = "app", fatal = FALSE) {
 #' @export
 log_session_start <- function(session_id) {
   log_info(
-    sprintf("Session started: %s", substr(session_id, 1, 8)),
+    sprintf(
+      "Session started: %s app_mode=%s",
+      substr(session_id, 1, 8),
+      get_app_mode()
+    ),
     component = "session"
   )
 }

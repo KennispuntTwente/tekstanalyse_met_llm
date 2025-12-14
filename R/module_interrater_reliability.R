@@ -365,6 +365,18 @@ interrater_server <- function(
           return()
         }
 
+        log_action(
+          "irr_start_rating_clicked",
+          details = sprintf(
+            "mode=%s sample_type=%s sample_size=%d total_items=%d assign_multiple=%s",
+            mode,
+            input$sample_type %||% "unknown",
+            n_sample,
+            total_n,
+            assign_multiple_categories
+          )
+        )
+
         # Perform random sampling
         sampled_indices <- sample(
           seq_len(total_n),
@@ -393,6 +405,18 @@ interrater_server <- function(
       # Reset button; returns to configuration state
       observeEvent(input$reset_module, {
         req(module_state() == "rating")
+
+        df_sample <- sampled_data_rv()
+        total_items <- if (is.data.frame(df_sample)) nrow(df_sample) else NA_integer_
+        log_action(
+          "irr_reset_clicked",
+          details = sprintf(
+            "mode=%s item_index=%d total_items=%s",
+            mode,
+            current_item_index() %||% NA_integer_,
+            as.character(total_items)
+          )
+        )
 
         # Reset relevant states
         module_state("configure_sample")
@@ -433,6 +457,19 @@ interrater_server <- function(
       observeEvent(input$go_back, {
         req(module_state() == "rating")
         req(current_item_index() > 1)
+
+        df_sample <- sampled_data_rv()
+        total_items <- if (is.data.frame(df_sample)) nrow(df_sample) else NA_integer_
+        log_action(
+          "irr_back_clicked",
+          details = sprintf(
+            "mode=%s from_index=%d to_index=%d total_items=%s",
+            mode,
+            current_item_index(),
+            current_item_index() - 1,
+            as.character(total_items)
+          )
+        )
         current_item_index(current_item_index() - 1)
       })
 
@@ -505,6 +542,17 @@ interrater_server <- function(
         current_ratings <- user_ratings_store()
         current_ratings[[as.character(current_index)]] <- user_input
         user_ratings_store(current_ratings)
+
+        log_action(
+          "irr_item_submitted",
+          details = sprintf(
+            "mode=%s item_index=%d total_items=%d last=%s",
+            mode,
+            current_index,
+            total_items,
+            isTRUE(current_index >= total_items)
+          )
+        )
 
         # Move to next item OR calculate final result
         if (current_index < total_items) {
