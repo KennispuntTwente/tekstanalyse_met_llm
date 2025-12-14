@@ -59,12 +59,18 @@ log_init <- function(
  retention = getOption("logger__retention", NULL),
   mode = "unknown"
 ) {
+  log_dir_abs <- tryCatch(
+    normalizePath(log_dir, winslash = "/", mustWork = FALSE),
+    error = function(e) log_dir
+  )
+
   # Create log directory if needed
-  if (!dir.exists(log_dir)) {
-    dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
+  if (!dir.exists(log_dir_abs)) {
+    dir.create(log_dir_abs, recursive = TRUE, showWarnings = FALSE)
   }
 
   .logger_env$log_dir <- log_dir
+  .logger_env$log_dir_abs <- log_dir_abs
   .logger_env$retention <- retention
   .logger_env$app_mode <- mode
 
@@ -83,18 +89,34 @@ log_init <- function(
     logger::log_threshold(log_level)
 
     # Set up file appender with daily rotation
-    log_file <- file.path(log_dir, paste0(format(Sys.Date(), "%Y-%m-%d"), ".log"))
+    log_file <- file.path(log_dir_abs, paste0(format(Sys.Date(), "%Y-%m-%d"), ".log"))
 
     logger::log_appender(
       logger::appender_tee(log_file),
       namespace = "global"
     )
 
-    # Set JSON-like layout for structured logs (with timezone and session)
+    # Structured layout (with timezone and Shiny session id)
     logger::log_layout(
-      logger::layout_glue_generator(
-        format = "[{format(time, '%Y-%m-%d %H:%M:%S%z')}] [{get_session_id()}] [{level}] [{ns}] {msg}"
-      ),
+      function(
+        level,
+        msg,
+        namespace = NA,
+        .logcall = sys.call(),
+        .topcall = sys.call(-1),
+        .topenv = parent.frame(),
+        .timestamp = Sys.time()
+      ) {
+        session_id <- tryCatch(get_session_id(), error = function(e) "system")
+        sprintf(
+          "[%s] [%s] [%s] [%s] %s",
+          format(.timestamp, "%Y-%m-%d %H:%M:%S%z"),
+          session_id,
+          level,
+          namespace,
+          msg
+        )
+      },
       namespace = "global"
     )
 
@@ -109,7 +131,7 @@ log_init <- function(
   
   # Apply retention policy (clean old logs)
   if (!is.null(retention) && is.numeric(retention) && retention > 0) {
-    .apply_retention_policy(log_dir, retention)
+    .apply_retention_policy(log_dir_abs, retention)
   }
 
   invisible(NULL)
@@ -198,6 +220,16 @@ get_session_id <- function() {
 
   if (.logger_env$use_logger_pkg) {
     # Use logger package
+    log_dir_abs <- NULL
+    if (exists("log_dir_abs", envir = .logger_env, inherits = FALSE)) {
+      log_dir_abs <- .logger_env$log_dir_abs
+    }
+    if (!is.null(log_dir_abs) && is.character(log_dir_abs) && length(log_dir_abs) == 1 && nzchar(log_dir_abs)) {
+      if (!dir.exists(log_dir_abs)) {
+        dir.create(log_dir_abs, recursive = TRUE, showWarnings = FALSE)
+      }
+    }
+
     log_fn <- switch(
       toupper(level),
       "DEBUG" = logger::log_debug,

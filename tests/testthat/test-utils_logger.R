@@ -115,8 +115,8 @@ test_that("log_init creates the log directory and initializes state", {
 
   # If logger is available, preserve global logger state to avoid leaking
   if (requireNamespace("logger", quietly = TRUE)) {
-    old_appender <- logger::log_appender()
-    old_layout <- logger::log_layout()
+    old_appender <- logger::log_appender(namespace = "global")
+    old_layout <- logger::log_layout(namespace = "global")
     old_threshold <- logger::log_threshold()
 
     resolve_logger_fun <- function(x) {

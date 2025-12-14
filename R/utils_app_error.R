@@ -29,6 +29,13 @@ app_error <- function(
 
   error <- capture.output(print(error)) |> paste0(collapse = "\n")
 
+  session_id <- "system"
+  if (!is.null(shiny_session) && !is.null(shiny_session$token) && nzchar(shiny_session$token)) {
+    session_id <- substr(shiny_session$token, 1, 8)
+  } else if (exists("get_session_id", mode = "function")) {
+    session_id <- tryCatch(get_session_id(), error = function(e) "system")
+  }
+
   current_time <- Sys.time()
   formatted_time <- format(current_time, "%Y-%m-%d %H:%M:%S%z")
   log_message <- paste0(
@@ -38,16 +45,24 @@ app_error <- function(
     "When: ",
     when,
     "\n",
+    "Session ID: ",
+    session_id,
+    "\n",
     "Time: ",
     formatted_time,
     "\n"
   )
+
+  cat(log_message)
   
   # Log error using the centralized logger
-  log_error(
-    sprintf("Error occurred: %s | When: %s", error, when),
-    component = "error",
-    fatal = fatal
+  tryCatch(
+    log_error(
+      sprintf("Error occurred: %s | When: %s", error, when),
+      component = "error",
+      fatal = fatal
+    ),
+    error = function(e) invisible(NULL)
   )
 
   if (is.null(shiny_session)) {
@@ -117,6 +132,7 @@ app_error <- function(
         p(lang$t(
           "Er gebeurde iets onverwachts, waardoor de app is gestopt. Sorry!"
         )),
+        p(tags$strong("Session ID:"), session_id),
         hr(),
         pre(log_message),
         hr(),
@@ -130,7 +146,7 @@ app_error <- function(
     shiny_session$close()
   } else {
     showNotification(
-      paste("Error:", error),
+      paste0("Session ID: ", session_id, " | Error: ", error),
       type = "error",
       duration = NULL
     )
