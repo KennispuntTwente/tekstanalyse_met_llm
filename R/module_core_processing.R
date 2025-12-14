@@ -1589,7 +1589,7 @@ processing_server <- function(
               paste0(
                 "Analysis total duration (click->download-ready): ",
                 "mode=%s, n_texts_preprocessed=%s, total_chars_preprocessed=%s, uuid=%s, ",
-                      "duration=%.1fs, avg=%.3fs/text, avg=%.3fs/1k_chars"
+                "duration=%.1fs, avg=%.3fs/text, avg=%.3fs/1k_chars"
               ),
               mode() %||% "unknown",
               as.character(n_texts_total),
@@ -1597,7 +1597,7 @@ processing_server <- function(
               uuid,
               duration_total_secs,
               secs_per_text,
-                    secs_per_1k_chars
+              secs_per_1k_chars
             ),
             component = "analysis"
           )
@@ -1688,7 +1688,10 @@ processing_server <- function(
           tags$div(
             style = "display:none;",
             `data-kwallm-modal-id` = "analysis_restart_modal",
-            `data-kwallm-modal-details` = sprintf("mode=%s", mode() %||% "unknown")
+            `data-kwallm-modal-details` = sprintf(
+              "mode=%s",
+              mode() %||% "unknown"
+            )
           ),
           lang()$t("Zorg dat je eerst de resultaten downloadt."),
           footer = modal_footer_confirm(
@@ -2072,7 +2075,10 @@ processing_server <- function(
           tags$div(
             style = "display:none;",
             `data-kwallm-modal-id` = "analysis_cancel_modal",
-            `data-kwallm-modal-details` = sprintf("mode=%s", mode() %||% "unknown")
+            `data-kwallm-modal-details` = sprintf(
+              "mode=%s",
+              mode() %||% "unknown"
+            )
           ),
           lang()$t("Weet je zeker dat je de analyse wilt annuleren?"),
           footer = modal_footer_confirm(

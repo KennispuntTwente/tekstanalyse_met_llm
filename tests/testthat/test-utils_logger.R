@@ -185,7 +185,11 @@ test_that("log_worker_init bootstraps logger in multisession future worker", {
 
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-worker-")
   logger_path <- tryCatch(
-    normalizePath(here::here("R", "utils_logger.R"), winslash = "/", mustWork = FALSE),
+    normalizePath(
+      here::here("R", "utils_logger.R"),
+      winslash = "/",
+      mustWork = FALSE
+    ),
     error = function(e) here::here("R", "utils_logger.R")
   )
 
@@ -221,7 +225,9 @@ test_that("log_worker_init bootstraps logger in multisession future worker", {
 
   log_file <- file.path(log_dir, paste0(format(Sys.Date(), "%Y-%m-%d"), ".log"))
   for (i in 1:30) {
-    if (file.exists(log_file)) break
+    if (file.exists(log_file)) {
+      break
+    }
     Sys.sleep(0.1)
   }
   expect_true(file.exists(log_file))

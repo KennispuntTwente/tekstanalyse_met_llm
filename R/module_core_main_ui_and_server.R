@@ -42,35 +42,39 @@ main_server <- function(
       log_session_end(session_id)
     })
 
-
     # Modal logging ---------------------------------------------------------
 
     # See `css_js_head()` JS: emits `input$kwallm_modal_event` with
     # {type: 'opened'|'closed', id: '<modal_id>', details: '<optional>', ts: <ms>}
 
-    observeEvent(input$kwallm_modal_event, {
-      evt <- input$kwallm_modal_event
-      if (is.null(evt) || is.null(evt$type) || is.null(evt$id)) return()
+    observeEvent(
+      input$kwallm_modal_event,
+      {
+        evt <- input$kwallm_modal_event
+        if (is.null(evt) || is.null(evt$type) || is.null(evt$id)) {
+          return()
+        }
 
-      type <- as.character(evt$type)
-      modal_id <- as.character(evt$id)
+        type <- as.character(evt$type)
+        modal_id <- as.character(evt$id)
 
-      # Log as e.g. `filter_modal_opened` / `filter_modal_closed`
-      action <- switch(
-        type,
-        opened = paste0(modal_id, "_opened"),
-        closed = paste0(modal_id, "_closed"),
-        paste0(modal_id, "_event")
-      )
+        # Log as e.g. `filter_modal_opened` / `filter_modal_closed`
+        action <- switch(
+          type,
+          opened = paste0(modal_id, "_opened"),
+          closed = paste0(modal_id, "_closed"),
+          paste0(modal_id, "_event")
+        )
 
-      details <- NULL
-      if (!is.null(evt$details) && nzchar(as.character(evt$details))) {
-        details <- as.character(evt$details)
-      }
+        details <- NULL
+        if (!is.null(evt$details) && nzchar(as.character(evt$details))) {
+          details <- as.character(evt$details)
+        }
 
-      log_action(action, details = details)
-    }, ignoreInit = TRUE)
-
+        log_action(action, details = details)
+      },
+      ignoreInit = TRUE
+    )
 
     # UI ---------------------------------------------------------------
 
@@ -256,7 +260,6 @@ main_server <- function(
       )
     })
 
-
     # 0 Authentication -----------------------------------------------
 
     # When deploying to server, you could implement, e.g.,
@@ -267,7 +270,6 @@ main_server <- function(
       user_info <- get_azure_auth(session, output)
       if (is.null(user_info)) return()
     }
-
 
     # 1 Text management ----------------------------------------------
 
@@ -313,7 +315,6 @@ main_server <- function(
       lang = lang
     )
 
-
     # 2 Mode management ----------------------------------------------
 
     # Obtain mode
@@ -354,7 +355,6 @@ main_server <- function(
       lang
     )
 
-
     # 3 Model management ---------------------------------------------
 
     # Determine if we have preconfigured LLM providers or not
@@ -385,7 +385,6 @@ main_server <- function(
       preconfigured_llm_provider_model_large = preconfigured_large_models
     )
 
-
     # 4 Category & score fields --------------------------------------
 
     categories <- categories_server(
@@ -409,7 +408,6 @@ main_server <- function(
       lang = lang
     )
 
-
     # 5 Processing ---------------------------------------------------
 
     processing <- processing_server(
@@ -431,9 +429,8 @@ main_server <- function(
       lang = lang
     )
 
-
     # 6 Language -----------------------------------------------------
-    
+
     lang <- language_server("language", processing)
   }
 
