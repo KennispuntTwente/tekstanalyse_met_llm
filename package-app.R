@@ -104,11 +104,6 @@ options(
   send_prompt_with_retries__retry_delay_seconds = 3,
   send_prompt_with_retries__max_interactions = 10,
 
-  # - Prompt logging;
-  #   if prompts & LLM replies should be written to folder 'prompt_logs'; for debugging purposes;
-  #     see: R/send_prompt_with_retries.R
-  send_prompt_with_retries__log_prompts = FALSE,
-
   # - Maximum number of texts to process at once;
   #     see: R/processing.R
   processing__max_texts = 3000,
@@ -157,7 +152,14 @@ options(
   topic_modelling__chunk_size_limit = 100,
   topic_modelling__number_of_chunks_limit = 50,
   topic_modelling__draws_default = 1,
-  topic_modelling__draws_limit = 5
+  topic_modelling__draws_limit = 5,
+
+  # - Logging settings;
+  #   logs are written to the 'logs/' directory;
+  #     see R/utils_logger.R
+  logger__level = "INFO", # DEBUG, INFO, WARN, ERROR
+  logger__dir = "logs", # Directory for log files
+  logger__retention = 30 # Keep last N log files (NULL = indefinite)
 )
 
 

@@ -447,6 +447,10 @@ model_server <- function(
         update_temperature_ui(session, input, models, "main")
         update_top_p_ui(session, input, models, "large")
         main_provider_updated(Sys.time())
+        log_action(
+          "model_selected",
+          details = sprintf("main=%s", input$main_model)
+        )
       })
 
       observeEvent(input$large_model, {
@@ -469,6 +473,10 @@ model_server <- function(
         update_temperature_ui(session, input, models, "large")
         update_top_p_ui(session, input, models, "large")
         large_provider_updated(Sys.time())
+        log_action(
+          "model_selected",
+          details = sprintf("large=%s", input$large_model)
+        )
       })
 
       # Advanced model configuration modal -------------------------------------
@@ -530,6 +538,11 @@ model_server <- function(
             easyClose = TRUE,
             footer = modalButton(lang()$t("Sluiten")),
             div(
+              tags$div(
+                style = "display:none;",
+                `data-kwallm-modal-id` = "model_settings_modal",
+                `data-kwallm-modal-details` = sprintf("which=%s", which)
+              ),
               # === Controls in a 2-col wrap ===
               bslib::layout_column_wrap(
                 width = 1 / 2, # <= up to 2 per row
@@ -734,6 +747,8 @@ model_server <- function(
         provider <- if (which == "main") models$main else models$large
         req(provider)
 
+        t0 <- Sys.time()
+
         shinyjs::disable(paste0(which, "_test_provider"))
         shinyjs::disable(paste0(which, "_test_provider_json"))
 
@@ -781,6 +796,27 @@ model_server <- function(
         ) %...>%
           (function(res) {
             removeNotification(nid)
+            elapsed_ms <- as.integer(
+              as.numeric(difftime(Sys.time(), t0, units = "secs")) * 1000
+            )
+            log_action(
+              "model_provider_test_succeeded",
+              details = sprintf(
+                "which=%s json=%s elapsed_ms=%d result_chars=%d",
+                which,
+                use_json,
+                elapsed_ms,
+                nchar(res %||% "")
+              )
+            )
+            log_info(
+              sprintf(
+                "Provider test success: which=%s, json=%s",
+                which,
+                use_json
+              ),
+              component = "llm"
+            )
             showNotification(
               paste0("Provider responded (success):\n'", res, "'"),
               type = "message",
@@ -791,6 +827,29 @@ model_server <- function(
           }) %...!%
           (function(e) {
             removeNotification(nid)
+            elapsed_ms <- as.integer(
+              as.numeric(difftime(Sys.time(), t0, units = "secs")) * 1000
+            )
+            log_action(
+              "model_provider_test_failed",
+              details = sprintf(
+                "which=%s json=%s elapsed_ms=%d error_class=%s error=%s",
+                which,
+                use_json,
+                elapsed_ms,
+                class(e)[1] %||% NA_character_,
+                stringr::str_trunc(e$message %||% as.character(e), 100)
+              )
+            )
+            log_warn(
+              sprintf(
+                "Provider test failed: which=%s, json=%s, error=%s",
+                which,
+                use_json,
+                e$message %||% as.character(e)
+              ),
+              component = "llm"
+            )
             app_error(
               e,
               when = "sending test message to provider",
@@ -812,6 +871,10 @@ model_server <- function(
             input[[paste0(w, "_test_provider")]],
             ignoreInit = TRUE,
             {
+              log_action(
+                "model_provider_test_clicked",
+                details = sprintf("which=%s json=false", w)
+              )
               do_test(w, use_json = FALSE)
             }
           )
@@ -820,6 +883,10 @@ model_server <- function(
             input[[paste0(w, "_test_provider_json")]],
             ignoreInit = TRUE,
             {
+              log_action(
+                "model_provider_test_clicked",
+                details = sprintf("which=%s json=true", w)
+              )
               do_test(w, use_json = TRUE)
             }
           )
@@ -876,6 +943,10 @@ model_server <- function(
       # Live update — JSON mode (MAIN)
       observeEvent(input$main_json_mode, ignoreInit = TRUE, {
         req(models$main)
+        log_action(
+          "model_json_mode_changed",
+          details = sprintf("which=main value=%s", input$main_json_mode)
+        )
         prov <- models$main$clone(deep = TRUE)
         prov$json_type <- input$main_json_mode
         models$main <- prov
@@ -888,6 +959,10 @@ model_server <- function(
       # Live update — JSON mode (LARGE)
       observeEvent(input$large_json_mode, ignoreInit = TRUE, {
         req(models$large)
+        log_action(
+          "model_json_mode_changed",
+          details = sprintf("which=large value=%s", input$large_json_mode)
+        )
         prov <- models$large$clone(deep = TRUE)
         prov$json_type <- input$large_json_mode
         models$large <- prov

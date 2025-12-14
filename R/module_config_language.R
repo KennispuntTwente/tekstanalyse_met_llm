@@ -84,6 +84,7 @@ language_server <- function(
         req(isTRUE(can_toggle))
         req(input$toggle %in% c("en", "nl"))
         current_lang_code(input$toggle)
+        log_action("language_changed", details = input$toggle)
       })
 
       # Disable during processing

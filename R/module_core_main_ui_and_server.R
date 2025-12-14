@@ -9,6 +9,7 @@
 # To run, see 'app.R'
 
 ## Main UI -----------------------------------------------------------
+
 main_ui <- function() {
   bslib::page(
     theme = bs_theme(
@@ -23,6 +24,7 @@ main_ui <- function() {
 
 
 # Main server ------------------------------------------------------
+
 # Here we build the main server for the Shiny app
 
 main_server <- function(
@@ -32,7 +34,50 @@ main_server <- function(
   gliner_model = NULL
 ) {
   server <- function(input, output, session) {
+    # Session logging -------------------------------------------------------
+
+    session_id <- session$token
+    log_session_start(session_id)
+    session$onSessionEnded(function() {
+      log_session_end(session_id)
+    })
+
+    # Modal logging ---------------------------------------------------------
+
+    # See `css_js_head()` JS: emits `input$kwallm_modal_event` with
+    # {type: 'opened'|'closed', id: '<modal_id>', details: '<optional>', ts: <ms>}
+
+    observeEvent(
+      input$kwallm_modal_event,
+      {
+        evt <- input$kwallm_modal_event
+        if (is.null(evt) || is.null(evt$type) || is.null(evt$id)) {
+          return()
+        }
+
+        type <- as.character(evt$type)
+        modal_id <- as.character(evt$id)
+
+        # Log as e.g. `filter_modal_opened` / `filter_modal_closed`
+        action <- switch(
+          type,
+          opened = paste0(modal_id, "_opened"),
+          closed = paste0(modal_id, "_closed"),
+          paste0(modal_id, "_event")
+        )
+
+        details <- NULL
+        if (!is.null(evt$details) && nzchar(as.character(evt$details))) {
+          details <- as.character(evt$details)
+        }
+
+        log_action(action, details = details)
+      },
+      ignoreInit = TRUE
+    )
+
     # UI ---------------------------------------------------------------
+
     output$main_ui <- renderUI({
       base_ui <- tagList(
         # Main header area with user/admin UI and title
@@ -216,6 +261,7 @@ main_server <- function(
     })
 
     # 0 Authentication -----------------------------------------------
+
     # When deploying to server, you could implement, e.g.,
     #   Azure AD authentication here
     # See for example R/azure_auth.R
@@ -226,6 +272,7 @@ main_server <- function(
     }
 
     # 1 Text management ----------------------------------------------
+
     # Text upload
     raw_texts <- text_upload_server("text_upload", processing, lang)
 
@@ -269,6 +316,7 @@ main_server <- function(
     )
 
     # 2 Mode management ----------------------------------------------
+
     # Obtain mode
     mode <- mode_server("mode", processing, lang)
 
@@ -308,6 +356,7 @@ main_server <- function(
     )
 
     # 3 Model management ---------------------------------------------
+
     # Determine if we have preconfigured LLM providers or not
     # Are both preconfigured_llm_provider and preconfigured_main_models provided?
     has_preconfigured_llm_provider <- if (
@@ -337,6 +386,7 @@ main_server <- function(
     )
 
     # 4 Category & score fields --------------------------------------
+
     categories <- categories_server(
       "categories",
       mode = mode,
@@ -359,6 +409,7 @@ main_server <- function(
     )
 
     # 5 Processing ---------------------------------------------------
+
     processing <- processing_server(
       id = "processing",
       mode = mode,
@@ -379,6 +430,7 @@ main_server <- function(
     )
 
     # 6 Language -----------------------------------------------------
+
     lang <- language_server("language", processing)
   }
 

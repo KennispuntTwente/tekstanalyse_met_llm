@@ -31,13 +31,7 @@ marking_codes_server <- function(
       lang = lang
     )
 
-    # Re-export test values
-    shiny::exportTestValues(
-      n_fields = fields$unique_non_empty_count(),
-      txt_in_fields = fields$texts(),
-      isEditing = fields$editing(),
-      generated_codes = generated_codes()
-    )
+    # Test exports are registered after all reactives are created
 
     ## UI: Card wrapper with code generation ####
     output$codes <- renderUI({
@@ -128,6 +122,13 @@ marking_codes_server <- function(
     # Reactive value to store generated codes
     generated_codes <- reactiveVal(NULL)
 
+    shiny::exportTestValues(
+      n_fields = fields$unique_non_empty_count(),
+      txt_in_fields = fields$texts(),
+      isEditing = fields$editing(),
+      generated_codes = generated_codes()
+    )
+
     # Reactive value to store if generation is in progress
     code_generation_in_progress <- reactiveVal(FALSE)
 
@@ -182,6 +183,15 @@ marking_codes_server <- function(
         generate_codes_message(lang()$t("Codes genereren..."))
         shiny::showNotification(lang()$t("Codes genereren..."))
 
+        # Log code generation start
+        log_info(
+          sprintf(
+            "Code generation started: n_texts=%d",
+            length(texts$preprocessed)
+          ),
+          component = "codes"
+        )
+
         # Empty all previously generated codes
         generated_codes(NULL)
         # Reset fields to empty (will be populated after generation)
@@ -195,8 +205,12 @@ marking_codes_server <- function(
 
         # Async generate codes
         queue$consumer$start()
+        log_ctx <- log_context_capture(is_async = TRUE)
+
         future_promise(
           {
+            log_context_apply(log_ctx)
+
             generate_codes_by_reading_texts(
               texts = texts,
               research_background = research_background,
@@ -213,6 +227,8 @@ marking_codes_server <- function(
             queue = queue,
             interrupter = interrupter,
             language = lang()$get_translation_language(),
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply,
             generate_codes_by_reading_texts = generate_codes_by_reading_texts,
             send_prompt_with_retries = send_prompt_with_retries,
             get_context_window_size_in_tokens = get_context_window_size_in_tokens,
@@ -236,6 +252,10 @@ marking_codes_server <- function(
           {
             generated_codes(.)
             code_generation_in_progress(FALSE)
+            log_info(
+              sprintf("Code generation complete: n_codes=%d", length(.)),
+              component = "codes"
+            )
             shinyjs::delay(500, queue$consumer$stop())
           } %...!%
           {

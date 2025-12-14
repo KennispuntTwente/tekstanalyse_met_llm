@@ -54,7 +54,18 @@ gliner_server <- function(
           size = "xl",
           easyClose = FALSE,
           footer = NULL,
-          uiOutput(ns("modal_content"))
+          tagList(
+            tags$div(
+              style = "display:none;",
+              `data-kwallm-modal-id` = "gliner_modal",
+              `data-kwallm-modal-details` = sprintf(
+                "module_id=%s, n_texts=%d",
+                id,
+                length(pii_texts() %||% character(0))
+              )
+            ),
+            uiOutput(ns("modal_content"))
+          )
         ))
 
         pii_entities_ui_rerender(Sys.time())
@@ -312,10 +323,32 @@ gliner_server <- function(
           if (!is.vector(labels)) {
             labels <- c(labels)
           }
-          print(labels)
+          log_debug(
+            sprintf("GLiNER labels: %s", paste(labels, collapse = ", ")),
+            component = "gliner"
+          )
+
+          log_action(
+            "gliner_start_clicked",
+            details = sprintf(
+              "n_texts=%d n_labels=%d",
+              length(pii_texts() %||% character(0)),
+              length(labels)
+            )
+          )
 
           ## 2 Switch the modal to the “running” state
           module_state("running")
+
+          # Log GLiNER start with configured labels
+          log_info(
+            sprintf(
+              "GLiNER detection started: n_texts=%d, n_labels=%d",
+              length(pii_texts()),
+              length(labels)
+            ),
+            component = "gliner"
+          )
 
           ## 3 Build a progress bar that the worker can update
           n_txt <- length(pii_texts())
@@ -327,9 +360,17 @@ gliner_server <- function(
           ## 3.1 Start queue to update about model loading
           queue$consumer$start(millis = 250)
 
+          session_id <- get_session_id()
+          log_ctx <- log_context_capture(
+            session_id = session_id,
+            is_async = TRUE
+          )
+
           ## 4 Spawn the future that runs GLiNER model on texts
           future(
             {
+              log_context_apply(log_ctx)
+
               if (is.null(gliner_model)) {
                 # If we are truly in async mode, we load the model here;
                 #   because reticulate objects cannot be passed to async processes
@@ -356,6 +397,8 @@ gliner_server <- function(
             globals = list(
               gliner_model = gliner_model,
               gliner_load_model = gliner_load_model,
+              log_ctx = log_ctx,
+              log_context_apply = log_context_apply,
               pii_texts = pii_texts(),
               labels = labels,
               progress = progress,
@@ -409,10 +452,19 @@ gliner_server <- function(
                 tibble::rowid_to_column(".row_id") |>
                 dplyr::mutate(anonymize = TRUE)
 
-              # Hand the data to the rest of the module
               pii_predictions(predictions_clean)
               pii_eval(predictions_clean)
               module_state("evaluating")
+
+              # Log detection results
+              log_info(
+                sprintf(
+                  "GLiNER detection complete: n_entities_found=%d, n_unique_labels=%d",
+                  nrow(predictions_clean),
+                  length(unique(predictions_clean$label))
+                ),
+                component = "gliner"
+              )
 
               progress$close()
               queue$consumer$stop()
@@ -423,7 +475,10 @@ gliner_server <- function(
               progress$close()
               queue$consumer$stop()
 
-              print(err)
+              log_error(
+                paste("GLiNER error:", err$message),
+                component = "gliner"
+              )
 
               shiny::showNotification(
                 paste0(
@@ -534,7 +589,6 @@ gliner_server <- function(
           $(tbl.table().body()).on('change', 'input.anon-box', function() {
             var rowId = $(this).data('rowid');
             var val   = this.checked;
-            console.log('⇢ anon_toggle', rowId, val);          // DEBUG browser
             Shiny.setInputValue('%s',
               {row: rowId, val: val, ts: Date.now()}, {priority:'event'});
           });
@@ -629,6 +683,18 @@ gliner_server <- function(
           df$anonymize[df$.row_id == info$row] <- info$val
           pii_eval(df)
 
+          n_total <- nrow(df)
+          n_selected <- sum(df$anonymize, na.rm = TRUE)
+          log_action(
+            "gliner_entity_toggle",
+            details = sprintf(
+              "val=%s n_selected=%d n_total=%d",
+              as.character(isTRUE(info$val)),
+              n_selected,
+              n_total
+            )
+          )
+
           # Rebuild check-box HTML for the changed row(s)
           df$checkbox <- mapply(
             build_cb,
@@ -715,7 +781,18 @@ gliner_server <- function(
           return$anonymized_texts <- anonymized_texts
           return$done <- TRUE
 
+          # Log anonymization saved
+          log_info(
+            sprintf(
+              "GLiNER anonymization saved: n_texts=%d, n_entities_removed=%d",
+              length(anonymized_texts),
+              return$number_of_pii_entities_removed
+            ),
+            component = "gliner"
+          )
+
           # Finished; close modal
+          log_action("gliner_modal_closed", details = "saved")
           shiny::removeModal()
         },
         ignoreInit = TRUE
@@ -747,6 +824,17 @@ gliner_server <- function(
         input$quit,
         {
           # Just close the modal, no state reset
+          log_action("gliner_modal_closed", details = "quit")
+          shiny::removeModal()
+        },
+        ignoreInit = TRUE
+      )
+
+      # Close button (finished state)
+      observeEvent(
+        input$close_modal,
+        {
+          log_action("gliner_modal_closed", details = "closed")
           shiny::removeModal()
         },
         ignoreInit = TRUE
@@ -757,6 +845,7 @@ gliner_server <- function(
         input$retry,
         {
           # State reset, but keep modal open
+          log_action("gliner_reset_clicked")
           reset_state(close_modal = FALSE) # keep modal open so user can hit Start again
         },
         ignoreInit = TRUE

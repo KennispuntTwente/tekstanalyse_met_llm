@@ -100,6 +100,9 @@ processing_server <- function(
       topics_definitive <- reactiveVal(FALSE)
       success <- reactiveVal(NULL)
 
+      # Timestamp for end-to-end duration (click -> download-ready)
+      analysis_started_at <- reactiveVal(NULL)
+
       shiny::exportTestValues(
         processing = processing(),
         success = success(),
@@ -143,6 +146,16 @@ processing_server <- function(
         if (processing()) {
           return()
         }
+
+        log_action(
+          "analysis_process_clicked",
+          details = sprintf(
+            "mode=%s n_texts=%d",
+            mode() %||% "unknown",
+            length(texts$preprocessed %||% character(0))
+          )
+        )
+
         req(texts$preprocessed)
         if (!mode() %in% c("Categorisatie", "Scoren")) {
           return()
@@ -160,6 +173,12 @@ processing_server <- function(
 
         # Set processing state
         processing(TRUE)
+        analysis_started_at(Sys.time())
+        log_analysis_start(
+          mode = mode(),
+          n_texts = length(texts$preprocessed),
+          model = models$main$parameters$model %||% "unknown"
+        )
         # Set initial progress
         progress_primary$set_with_total(0, length(texts$preprocessed), "...")
 
@@ -167,8 +186,15 @@ processing_server <- function(
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
 
+        log_ctx <- log_context_capture(
+          is_async = TRUE,
+          mode = getOption("app__mode", "unknown")
+        )
+
         future_promise(
           {
+            log_context_apply(log_ctx)
+
             results <- vector("list", length(texts))
 
             for (i in seq_along(texts)) {
@@ -205,6 +231,16 @@ processing_server <- function(
               results[[i]] <- result
 
               progress_primary$set_with_total(i, length(texts), text)
+              if (i == 1 || i %% 5 == 0 || i == length(texts)) {
+                log_info(
+                  sprintf(
+                    "Categorization/Scoring progress: %d/%d",
+                    i,
+                    length(texts)
+                  ),
+                  component = "analysis"
+                )
+              }
 
               if (is.na(result)) break
             }
@@ -350,6 +386,8 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply,
             llm_stream_async = llm_stream$async,
             streaming_enabled = getOption("paragraph_streaming", TRUE) &&
               isTRUE(models$main$parameters$stream)
@@ -362,6 +400,22 @@ processing_server <- function(
             # Clean up async controllers before error handling
             llm_stream$async$stop()
             llm_stream$hide()
+
+            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
+              as.character(.)
+            })
+            err_msg <- substr(err_msg, 1, 200)
+            err_class <- paste(class(.), collapse = "|")
+            log_action(
+              "analysis_failed",
+              details = sprintf(
+                "mode=%s when=%s error_class=%s error=%s",
+                mode() %||% "unknown",
+                "main processing of categorization/scoring",
+                err_class,
+                err_msg
+              )
+            )
             app_error(
               .,
               when = "main processing of categorization/scoring",
@@ -369,7 +423,10 @@ processing_server <- function(
               lang = lang()
             )
           }
-        print("Started async processing for categorization/scoring")
+        log_debug(
+          "Started async processing for categorization/scoring",
+          component = "analysis"
+        )
       })
 
       # Helper function to check if categories are valid
@@ -419,6 +476,16 @@ processing_server <- function(
         if (processing()) {
           return()
         }
+
+        log_action(
+          "analysis_process_clicked",
+          details = sprintf(
+            "mode=%s n_texts=%d",
+            mode() %||% "unknown",
+            length(texts$preprocessed %||% character(0))
+          )
+        )
+
         req(texts$preprocessed)
         req(context_window$text_chunks)
         if (!mode() %in% c("Onderwerpextractie")) {
@@ -432,12 +499,22 @@ processing_server <- function(
 
         # Set processing state
         processing(TRUE)
+        analysis_started_at(Sys.time())
+        log_analysis_start(
+          mode = mode(),
+          n_texts = length(texts$preprocessed),
+          model = models$main$parameters$model %||% "unknown"
+        )
 
         # Disable button
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
 
         # Step 1: Generate candidate topics
+        log_info(
+          "Step 1/5: Generating candidate topics...",
+          component = "analysis"
+        )
         progress_primary$set_with_total(
           1,
           5,
@@ -450,8 +527,15 @@ processing_server <- function(
           lang()$t("...")
         )
 
+        log_ctx <- log_context_capture(
+          is_async = TRUE,
+          mode = getOption("app__mode", "unknown")
+        )
+
         future_promise(
           {
+            log_context_apply(log_ctx)
+
             candidate_topics <- tryCatch(
               {
                 results <- c()
@@ -483,6 +567,7 @@ processing_server <- function(
 
             # Step 2: Reduce topics
             interrupter$execInterrupts()
+            log_info("Step 2/5: Reducing topics...", component = "analysis")
             progress_primary$set_with_total(
               2,
               5,
@@ -524,7 +609,10 @@ processing_server <- function(
             lang = lang(),
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
-            interrupter = interrupter
+            interrupter = interrupter,
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply,
+            log_info = log_info
           ),
           packages = c(
             "tidyprompt",
@@ -540,6 +628,22 @@ processing_server <- function(
           topics() %...!%
           {
             llm_stream$hide()
+
+            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
+              as.character(.)
+            })
+            err_msg <- substr(err_msg, 1, 200)
+            err_class <- paste(class(.), collapse = "|")
+            log_action(
+              "analysis_failed",
+              details = sprintf(
+                "mode=%s when=%s error_class=%s error=%s",
+                mode() %||% "unknown",
+                "main processing (step 1-2) of topic modelling",
+                err_class,
+                err_msg
+              )
+            )
             app_error(
               .,
               when = "main processing (step 1-2) of topic modelling",
@@ -547,7 +651,10 @@ processing_server <- function(
               lang = lang()
             )
           }
-        print("Started async processing for topic modelling (step 1-2)")
+        log_debug(
+          "Started async processing for topic modelling (step 1-2)",
+          component = "analysis"
+        )
       })
 
       ## >> Topics generated; editing --------------------------------
@@ -622,10 +729,14 @@ processing_server <- function(
           exclusive_topics(topics())
         }
 
-        print(paste0(
-          "Starting topic assignment with topics: ",
-          paste(topics(), collapse = ", ")
-        ))
+        log_info(
+          sprintf(
+            "Starting topic assignment: n_topics=%d, topics=%s",
+            length(topics()),
+            paste(topics(), collapse = ", ")
+          ),
+          component = "analysis"
+        )
 
         # Write progress
         progress_primary$set_with_total(
@@ -641,8 +752,15 @@ processing_server <- function(
           "..."
         )
 
+        log_ctx <- log_context_capture(
+          is_async = TRUE,
+          mode = getOption("app__mode", "unknown")
+        )
+
         future_promise(
           {
+            log_context_apply(log_ctx)
+
             # Step 4: Assign topics
             # Writing progress on secondary progress file
             texts_with_topics <- tryCatch(
@@ -709,6 +827,7 @@ processing_server <- function(
             )
 
             ## Step 5: Write paragraphs about the topics
+            log_info("Step 5/5: Writing paragraphs...", component = "analysis")
             progress_primary$set_with_total(
               4,
               5,
@@ -835,6 +954,9 @@ processing_server <- function(
             progress_primary = progress_primary$async,
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply,
+            log_info = log_info,
             exclusive_topics = exclusive_topics(),
             llm_stream_async = llm_stream$async,
             streaming_enabled = getOption("paragraph_streaming", TRUE) &&
@@ -848,6 +970,22 @@ processing_server <- function(
             # Clean up async controllers before error handling
             llm_stream$async$stop()
             llm_stream$hide()
+
+            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
+              as.character(.)
+            })
+            err_msg <- substr(err_msg, 1, 200)
+            err_class <- paste(class(.), collapse = "|")
+            log_action(
+              "analysis_failed",
+              details = sprintf(
+                "mode=%s when=%s error_class=%s error=%s",
+                mode() %||% "unknown",
+                "main processing (step 3-4) of topic modelling",
+                err_class,
+                err_msg
+              )
+            )
             app_error(
               .,
               when = "main processing (step 3-4) of topic modelling",
@@ -855,7 +993,10 @@ processing_server <- function(
               lang = lang()
             )
           }
-        print("Started async processing for topic modelling (step 3-4)")
+        log_debug(
+          "Started async processing for topic modelling (step 3-4)",
+          component = "analysis"
+        )
       })
 
       ## Markeren ----------------------------------------------------
@@ -898,6 +1039,16 @@ processing_server <- function(
         if (processing()) {
           return()
         }
+
+        log_action(
+          "analysis_process_clicked",
+          details = sprintf(
+            "mode=%s n_texts=%d",
+            mode() %||% "unknown",
+            length(texts$preprocessed %||% character(0))
+          )
+        )
+
         req(texts$preprocessed)
         if (!mode() %in% c("Markeren")) {
           return()
@@ -914,6 +1065,12 @@ processing_server <- function(
 
         # Set processing state
         processing(TRUE)
+        analysis_started_at(Sys.time())
+        log_analysis_start(
+          mode = mode(),
+          n_texts = length(texts$preprocessed),
+          model = models$main$parameters$model %||% "unknown"
+        )
         # Set initial progress
         progress_primary$set_with_total(0, length(texts$preprocessed), "...")
 
@@ -921,8 +1078,15 @@ processing_server <- function(
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
 
+        log_ctx <- log_context_capture(
+          is_async = TRUE,
+          mode = getOption("app__mode", "unknown")
+        )
+
         future_promise(
           {
+            log_context_apply(log_ctx)
+
             mark_texts(
               texts = texts,
               codes = codes,
@@ -946,6 +1110,8 @@ processing_server <- function(
             research_background = research_background(),
             style_prompt = style_prompt(),
             codes = codes$texts(),
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply,
             mark_texts = mark_texts,
             mark_text_prompt = mark_text_prompt,
             get_context_window_size_in_tokens = get_context_window_size_in_tokens,
@@ -986,6 +1152,22 @@ processing_server <- function(
             # Clean up async controllers before error handling
             llm_stream$async$stop()
             llm_stream$hide()
+
+            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
+              as.character(.)
+            })
+            err_msg <- substr(err_msg, 1, 200)
+            err_class <- paste(class(.), collapse = "|")
+            log_action(
+              "analysis_failed",
+              details = sprintf(
+                "mode=%s when=%s error_class=%s error=%s",
+                mode() %||% "unknown",
+                "main processing of marking",
+                err_class,
+                err_msg
+              )
+            )
             app_error(
               .,
               when = "main processing of marking",
@@ -1003,7 +1185,10 @@ processing_server <- function(
       # Launch interrater reliability module if required
       observeEvent(results_df(), {
         req(results_df())
-        print(results_df())
+        log_debug(
+          sprintf("Results received: n_rows=%d", nrow(results_df())),
+          component = "analysis"
+        )
 
         # Join results of preprocessed texts to raw texts
         df <- texts$df
@@ -1025,6 +1210,16 @@ processing_server <- function(
         # Verify that df actually has results
         # (sometimes we have API failure, then result/topic contains NA values)
         if (anyNA(df$result)) {
+          log_action(
+            "analysis_failed",
+            details = sprintf(
+              "mode=%s when=%s error_class=%s error=%s",
+              mode() %||% "unknown",
+              "processing results",
+              "NA_results",
+              "Results contain NA values"
+            )
+          )
           app_error(
             "Results contain NA values; processing failed",
             when = "processing results",
@@ -1035,6 +1230,7 @@ processing_server <- function(
 
         # Update UI to show finished processing
         progress_primary$async$stop()
+
         progress_primary$set(
           100,
           paste0(
@@ -1121,6 +1317,16 @@ processing_server <- function(
 
           # Set preparing download state (to show loading animation)
           preparing_download(TRUE)
+
+          log_action(
+            "results_download_preparing",
+            details = sprintf(
+              "mode=%s n_texts=%d uuid=%s",
+              mode() %||% "unknown",
+              nrow(result_list$df %||% data.frame()),
+              uuid
+            )
+          )
 
           # Generate files async
           future(
@@ -1277,12 +1483,105 @@ processing_server <- function(
           return()
         }
 
+        # End-to-end duration: from process click to download-ready
+        started_at <- analysis_started_at()
+        if (!is.null(started_at)) {
+          duration_total_secs <- as.numeric(difftime(
+            Sys.time(),
+            started_at,
+            units = "secs"
+          ))
+
+          preprocessed_texts <- tryCatch(
+            {
+              txt <- texts$preprocessed %||% character(0)
+              as.character(txt)
+            },
+            error = function(e) character(0)
+          )
+
+          n_texts_total <- length(preprocessed_texts)
+
+          total_chars <- tryCatch(
+            sum(
+              nchar(preprocessed_texts, type = "chars", allowNA = TRUE),
+              na.rm = TRUE
+            ),
+            error = function(e) NA_real_
+          )
+
+          secs_per_text <- if (
+            isTRUE(!is.na(n_texts_total)) && isTRUE(n_texts_total > 0)
+          ) {
+            duration_total_secs / n_texts_total
+          } else {
+            NA_real_
+          }
+
+          secs_per_1k_chars <- if (
+            isTRUE(!is.na(total_chars)) && isTRUE(total_chars > 0)
+          ) {
+            (duration_total_secs / total_chars) * 1000
+          } else {
+            NA_real_
+          }
+
+          log_info(
+            sprintf(
+              paste0(
+                "Analysis total duration (click->download-ready): ",
+                "mode=%s, n_texts_preprocessed=%s, total_chars_preprocessed=%s, uuid=%s, ",
+                "duration=%.1fs, avg=%.3fs/text, avg=%.3fs/1k_chars"
+              ),
+              mode() %||% "unknown",
+              as.character(n_texts_total),
+              as.character(total_chars),
+              uuid,
+              duration_total_secs,
+              secs_per_text,
+              secs_per_1k_chars
+            ),
+            component = "analysis"
+          )
+        }
+
+        zip_bytes <- tryCatch(file.size(zip_file()), error = function(e) {
+          NA_integer_
+        })
+
+        log_info(
+          sprintf(
+            "Output files ready: mode=%s, n_texts=%d, uuid=%s, zip_bytes=%s",
+            mode(),
+            nrow(results_df()),
+            uuid,
+            as.character(zip_bytes)
+          ),
+          component = "output"
+        )
+
         # Create download handler
         output$download_results <- downloadHandler(
           filename = function() {
             paste0(uuid, ".zip")
           },
           content = function(file) {
+            zip_bytes <- tryCatch(file.size(zip_file()), error = function(e) {
+              NA_integer_
+            })
+            log_action(
+              "results_download_started",
+              details = sprintf(
+                "mode=%s uuid=%s zip_bytes=%s",
+                mode() %||% "unknown",
+                uuid,
+                as.character(zip_bytes)
+              )
+            )
+            log_info(
+              sprintf("Results downloaded: uuid=%s mode=%s", uuid, mode()),
+              component = "download"
+            )
             file.copy(zip_file(), file)
           },
           contentType = "application/zip; charset=utf-8"
@@ -1328,6 +1627,14 @@ processing_server <- function(
       observeEvent(input$restart, {
         showModal(modalDialog(
           title = lang()$t("Nieuwe analyse starten?"),
+          tags$div(
+            style = "display:none;",
+            `data-kwallm-modal-id` = "analysis_restart_modal",
+            `data-kwallm-modal-details` = sprintf(
+              "mode=%s",
+              mode() %||% "unknown"
+            )
+          ),
           lang()$t("Zorg dat je eerst de resultaten downloadt."),
           footer = modal_footer_confirm(
             cancel_label = lang()$t("Annuleren"),
@@ -1341,6 +1648,11 @@ processing_server <- function(
       # Confirm restart button listener
       # Reloads the app
       observeEvent(input$confirm_restart, {
+        log_action(
+          "analysis_restart_confirmed",
+          details = sprintf("mode=%s", mode() %||% "unknown")
+        )
+        log_action("analysis_restart", details = mode())
         removeModal()
         session$reload()
       })
@@ -1692,10 +2004,24 @@ processing_server <- function(
       # Cancel button observer
       observeEvent(input$cancel, {
         req(isTRUE(processing()))
+
+        log_action(
+          "analysis_cancel_clicked",
+          details = sprintf("mode=%s", mode() %||% "unknown")
+        )
+
         # Show modal dialog to confirm cancellation
         removeModal()
         showModal(modalDialog(
           title = lang()$t("Annuleren?"),
+          tags$div(
+            style = "display:none;",
+            `data-kwallm-modal-id` = "analysis_cancel_modal",
+            `data-kwallm-modal-details` = sprintf(
+              "mode=%s",
+              mode() %||% "unknown"
+            )
+          ),
           lang()$t("Weet je zeker dat je de analyse wilt annuleren?"),
           footer = modal_footer_confirm(
             cancel_label = lang()$t("Nee, niet annuleren"),
@@ -1709,6 +2035,13 @@ processing_server <- function(
       # Confirm cancel button observer
       observeEvent(input$confirm_cancel, {
         req(isTRUE(processing()))
+
+        log_action(
+          "analysis_cancel_confirmed",
+          details = sprintf("mode=%s", mode() %||% "unknown")
+        )
+
+        log_analysis_interrupted(mode = mode(), reason = "user cancelled")
         removeModal()
         session$reload()
       })

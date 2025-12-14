@@ -242,6 +242,45 @@ css_js_head <- function() {
       $(document).on('click', 'a.action-button', function(e) {
         e.preventDefault();
       });
+
+      // ---- KWALLM: modal open/close auto logging -------------------------
+      // Shiny renders modals using Bootstrap's .modal. We attach a marker element
+      // inside each modal with attributes:
+      //   data-kwallm-modal-id=\"filter_modal\" (required)
+      //   data-kwallm-modal-details=\"...\" (optional)
+      // This handler forwards modal show/hide events to the server.
+      (function() {
+        function getKwallmModalMeta(modalEl) {
+          try {
+            var $marker = $(modalEl).find('[data-kwallm-modal-id]').first();
+            if (!$marker || $marker.length === 0) return null;
+            return {
+              id: $marker.attr('data-kwallm-modal-id'),
+              details: $marker.attr('data-kwallm-modal-details') || null
+            };
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function emitModalEvent(type, modalEl) {
+          if (!window.Shiny || !window.Shiny.setInputValue) return;
+          var meta = getKwallmModalMeta(modalEl);
+          if (!meta || !meta.id) return;
+          window.Shiny.setInputValue(
+            'kwallm_modal_event',
+            { type: type, id: meta.id, details: meta.details, ts: Date.now() },
+            { priority: 'event' }
+          );
+        }
+
+        $(document).on('shown.bs.modal', '.modal', function() {
+          emitModalEvent('opened', this);
+        });
+        $(document).on('hidden.bs.modal', '.modal', function() {
+          emitModalEvent('closed', this);
+        });
+      })();
     "
     ))
   )
