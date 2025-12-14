@@ -45,7 +45,7 @@ interrater_server <- function(
 
     rating_data <- rating_data |>
       tidyr::pivot_longer(
-        cols = all_categories,
+        cols = tidyselect::all_of(all_categories),
         names_to = "category",
         values_to = rater1_col
       )
@@ -441,7 +441,7 @@ interrater_server <- function(
             text_col %in% names(df_sample),
             paste(
               "Error: Required text column '",
-              htmlEscape(text_col),
+              htmltools::htmlEscape(text_col),
               "' not found in sampled data."
             )
           ),
@@ -449,7 +449,7 @@ interrater_server <- function(
             rater1_col %in% names(df_sample),
             paste(
               "Error: Required rater 1 column '",
-              htmlEscape(rater1_col),
+              htmltools::htmlEscape(rater1_col),
               "' not found in sampled data."
             )
           )

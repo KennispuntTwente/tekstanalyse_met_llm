@@ -38,9 +38,16 @@ edit_topics_server <- function(
         )
       }
 
-      shiny::exportTestValues(
-        started = started()
-      )
+      if (isTRUE(getOption("shiny.testmode"))) {
+        observe({
+          shiny::exportTestValues(
+            started = started(),
+            reduction_in_progress = reduction_in_progress(),
+            rereduced_topics = rereduced_topics(),
+            topics_table_data = topics_table_data()
+          )
+        })
+      }
 
       ## ── first-run modal ────────────────────────────────────────
       observe({

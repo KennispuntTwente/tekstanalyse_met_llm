@@ -1346,19 +1346,6 @@ processing_server <- function(
       })
 
       # Helper functions ---------------------------------------------
-      # Handle error details
-      handle_detailed_error <- function(context = "An operation") {
-        function(e) {
-          error_message <- paste0(
-            context,
-            " failed:\n",
-            "Message: ",
-            conditionMessage(e)
-          )
-          stop(error_message)
-        }
-      }
-
       # Helper function to create a list with all the results, including metadata
       create_result_list <- function(df) {
         result_list <- list(

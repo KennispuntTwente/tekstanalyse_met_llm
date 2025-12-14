@@ -223,11 +223,13 @@ editable_field_list_server <- function(
     # Non-empty unique texts
     nonEmptyTexts <- reactive({
       vals <- txt_in_fields()
-      unique(trimws(vals))[nzchar(trimws(vals))]
+      trimmed <- trimws(vals)
+      trimmed <- trimmed[nzchar(trimmed)]
+      unique(trimmed)
     })
 
     nonEmptyUniqueCount <- reactive({
-      sum(nzchar(nonEmptyTexts()))
+      length(nonEmptyTexts())
     })
 
     # Exclusive flags (respects show_exclusive)
