@@ -360,9 +360,17 @@ gliner_server <- function(
           ## 3.1 Start queue to update about model loading
           queue$consumer$start(millis = 250)
 
+          session_id <- get_session_id()
+
           ## 4 Spawn the future that runs GLiNER model on texts
           future(
             {
+              options(
+                kwallm__log_session_id = session_id,
+                kwallm__log_is_async = TRUE
+              )
+              try(log_init(), silent = TRUE)
+
               if (is.null(gliner_model)) {
                 # If we are truly in async mode, we load the model here;
                 #   because reticulate objects cannot be passed to async processes
@@ -389,6 +397,8 @@ gliner_server <- function(
             globals = list(
               gliner_model = gliner_model,
               gliner_load_model = gliner_load_model,
+              log_init = log_init,
+              session_id = session_id,
               pii_texts = pii_texts(),
               labels = labels,
               progress = progress,

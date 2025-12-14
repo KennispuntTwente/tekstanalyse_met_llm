@@ -213,12 +213,16 @@ marking_codes_server <- function(
           retention = getOption("logger__retention")
         )
 
+        session_id <- get_session_id()
+
         future_promise(
           {
             options(
               logger__level = log_opts$level,
               logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention
+              logger__retention = log_opts$retention,
+              kwallm__log_session_id = session_id,
+              kwallm__log_is_async = TRUE
             )
             try(log_init(), silent = TRUE)
 
@@ -247,6 +251,7 @@ marking_codes_server <- function(
             reduce_topics = reduce_topics,
             semchunk_load_chunker = semchunk_load_chunker,
             log_opts = log_opts,
+            session_id = session_id,
             log_init = log_init,
             get_session_id = get_session_id,
             log_info = log_info,

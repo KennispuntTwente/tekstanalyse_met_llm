@@ -194,6 +194,8 @@ processing_server <- function(
           retention = getOption("logger__retention")
         )
 
+        session_id <- get_session_id()
+
         utils_logger_path <- tryCatch(
           normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
           error = function(e) "R/utils_logger.R"
@@ -205,9 +207,16 @@ processing_server <- function(
             options(
               logger__level = log_opts$level,
               logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention
+              logger__retention = log_opts$retention,
+              kwallm__log_session_id = session_id,
+              kwallm__log_is_async = TRUE
             )
-            log_worker_init(logger_path = utils_logger_path, mode = app_mode)
+            log_worker_init(
+              logger_path = utils_logger_path,
+              mode = app_mode,
+              session_id = session_id,
+              is_async = TRUE
+            )
 
             results <- vector("list", length(texts))
 
@@ -549,6 +558,8 @@ processing_server <- function(
           retention = getOption("logger__retention")
         )
 
+        session_id <- get_session_id()
+
         utils_logger_path <- tryCatch(
           normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
           error = function(e) "R/utils_logger.R"
@@ -560,9 +571,16 @@ processing_server <- function(
             options(
               logger__level = log_opts$level,
               logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention
+              logger__retention = log_opts$retention,
+              kwallm__log_session_id = session_id,
+              kwallm__log_is_async = TRUE
             )
-            log_worker_init(logger_path = utils_logger_path, mode = app_mode)
+            log_worker_init(
+              logger_path = utils_logger_path,
+              mode = app_mode,
+              session_id = session_id,
+              is_async = TRUE
+            )
 
             candidate_topics <- tryCatch(
               {
@@ -788,6 +806,8 @@ processing_server <- function(
           retention = getOption("logger__retention")
         )
 
+        session_id <- get_session_id()
+
         utils_logger_path <- tryCatch(
           normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
           error = function(e) "R/utils_logger.R"
@@ -799,9 +819,16 @@ processing_server <- function(
             options(
               logger__level = log_opts$level,
               logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention
+              logger__retention = log_opts$retention,
+              kwallm__log_session_id = session_id,
+              kwallm__log_is_async = TRUE
             )
-            log_worker_init(logger_path = utils_logger_path, mode = app_mode)
+            log_worker_init(
+              logger_path = utils_logger_path,
+              mode = app_mode,
+              session_id = session_id,
+              is_async = TRUE
+            )
 
             # Step 4: Assign topics
             # Writing progress on secondary progress file
@@ -1128,6 +1155,8 @@ processing_server <- function(
           retention = getOption("logger__retention")
         )
 
+        session_id <- get_session_id()
+
         utils_logger_path <- tryCatch(
           normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
           error = function(e) "R/utils_logger.R"
@@ -1139,9 +1168,16 @@ processing_server <- function(
             options(
               logger__level = log_opts$level,
               logger__dir = log_opts$dir,
-              logger__retention = log_opts$retention
+              logger__retention = log_opts$retention,
+              kwallm__log_session_id = session_id,
+              kwallm__log_is_async = TRUE
             )
-            log_worker_init(logger_path = utils_logger_path, mode = app_mode)
+            log_worker_init(
+              logger_path = utils_logger_path,
+              mode = app_mode,
+              session_id = session_id,
+              is_async = TRUE
+            )
 
             mark_texts(
               texts = texts,

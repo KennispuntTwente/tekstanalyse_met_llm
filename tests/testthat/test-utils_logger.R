@@ -18,6 +18,14 @@ test_that("get_session_id returns 'system' outside Shiny session", {
 })
 
 
+test_that("get_session_id honors kwallm__log_session_id override", {
+  reset_logger_state()
+
+  withr::local_options(list(kwallm__log_session_id = "deadbeefcafebabe"))
+  expect_identical(get_session_id(), "deadbeef")
+})
+
+
 test_that("fallback logging writes to file and emits a message", {
   reset_logger_state()
 
@@ -38,7 +46,7 @@ test_that("fallback logging writes to file and emits a message", {
   expect_true(file.exists(log_file))
 
   lines <- readLines(log_file, warn = FALSE)
-  expect_true(any(grepl("\\[INFO\\] \\[unit\\] hello world", lines)))
+  expect_true(any(grepl("\\[sync\\] \\[INFO\\] \\[unit\\] hello world", lines)))
 })
 
 
@@ -60,7 +68,10 @@ test_that("log_error(fatal = TRUE) prefixes message", {
 
   log_file <- file.path(log_dir, paste0(format(Sys.Date(), "%Y-%m-%d"), ".log"))
   lines <- readLines(log_file, warn = FALSE)
-  expect_true(any(grepl("\\[ERROR\\] \\[unit\\] \\[FATAL\\] boom", lines)))
+  expect_true(any(grepl(
+    "\\[sync\\] \\[ERROR\\] \\[unit\\] \\[FATAL\\] boom",
+    lines
+  )))
 })
 
 
@@ -83,7 +94,7 @@ test_that("analysis progress uses DEBUG level and analysis component", {
   log_file <- file.path(log_dir, paste0(format(Sys.Date(), "%Y-%m-%d"), ".log"))
   lines <- readLines(log_file, warn = FALSE)
   expect_true(any(grepl(
-    "\\[DEBUG\\] \\[analysis\\] Progress: 1/3 \\(categorizing\\)",
+    "\\[sync\\] \\[DEBUG\\] \\[analysis\\] Progress: 1/3 \\(categorizing\\)",
     lines
   )))
 })
@@ -184,6 +195,7 @@ test_that("log_worker_init bootstraps logger in multisession future worker", {
   }
 
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-worker-")
+  session_id <- "deadbeef"
   logger_path <- tryCatch(
     normalizePath(
       here::here("R", "utils_logger.R"),
@@ -199,7 +211,9 @@ test_that("log_worker_init bootstraps logger in multisession future worker", {
         logger__level = "INFO",
         logger__dir = log_dir,
         logger__retention = NULL,
-        app__mode = "test"
+        app__mode = "test",
+        kwallm__log_session_id = session_id,
+        kwallm__log_is_async = TRUE
       )
 
       # Simulate the situation that caused the bug: log_* exists but .write_log
@@ -208,7 +222,12 @@ test_that("log_worker_init bootstraps logger in multisession future worker", {
         rm(list = ".write_log", envir = .GlobalEnv)
       }
 
-      log_worker_init(logger_path = logger_path, mode = "test")
+      log_worker_init(
+        logger_path = logger_path,
+        mode = "test",
+        session_id = session_id,
+        is_async = TRUE
+      )
       log_info("hello from worker", component = "unit")
       TRUE
     },
@@ -216,7 +235,8 @@ test_that("log_worker_init bootstraps logger in multisession future worker", {
       log_worker_init = log_worker_init,
       log_info = log_info,
       logger_path = logger_path,
-      log_dir = log_dir
+      log_dir = log_dir,
+      session_id = session_id
     ),
     seed = NULL
   )
@@ -234,4 +254,5 @@ test_that("log_worker_init bootstraps logger in multisession future worker", {
 
   lines <- readLines(log_file, warn = FALSE)
   expect_true(any(grepl("hello from worker", lines, fixed = TRUE)))
+  expect_true(any(grepl("\\[deadbeef\\] \\[async\\]", lines)))
 })
