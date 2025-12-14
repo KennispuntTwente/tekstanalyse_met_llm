@@ -56,17 +56,21 @@ edit_topics_server <- function(
 
         topics_table_data(build_df(topics(), exclusive_topics()))
 
-        log_action(
-          "edit_topics_modal_opened",
-          details = sprintf("n_topics=%d", length(topics()))
-        )
-
         showModal(modalDialog(
           title = lang()$t("Onderwerpen"),
           size = "l",
           easyClose = FALSE,
           tagList(
             shinyjs::useShinyjs(),
+            tags$div(
+              style = "display:none;",
+              `data-kwallm-modal-id` = "edit_topics_modal",
+              `data-kwallm-modal-details` = sprintf(
+                "module_id=%s, n_topics=%d",
+                id,
+                length(topics() %||% character(0))
+              )
+            ),
             lang()$t("Controleer de onderwerpen en pas ze aan waar nodig."),
             br(),
             HTML(lang()$t("<i>Dubbel-klik op een cel om te bewerken.</i>")),
@@ -259,7 +263,6 @@ edit_topics_server <- function(
         }
 
         exclusive_topics(updated_exclusive)
-        log_action("edit_topics_modal_closed")
         removeModal()
         edited_topics(updated_topics)
 

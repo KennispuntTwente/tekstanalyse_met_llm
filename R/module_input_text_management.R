@@ -515,12 +515,16 @@ text_management_server <- function(
 
     # -- 7  Modal: text table ---------------------------------------
     observeEvent(input$open_text_table_modal, {
-      log_action(
-        "text_table_modal_opened",
-        details = sprintf("n_texts=%d", length(texts$preprocessed))
-      )
       showModal(modalDialog(
         title = lang()$t("Teksten"),
+        tags$div(
+          style = "display:none;",
+          `data-kwallm-modal-id` = "text_table_modal",
+          `data-kwallm-modal-details` = sprintf(
+            "module=text_management, n_texts=%d",
+            length(texts$preprocessed)
+          )
+        ),
         DT::dataTableOutput(ns("text_table")),
         easyClose = TRUE,
         footer = tagList(
@@ -550,7 +554,6 @@ text_management_server <- function(
 
     # Log text table modal close
     observeEvent(input$close_text_table_modal, {
-      log_action("text_table_modal_closed")
       removeModal()
     })
 

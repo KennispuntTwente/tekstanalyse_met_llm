@@ -538,6 +538,11 @@ model_server <- function(
             easyClose = TRUE,
             footer = modalButton(lang()$t("Sluiten")),
             div(
+              tags$div(
+                style = "display:none;",
+                `data-kwallm-modal-id` = "model_settings_modal",
+                `data-kwallm-modal-details` = sprintf("which=%s", which)
+              ),
               # === Controls in a 2-col wrap ===
               bslib::layout_column_wrap(
                 width = 1 / 2, # <= up to 2 per row
@@ -890,11 +895,9 @@ model_server <- function(
 
       # Open modals
       observeEvent(input$main_cog, ignoreInit = TRUE, {
-        log_action("model_settings_modal_opened", details = "main")
         open_settings_modal("main")
       })
       observeEvent(input$large_cog, ignoreInit = TRUE, {
-        log_action("model_settings_modal_opened", details = "large")
         open_settings_modal("large")
       })
 

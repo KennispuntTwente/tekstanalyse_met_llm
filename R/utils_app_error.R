@@ -133,6 +133,11 @@ app_error <- function(
     showModal(modalDialog(
       title = "Error",
       tagList(
+        tags$div(
+          style = "display:none;",
+          `data-kwallm-modal-id` = "app_error_modal",
+          `data-kwallm-modal-details` = sprintf("fatal=%s", fatal)
+        ),
         p(lang$t(
           "Er gebeurde iets onverwachts, waardoor de app is gestopt. Sorry!"
         )),

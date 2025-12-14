@@ -1605,12 +1605,13 @@ processing_server <- function(
       # Restart button listener
       # Launches modal dialog to confirm restart
       observeEvent(input$restart, {
-        log_action(
-          "analysis_restart_modal_opened",
-          details = sprintf("mode=%s", mode() %||% "unknown")
-        )
         showModal(modalDialog(
           title = lang()$t("Nieuwe analyse starten?"),
+          tags$div(
+            style = "display:none;",
+            `data-kwallm-modal-id` = "analysis_restart_modal",
+            `data-kwallm-modal-details` = sprintf("mode=%s", mode() %||% "unknown")
+          ),
           lang()$t("Zorg dat je eerst de resultaten downloadt."),
           footer = modal_footer_confirm(
             cancel_label = lang()$t("Annuleren"),
@@ -1990,6 +1991,11 @@ processing_server <- function(
         removeModal()
         showModal(modalDialog(
           title = lang()$t("Annuleren?"),
+          tags$div(
+            style = "display:none;",
+            `data-kwallm-modal-id` = "analysis_cancel_modal",
+            `data-kwallm-modal-details` = sprintf("mode=%s", mode() %||% "unknown")
+          ),
           lang()$t("Weet je zeker dat je de analyse wilt annuleren?"),
           footer = modal_footer_confirm(
             cancel_label = lang()$t("Nee, niet annuleren"),

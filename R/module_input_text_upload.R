@@ -396,8 +396,6 @@ text_upload_server <- function(
       req(uploaded_data())
       req(!isTRUE(processing()))
 
-      log_action("filter_modal_opened")
-
       showModal(modalDialog(
         title = lang()$t("Filter data"),
         size = "l",
@@ -405,6 +403,11 @@ text_upload_server <- function(
         footer = NULL,
 
         bslib::page(
+          tags$div(
+            style = "display:none;",
+            `data-kwallm-modal-id` = "filter_modal",
+            `data-kwallm-modal-details` = "module=text_upload"
+          ),
           p(lang()$t(
             "Je kunt hier de data filteren op basis van waarden in een kolom. Selecteer een kolom en kies waarden. Rijen zonder de gekozen waarden worden uitgesloten."
           )),
@@ -543,7 +546,6 @@ text_upload_server <- function(
           length(input$filter_vals)
         )
       )
-      log_action("filter_modal_closed")
       removeModal()
     })
 

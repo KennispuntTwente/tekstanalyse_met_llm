@@ -73,7 +73,14 @@ interrater_server <- function(
           size = "l",
           easyClose = FALSE,
           footer = NULL,
-          uiOutput(ns("dynamic_content_area"))
+          tagList(
+            tags$div(
+              style = "display:none;",
+              `data-kwallm-modal-id` = "interrater_modal",
+              `data-kwallm-modal-details` = sprintf("module_id=%s", id)
+            ),
+            uiOutput(ns("dynamic_content_area"))
+          )
         ))
       }
       # Make available to the main server:

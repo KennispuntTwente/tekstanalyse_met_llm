@@ -77,10 +77,13 @@ yes_no_toggle_card_server <- function(
     # Show modal when button is clicked
     observeEvent(input$show_modal, {
       req(modal_config)
-      log_action("style_prompt_modal_opened")
       showModal(
         modalDialog(
           title = tagList(icon(modal_config$icon), " ", t(modal_config$title)),
+          tags$div(
+            style = "display:none;",
+            `data-kwallm-modal-id` = "style_prompt_modal"
+          ),
           div(
             if (
               !is.null(modal_config$body_text1) ||
@@ -165,7 +168,6 @@ yes_no_toggle_card_server <- function(
     })
 
     observeEvent(input$modal_close, {
-      log_action("modal_closed", details = sprintf("id=%s", id))
       removeModal()
     })
 

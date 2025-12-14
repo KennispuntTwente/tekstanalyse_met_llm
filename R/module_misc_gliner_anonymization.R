@@ -54,13 +54,19 @@ gliner_server <- function(
           size = "xl",
           easyClose = FALSE,
           footer = NULL,
-          uiOutput(ns("modal_content"))
+          tagList(
+            tags$div(
+              style = "display:none;",
+              `data-kwallm-modal-id` = "gliner_modal",
+              `data-kwallm-modal-details` = sprintf(
+                "module_id=%s, n_texts=%d",
+                id,
+                length(pii_texts() %||% character(0))
+              )
+            ),
+            uiOutput(ns("modal_content"))
+          )
         ))
-
-        log_action(
-          "gliner_modal_opened",
-          details = sprintf("n_texts=%d", length(pii_texts() %||% character(0)))
-        )
 
         pii_entities_ui_rerender(Sys.time())
 
