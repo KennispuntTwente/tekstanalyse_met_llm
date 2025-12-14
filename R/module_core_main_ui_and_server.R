@@ -32,6 +32,184 @@ main_server <- function(
   gliner_model = NULL
 ) {
   server <- function(input, output, session) {
+    # Layout state -----------------------------------------------------------
+
+    n_sections <- 5L
+    current_section <- reactiveVal(1L)
+
+    show_all_sections <- function() {
+      for (i in seq_len(n_sections)) {
+        shinyjs::show(paste0("kwallm_section_", i), anim = FALSE)
+      }
+    }
+
+    show_single_section <- function(i, direction = c("none", "left", "right")) {
+      direction <- match.arg(direction)
+
+      for (j in seq_len(n_sections)) {
+        id <- paste0("kwallm_section_", j)
+        if (identical(j, i)) {
+          shinyjs::show(id, anim = FALSE)
+        } else {
+          shinyjs::hide(id, anim = FALSE)
+        }
+      }
+
+      if (!identical(direction, "none")) {
+        anim_class <- if (direction == "left") {
+          "kwallm-slide-in-left"
+        } else {
+          "kwallm-slide-in-right"
+        }
+
+        shinyjs::runjs(sprintf(
+          paste0(
+            "var el=document.getElementById('%s');",
+            "if(el){",
+            "el.classList.remove('kwallm-slide-in-left','kwallm-slide-in-right');",
+            "void el.offsetWidth;",
+            "el.classList.add('%s');",
+            "}"
+          ),
+          paste0("kwallm_section_", i),
+          anim_class
+        ))
+      }
+    }
+
+    update_section_nav_buttons <- function(i) {
+      if (i <= 1L) {
+        shinyjs::hide("kwallm_sections_prev")
+      } else {
+        shinyjs::show("kwallm_sections_prev")
+      }
+
+      if (i >= n_sections) {
+        shinyjs::hide("kwallm_sections_next")
+      } else {
+        shinyjs::show("kwallm_sections_next")
+      }
+    }
+
+    # Progress UI (only shown in "sections" mode) ----------------------------
+
+    output$kwallm_sections_progress <- renderUI({
+      req(lang())
+      cur <- current_section()
+      pct <- if (n_sections <= 1L) {
+        100L
+      } else {
+        round((cur - 1L) / (n_sections - 1L) * 100L)
+      }
+
+      div(
+        class = "kwallm-sections-progress",
+        tags$div(
+          class = "d-flex justify-content-between align-items-center mb-1",
+          tags$small(
+            class = "text-muted",
+            paste0(lang()$t("Sectie"), " ", cur, "/", n_sections)
+          )
+        ),
+        div(
+          class = "progress",
+          div(
+            class = "progress-bar",
+            role = "progressbar",
+            style = sprintf("width: %s%%;", pct),
+            `aria-valuenow` = pct,
+            `aria-valuemin` = 0,
+            `aria-valuemax` = 100
+          )
+        )
+      )
+    })
+
+    # Layout toggle behaviour ------------------------------------------------
+
+    observeEvent(input$kwallm_layout_view, {
+      view <- input$kwallm_layout_view
+      if (is.null(view) || !view %in% c("vertical", "sections")) {
+        return()
+      }
+
+      if (identical(view, "vertical")) {
+        shinyjs::hide("kwallm_sections_nav", anim = FALSE)
+        show_all_sections()
+        return()
+      }
+
+      # sections view
+      shinyjs::show("kwallm_sections_nav", anim = FALSE)
+
+      cur <- current_section()
+      shinyWidgets::updateRadioGroupButtons(
+        session = session,
+        inputId = "kwallm_sections_step",
+        selected = as.character(cur)
+      )
+
+      show_single_section(cur, direction = "none")
+      update_section_nav_buttons(cur)
+    }, ignoreInit = TRUE)
+
+    # Section navigation behaviour ------------------------------------------
+
+    observeEvent(input$kwallm_sections_step, {
+      new <- suppressWarnings(as.integer(input$kwallm_sections_step))
+      if (is.na(new) || new < 1L || new > n_sections) {
+        return()
+      }
+
+      old <- current_section()
+      current_section(new)
+
+      if (!identical(input$kwallm_layout_view, "sections")) {
+        return()
+      }
+
+      direction <- if (new > old) {
+        "right"
+      } else if (new < old) {
+        "left"
+      } else {
+        "none"
+      }
+
+      show_single_section(new, direction = direction)
+      update_section_nav_buttons(new)
+    }, ignoreInit = TRUE)
+
+    observeEvent(input$kwallm_sections_prev, {
+      if (!identical(input$kwallm_layout_view, "sections")) {
+        return()
+      }
+      cur <- current_section()
+      if (cur <= 1L) {
+        return()
+      }
+      shinyWidgets::updateRadioGroupButtons(
+        session = session,
+        inputId = "kwallm_sections_step",
+        selected = as.character(cur - 1L)
+      )
+    }, ignoreInit = TRUE)
+
+    observeEvent(input$kwallm_sections_next, {
+      if (!identical(input$kwallm_layout_view, "sections")) {
+        return()
+      }
+      cur <- current_section()
+      if (cur >= n_sections) {
+        return()
+      }
+      shinyWidgets::updateRadioGroupButtons(
+        session = session,
+        inputId = "kwallm_sections_step",
+        selected = as.character(cur + 1L)
+      )
+    }, ignoreInit = TRUE)
+
     # UI ---------------------------------------------------------------
     output$main_ui <- renderUI({
       base_ui <- tagList(
@@ -94,70 +272,67 @@ main_server <- function(
 
           # Info box under the title
           hr(),
-          language_ui("language"),
           div(
-            style = "
-              max-width: 800px;
-              margin: 10px auto 0 auto;
-              padding: 15px 20px;
-              background-color: #f8f9fa;
-              border: 1px solid #dee2e6;
-              border-radius: 5px;
-              font-size: 0.9em;
-              color: #495057;
-              text-align: center;
-            ",
-            p(
-              HTML(paste0(
-                lang()$t(
-                  "Deze app is ontwikkeld door <a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a>,"
+            class = "d-flex justify-content-center align-items-center gap-3 flex-wrap",
+            language_ui("language"),
+            div(
+              id = "kwallm_layout_controls",
+              shinyWidgets::radioGroupButtons(
+                inputId = "kwallm_layout_view",
+                label = NULL,
+                choices = stats::setNames(
+                  c("vertical", "sections"),
+                  c(
+                    lang()$t("Verticaal"),
+                    lang()$t("Secties")
+                  )
                 ),
-                lang()$t(
-                  " voortkomend uit een samenwerkingstraject van de Kennispunt Twente en GGD Twente."
-                ),
-                lang()$t(
-                  " Samen werken onze organisaties toepassingen met generatieve AI ten behoeve van de samenleving."
-                )
-              ))
-            ),
-            p(
-              HTML(paste0(
-                lang()$t(
-                  "Kennispunt Twente is een non-profit organisatie voor data, inzicht, en kennis."
-                ),
-                lang()$t(" Ideeën of verbeterpunten voor de app? "),
-                lang()$t(
-                  "<a href='https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new' target='_blank'>Open een issue in de GitHub-repository</a>."
-                ),
-                lang()$t(
-                  " Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?"
-                ),
-                lang()$t(
-                  " Bezoek <a href='https://www.kennispunttwente.nl' target='_blank'>onze website</a>"
-                ),
-                lang()$t(
-                  " of <a href=\"mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl\" target=\"_blank\">neem contact op met onze ontwikkelaars</a>."
-                )
-              ))
-            ),
+                selected = if (isTRUE(getOption("shiny.testmode"))) "vertical" else "sections",
+                size = "sm"
+              )
+            )
+          ),
+          div(
+            style = "max-width: 1000px; margin: 10px auto 0 auto;",
             accordion(
-              id = "team-accordion",
+              id = "info-accordion",
               open = FALSE,
               accordion_panel(
-                lang()$t("Bekijk contactinformatie"),
+                title = lang()$t("Over deze app"),
                 div(
-                  style = "text-align: left;",
-                  tags$ul(
-                    tags$li(
-                      HTML(
-                        "Luka Koning (<a href='mailto:l.koning@kennispunttwente.nl'>l.koning@kennispunttwente.nl</a>)"
+                  style = "text-align: center;",
+                  p(
+                    HTML(paste0(
+                      lang()$t(
+                        "Deze app is ontwikkeld door <a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a>,"
+                      ),
+                      lang()$t(
+                        " voortkomend uit een samenwerkingstraject van de Kennispunt Twente en GGD Twente."
+                      ),
+                      lang()$t(
+                        " Samen werken onze organisaties toepassingen met generatieve AI ten behoeve van de samenleving."
                       )
-                    ),
-                    tags$li(
-                      HTML(
-                        "Tjark van de Merwe (<a href='mailto:t.vandemerwe@kennispunttwente.nl'>t.vandemerwe@kennispunttwente.nl</a>)"
+                    ))
+                  ),
+                  p(
+                    HTML(paste0(
+                      lang()$t(
+                        "Kennispunt Twente is een non-profit organisatie voor data, inzicht, en kennis."
+                      ),
+                      lang()$t(" Ideeën of verbeterpunten voor de app? "),
+                      lang()$t(
+                        "<a href='https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new' target='_blank'>Open een issue in de GitHub-repository</a>."
+                      ),
+                      lang()$t(
+                        " Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?"
+                      ),
+                      lang()$t(
+                        " Bezoek <a href='https://www.kennispunttwente.nl' target='_blank'>onze website</a>"
+                      ),
+                      lang()$t(
+                        " of <a href=\"mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl\" target=\"_blank\">neem contact op met onze ontwikkelaars</a>."
                       )
-                    )
+                    ))
                   )
                 )
               )
@@ -169,25 +344,80 @@ main_server <- function(
 
           div(
             class = "card-container",
-
-            text_upload_ui("text_upload"),
-            text_split_ui("text_split"),
-            text_management_ui("text_management"),
-            research_background_ui("research_background"),
-            mode_ui("mode"),
-            categories_ui("categories"),
-            score_ui("scoring"),
-            marking_codes_ui("marking_codes"),
-            llm_provider_ui("llm_provider"),
-            model_ui("model"),
-            context_window_ui("context_window"),
-            assign_multiple_categories_toggle_ui(
-              "assign_multiple_categories_toggle"
+            div(
+              id = "kwallm_sections_nav",
+              class = "kwallm-sections-nav",
+              style = "display: none;",
+              shinyWidgets::radioGroupButtons(
+                inputId = "kwallm_sections_step",
+                label = NULL,
+                choices = stats::setNames(
+                  as.character(seq_len(n_sections)),
+                  c(
+                    paste0("1. ", lang()$t("Teksten")),
+                    paste0("2. ", lang()$t("Onderzoek & modus")),
+                    paste0("3. ", lang()$t("Analyse")),
+                    paste0("4. ", lang()$t("LLM & context")),
+                    paste0("5. ", lang()$t("Uitvoeren"))
+                  )
+                ),
+                selected = "1",
+                size = "sm",
+                justified = TRUE
+              ),
+              uiOutput("kwallm_sections_progress"),
+              div(
+                class = "d-flex justify-content-between gap-2 mt-2",
+                actionButton(
+                  "kwallm_sections_prev",
+                  lang()$t("Terug"),
+                  class = "btn btn-outline-secondary btn-sm"
+                ),
+                actionButton(
+                  "kwallm_sections_next",
+                  lang()$t("Volgende"),
+                  class = "btn btn-primary btn-sm"
+                )
+              )
             ),
-            interrater_toggle_ui("interrater_toggle"),
-            human_in_the_loop_toggle_ui("human_in_the_loop_toggle"),
-            write_paragraphs_toggle_ui("write_paragraphs_toggle"),
-            processing_ui("processing"),
+            div(
+              id = "kwallm_section_1",
+              class = "kwallm-section",
+              text_upload_ui("text_upload"),
+              text_split_ui("text_split"),
+              text_management_ui("text_management")
+            ),
+            div(
+              id = "kwallm_section_2",
+              class = "kwallm-section",
+              research_background_ui("research_background"),
+              mode_ui("mode")
+            ),
+            div(
+              id = "kwallm_section_3",
+              class = "kwallm-section",
+              categories_ui("categories"),
+              assign_multiple_categories_toggle_ui(
+                "assign_multiple_categories_toggle"
+              ),
+              score_ui("scoring"),
+              marking_codes_ui("marking_codes")
+            ),
+            div(
+              id = "kwallm_section_4",
+              class = "kwallm-section",
+              llm_provider_ui("llm_provider"),
+              model_ui("model"),
+              context_window_ui("context_window")
+            ),
+            div(
+              id = "kwallm_section_5",
+              class = "kwallm-section",
+              interrater_toggle_ui("interrater_toggle"),
+              human_in_the_loop_toggle_ui("human_in_the_loop_toggle"),
+              write_paragraphs_toggle_ui("write_paragraphs_toggle"),
+              processing_ui("processing")
+            ),
 
             div(style = "height: 75px;"),
           ),
