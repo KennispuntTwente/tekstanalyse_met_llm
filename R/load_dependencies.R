@@ -132,6 +132,17 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   library(future)
   library(promises)
 
+  # Make a fake call to 'jsonvalidate' to avoid `renv::status()` complaint
+  # 'jsonvalidate' is used as suggested dependency of 'tidyprompt', but
+  # not directly called in the code. We make a fake call here to avoid
+  # `renv::status()` reporting it as unused
+  try(
+    {
+      invisible(jsonvalidate::json_validate("...", schema = NULL))
+    },
+    silent = TRUE
+  )
+
   cli::cli_alert_success("R packages loaded")
 
   # 3 Load R functions ------------------------------------------------------
