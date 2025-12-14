@@ -110,11 +110,32 @@ log_init <- function(
         .timestamp = Sys.time()
       ) {
         session_id <- tryCatch(get_session_id(), error = function(e) "system")
+
+        level_label <- tryCatch(
+          {
+            if (is.numeric(level) && length(level) == 1) {
+              if (identical(level, logger::DEBUG)) {
+                "DEBUG"
+              } else if (identical(level, logger::INFO)) {
+                "INFO"
+              } else if (identical(level, logger::WARN)) {
+                "WARN"
+              } else if (identical(level, logger::ERROR)) {
+                "ERROR"
+              } else {
+                as.character(level)
+              }
+            } else {
+              as.character(level)
+            }
+          },
+          error = function(e) as.character(level)
+        )
         sprintf(
           "[%s] [%s] [%s] [%s] %s",
           format(.timestamp, "%Y-%m-%d %H:%M:%S%z"),
           session_id,
-          level,
+          level_label,
           namespace,
           msg
         )
