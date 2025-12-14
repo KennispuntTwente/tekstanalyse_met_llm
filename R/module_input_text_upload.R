@@ -98,8 +98,8 @@ text_upload_server <- function(
     # ---- Helpers ------------------------------------------------------------
     discard_empty <- function(x) {
       x <- x[!is.na(x)]
-      x <- x[stringr::str_trim(x) != ""]
-      unique(x)
+      keep <- stringr::str_trim(x) != ""
+      unique(x[keep])
     }
 
     # ---- Reactive values ----------------------------------------------------
@@ -172,7 +172,7 @@ text_upload_server <- function(
             split_lines <- isTRUE(input$txt_split_lines == lang()$t("Ja"))
 
             txt <- if (split_lines) {
-              discard_empty(txt_lines)
+              discard_empty(stringr::str_trim(txt_lines))
             } else {
               paste(txt_lines, collapse = "\n") # combine to single text
             }

@@ -4,16 +4,11 @@
 #   a paragraph about each category/topic
 
 write_paragraph <- function(
-  texts = c(
-    "this sucks!",
-    "i like this"
-  ),
-  topic = "product review",
+  texts,
+  topic,
   research_background = "",
   style_prompt = "",
-  llm_provider = tidyprompt::llm_provider_openai(
-    parameters = list(model = "gpt-4o-mini")
-  ),
+  llm_provider,
   language = c("nl", "en"),
   focus_on_highlighted_text = FALSE,
   stream_callback = NULL

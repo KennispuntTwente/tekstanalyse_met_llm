@@ -16,47 +16,29 @@ context_window_ui <- function(id) {
 
 
 # 2 Server ---------------------------------------------------------
+
+#' Manage context window and chunking parameters.
+#'
+#' @param mode Reactive returning current analysis mode (character scalar).
+#' @param models reactiveValues with `$main` and `$large` tidyprompt providers (must have `$parameters$model`).
+#' @param categories List with reactives `$texts()`, `$editing()`, `$unique_non_empty_count()`.
+#' @param scoring_characteristic Reactive returning a character scalar.
+#' @param codes List with reactives `$texts()`, `$editing()`, `$unique_non_empty_count()`.
+#' @param research_background Reactive returning a character scalar.
+#' @param assign_multiple_categories Reactive returning a logical scalar.
+#' @param texts reactiveValues with at least `$preprocessed` (character vector).
 context_window_server <- function(
   id,
-  mode = reactiveVal("Categorisatie"),
-  models = reactiveValues(
-    main = "gpt-4o-mini",
-    large = "gpt-4o-mini"
-  ),
-  categories = list(
-    texts = reactiveVal(c(
-      "positive review",
-      "negative review",
-      "neutral review"
-    )),
-    editing = reactiveVal(FALSE),
-    unique_non_empty_count = reactiveVal(3)
-  ),
-  scoring_characteristic = reactiveVal("positive sentiment"),
-  codes = list(
-    texts = reactiveVal(c(
-      "positive",
-      "negative",
-      "neutral"
-    )),
-    editing = reactiveVal(FALSE),
-    unique_non_empty_count = reactiveVal(3)
-  ),
-  research_background = reactiveVal(
-    "We have collected consumer reviews of our product."
-  ),
+  mode,
+  models,
+  categories,
+  scoring_characteristic,
+  codes,
+  research_background,
   assign_multiple_categories = reactiveVal(FALSE),
   texts = reactiveValues(
-    preprocessed = c(
-      "This is a positive review.",
-      "This is a negative review.",
-      "This is a neutral review. Very longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg texttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttVery longggggggggggggggggggggggggggggg textttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
-    ),
-    raw = c(
-      "Dit is een positieve review.",
-      "Dit is een negatieve review.",
-      "Dit is een neutrale review."
-    )
+    preprocessed = character(),
+    raw = character()
   ),
   processing = reactiveVal(FALSE),
   lang = default_lang(),
@@ -120,54 +102,21 @@ context_window_server <- function(
 
       # Reactive values ----------------------------------------------
       rv <- reactiveValues(
-        # State
-        text_chunks = NULL,
-        n_chunks = NULL,
-        context_window_known = NULL,
-
-        # Validity
-        too_many_chunks = NULL,
-        any_fit_problem = NULL,
-        fit_context_window_chunks = NULL,
-        fit_context_window_assigning = NULL,
-
-        # Chunking parameters
         chunk_size = chunk_size_default,
         draws = draws_default,
-        n_tokens_context_window = 2048,
-        base_prompt_text = NULL,
-
-        # Parameters for splitting texts in 'markeren' mode:
+        n_tokens_context_window = NULL,
         max_tokens = 256,
-        overlap = 64
+        overlap = 0,
+        base_prompt_text = NULL,
+        fit_context_window_assigning = NULL,
+        fit_context_window_chunks = NULL,
+        text_chunks = NULL,
+        n_chunks = NULL
       )
 
-      # Sync user input to internal state ----------------------------
+      # Keep rv in sync with numeric inputs
       observe({
-        is_valid_number <- function(input) {
-          if (is.null(input)) {
-            return(FALSE)
-          }
-
-          if (!is.numeric(input)) {
-            return(FALSE)
-          }
-
-          if (input != round(input)) {
-            return(FALSE)
-          }
-
-          if (input <= 0) {
-            return(FALSE)
-          }
-
-          return(TRUE)
-        }
-
-        if (
-          is_valid_number(input$chunk_size) &&
-            input$chunk_size <= chunk_size_limit
-        ) {
+        if (is_valid_number(input$chunk_size)) {
           rv$chunk_size <- input$chunk_size
         }
 
@@ -761,27 +710,61 @@ if (FALSE) {
   )
 
   server <- function(input, output, session) {
-    mode <- mode_server("mode", processing = reactiveVal(FALSE))
-    models <- model_server(
-      "models",
-      processing = reactiveVal(FALSE),
-      mode = mode,
-      llm_provider = tidyprompt::llm_provider_openai(),
-      available_main_models = c(
-        "gpt-4o-mini-2024-07-18",
-        "gpt-4.1-mini-2025-04-14",
-        "some model"
+    mode <- reactiveVal("Categorisatie")
+
+    models <- reactiveValues(
+      main = tidyprompt::llm_provider_openai()$set_parameters(list(
+        model = "gpt-4o-mini"
+      )),
+      large = tidyprompt::llm_provider_openai()$set_parameters(list(
+        model = "gpt-4o-mini"
+      ))
+    )
+
+    categories <- list(
+      texts = reactiveVal(c(
+        "positive review",
+        "negative review",
+        "neutral review"
+      )),
+      editing = reactiveVal(FALSE),
+      unique_non_empty_count = reactiveVal(3)
+    )
+    codes <- list(
+      texts = reactiveVal(c("positive", "negative", "neutral")),
+      editing = reactiveVal(FALSE),
+      unique_non_empty_count = reactiveVal(3)
+    )
+    scoring_characteristic <- reactiveVal("positive sentiment")
+    research_background <- reactiveVal(
+      "We have collected consumer reviews of our product."
+    )
+    assign_multiple_categories <- reactiveVal(FALSE)
+    texts <- reactiveValues(
+      preprocessed = c(
+        "This is a positive review.",
+        "This is a negative review.",
+        "This is a neutral review."
       ),
-      available_large_models = c(
-        "gpt-4o-mini-2024-07-18",
-        "gpt-4.1-mini-2025-04-14",
-        "some model"
+      raw = c(
+        "Dit is een positieve review.",
+        "Dit is een negatieve review.",
+        "Dit is een neutrale review."
       )
     )
+
     context_window_server(
       "context_window",
       mode = mode,
-      models = models
+      models = models,
+      categories = categories,
+      scoring_characteristic = scoring_characteristic,
+      codes = codes,
+      research_background = research_background,
+      assign_multiple_categories = assign_multiple_categories,
+      texts = texts,
+      processing = reactiveVal(FALSE),
+      lang = default_lang()
     )
   }
 

@@ -25,9 +25,7 @@
 create_candidate_topics <- function(
   text_chunks,
   research_background = "",
-  llm_provider = tidyprompt::llm_provider_openai(
-    parameters = list(model = "gpt-4o-mini")
-  ),
+  llm_provider,
   language = c("nl", "en")
 ) {
   language <- match.arg(language)
@@ -174,7 +172,7 @@ prompt_candidate_topics <- function(
 #'
 #' @param candidate_topics Character vector of candidate topics.
 #' @param research_background (Optional) Background information to feed the LLM.
-#' @param llm_provider A `tidyprompt` LLM provider (defaults to GPT-4o).
+#' @param llm_provider A `tidyprompt` LLM provider.
 #' @param desired_number Desired number of topics (optional).
 #' @param desired_number_type "max" or "goal".
 #' @param language "nl" or "en" – controls the language of the returned topics.
@@ -189,9 +187,7 @@ prompt_candidate_topics <- function(
 reduce_topics <- function(
   candidate_topics,
   research_background = "",
-  llm_provider = tidyprompt::llm_provider_openai(
-    parameters = list(model = "gpt-4o")
-  ),
+  llm_provider,
   desired_number = NULL,
   desired_number_type = c("max", "goal"),
   language = c("nl", "en"),
@@ -507,9 +503,7 @@ assign_topics <- function(
   texts,
   topics,
   research_background = "",
-  llm_provider = tidyprompt::llm_provider_openai(
-    parameters = list(model = "gpt-4o-mini")
-  ),
+  llm_provider,
   assign_multiple_categories = FALSE,
   exclusive_topics = c(),
   verbose = FALSE,
@@ -678,7 +672,14 @@ if (FALSE) {
   )
 
   # Use LLM to assign topics
-  texts_with_topics <- assign_topics(texts, topics, research_background)
+  texts_with_topics <- assign_topics(
+    texts,
+    topics,
+    research_background,
+    llm_provider = llm_provider_openai(
+      parameters = list(model = "gpt-4.1-2025-04-14")
+    )
+  )
 
   # Add topics back to original data
   sentences_df_with_topics <- sentences_df |>

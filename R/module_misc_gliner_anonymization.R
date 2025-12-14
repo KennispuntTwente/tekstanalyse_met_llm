@@ -12,21 +12,13 @@
 #     5: 'save' button where user finishes the anonymization process
 #       preprocessed texts are returned for use in the other modules
 
+#' GLiNER-based anonymization modal.
+#'
+#' @param pii_texts Reactive returning a character vector of texts to anonymize.
+#' @param gliner_model Optional pre-loaded model object; leave NULL to load in async.
 gliner_server <- function(
   id,
-  pii_texts = reactiveVal(
-    c(
-      "My name is Luka Koning, I live on 5th avenue street in London.",
-      "i'm Bob and I work at Kennispunt Twente sometimes I visit the University of Twente",
-      "my phone number is +3125251512, call me! or mail me at bob@bobthebob.com",
-      "it's a nice and sunny day today! Let's go for a walk",
-      "i am Bob de Nijs, this is a veryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy longggggggggggggggggggggggggggggggggggggggggggggggggggggg text and here is my phone number +313243244243 by the way this text will never fit inside a cell of a datatable loooooooooooooooooooooooool",
-      "lets go for a walk at 5th avenue street today! btw, my name is Kangorowits Wakka Wakka",
-      " u should really check out my twitter, its at twitter.com/lukakoning",
-      " im christian and i live in enschede",
-      " im gay and i live in amsterdam"
-    )
-  ),
+  pii_texts,
   lang = default_lang(),
   # If gliner model is NULL, the gliner model will be
   #   loaded in the async process. This takes some exra time but is required
@@ -36,7 +28,7 @@ gliner_server <- function(
   #   you can pass the model directly here; that means model does not
   #   have to be (re)loaded upon start of anonymization, and things
   #   will go faster (initial loading can then be done once, before user clicks button)
-  gliner_model = gliner_load_model()
+  gliner_model = NULL
 ) {
   moduleServer(
     id,
@@ -867,9 +859,15 @@ if (FALSE) {
   server <- function(input, output, session) {
     lang <- language_server("language", processing = reactiveVal(FALSE))
 
+    pii_texts <- reactiveVal(c(
+      "My name is Luka Koning, I live on 5th avenue street in London.",
+      "my phone number is +3125251512, call me! or mail me at bob@bobthebob.com"
+    ))
+
     # Create the GLiNER module server
     gliner <- gliner_server(
       "gliner",
+      pii_texts = pii_texts,
       lang = lang,
       # gliner_model = gliner_model
       gliner_model = NULL
