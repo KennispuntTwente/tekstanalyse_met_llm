@@ -603,7 +603,7 @@ log_warn <- function(message, component = "app") {
 #' @param fatal Whether this is a fatal error
 #' @export
 log_error <- function(message, component = "app", fatal = FALSE) {
-  level <- if (fatal) "ERROR" else "ERROR"
+  level <- "ERROR"
   prefix <- if (fatal) "[FATAL] " else ""
   tryCatch(
     .write_log(level, paste0(prefix, message), component),
