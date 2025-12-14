@@ -44,14 +44,12 @@ editable_field_list_server <- function(
 
     prev_exclusive_vals <- reactiveVal(rep(FALSE, initial_count))
 
-    observe({
-      shiny::exportTestValues(
-        n_fields = n_fields(),
-        txt_in_fields = txt_in_fields(),
-        exclusive_sel = exclusive_vals(),
-        isEditing = isEditing()
-      )
-    })
+    shiny::exportTestValues(
+      n_fields = n_fields(),
+      txt_in_fields = txt_in_fields(),
+      exclusive_sel = exclusive_vals(),
+      isEditing = isEditing()
+    )
 
     # UI rendering ---------------------------------------------------
     # Individual fields

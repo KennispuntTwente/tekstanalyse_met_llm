@@ -103,13 +103,11 @@ processing_server <- function(
       # Timestamp for end-to-end duration (click -> download-ready)
       analysis_started_at <- reactiveVal(NULL)
 
-      observe({
-        shiny::exportTestValues(
-          processing = processing(),
-          success = success(),
-          final_results_df = final_results_df()
-        )
-      })
+      shiny::exportTestValues(
+        processing = processing(),
+        success = success(),
+        final_results_df = final_results_df()
+      )
 
       # UUID for the current processing task
       uuid <- uuid::UUIDgenerate()

@@ -122,14 +122,12 @@ marking_codes_server <- function(
     # Reactive value to store generated codes
     generated_codes <- reactiveVal(NULL)
 
-    observe({
-      shiny::exportTestValues(
-        n_fields = fields$unique_non_empty_count(),
-        txt_in_fields = fields$texts(),
-        isEditing = fields$editing(),
-        generated_codes = generated_codes()
-      )
-    })
+    shiny::exportTestValues(
+      n_fields = fields$unique_non_empty_count(),
+      txt_in_fields = fields$texts(),
+      isEditing = fields$editing(),
+      generated_codes = generated_codes()
+    )
 
     # Reactive value to store if generation is in progress
     code_generation_in_progress <- reactiveVal(FALSE)
