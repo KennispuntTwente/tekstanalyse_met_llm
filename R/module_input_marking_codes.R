@@ -242,7 +242,6 @@ marking_codes_server <- function(
             create_candidate_topics = create_candidate_topics,
             prompt_candidate_topics = prompt_candidate_topics,
             reduce_topics = reduce_topics,
-            reduce_topics = reduce_topics,
             semchunk_load_chunker = semchunk_load_chunker,
             log_opts = log_opts,
             log_init = log_init,

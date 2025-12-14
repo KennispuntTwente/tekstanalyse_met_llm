@@ -339,7 +339,6 @@ edit_topics_server <- function(
             get_context_window_size_in_tokens = get_context_window_size_in_tokens,
             tiktoken_load_tokenizer = tiktoken_load_tokenizer,
             count_tokens = count_tokens,
-            count_tokens = count_tokens,
             async_message_printer = async_message_printer,
             log_opts = log_opts,
             log_init = log_init,

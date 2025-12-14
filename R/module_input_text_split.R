@@ -275,7 +275,6 @@ text_split_server <- function(
           queue = queue,
           split_texts_with_semchunk = split_texts_with_semchunk,
           semchunk_load_chunker = semchunk_load_chunker,
-          semchunk_load_chunker = semchunk_load_chunker,
           async_message_printer = async_message_printer,
           log_opts = log_opts,
           log_init = log_init,
