@@ -103,12 +103,14 @@ text_management_server <- function(
 
     texts <- reactiveValues(raw = NULL, preprocessed = NULL, df = NULL)
 
-    shiny::exportTestValues(
-      anonymization_mode = anonymization_mode(),
-      texts__raw = texts$raw,
-      texts__preprocessed = texts$preprocessed,
-      texts__df = texts$df
-    )
+    observe({
+      shiny::exportTestValues(
+        anonymization_mode = anonymization_mode(),
+        texts__raw = texts$raw,
+        texts__preprocessed = texts$preprocessed,
+        texts__df = texts$df
+      )
+    })
 
     # -- 3  UI: main card -------------------------------------------
     output$card <- renderUI({

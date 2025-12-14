@@ -21,7 +21,9 @@ mode_server <- function(
       ns <- session$ns
 
       mode <- reactiveVal("Categorisatie")
-      shiny::exportTestValues(mode = mode())
+      observe({
+        shiny::exportTestValues(mode = mode())
+      })
 
       output$card <- renderUI({
         bslib::card(

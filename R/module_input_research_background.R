@@ -24,9 +24,11 @@ research_background_server <- function(
       ns <- session$ns
 
       research_background <- reactiveVal("")
-      shiny::exportTestValues(
-        research_background = research_background()
-      )
+      observe({
+        shiny::exportTestValues(
+          research_background = research_background()
+        )
+      })
 
       output$card <- renderUI({
         bslib::card(

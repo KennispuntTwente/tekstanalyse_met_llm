@@ -35,11 +35,13 @@ categories_server <- function(
     )
 
     # Re-export test values from child module
-    shiny::exportTestValues(
-      n_fields = fields$unique_non_empty_count(),
-      txt_in_fields = fields$texts(),
-      isEditing = fields$editing()
-    )
+    observe({
+      shiny::exportTestValues(
+        n_fields = fields$unique_non_empty_count(),
+        txt_in_fields = fields$texts(),
+        isEditing = fields$editing()
+      )
+    })
 
     ## UI: Card wrapper ####
     output$categories <- renderUI({

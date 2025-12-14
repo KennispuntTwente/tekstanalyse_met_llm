@@ -42,14 +42,16 @@ editable_field_list_server <- function(
     exclusive_vals <- reactiveVal(rep(FALSE, initial_count))
     isEditing <- reactiveVal(TRUE)
 
-    prev_exclusive_vals <- reactiveVal(exclusive_vals())
+    prev_exclusive_vals <- reactiveVal(rep(FALSE, initial_count))
 
-    shiny::exportTestValues(
-      n_fields = n_fields(),
-      txt_in_fields = txt_in_fields(),
-      exclusive_sel = exclusive_vals(),
-      isEditing = isEditing()
-    )
+    observe({
+      shiny::exportTestValues(
+        n_fields = n_fields(),
+        txt_in_fields = txt_in_fields(),
+        exclusive_sel = exclusive_vals(),
+        isEditing = isEditing()
+      )
+    })
 
     # UI rendering ---------------------------------------------------
     # Individual fields
@@ -237,12 +239,20 @@ editable_field_list_server <- function(
 
     # Disable when processing ----------------------------------------
     update_input_state <- function() {
-      show_excl <- isTRUE(show_exclusive()) || identical(show_exclusive, TRUE)
+      show_excl <- if (is.function(show_exclusive)) {
+        isTRUE(shiny::isolate(show_exclusive()))
+      } else {
+        isTRUE(show_exclusive)
+      }
 
-      lapply(seq_len(n_fields()), function(i) {
+      editing_now <- shiny::isolate(isEditing())
+      processing_now <- shiny::isolate(processing())
+      fields_now <- shiny::isolate(n_fields())
+
+      lapply(seq_len(fields_now), function(i) {
         txt_id <- paste0("field", i)
         ex_id <- paste0("exclusive", i)
-        if (!isEditing() || isTRUE(processing())) {
+        if (!editing_now || isTRUE(processing_now)) {
           shinyjs::disable(txt_id)
           if (show_excl) shinyjs::disable(ex_id)
         } else {
@@ -251,7 +261,7 @@ editable_field_list_server <- function(
         }
       })
 
-      if (!isEditing() || isTRUE(processing())) {
+      if (!editing_now || isTRUE(processing_now)) {
         shinyjs::disable("addField")
         shinyjs::disable("removeField")
         shinyjs::disable("toggleEdit")

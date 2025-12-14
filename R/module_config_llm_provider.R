@@ -157,11 +157,6 @@ llm_provider_server <- function(
       #   In this module, we ping the API to get the available models
       #   and pass those on to the model module
 
-      shiny::exportTestValues(
-        available_models_openai = available_models_openai(),
-        available_models_ollama = available_models_ollama()
-      )
-
       # Default URLs and state
       openai_url <- reactiveVal(getOption(
         "llm_provider__default_oai_url",
@@ -386,8 +381,9 @@ llm_provider_server <- function(
 
       # API key  ---------------------------------------------------------------
 
-      api_key_input <- reactiveVal(Sys.getenv("OPENAI_API_KEY"))
-      prev_api_key_has_value <- reactiveVal(nchar(api_key_input() %||% "") > 0)
+      initial_api_key <- Sys.getenv("OPENAI_API_KEY")
+      api_key_input <- reactiveVal(initial_api_key)
+      prev_api_key_has_value <- reactiveVal(nchar(initial_api_key %||% "") > 0)
 
       # Reactively update API key (updating URLs only when 'get models' is clicked)
       observeEvent(input$api_key_text, api_key_input(input$api_key_text))
@@ -520,6 +516,12 @@ llm_provider_server <- function(
 
       available_models_openai <- reactiveVal(NULL)
       available_models_ollama <- reactiveVal(NULL)
+
+      # Expose model lists for automated tests (safe outside reactive context)
+      shiny::exportTestValues(
+        available_models_openai = shiny::isolate(available_models_openai()),
+        available_models_ollama = shiny::isolate(available_models_ollama())
+      )
 
       # Keep track of requests for available models
       last_model_request_time <- reactiveVal(Sys.time() - 10)

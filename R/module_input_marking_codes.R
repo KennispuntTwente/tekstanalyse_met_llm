@@ -31,13 +31,7 @@ marking_codes_server <- function(
       lang = lang
     )
 
-    # Re-export test values
-    shiny::exportTestValues(
-      n_fields = fields$unique_non_empty_count(),
-      txt_in_fields = fields$texts(),
-      isEditing = fields$editing(),
-      generated_codes = generated_codes()
-    )
+    # Test exports are registered after all reactives are created
 
     ## UI: Card wrapper with code generation ####
     output$codes <- renderUI({
@@ -127,6 +121,15 @@ marking_codes_server <- function(
 
     # Reactive value to store generated codes
     generated_codes <- reactiveVal(NULL)
+
+    observe({
+      shiny::exportTestValues(
+        n_fields = fields$unique_non_empty_count(),
+        txt_in_fields = fields$texts(),
+        isEditing = fields$editing(),
+        generated_codes = generated_codes()
+      )
+    })
 
     # Reactive value to store if generation is in progress
     code_generation_in_progress <- reactiveVal(FALSE)

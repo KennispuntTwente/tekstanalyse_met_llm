@@ -100,11 +100,13 @@ processing_server <- function(
       topics_definitive <- reactiveVal(FALSE)
       success <- reactiveVal(NULL)
 
-      shiny::exportTestValues(
-        processing = processing(),
-        success = success(),
-        final_results_df = final_results_df()
-      )
+      observe({
+        shiny::exportTestValues(
+          processing = processing(),
+          success = success(),
+          final_results_df = final_results_df()
+        )
+      })
 
       # UUID for the current processing task
       uuid <- uuid::UUIDgenerate()
