@@ -100,6 +100,9 @@ processing_server <- function(
       topics_definitive <- reactiveVal(FALSE)
       success <- reactiveVal(NULL)
 
+      # Timestamp for end-to-end duration (click -> download-ready)
+      analysis_started_at <- reactiveVal(NULL)
+
       observe({
         shiny::exportTestValues(
           processing = processing(),
@@ -172,7 +175,7 @@ processing_server <- function(
 
         # Set processing state
         processing(TRUE)
-        analysis_start_time <- Sys.time()
+        analysis_started_at(Sys.time())
         log_analysis_start(
           mode = mode(),
           n_texts = length(texts$preprocessed),
@@ -512,7 +515,7 @@ processing_server <- function(
 
         # Set processing state
         processing(TRUE)
-        analysis_start_time <- Sys.time()
+        analysis_started_at(Sys.time())
         log_analysis_start(
           mode = mode(),
           n_texts = length(texts$preprocessed),
@@ -1106,7 +1109,7 @@ processing_server <- function(
 
         # Set processing state
         processing(TRUE)
-        analysis_start_time <- Sys.time()
+        analysis_started_at(Sys.time())
         log_analysis_start(
           mode = mode(),
           n_texts = length(texts$preprocessed),
@@ -1285,21 +1288,6 @@ processing_server <- function(
 
         # Update UI to show finished processing
         progress_primary$async$stop()
-
-        # Log analysis completion
-        if (exists("analysis_start_time")) {
-          duration_secs <- as.numeric(difftime(
-            Sys.time(),
-            analysis_start_time,
-            units = "secs"
-          ))
-          log_analysis_complete(
-            mode = mode(),
-            duration_secs = duration_secs,
-            n_texts = nrow(df),
-            success = TRUE
-          )
-        }
 
         progress_primary$set(
           100,
@@ -1551,6 +1539,68 @@ processing_server <- function(
       observeEvent(zip_file(), {
         if (is.null(zip_file())) {
           return()
+        }
+
+        # End-to-end duration: from process click to download-ready
+        started_at <- analysis_started_at()
+        if (!is.null(started_at)) {
+          duration_total_secs <- as.numeric(difftime(
+            Sys.time(),
+            started_at,
+            units = "secs"
+          ))
+
+          preprocessed_texts <- tryCatch(
+            {
+              txt <- texts$preprocessed %||% character(0)
+              as.character(txt)
+            },
+            error = function(e) character(0)
+          )
+
+          n_texts_total <- length(preprocessed_texts)
+
+          total_chars <- tryCatch(
+            sum(
+              nchar(preprocessed_texts, type = "chars", allowNA = TRUE),
+              na.rm = TRUE
+            ),
+            error = function(e) NA_real_
+          )
+
+          secs_per_text <- if (
+            isTRUE(!is.na(n_texts_total)) && isTRUE(n_texts_total > 0)
+          ) {
+            duration_total_secs / n_texts_total
+          } else {
+            NA_real_
+          }
+
+          secs_per_1k_chars <- if (
+            isTRUE(!is.na(total_chars)) && isTRUE(total_chars > 0)
+          ) {
+            (duration_total_secs / total_chars) * 1000
+          } else {
+            NA_real_
+          }
+
+          log_info(
+            sprintf(
+              paste0(
+                "Analysis total duration (click->download-ready): ",
+                "mode=%s, n_texts_preprocessed=%s, total_chars_preprocessed=%s, uuid=%s, ",
+                      "duration=%.1fs, avg=%.3fs/text, avg=%.3fs/1k_chars"
+              ),
+              mode() %||% "unknown",
+              as.character(n_texts_total),
+              as.character(total_chars),
+              uuid,
+              duration_total_secs,
+              secs_per_text,
+                    secs_per_1k_chars
+            ),
+            component = "analysis"
+          )
         }
 
         zip_bytes <- tryCatch(file.size(zip_file()), error = function(e) {
