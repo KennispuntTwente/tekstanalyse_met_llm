@@ -159,10 +159,13 @@ test_that("log_init creates the log directory and initializes state", {
     old_threshold <- logger::log_threshold()
 
     resolve_logger_fun <- function(x) {
-      if (is.name(x)) {
+      if (is.function(x)) {
+        x
+      } else if (is.name(x)) {
         get(as.character(x), envir = asNamespace("logger"))
       } else {
-        x
+        # Fallback to console appender if x is NULL or unexpected type
+        logger::appender_console
       }
     }
 
