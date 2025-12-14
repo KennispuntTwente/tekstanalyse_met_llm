@@ -161,3 +161,71 @@ test_that("log_init creates the log directory and initializes state", {
   expect_true(.logger_env$initialized)
   expect_identical(.logger_env$log_dir, log_dir)
 })
+
+
+test_that("log_worker_init bootstraps logger in multisession future worker", {
+  testthat::skip_if_not_installed("future")
+
+  # Multisession plans can fail in constrained environments.
+  # If a parallel plan cannot start, we skip (rather than failing unrelated CI).
+  can_multisession <- TRUE
+  tryCatch(
+    {
+      old_plan <- future::plan()
+      on.exit(future::plan(old_plan), add = TRUE)
+      future::plan(future::multisession)
+    },
+    error = function(e) {
+      can_multisession <<- FALSE
+    }
+  )
+  if (!isTRUE(can_multisession)) {
+    testthat::skip("future::multisession not available in this environment")
+  }
+
+  log_dir <- withr::local_tempdir(pattern = "kwallm-logs-worker-")
+  logger_path <- tryCatch(
+    normalizePath(here::here("R", "utils_logger.R"), winslash = "/", mustWork = FALSE),
+    error = function(e) here::here("R", "utils_logger.R")
+  )
+
+  f <- future::future(
+    {
+      options(
+        logger__level = "INFO",
+        logger__dir = log_dir,
+        logger__retention = NULL,
+        app__mode = "test"
+      )
+
+      # Simulate the situation that caused the bug: log_* exists but .write_log
+      # may not be present in the worker.
+      if (exists(".write_log", envir = .GlobalEnv, inherits = FALSE)) {
+        rm(list = ".write_log", envir = .GlobalEnv)
+      }
+
+      log_worker_init(logger_path = logger_path, mode = "test")
+      log_info("hello from worker", component = "unit")
+      TRUE
+    },
+    globals = list(
+      log_worker_init = log_worker_init,
+      log_info = log_info,
+      logger_path = logger_path,
+      log_dir = log_dir
+    ),
+    seed = NULL
+  )
+
+  expect_true(future::value(f))
+
+  log_file <- file.path(log_dir, paste0(format(Sys.Date(), "%Y-%m-%d"), ".log"))
+  for (i in 1:30) {
+    if (file.exists(log_file)) break
+    Sys.sleep(0.1)
+  }
+  expect_true(file.exists(log_file))
+
+  lines <- readLines(log_file, warn = FALSE)
+  expect_true(any(grepl("hello from worker", lines, fixed = TRUE)))
+})

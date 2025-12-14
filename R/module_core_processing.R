@@ -191,6 +191,12 @@ processing_server <- function(
           retention = getOption("logger__retention")
         )
 
+        utils_logger_path <- tryCatch(
+          normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
+          error = function(e) "R/utils_logger.R"
+        )
+        app_mode <- getOption("app__mode", "unknown")
+
         future_promise(
           {
             options(
@@ -198,7 +204,7 @@ processing_server <- function(
               logger__dir = log_opts$dir,
               logger__retention = log_opts$retention
             )
-            try(log_init(), silent = TRUE)
+            log_worker_init(logger_path = utils_logger_path, mode = app_mode)
 
             results <- vector("list", length(texts))
 
@@ -392,8 +398,9 @@ processing_server <- function(
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
             log_opts = log_opts,
-            log_init = log_init,
-            get_session_id = get_session_id,
+            log_worker_init = log_worker_init,
+            utils_logger_path = utils_logger_path,
+            app_mode = app_mode,
             llm_stream_async = llm_stream$async,
             streaming_enabled = getOption("paragraph_streaming", TRUE) &&
               isTRUE(models$main$parameters$stream)
@@ -539,6 +546,12 @@ processing_server <- function(
           retention = getOption("logger__retention")
         )
 
+        utils_logger_path <- tryCatch(
+          normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
+          error = function(e) "R/utils_logger.R"
+        )
+        app_mode <- getOption("app__mode", "unknown")
+
         future_promise(
           {
             options(
@@ -546,7 +559,7 @@ processing_server <- function(
               logger__dir = log_opts$dir,
               logger__retention = log_opts$retention
             )
-            try(log_init(), silent = TRUE)
+            log_worker_init(logger_path = utils_logger_path, mode = app_mode)
 
             candidate_topics <- tryCatch(
               {
@@ -623,8 +636,9 @@ processing_server <- function(
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
             log_opts = log_opts,
-            log_init = log_init,
-            get_session_id = get_session_id,
+            log_worker_init = log_worker_init,
+            utils_logger_path = utils_logger_path,
+            app_mode = app_mode,
             log_info = log_info
           ),
           packages = c(
@@ -771,6 +785,12 @@ processing_server <- function(
           retention = getOption("logger__retention")
         )
 
+        utils_logger_path <- tryCatch(
+          normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
+          error = function(e) "R/utils_logger.R"
+        )
+        app_mode <- getOption("app__mode", "unknown")
+
         future_promise(
           {
             options(
@@ -778,7 +798,7 @@ processing_server <- function(
               logger__dir = log_opts$dir,
               logger__retention = log_opts$retention
             )
-            try(log_init(), silent = TRUE)
+            log_worker_init(logger_path = utils_logger_path, mode = app_mode)
 
             # Step 4: Assign topics
             # Writing progress on secondary progress file
@@ -974,8 +994,9 @@ processing_server <- function(
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
             log_opts = log_opts,
-            log_init = log_init,
-            get_session_id = get_session_id,
+            log_worker_init = log_worker_init,
+            utils_logger_path = utils_logger_path,
+            app_mode = app_mode,
             log_info = log_info,
             exclusive_topics = exclusive_topics(),
             llm_stream_async = llm_stream$async,
@@ -1104,6 +1125,12 @@ processing_server <- function(
           retention = getOption("logger__retention")
         )
 
+        utils_logger_path <- tryCatch(
+          normalizePath("R/utils_logger.R", winslash = "/", mustWork = FALSE),
+          error = function(e) "R/utils_logger.R"
+        )
+        app_mode <- getOption("app__mode", "unknown")
+
         future_promise(
           {
             options(
@@ -1111,7 +1138,7 @@ processing_server <- function(
               logger__dir = log_opts$dir,
               logger__retention = log_opts$retention
             )
-            try(log_init(), silent = TRUE)
+            log_worker_init(logger_path = utils_logger_path, mode = app_mode)
 
             mark_texts(
               texts = texts,
@@ -1149,8 +1176,9 @@ processing_server <- function(
             progress_secondary = progress_secondary$async,
             interrupter = interrupter,
             log_opts = log_opts,
-            log_init = log_init,
-            get_session_id = get_session_id,
+            log_worker_init = log_worker_init,
+            utils_logger_path = utils_logger_path,
+            app_mode = app_mode,
             write_paragraph = write_paragraph,
             write_paragraphs = write_paragraphs(),
             text_size_tokens = context_window$max_tokens,

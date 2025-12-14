@@ -140,6 +140,58 @@ log_init <- function(
 }
 
 
+#' Initialize logging in async workers
+#'
+#' Future workers run in fresh R sessions and may not have the logger helpers
+#' (including internal `.write_log`) loaded. This helper can be called at the
+#' start of a `future()` / `future_promise()` expression to (re)load the logger
+#' code and initialize it in that worker.
+#'
+#' This function is best-effort and must never crash processing.
+#'
+#' @param logger_path Optional path to `R/utils_logger.R` (prefer an absolute
+#'   path captured in the main process and passed into the worker).
+#' @param mode App mode string (e.g., "regular", "docker", "electron").
+#' @keywords internal
+log_worker_init <- function(
+  logger_path = NULL,
+  mode = getOption("app__mode", "unknown")
+) {
+  tryCatch(
+    {
+      # Always (re)source the logger file in workers when available.
+      # Future globals serialization can make existence checks misleading.
+      if (
+        !is.null(logger_path) &&
+          is.character(logger_path) &&
+          length(logger_path) == 1 &&
+          nzchar(logger_path) &&
+          file.exists(logger_path)
+      ) {
+        source(logger_path, local = FALSE)
+      }
+
+      if (exists("log_init", mode = "function", inherits = TRUE)) {
+        initialized <- FALSE
+        env <- get0(".logger_env", inherits = TRUE)
+        if (is.environment(env) && isTRUE(env$initialized)) {
+          initialized <- TRUE
+        }
+
+        if (!isTRUE(initialized)) {
+          log_init(mode = mode)
+        }
+      }
+    },
+    error = function(e) {
+      invisible(NULL)
+    }
+  )
+
+  invisible(NULL)
+}
+
+
 #' Get current app mode safely
 #' @keywords internal
 get_app_mode <- function() {
@@ -293,7 +345,23 @@ get_session_id <- function() {
 #' @param component Component name (e.g., "startup", "session", "processing")
 #' @export
 log_info <- function(message, component = "app") {
-  .write_log("INFO", message, component)
+  write_log_fn <- get0(".write_log", mode = "function", inherits = TRUE)
+  if (!is.null(write_log_fn)) {
+    write_log_fn("INFO", message, component)
+    return(invisible(NULL))
+  }
+
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
+  session_id <- tryCatch(get_session_id(), error = function(e) "system")
+  message(sprintf(
+    "[%s] [%s] [%s] [%s] %s",
+    timestamp,
+    session_id,
+    "INFO",
+    component,
+    message
+  ))
+  invisible(NULL)
 }
 
 
@@ -303,7 +371,24 @@ log_info <- function(message, component = "app") {
 #' @param component Component name
 #' @export
 log_debug <- function(message, component = "app") {
-  .write_log("DEBUG", message, component)
+  write_log_fn <- get0(".write_log", mode = "function", inherits = TRUE)
+  if (!is.null(write_log_fn)) {
+    write_log_fn("DEBUG", message, component)
+    return(invisible(NULL))
+  }
+
+  # In async worker sessions we may not have logger initialized; debug is best-effort.
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
+  session_id <- tryCatch(get_session_id(), error = function(e) "system")
+  message(sprintf(
+    "[%s] [%s] [%s] [%s] %s",
+    timestamp,
+    session_id,
+    "DEBUG",
+    component,
+    message
+  ))
+  invisible(NULL)
 }
 
 
@@ -313,7 +398,23 @@ log_debug <- function(message, component = "app") {
 #' @param component Component name
 #' @export
 log_warn <- function(message, component = "app") {
-  .write_log("WARN", message, component)
+  write_log_fn <- get0(".write_log", mode = "function", inherits = TRUE)
+  if (!is.null(write_log_fn)) {
+    write_log_fn("WARN", message, component)
+    return(invisible(NULL))
+  }
+
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
+  session_id <- tryCatch(get_session_id(), error = function(e) "system")
+  message(sprintf(
+    "[%s] [%s] [%s] [%s] %s",
+    timestamp,
+    session_id,
+    "WARN",
+    component,
+    message
+  ))
+  invisible(NULL)
 }
 
 
@@ -326,7 +427,23 @@ log_warn <- function(message, component = "app") {
 log_error <- function(message, component = "app", fatal = FALSE) {
   level <- if (fatal) "ERROR" else "ERROR"
   prefix <- if (fatal) "[FATAL] " else ""
-  .write_log(level, paste0(prefix, message), component)
+  write_log_fn <- get0(".write_log", mode = "function", inherits = TRUE)
+  if (!is.null(write_log_fn)) {
+    write_log_fn(level, paste0(prefix, message), component)
+    return(invisible(NULL))
+  }
+
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
+  session_id <- tryCatch(get_session_id(), error = function(e) "system")
+  message(sprintf(
+    "[%s] [%s] [%s] [%s] %s",
+    timestamp,
+    session_id,
+    level,
+    component,
+    paste0(prefix, message)
+  ))
+  invisible(NULL)
 }
 
 
