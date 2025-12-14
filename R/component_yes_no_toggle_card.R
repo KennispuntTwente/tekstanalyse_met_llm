@@ -82,7 +82,7 @@ yes_no_toggle_card_server <- function(
           title = tagList(icon(modal_config$icon), " ", t(modal_config$title)),
           tags$div(
             style = "display:none;",
-            `data-kwallm-modal-id` = "style_prompt_modal"
+            `data-kwallm-modal-id` = paste0(id, "_modal")
           ),
           div(
             if (
