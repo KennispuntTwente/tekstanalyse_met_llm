@@ -216,7 +216,11 @@ editable_field_list_server <- function(
         # Log config saved
         log_action(
           "config_saved",
-          details = sprintf("field=%s, n_items=%d", field_label, length(nonEmptyTexts()))
+          details = sprintf(
+            "field=%s, n_items=%d",
+            field_label,
+            length(nonEmptyTexts())
+          )
         )
       } else {
         # EDIT

@@ -117,7 +117,14 @@ mark_texts <- function(
       marked_text = purrr::map2(sub_text, code, function(txt, cd) {
         current_count <<- current_count + 1
         if (current_count == 1 || current_count %% 10 == 0) {
-          log_info(sprintf("Marking progress: %d/%d", current_count, total_combinations), component = "analysis")
+          log_info(
+            sprintf(
+              "Marking progress: %d/%d",
+              current_count,
+              total_combinations
+            ),
+            component = "analysis"
+          )
         }
         try({
           progress_secondary$set_with_total(

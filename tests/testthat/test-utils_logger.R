@@ -82,7 +82,10 @@ test_that("analysis progress uses DEBUG level and analysis component", {
 
   log_file <- file.path(log_dir, paste0(format(Sys.Date(), "%Y-%m-%d"), ".log"))
   lines <- readLines(log_file, warn = FALSE)
-  expect_true(any(grepl("\\[DEBUG\\] \\[analysis\\] Progress: 1/3 \\(categorizing\\)", lines)))
+  expect_true(any(grepl(
+    "\\[DEBUG\\] \\[analysis\\] Progress: 1/3 \\(categorizing\\)",
+    lines
+  )))
 })
 
 
@@ -105,7 +108,11 @@ test_that("apply_retention_policy keeps newest N log files", {
 
   .apply_retention_policy(log_dir, retention = 2)
 
-  remaining <- list.files(log_dir, pattern = "^\\d{4}-\\d{2}-\\d{2}\\.log$", full.names = FALSE)
+  remaining <- list.files(
+    log_dir,
+    pattern = "^\\d{4}-\\d{2}-\\d{2}\\.log$",
+    full.names = FALSE
+  )
   expect_setequal(remaining, c("2025-01-02.log", "2025-01-03.log"))
 })
 
@@ -129,7 +136,10 @@ test_that("log_init creates the log directory and initializes state", {
 
     withr::defer(
       {
-        logger::log_appender(resolve_logger_fun(old_appender), namespace = "global")
+        logger::log_appender(
+          resolve_logger_fun(old_appender),
+          namespace = "global"
+        )
         logger::log_layout(resolve_logger_fun(old_layout), namespace = "global")
         logger::log_threshold(old_threshold)
       },
@@ -141,7 +151,12 @@ test_that("log_init creates the log directory and initializes state", {
   log_dir <- file.path(base_dir, "nested", "logs")
 
   expect_false(dir.exists(log_dir))
-  expect_invisible(log_init(level = "INFO", log_dir = log_dir, retention = NULL, mode = "test"))
+  expect_invisible(log_init(
+    level = "INFO",
+    log_dir = log_dir,
+    retention = NULL,
+    mode = "test"
+  ))
   expect_true(dir.exists(log_dir))
   expect_true(.logger_env$initialized)
   expect_identical(.logger_env$log_dir, log_dir)

@@ -30,7 +30,11 @@ app_error <- function(
   error <- capture.output(print(error)) |> paste0(collapse = "\n")
 
   session_id <- "system"
-  if (!is.null(shiny_session) && !is.null(shiny_session$token) && nzchar(shiny_session$token)) {
+  if (
+    !is.null(shiny_session) &&
+      !is.null(shiny_session$token) &&
+      nzchar(shiny_session$token)
+  ) {
     session_id <- substr(shiny_session$token, 1, 8)
   } else if (exists("get_session_id", mode = "function")) {
     session_id <- tryCatch(get_session_id(), error = function(e) "system")
@@ -54,7 +58,7 @@ app_error <- function(
   )
 
   cat(log_message)
-  
+
   # Log error using the centralized logger
   tryCatch(
     log_error(

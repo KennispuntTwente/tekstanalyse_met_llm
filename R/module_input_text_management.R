@@ -303,7 +303,7 @@ text_management_server <- function(
     # -- 5  Compute/refresh texts -----------------------------------
     # Track previous state to avoid duplicate logs
     prev_text_state <- reactiveVal(list(raw = 0, unique = 0, mode = ""))
-    
+
     observe({
       req(raw_texts())
       mode <- anonymization_mode()
@@ -328,7 +328,7 @@ text_management_server <- function(
         preprocessed = out,
         stringsAsFactors = FALSE
       )
-      
+
       # Only log when there's an actual change in counts
       new_state <- list(
         raw = length(texts$raw),
@@ -336,13 +336,19 @@ text_management_server <- function(
         mode = mode
       )
       old_state <- prev_text_state()
-      
-      if (new_state$raw != old_state$raw || 
-          new_state$unique != old_state$unique || 
-          new_state$mode != old_state$mode) {
+
+      if (
+        new_state$raw != old_state$raw ||
+          new_state$unique != old_state$unique ||
+          new_state$mode != old_state$mode
+      ) {
         log_info(
-          sprintf("Text count changed: raw=%d, unique=%d, mode=%s",
-                  new_state$raw, new_state$unique, mode),
+          sprintf(
+            "Text count changed: raw=%d, unique=%d, mode=%s",
+            new_state$raw,
+            new_state$unique,
+            mode
+          ),
           component = "text"
         )
         prev_text_state(new_state)
@@ -507,7 +513,10 @@ text_management_server <- function(
 
     # -- 7  Modal: text table ---------------------------------------
     observeEvent(input$open_text_table_modal, {
-      log_action("text_table_modal_opened", details = sprintf("n_texts=%d", length(texts$preprocessed)))
+      log_action(
+        "text_table_modal_opened",
+        details = sprintf("n_texts=%d", length(texts$preprocessed))
+      )
       showModal(modalDialog(
         title = lang()$t("Teksten"),
         DT::dataTableOutput(ns("text_table")),
@@ -527,12 +536,16 @@ text_management_server <- function(
                 placement = "top"
               )
           ),
-          actionButton(ns("close_text_table_modal"), lang()$t("Sluiten"), class = "btn-secondary")
+          actionButton(
+            ns("close_text_table_modal"),
+            lang()$t("Sluiten"),
+            class = "btn-secondary"
+          )
         ),
         size = "l"
       ))
     })
-    
+
     # Log text table modal close
     observeEvent(input$close_text_table_modal, {
       log_action("text_table_modal_closed")

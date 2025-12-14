@@ -181,10 +181,13 @@ marking_codes_server <- function(
         # Set generation message
         generate_codes_message(lang()$t("Codes genereren..."))
         shiny::showNotification(lang()$t("Codes genereren..."))
-        
+
         # Log code generation start
         log_info(
-          sprintf("Code generation started: n_texts=%d", length(texts$preprocessed)),
+          sprintf(
+            "Code generation started: n_texts=%d",
+            length(texts$preprocessed)
+          ),
           component = "codes"
         )
 

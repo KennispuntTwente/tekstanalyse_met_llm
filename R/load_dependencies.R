@@ -161,14 +161,20 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   # Make app mode available to other modules/logging
   options(app__mode = mode)
 
-  tryCatch({
-    log_init(mode = mode)
-    log_info(paste("Application starting in", mode, "mode"), component = "startup")
-    log_info(paste("R version:", R.version.string), component = "startup")
-    cli::cli_alert_success("Logger initialized")
-  }, error = function(e) {
-    cli::cli_alert_warning(paste("Logger init failed:", e$message))
-  })
+  tryCatch(
+    {
+      log_init(mode = mode)
+      log_info(
+        paste("Application starting in", mode, "mode"),
+        component = "startup"
+      )
+      log_info(paste("R version:", R.version.string), component = "startup")
+      cli::cli_alert_success("Logger initialized")
+    },
+    error = function(e) {
+      cli::cli_alert_warning(paste("Logger init failed:", e$message))
+    }
+  )
 
   # 5 Done ------------------------------------------------------------------
 

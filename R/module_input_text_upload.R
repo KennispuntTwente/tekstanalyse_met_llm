@@ -95,14 +95,18 @@ text_upload_server <- function(
       )
     })
 
-    observeEvent(input$txt_split_lines, {
-      req(file_type() == "txt")
-      req(input$txt_split_lines %in% c(lang()$t("Nee"), lang()$t("Ja")))
-      log_action(
-        "txt_split_lines_changed",
-        details = sprintf("value=%s", input$txt_split_lines)
-      )
-    }, ignoreInit = TRUE)
+    observeEvent(
+      input$txt_split_lines,
+      {
+        req(file_type() == "txt")
+        req(input$txt_split_lines %in% c(lang()$t("Nee"), lang()$t("Ja")))
+        log_action(
+          "txt_split_lines_changed",
+          details = sprintf("value=%s", input$txt_split_lines)
+        )
+      },
+      ignoreInit = TRUE
+    )
     # ---- Helpers ------------------------------------------------------------
     discard_empty <- function(x) {
       x <- x[!is.na(x)]
@@ -153,11 +157,14 @@ text_upload_server <- function(
     # ---- File upload --------------------------------------------------------
     observe({
       req(input$text_file)
-      
+
       # Log file upload
       log_info(
-        sprintf("File uploaded: name=%s, type=%s", 
-                input$text_file$name, tools::file_ext(input$text_file$name)),
+        sprintf(
+          "File uploaded: name=%s, type=%s",
+          input$text_file$name,
+          tools::file_ext(input$text_file$name)
+        ),
         component = "upload"
       )
 
@@ -388,7 +395,7 @@ text_upload_server <- function(
     observeEvent(input$filter_btn, {
       req(uploaded_data())
       req(!isTRUE(processing()))
-      
+
       log_action("filter_modal_opened")
 
       showModal(modalDialog(
@@ -528,9 +535,14 @@ text_upload_server <- function(
         col = if (file_type() == "txt") "text" else input$filter_col,
         vals = input$filter_vals
       ))
-      log_action("filter_applied", details = sprintf("col=%s, n_vals=%d", 
-                 if (file_type() == "txt") "text" else input$filter_col,
-                 length(input$filter_vals)))
+      log_action(
+        "filter_applied",
+        details = sprintf(
+          "col=%s, n_vals=%d",
+          if (file_type() == "txt") "text" else input$filter_col,
+          length(input$filter_vals)
+        )
+      )
       log_action("filter_modal_closed")
       removeModal()
     })

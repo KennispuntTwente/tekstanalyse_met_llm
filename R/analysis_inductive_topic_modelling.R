@@ -53,11 +53,15 @@ create_candidate_topics <- function(
   })
 
   candidate_topics <- candidate_topics |> purrr::flatten_chr()
-  
+
   # Log candidate topics generated
   tryCatch(
     log_info(
-      sprintf("Topic generation: n_chunks=%d, n_candidates=%d", length(text_chunks), length(candidate_topics)),
+      sprintf(
+        "Topic generation: n_chunks=%d, n_candidates=%d",
+        length(text_chunks),
+        length(candidate_topics)
+      ),
       component = "topics"
     ),
     error = function(e) NULL
@@ -475,7 +479,9 @@ reduce_topics <- function(
     log_info(
       sprintf(
         "Topic reduction complete: n_input=%d, n_output=%d, iterations=%d",
-        length(candidate_topics), length(current_topics), iteration
+        length(candidate_topics),
+        length(current_topics),
+        iteration
       ),
       component = "topics"
     ),

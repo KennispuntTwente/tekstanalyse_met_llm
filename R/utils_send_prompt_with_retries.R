@@ -34,7 +34,7 @@ send_prompt_with_retries <- function(
   result <- NULL
   call_start_time <- Sys.time()
   model_name <- llm_provider$parameters$model %||% "unknown"
-  
+
   # Log LLM call start
   tryCatch(
     log_debug(
@@ -65,11 +65,11 @@ send_prompt_with_retries <- function(
         if (tries == 1) {
           # Log initial prompt (debug only)
           tryCatch(
-             log_debug(
-               sprintf("Sending prompt to %s", model_name),
-               component = "llm_trace"
-             ),
-             error = function(e) NULL
+            log_debug(
+              sprintf("Sending prompt to %s", model_name),
+              component = "llm_trace"
+            ),
+            error = function(e) NULL
           )
         }
 
@@ -81,13 +81,15 @@ send_prompt_with_retries <- function(
           log_warn(
             sprintf(
               "LLM call failed (attempt %d/%d): %s",
-              tries, max_tries, conditionMessage(e)
+              tries,
+              max_tries,
+              conditionMessage(e)
             ),
             component = "llm"
           ),
           error = function(e2) NULL
         )
-        
+
         if (tries == max_tries) {
           stop(sprintf(
             "Error in LLM call after %d attempts: %s\nFinal error:\n%s",
@@ -110,7 +112,11 @@ send_prompt_with_retries <- function(
     # Log final failure
     tryCatch(
       log_error(
-        sprintf("LLM call failed after %d attempts: model=%s", max_tries, model_name),
+        sprintf(
+          "LLM call failed after %d attempts: model=%s",
+          max_tries,
+          model_name
+        ),
         component = "llm"
       ),
       error = function(e) NULL
@@ -141,14 +147,21 @@ send_prompt_with_retries <- function(
       }
     ))
   }
-  
+
   # Log successful LLM call
-  duration_ms <- as.numeric(difftime(Sys.time(), call_start_time, units = "secs")) * 1000
+  duration_ms <- as.numeric(difftime(
+    Sys.time(),
+    call_start_time,
+    units = "secs"
+  )) *
+    1000
   tryCatch(
     log_debug(
       sprintf(
         "LLM call success: model=%s, attempts=%d, duration=%.0fms",
-        model_name, tries, duration_ms
+        model_name,
+        tries,
+        duration_ms
       ),
       component = "llm"
     ),

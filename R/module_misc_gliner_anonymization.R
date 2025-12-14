@@ -317,7 +317,10 @@ gliner_server <- function(
           if (!is.vector(labels)) {
             labels <- c(labels)
           }
-          log_debug(sprintf("GLiNER labels: %s", paste(labels, collapse = ", ")), component = "gliner")
+          log_debug(
+            sprintf("GLiNER labels: %s", paste(labels, collapse = ", ")),
+            component = "gliner"
+          )
 
           log_action(
             "gliner_start_clicked",
@@ -330,12 +333,13 @@ gliner_server <- function(
 
           ## 2 Switch the modal to the “running” state
           module_state("running")
-          
+
           # Log GLiNER start with configured labels
           log_info(
             sprintf(
               "GLiNER detection started: n_texts=%d, n_labels=%d",
-              length(pii_texts()), length(labels)
+              length(pii_texts()),
+              length(labels)
             ),
             component = "gliner"
           )
@@ -435,7 +439,7 @@ gliner_server <- function(
               pii_predictions(predictions_clean)
               pii_eval(predictions_clean)
               module_state("evaluating")
-              
+
               # Log detection results
               log_info(
                 sprintf(
@@ -455,7 +459,10 @@ gliner_server <- function(
               progress$close()
               queue$consumer$stop()
 
-              log_error(paste("GLiNER error:", err$message), component = "gliner")
+              log_error(
+                paste("GLiNER error:", err$message),
+                component = "gliner"
+              )
 
               shiny::showNotification(
                 paste0(
@@ -757,12 +764,13 @@ gliner_server <- function(
           # Set the result and done status
           return$anonymized_texts <- anonymized_texts
           return$done <- TRUE
-          
+
           # Log anonymization saved
           log_info(
             sprintf(
               "GLiNER anonymization saved: n_texts=%d, n_entities_removed=%d",
-              length(anonymized_texts), return$number_of_pii_entities_removed
+              length(anonymized_texts),
+              return$number_of_pii_entities_removed
             ),
             component = "gliner"
           )

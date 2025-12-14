@@ -447,7 +447,10 @@ model_server <- function(
         update_temperature_ui(session, input, models, "main")
         update_top_p_ui(session, input, models, "large")
         main_provider_updated(Sys.time())
-        log_action("model_selected", details = sprintf("main=%s", input$main_model))
+        log_action(
+          "model_selected",
+          details = sprintf("main=%s", input$main_model)
+        )
       })
 
       observeEvent(input$large_model, {
@@ -470,7 +473,10 @@ model_server <- function(
         update_temperature_ui(session, input, models, "large")
         update_top_p_ui(session, input, models, "large")
         large_provider_updated(Sys.time())
-        log_action("model_selected", details = sprintf("large=%s", input$large_model))
+        log_action(
+          "model_selected",
+          details = sprintf("large=%s", input$large_model)
+        )
       })
 
       # Advanced model configuration modal -------------------------------------
@@ -785,7 +791,9 @@ model_server <- function(
         ) %...>%
           (function(res) {
             removeNotification(nid)
-            elapsed_ms <- as.integer(as.numeric(difftime(Sys.time(), t0, units = "secs")) * 1000)
+            elapsed_ms <- as.integer(
+              as.numeric(difftime(Sys.time(), t0, units = "secs")) * 1000
+            )
             log_action(
               "model_provider_test_succeeded",
               details = sprintf(
@@ -797,7 +805,11 @@ model_server <- function(
               )
             )
             log_info(
-              sprintf("Provider test success: which=%s, json=%s", which, use_json),
+              sprintf(
+                "Provider test success: which=%s, json=%s",
+                which,
+                use_json
+              ),
               component = "llm"
             )
             showNotification(
@@ -810,7 +822,9 @@ model_server <- function(
           }) %...!%
           (function(e) {
             removeNotification(nid)
-            elapsed_ms <- as.integer(as.numeric(difftime(Sys.time(), t0, units = "secs")) * 1000)
+            elapsed_ms <- as.integer(
+              as.numeric(difftime(Sys.time(), t0, units = "secs")) * 1000
+            )
             log_action(
               "model_provider_test_failed",
               details = sprintf(
@@ -823,7 +837,12 @@ model_server <- function(
               )
             )
             log_warn(
-              sprintf("Provider test failed: which=%s, json=%s, error=%s", which, use_json, e$message %||% as.character(e)),
+              sprintf(
+                "Provider test failed: which=%s, json=%s, error=%s",
+                which,
+                use_json,
+                e$message %||% as.character(e)
+              ),
               component = "llm"
             )
             app_error(

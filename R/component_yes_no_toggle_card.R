@@ -114,7 +114,11 @@ yes_no_toggle_card_server <- function(
               style = "display:flex; width:100%; align-items:center;",
               tags$div(
                 style = "flex:1; text-align:left;",
-                actionButton(ns("modal_close"), lang()$t("Sluiten"), class = "btn-secondary")
+                actionButton(
+                  ns("modal_close"),
+                  lang()$t("Sluiten"),
+                  class = "btn-secondary"
+                )
               ),
               tags$div(
                 style = "flex:1; text-align:center;",
@@ -210,7 +214,10 @@ yes_no_toggle_card_server <- function(
     observeEvent(input$toggle, {
       new_value <- input$toggle == lang()$t("Ja")
       toggle(new_value)
-      log_action("toggle_changed", details = sprintf("id=%s, value=%s", id, new_value))
+      log_action(
+        "toggle_changed",
+        details = sprintf("id=%s, value=%s", id, new_value)
+      )
     })
 
     # Disable when processing

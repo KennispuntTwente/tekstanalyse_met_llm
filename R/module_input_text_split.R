@@ -230,14 +230,18 @@ text_split_server <- function(
       shinyjs::disable("split_texts")
       # Set message
       semchunk_message(lang()$t("..."))
-      
+
       # Log split action start
       log_info(
-        sprintf("Text split started: max_tokens=%d, overlap=%d, n_texts=%d",
-                input$max_tokens, input$overlap %||% 0, length(raw_texts())),
+        sprintf(
+          "Text split started: max_tokens=%d, overlap=%d, n_texts=%d",
+          input$max_tokens,
+          input$overlap %||% 0,
+          length(raw_texts())
+        ),
         component = "split"
       )
-      
+
       # Start queue consumer
       queue$consumer$start(millis = 50)
 
@@ -311,7 +315,10 @@ text_split_server <- function(
         } %...!%
         {
           error <- .
-          log_error(paste("Text split error:", error$message %||% as.character(error)), component = "split")
+          log_error(
+            paste("Text split error:", error$message %||% as.character(error)),
+            component = "split"
+          )
 
           split_in_progress(FALSE)
           split_texts(NULL)
@@ -338,40 +345,56 @@ text_split_server <- function(
     })
 
     # Ensure max_tokens value stays valid
-    observeEvent(input$max_tokens, {
-      req(input$max_tokens)
-      req(isTRUE(enabled))
+    observeEvent(
+      input$max_tokens,
+      {
+        req(input$max_tokens)
+        req(isTRUE(enabled))
 
-      new_val <- max(1, input$max_tokens)
-      max_tokens_val(new_val)
+        new_val <- max(1, input$max_tokens)
+        max_tokens_val(new_val)
 
-      if (input$max_tokens != new_val) {
-        updateNumericInput(session, "max_tokens", value = new_val)
-      }
+        if (input$max_tokens != new_val) {
+          updateNumericInput(session, "max_tokens", value = new_val)
+        }
 
-      log_action(
-        "max_tokens_changed",
-        details = sprintf("splitting=%s value=%d", isTRUE(splitting()), new_val)
-      )
-    }, ignoreInit = TRUE)
+        log_action(
+          "max_tokens_changed",
+          details = sprintf(
+            "splitting=%s value=%d",
+            isTRUE(splitting()),
+            new_val
+          )
+        )
+      },
+      ignoreInit = TRUE
+    )
 
     # Ensure overlap value stays valid
-    observeEvent(input$overlap, {
-      req(input$overlap)
-      req(isTRUE(enabled))
+    observeEvent(
+      input$overlap,
+      {
+        req(input$overlap)
+        req(isTRUE(enabled))
 
-      new_val <- max(0, input$overlap)
-      overlap_val(new_val)
+        new_val <- max(0, input$overlap)
+        overlap_val(new_val)
 
-      if (input$overlap != new_val) {
-        updateNumericInput(session, "overlap", value = new_val)
-      }
+        if (input$overlap != new_val) {
+          updateNumericInput(session, "overlap", value = new_val)
+        }
 
-      log_action(
-        "overlap_changed",
-        details = sprintf("splitting=%s value=%d", isTRUE(splitting()), new_val)
-      )
-    }, ignoreInit = TRUE)
+        log_action(
+          "overlap_changed",
+          details = sprintf(
+            "splitting=%s value=%d",
+            isTRUE(splitting()),
+            new_val
+          )
+        )
+      },
+      ignoreInit = TRUE
+    )
 
     # Disable inputs when processing -------------------------------
 

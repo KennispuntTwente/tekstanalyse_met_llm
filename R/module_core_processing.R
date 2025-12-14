@@ -236,7 +236,11 @@ processing_server <- function(
               progress_primary$set_with_total(i, length(texts), text)
               if (i == 1 || i %% 5 == 0 || i == length(texts)) {
                 log_info(
-                  sprintf("Categorization/Scoring progress: %d/%d", i, length(texts)),
+                  sprintf(
+                    "Categorization/Scoring progress: %d/%d",
+                    i,
+                    length(texts)
+                  ),
                   component = "analysis"
                 )
               }
@@ -401,7 +405,9 @@ processing_server <- function(
             llm_stream$async$stop()
             llm_stream$hide()
 
-            err_msg <- tryCatch(conditionMessage(.), error = function(e) as.character(.))
+            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
+              as.character(.)
+            })
             err_msg <- substr(err_msg, 1, 200)
             err_class <- paste(class(.), collapse = "|")
             log_action(
@@ -421,7 +427,10 @@ processing_server <- function(
               lang = lang()
             )
           }
-        log_debug("Started async processing for categorization/scoring", component = "analysis")
+        log_debug(
+          "Started async processing for categorization/scoring",
+          component = "analysis"
+        )
       })
 
       # Helper function to check if categories are valid
@@ -506,7 +515,10 @@ processing_server <- function(
         shinyjs::addClass("process", "loading")
 
         # Step 1: Generate candidate topics
-        log_info("Step 1/5: Generating candidate topics...", component = "analysis")
+        log_info(
+          "Step 1/5: Generating candidate topics...",
+          component = "analysis"
+        )
         progress_primary$set_with_total(
           1,
           5,
@@ -628,7 +640,9 @@ processing_server <- function(
           {
             llm_stream$hide()
 
-            err_msg <- tryCatch(conditionMessage(.), error = function(e) as.character(.))
+            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
+              as.character(.)
+            })
             err_msg <- substr(err_msg, 1, 200)
             err_class <- paste(class(.), collapse = "|")
             log_action(
@@ -648,7 +662,10 @@ processing_server <- function(
               lang = lang()
             )
           }
-        log_debug("Started async processing for topic modelling (step 1-2)", component = "analysis")
+        log_debug(
+          "Started async processing for topic modelling (step 1-2)",
+          component = "analysis"
+        )
       })
 
       ## >> Topics generated; editing --------------------------------
@@ -724,8 +741,11 @@ processing_server <- function(
         }
 
         log_info(
-          sprintf("Starting topic assignment: n_topics=%d, topics=%s",
-                  length(topics()), paste(topics(), collapse = ", ")),
+          sprintf(
+            "Starting topic assignment: n_topics=%d, topics=%s",
+            length(topics()),
+            paste(topics(), collapse = ", ")
+          ),
           component = "analysis"
         )
 
@@ -969,7 +989,9 @@ processing_server <- function(
             llm_stream$async$stop()
             llm_stream$hide()
 
-            err_msg <- tryCatch(conditionMessage(.), error = function(e) as.character(.))
+            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
+              as.character(.)
+            })
             err_msg <- substr(err_msg, 1, 200)
             err_class <- paste(class(.), collapse = "|")
             log_action(
@@ -989,7 +1011,10 @@ processing_server <- function(
               lang = lang()
             )
           }
-        log_debug("Started async processing for topic modelling (step 3-4)", component = "analysis")
+        log_debug(
+          "Started async processing for topic modelling (step 3-4)",
+          component = "analysis"
+        )
       })
 
       ## Markeren ----------------------------------------------------
@@ -1153,7 +1178,9 @@ processing_server <- function(
             llm_stream$async$stop()
             llm_stream$hide()
 
-            err_msg <- tryCatch(conditionMessage(.), error = function(e) as.character(.))
+            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
+              as.character(.)
+            })
             err_msg <- substr(err_msg, 1, 200)
             err_class <- paste(class(.), collapse = "|")
             log_action(
@@ -1228,10 +1255,14 @@ processing_server <- function(
 
         # Update UI to show finished processing
         progress_primary$async$stop()
-        
+
         # Log analysis completion
         if (exists("analysis_start_time")) {
-          duration_secs <- as.numeric(difftime(Sys.time(), analysis_start_time, units = "secs"))
+          duration_secs <- as.numeric(difftime(
+            Sys.time(),
+            analysis_start_time,
+            units = "secs"
+          ))
           log_analysis_complete(
             mode = mode(),
             duration_secs = duration_secs,
@@ -1239,7 +1270,7 @@ processing_server <- function(
             success = TRUE
           )
         }
-        
+
         progress_primary$set(
           100,
           paste0(
@@ -1492,7 +1523,9 @@ processing_server <- function(
           return()
         }
 
-        zip_bytes <- tryCatch(file.size(zip_file()), error = function(e) NA_integer_)
+        zip_bytes <- tryCatch(file.size(zip_file()), error = function(e) {
+          NA_integer_
+        })
 
         log_info(
           sprintf(
@@ -1511,7 +1544,9 @@ processing_server <- function(
             paste0(uuid, ".zip")
           },
           content = function(file) {
-            zip_bytes <- tryCatch(file.size(zip_file()), error = function(e) NA_integer_)
+            zip_bytes <- tryCatch(file.size(zip_file()), error = function(e) {
+              NA_integer_
+            })
             log_action(
               "results_download_started",
               details = sprintf(
@@ -1568,7 +1603,10 @@ processing_server <- function(
       # Restart button listener
       # Launches modal dialog to confirm restart
       observeEvent(input$restart, {
-        log_action("analysis_restart_modal_opened", details = sprintf("mode=%s", mode() %||% "unknown"))
+        log_action(
+          "analysis_restart_modal_opened",
+          details = sprintf("mode=%s", mode() %||% "unknown")
+        )
         showModal(modalDialog(
           title = lang()$t("Nieuwe analyse starten?"),
           lang()$t("Zorg dat je eerst de resultaten downloadt."),
@@ -1584,7 +1622,10 @@ processing_server <- function(
       # Confirm restart button listener
       # Reloads the app
       observeEvent(input$confirm_restart, {
-        log_action("analysis_restart_confirmed", details = sprintf("mode=%s", mode() %||% "unknown"))
+        log_action(
+          "analysis_restart_confirmed",
+          details = sprintf("mode=%s", mode() %||% "unknown")
+        )
         log_action("analysis_restart", details = mode())
         removeModal()
         session$reload()
@@ -1938,7 +1979,10 @@ processing_server <- function(
       observeEvent(input$cancel, {
         req(isTRUE(processing()))
 
-        log_action("analysis_cancel_clicked", details = sprintf("mode=%s", mode() %||% "unknown"))
+        log_action(
+          "analysis_cancel_clicked",
+          details = sprintf("mode=%s", mode() %||% "unknown")
+        )
 
         # Show modal dialog to confirm cancellation
         removeModal()
@@ -1958,7 +2002,10 @@ processing_server <- function(
       observeEvent(input$confirm_cancel, {
         req(isTRUE(processing()))
 
-        log_action("analysis_cancel_confirmed", details = sprintf("mode=%s", mode() %||% "unknown"))
+        log_action(
+          "analysis_cancel_confirmed",
+          details = sprintf("mode=%s", mode() %||% "unknown")
+        )
 
         log_analysis_interrupted(mode = mode(), reason = "user cancelled")
         removeModal()

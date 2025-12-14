@@ -55,8 +55,11 @@ edit_topics_server <- function(
         req(is.null(edited_topics()))
 
         topics_table_data(build_df(topics(), exclusive_topics()))
-        
-        log_action("edit_topics_modal_opened", details = sprintf("n_topics=%d", length(topics())))
+
+        log_action(
+          "edit_topics_modal_opened",
+          details = sprintf("n_topics=%d", length(topics()))
+        )
 
         showModal(modalDialog(
           title = lang()$t("Onderwerpen"),
@@ -195,7 +198,11 @@ edit_topics_server <- function(
         df2 <- df[df$topic != "", , drop = FALSE]
         log_action(
           "topic_empty_rows_deleted",
-          details = sprintf("n_rows_before=%d n_rows_after=%d", n_before, nrow(df2))
+          details = sprintf(
+            "n_rows_before=%d n_rows_after=%d",
+            n_before,
+            nrow(df2)
+          )
         )
         topics_table_data(df2)
       })
@@ -255,7 +262,7 @@ edit_topics_server <- function(
         log_action("edit_topics_modal_closed")
         removeModal()
         edited_topics(updated_topics)
-        
+
         # Log topic editing result
         log_info(
           sprintf(
@@ -289,10 +296,13 @@ edit_topics_server <- function(
         )
         reduction_in_progress(TRUE)
         rereduced_topics(NULL)
-        
+
         # Log topic re-reduction start
         log_info(
-          sprintf("Topics re-reduction started: n_topics=%d", length(updated_topics)),
+          sprintf(
+            "Topics re-reduction started: n_topics=%d",
+            length(updated_topics)
+          ),
           component = "topics"
         )
 
@@ -310,7 +320,7 @@ edit_topics_server <- function(
               logger__retention = log_opts$retention
             )
             try(log_init(), silent = TRUE)
-            
+
             reduce_topics(
               updated_topics,
               research_background,
@@ -379,10 +389,13 @@ edit_topics_server <- function(
 
         topics_table_data(build_df(new_topics, current_exclusive))
         reduction_in_progress(FALSE)
-        
+
         # Log topic re-reduction result
         log_info(
-          sprintf("Topics re-reduction complete: n_final=%d", length(new_topics)),
+          sprintf(
+            "Topics re-reduction complete: n_final=%d",
+            length(new_topics)
+          ),
           component = "topics"
         )
       })

@@ -421,7 +421,10 @@ context_window_server <- function(
         )
 
         prev <- prev_states()
-        if (!identical(current_states$any_fit_problem, prev$any_fit_problem) && !is.null(current_states$any_fit_problem)) {
+        if (
+          !identical(current_states$any_fit_problem, prev$any_fit_problem) &&
+            !is.null(current_states$any_fit_problem)
+        ) {
           log_action(
             "context_window_fit_problem_changed",
             details = sprintf(
@@ -434,7 +437,10 @@ context_window_server <- function(
           )
         }
 
-        if (!identical(current_states$too_many_chunks, prev$too_many_chunks) && !is.null(current_states$too_many_chunks)) {
+        if (
+          !identical(current_states$too_many_chunks, prev$too_many_chunks) &&
+            !is.null(current_states$too_many_chunks)
+        ) {
           log_action(
             "too_many_chunks_changed",
             details = sprintf(
@@ -447,7 +453,10 @@ context_window_server <- function(
           )
         }
 
-        if (!identical(current_states$n_chunks, prev$n_chunks) && !is.null(current_states$n_chunks)) {
+        if (
+          !identical(current_states$n_chunks, prev$n_chunks) &&
+            !is.null(current_states$n_chunks)
+        ) {
           log_action(
             "n_chunks_changed",
             details = sprintf(

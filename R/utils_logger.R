@@ -31,7 +31,6 @@
 #' log_analysis_progress(current = 10, total = 50, step = "categorizing")
 #' log_analysis_complete(mode = "Categorisatie", duration_secs = 120, n_texts = 50)
 
-
 # 1 Internal state ------------------------------------------------------------
 
 # Store logger state in an environment to avoid global variables
@@ -56,7 +55,7 @@
 log_init <- function(
   level = getOption("logger__level", "INFO"),
   log_dir = getOption("logger__dir", "logs"),
- retention = getOption("logger__retention", NULL),
+  retention = getOption("logger__retention", NULL),
   mode = "unknown"
 ) {
   log_dir_abs <- tryCatch(
@@ -89,7 +88,10 @@ log_init <- function(
     logger::log_threshold(log_level)
 
     # Set up file appender with daily rotation
-    log_file <- file.path(log_dir_abs, paste0(format(Sys.Date(), "%Y-%m-%d"), ".log"))
+    log_file <- file.path(
+      log_dir_abs,
+      paste0(format(Sys.Date(), "%Y-%m-%d"), ".log")
+    )
 
     logger::log_appender(
       logger::appender_tee(log_file),
@@ -128,7 +130,7 @@ log_init <- function(
     .logger_env$use_logger_pkg <- FALSE
     .logger_env$level <- toupper(level)
   }
-  
+
   # Apply retention policy (clean old logs)
   if (!is.null(retention) && is.numeric(retention) && retention > 0) {
     .apply_retention_policy(log_dir_abs, retention)
@@ -146,7 +148,9 @@ get_app_mode <- function() {
     mode <- .logger_env$app_mode
   }
 
-  if (!is.null(mode) && is.character(mode) && length(mode) == 1 && nzchar(mode)) {
+  if (
+    !is.null(mode) && is.character(mode) && length(mode) == 1 && nzchar(mode)
+  ) {
     return(mode)
   }
 
@@ -196,7 +200,7 @@ get_session_id <- function() {
     # Sort by modification time (oldest first)
     file_info <- file.info(log_files)
     sorted_files <- log_files[order(file_info$mtime)]
-    
+
     # Remove oldest files
     files_to_remove <- head(sorted_files, length(log_files) - retention)
     file.remove(files_to_remove)
@@ -224,7 +228,12 @@ get_session_id <- function() {
     if (exists("log_dir_abs", envir = .logger_env, inherits = FALSE)) {
       log_dir_abs <- .logger_env$log_dir_abs
     }
-    if (!is.null(log_dir_abs) && is.character(log_dir_abs) && length(log_dir_abs) == 1 && nzchar(log_dir_abs)) {
+    if (
+      !is.null(log_dir_abs) &&
+        is.character(log_dir_abs) &&
+        length(log_dir_abs) == 1 &&
+        nzchar(log_dir_abs)
+    ) {
       if (!dir.exists(log_dir_abs)) {
         dir.create(log_dir_abs, recursive = TRUE, showWarnings = FALSE)
       }
@@ -245,21 +254,32 @@ get_session_id <- function() {
     current_level <- levels[.logger_env$level]
     msg_level <- levels[toupper(level)]
 
-    if (is.na(msg_level)) msg_level <- 2
-    if (is.na(current_level)) current_level <- 2
+    if (is.na(msg_level)) {
+      msg_level <- 2
+    }
+    if (is.na(current_level)) {
+      current_level <- 2
+    }
 
     if (msg_level >= current_level) {
       timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
       session_id <- get_session_id()
-      log_line <- sprintf("[%s] [%s] [%s] [%s] %s", timestamp, session_id, level, component, message)
-      
+      log_line <- sprintf(
+        "[%s] [%s] [%s] [%s] %s",
+        timestamp,
+        session_id,
+        level,
+        component,
+        message
+      )
+
       # Write to file
       log_file <- file.path(
         .logger_env$log_dir,
         paste0(format(Sys.Date(), "%Y-%m-%d"), ".log")
       )
       cat(log_line, "\n", file = log_file, append = TRUE)
-      
+
       # Also print to console
       message(log_line)
     }
@@ -350,7 +370,12 @@ log_session_end <- function(session_id) {
 #' @export
 log_analysis_start <- function(mode, n_texts, model) {
   log_info(
-    sprintf("Analysis started: mode=%s, texts=%d, model=%s", mode, n_texts, model),
+    sprintf(
+      "Analysis started: mode=%s, texts=%d, model=%s",
+      mode,
+      n_texts,
+      model
+    ),
     component = "analysis"
   )
 }
@@ -377,12 +402,20 @@ log_analysis_progress <- function(current, total, step = "processing") {
 #' @param n_texts Number of texts processed
 #' @param success Whether analysis completed successfully
 #' @export
-log_analysis_complete <- function(mode, duration_secs, n_texts, success = TRUE) {
+log_analysis_complete <- function(
+  mode,
+  duration_secs,
+  n_texts,
+  success = TRUE
+) {
   status <- if (success) "completed" else "failed"
   log_info(
     sprintf(
       "Analysis %s: mode=%s, texts=%d, duration=%.1fs",
-      status, mode, n_texts, duration_secs
+      status,
+      mode,
+      n_texts,
+      duration_secs
     ),
     component = "analysis"
   )
@@ -395,7 +428,7 @@ log_analysis_complete <- function(mode, duration_secs, n_texts, success = TRUE) 
 #' @param reason Reason for interruption
 #' @export
 log_analysis_interrupted <- function(mode, reason = "user requested") {
-log_warn(
+  log_warn(
     sprintf("Analysis interrupted: mode=%s, reason=%s", mode, reason),
     component = "analysis"
   )
