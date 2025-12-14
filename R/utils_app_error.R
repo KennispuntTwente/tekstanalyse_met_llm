@@ -141,7 +141,6 @@ app_error <- function(
         p(lang$t(
           "Er gebeurde iets onverwachts, waardoor de app is gestopt. Sorry!"
         )),
-        p(tags$strong("Session ID:"), session_id),
         hr(),
         pre(log_message),
         hr(),
