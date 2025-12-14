@@ -31,15 +31,17 @@ test_that("fallback logging writes to file and emits a message", {
 
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-")
 
-  options(kwallm__logger_state = list(
-    initialized = TRUE,
-    use_logger_pkg = FALSE,
-    level = "DEBUG",
-    log_dir = log_dir,
-    log_dir_abs = log_dir,
-    retention = NULL,
-    app_mode = "test"
-  ))
+  options(
+    kwallm__logger_state = list(
+      initialized = TRUE,
+      use_logger_pkg = FALSE,
+      level = "DEBUG",
+      log_dir = log_dir,
+      log_dir_abs = log_dir,
+      retention = NULL,
+      app_mode = "test"
+    )
+  )
 
   expect_message(
     log_info("hello world", component = "unit"),
@@ -60,15 +62,17 @@ test_that("log_error(fatal = TRUE) prefixes message", {
 
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-")
 
-  options(kwallm__logger_state = list(
-    initialized = TRUE,
-    use_logger_pkg = FALSE,
-    level = "DEBUG",
-    log_dir = log_dir,
-    log_dir_abs = log_dir,
-    retention = NULL,
-    app_mode = "test"
-  ))
+  options(
+    kwallm__logger_state = list(
+      initialized = TRUE,
+      use_logger_pkg = FALSE,
+      level = "DEBUG",
+      log_dir = log_dir,
+      log_dir_abs = log_dir,
+      retention = NULL,
+      app_mode = "test"
+    )
+  )
 
   expect_message(
     log_error("boom", component = "unit", fatal = TRUE),
@@ -90,15 +94,17 @@ test_that("analysis progress uses DEBUG level and analysis component", {
 
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-")
 
-  options(kwallm__logger_state = list(
-    initialized = TRUE,
-    use_logger_pkg = FALSE,
-    level = "DEBUG",
-    log_dir = log_dir,
-    log_dir_abs = log_dir,
-    retention = NULL,
-    app_mode = "test"
-  ))
+  options(
+    kwallm__logger_state = list(
+      initialized = TRUE,
+      use_logger_pkg = FALSE,
+      level = "DEBUG",
+      log_dir = log_dir,
+      log_dir_abs = log_dir,
+      retention = NULL,
+      app_mode = "test"
+    )
+  )
 
   expect_message(
     log_analysis_progress(current = 1, total = 3, step = "categorizing"),

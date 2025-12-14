@@ -149,7 +149,9 @@ log_init <- function(
         .timestamp = Sys.time()
       ) {
         session_id <- tryCatch(get_session_id(), error = function(e) "system")
-        async_label <- tryCatch(get_log_async_label(), error = function(e) "sync")
+        async_label <- tryCatch(get_log_async_label(), error = function(e) {
+          "sync"
+        })
 
         level_label <- tryCatch(
           {
@@ -227,10 +229,17 @@ log_worker_init <- function(
     {
       # Kept for backward-compat: this used to `source()` utils_logger.R.
       # The new implementation is worker-safe without sourcing.
-      if (!is.null(session_id) && is.character(session_id) && length(session_id) == 1 && nzchar(session_id)) {
+      if (
+        !is.null(session_id) &&
+          is.character(session_id) &&
+          length(session_id) == 1 &&
+          nzchar(session_id)
+      ) {
         options(kwallm__log_session_id = substr(session_id, 1, 8))
       }
-      if (!is.null(is_async)) options(kwallm__log_is_async = isTRUE(is_async))
+      if (!is.null(is_async)) {
+        options(kwallm__log_is_async = isTRUE(is_async))
+      }
 
       st <- .logger_state_get()
       if (!isTRUE(st$initialized)) {
@@ -329,7 +338,11 @@ log_context_capture <- function(
       dir = getOption("logger__dir", "logs"),
       retention = getOption("logger__retention", NULL),
       mode = mode,
-      session_id = substr(as.character(.null_coalesce(session_id, "system")), 1, 8),
+      session_id = substr(
+        as.character(.null_coalesce(session_id, "system")),
+        1,
+        8
+      ),
       is_async = isTRUE(is_async)
     ),
     class = "kwallm_log_context"
@@ -348,26 +361,39 @@ log_context_capture <- function(
 log_context_apply <- function(ctx) {
   tryCatch(
     {
-      if (is.null(ctx) || !is.list(ctx)) return(invisible(NULL))
+      if (is.null(ctx) || !is.list(ctx)) {
+        return(invisible(NULL))
+      }
 
       if (!is.null(ctx$session_id)) {
-        options(kwallm__log_session_id = substr(as.character(ctx$session_id), 1, 8))
+        options(
+          kwallm__log_session_id = substr(as.character(ctx$session_id), 1, 8)
+        )
       }
       if (!is.null(ctx$is_async)) {
         options(kwallm__log_is_async = isTRUE(ctx$is_async))
       }
 
       # Ensure log_init sees the same config in any session.
-      if (!is.null(ctx$level)) options(logger__level = ctx$level)
-      if (!is.null(ctx$dir)) options(logger__dir = ctx$dir)
-      if (!is.null(ctx$retention)) options(logger__retention = ctx$retention)
+      if (!is.null(ctx$level)) {
+        options(logger__level = ctx$level)
+      }
+      if (!is.null(ctx$dir)) {
+        options(logger__dir = ctx$dir)
+      }
+      if (!is.null(ctx$retention)) {
+        options(logger__retention = ctx$retention)
+      }
 
       st <- .logger_state_get()
       if (!isTRUE(st$initialized)) {
         log_init(
           level = .null_coalesce(ctx$level, getOption("logger__level", "INFO")),
           log_dir = .null_coalesce(ctx$dir, getOption("logger__dir", "logs")),
-          retention = .null_coalesce(ctx$retention, getOption("logger__retention", NULL)),
+          retention = .null_coalesce(
+            ctx$retention,
+            getOption("logger__retention", NULL)
+          ),
           mode = .null_coalesce(ctx$mode, getOption("app__mode", "unknown"))
         )
       }
@@ -494,7 +520,9 @@ log_info <- function(message, component = "app") {
     error = function(e) {
       timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
       session_id <- tryCatch(get_session_id(), error = function(e2) "system")
-      async_label <- tryCatch(get_log_async_label(), error = function(e2) "sync")
+      async_label <- tryCatch(get_log_async_label(), error = function(e2) {
+        "sync"
+      })
       base::message(sprintf(
         "[%s] [%s] [%s] [%s] [%s] %s",
         timestamp,
@@ -521,7 +549,9 @@ log_debug <- function(message, component = "app") {
     error = function(e) {
       timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
       session_id <- tryCatch(get_session_id(), error = function(e2) "system")
-      async_label <- tryCatch(get_log_async_label(), error = function(e2) "sync")
+      async_label <- tryCatch(get_log_async_label(), error = function(e2) {
+        "sync"
+      })
       base::message(sprintf(
         "[%s] [%s] [%s] [%s] [%s] %s",
         timestamp,
@@ -548,7 +578,9 @@ log_warn <- function(message, component = "app") {
     error = function(e) {
       timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
       session_id <- tryCatch(get_session_id(), error = function(e2) "system")
-      async_label <- tryCatch(get_log_async_label(), error = function(e2) "sync")
+      async_label <- tryCatch(get_log_async_label(), error = function(e2) {
+        "sync"
+      })
       base::message(sprintf(
         "[%s] [%s] [%s] [%s] [%s] %s",
         timestamp,
@@ -578,7 +610,9 @@ log_error <- function(message, component = "app", fatal = FALSE) {
     error = function(e) {
       timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S%z")
       session_id <- tryCatch(get_session_id(), error = function(e2) "system")
-      async_label <- tryCatch(get_log_async_label(), error = function(e2) "sync")
+      async_label <- tryCatch(get_log_async_label(), error = function(e2) {
+        "sync"
+      })
       base::message(sprintf(
         "[%s] [%s] [%s] [%s] [%s] %s",
         timestamp,

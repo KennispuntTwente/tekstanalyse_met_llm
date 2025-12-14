@@ -361,7 +361,10 @@ gliner_server <- function(
           queue$consumer$start(millis = 250)
 
           session_id <- get_session_id()
-          log_ctx <- log_context_capture(session_id = session_id, is_async = TRUE)
+          log_ctx <- log_context_capture(
+            session_id = session_id,
+            is_async = TRUE
+          )
 
           ## 4 Spawn the future that runs GLiNER model on texts
           future(
