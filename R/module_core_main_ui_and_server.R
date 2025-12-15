@@ -79,15 +79,15 @@ main_server <- function(
 
     update_section_nav_buttons <- function(i) {
       if (i <= 1L) {
-        shinyjs::hide("kwallm_sections_prev")
+        shinyjs::runjs("$('#kwallm_sections_prev').css('visibility', 'hidden');")
       } else {
-        shinyjs::show("kwallm_sections_prev")
+        shinyjs::runjs("$('#kwallm_sections_prev').css('visibility', 'visible');")
       }
 
       if (i >= n_sections) {
-        shinyjs::hide("kwallm_sections_next")
+        shinyjs::runjs("$('#kwallm_sections_next').css('visibility', 'hidden');")
       } else {
-        shinyjs::show("kwallm_sections_next")
+        shinyjs::runjs("$('#kwallm_sections_next').css('visibility', 'visible');")
       }
     }
 
