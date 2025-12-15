@@ -78,17 +78,8 @@ main_server <- function(
     }
 
     update_section_nav_buttons <- function(i) {
-      if (i <= 1L) {
-        shinyjs::runjs("$('#kwallm_sections_prev').css('visibility', 'hidden');")
-      } else {
-        shinyjs::runjs("$('#kwallm_sections_prev').css('visibility', 'visible');")
-      }
-
-      if (i >= n_sections) {
-        shinyjs::runjs("$('#kwallm_sections_next').css('visibility', 'hidden');")
-      } else {
-        shinyjs::runjs("$('#kwallm_sections_next').css('visibility', 'visible');")
-      }
+      # Button visibility is now handled client-side in JavaScript for instant updates
+      # See style_css_js.R kwallmUpdateNavButtons()
     }
 
     # Progress UI (only shown in "sections" mode) ----------------------------
@@ -207,6 +198,15 @@ main_server <- function(
         session = session,
         inputId = "kwallm_sections_step",
         selected = as.character(cur + 1L)
+      )
+    }, ignoreInit = TRUE)
+
+    # Go to processing section button handler
+    observeEvent(input$kwallm_goto_processing, {
+      shinyWidgets::updateRadioGroupButtons(
+        session = session,
+        inputId = "kwallm_sections_step",
+        selected = as.character(n_sections)
       )
     }, ignoreInit = TRUE)
 
@@ -377,6 +377,38 @@ main_server <- function(
                   "kwallm_sections_next",
                   lang()$t("Volgende"),
                   class = "btn btn-primary btn-sm"
+                )
+              ),
+              # Floating processing status (visible when processing and not on section 5)
+              div(
+                id = "kwallm_floating_processing",
+                class = "kwallm-floating-processing",
+                style = "display: none;",
+                tags$hr(style = "margin: 0.75rem 0;"),
+                div(
+                  class = "d-flex align-items-center gap-2",
+                  div(
+                    class = "flex-grow-1",
+                    div(
+                      id = "kwallm_floating_progress_bar",
+                      class = "progress",
+                      style = "height: 0.5rem;",
+                      div(
+                        id = "kwallm_floating_progress_fill",
+                        class = "progress-bar",
+                        role = "progressbar",
+                        style = "width: 0%;",
+                        `aria-valuenow` = "0",
+                        `aria-valuemin` = "0",
+                        `aria-valuemax` = "100"
+                      )
+                    )
+                  ),
+                  actionButton(
+                    "kwallm_goto_processing",
+                    lang()$t("Bekijk"),
+                    class = "btn btn-outline-primary btn-sm"
+                  )
                 )
               )
             ),
@@ -607,6 +639,17 @@ main_server <- function(
       context_window = context_window,
       lang = lang
     )
+
+    # Show/hide floating processing panel based on processing state and section
+    observe({
+      is_processing <- isTRUE(processing())
+      is_sections_mode <- identical(input$kwallm_layout_view, "sections")
+      not_on_last_section <- current_section() < n_sections
+
+      show_floating <- is_processing && is_sections_mode && not_on_last_section
+
+      session$sendCustomMessage("kwallm_floating_processing", list(show = show_floating))
+    })
 
     # 6 Language -----------------------------------------------------
     lang <- language_server("language", processing)

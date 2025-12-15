@@ -263,6 +263,16 @@ css_js_head <- function() {
         transition: width 0.35s ease-out;
       }
 
+      /* Floating processing status in nav bar */
+      .kwallm-floating-processing .progress {
+        background-color: #e9ecef;
+        border-radius: 0.25rem;
+      }
+
+      .kwallm-floating-processing .progress-bar {
+        transition: width 0.35s ease-out;
+      }
+
       @keyframes kwallm-slide-in-right {
         from { opacity: 0; transform: translateX(18px); }
         to   { opacity: 1; transform: translateX(0); }
@@ -343,10 +353,45 @@ css_js_head <- function() {
         e.preventDefault();
         var btnId = e.key === 'ArrowLeft' ? 'kwallm_sections_prev' : 'kwallm_sections_next';
         var btn = $('#' + btnId);
-        if (btn.length && !btn.prop('disabled')) {
+        if (btn.length && btn.css('visibility') !== 'hidden') {
           btn.click();
           btn.blur(); // Don't leave focus on the nav button either
         }
+      });
+
+      // KWALLM: Update prev/next button visibility immediately on section change (client-side)
+      var kwallmNumSections = 5;
+      function kwallmUpdateNavButtons(sectionNum) {
+        var prevBtn = $('#kwallm_sections_prev');
+        var nextBtn = $('#kwallm_sections_next');
+        if (sectionNum <= 1) {
+          prevBtn.css('visibility', 'hidden');
+        } else {
+          prevBtn.css('visibility', 'visible');
+        }
+        if (sectionNum >= kwallmNumSections) {
+          nextBtn.css('visibility', 'hidden');
+        } else {
+          nextBtn.css('visibility', 'visible');
+        }
+      }
+
+      // Listen for section step button changes
+      $(document).on('change', 'input[name=kwallm_sections_step]', function() {
+        var val = parseInt($(this).val(), 10);
+        if (!isNaN(val)) {
+          kwallmUpdateNavButtons(val);
+        }
+      });
+
+      // Also run on initial load if in sections mode
+      $(document).on('shiny:connected', function() {
+        setTimeout(function() {
+          var checkedStep = $('input[name=kwallm_sections_step]:checked').val();
+          if (checkedStep) {
+            kwallmUpdateNavButtons(parseInt(checkedStep, 10));
+          }
+        }, 100);
       });
 
       // KWALLM: Persist layout preference in localStorage
@@ -363,6 +408,37 @@ css_js_head <- function() {
         var val = $(this).val();
         if (val) {
           localStorage.setItem('kwallm_layout_view', val);
+        }
+      });
+
+      // KWALLM: Sync floating progress bar with main progress bar
+      // Watch for changes to the main progress bar and update the floating one
+      var kwallmProcessingObserver = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+            var mainBar = document.getElementById('progress_primary-bar');
+            var floatingBar = document.getElementById('kwallm_floating_progress_fill');
+            if (mainBar && floatingBar) {
+              floatingBar.style.width = mainBar.style.width;
+            }
+          }
+        });
+      });
+
+      // Start observing when DOM is ready
+      $(document).on('shiny:connected', function() {
+        var mainBar = document.getElementById('progress_primary-bar');
+        if (mainBar) {
+          kwallmProcessingObserver.observe(mainBar, { attributes: true, attributeFilter: ['style'] });
+        }
+      });
+
+      // KWALLM: Show/hide floating processing based on section and processing state
+      // Custom message handler from R
+      Shiny.addCustomMessageHandler('kwallm_floating_processing', function(message) {
+        var floatingPanel = document.getElementById('kwallm_floating_processing');
+        if (floatingPanel) {
+          floatingPanel.style.display = message.show ? '' : 'none';
         }
       });
     "
