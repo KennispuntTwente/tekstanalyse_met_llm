@@ -421,6 +421,23 @@ css_js_head <- function() {
           localStorage.setItem('kwallm_layout_view', val);
         }
       });
+
+      // KWALLM: Update progress bar smoothly (without DOM replacement)
+      Shiny.addCustomMessageHandler('kwallm_sections_progress_update', function(message) {
+        try {
+          var bar = document.getElementById('kwallm_sections_progress_bar');
+          var text = document.getElementById('kwallm_sections_progress_text');
+          if (bar) {
+            bar.style.width = message.pct + '%';
+            bar.setAttribute('aria-valuenow', message.pct);
+          }
+          if (text) {
+            text.textContent = message.text;
+          }
+        } catch (e) {
+          // no-op
+        }
+      });
     "
     ))
   )

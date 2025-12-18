@@ -77,10 +77,8 @@ main_server <- function(
       }
     }
 
-    update_section_nav_buttons <- function(i) {
-      # Button visibility is now handled client-side in JavaScript for instant updates
-      # See style_css_js.R kwallmUpdateNavButtons()
-    }
+    # Note: Button visibility is handled client-side in JavaScript
+    # See style_css_js.R kwallmUpdateNavButtons()
 
     # Keep prev/next button visibility in sync (works even when UI is re-rendered)
     observe({
@@ -97,8 +95,10 @@ main_server <- function(
     })
 
     # Progress UI (only shown in "sections" mode) ----------------------------
+    # Update progress bar via custom message for smooth CSS animation
+    # (renderUI would replace DOM, breaking the transition)
 
-    output$kwallm_sections_progress <- renderUI({
+    observe({
       req(lang())
       cur <- current_section()
       pct <- if (n_sections <= 1L) {
@@ -107,113 +107,109 @@ main_server <- function(
         round((cur - 1L) / (n_sections - 1L) * 100L)
       }
 
-      div(
-        class = "kwallm-sections-progress",
-        tags$div(
-          class = "d-flex justify-content-between align-items-center mb-1",
-          tags$small(
-            class = "text-muted",
-            paste0(lang()$t("Sectie"), " ", cur, "/", n_sections)
-          )
-        ),
-        div(
-          class = "progress",
-          div(
-            class = "progress-bar",
-            role = "progressbar",
-            style = sprintf("width: %s%%;", pct),
-            `aria-valuenow` = pct,
-            `aria-valuemin` = 0,
-            `aria-valuemax` = 100
-          )
+      session$sendCustomMessage(
+        "kwallm_sections_progress_update",
+        list(
+          pct = pct,
+          text = paste0(lang()$t("Sectie"), " ", cur, "/", n_sections)
         )
       )
     })
 
     # Layout toggle behaviour ------------------------------------------------
 
-    observeEvent(input$kwallm_layout_view, {
-      view <- input$kwallm_layout_view
-      if (is.null(view) || !view %in% c("vertical", "sections")) {
-        return()
-      }
+    observeEvent(input$kwallm_layout_view,
+      {
+        view <- input$kwallm_layout_view
+        if (is.null(view) || !view %in% c("vertical", "sections")) {
+          return()
+        }
 
-      if (identical(view, "vertical")) {
-        shinyjs::hide("kwallm_sections_nav", anim = FALSE)
-        show_all_sections()
-        return()
-      }
+        if (identical(view, "vertical")) {
+          shinyjs::hide("kwallm_sections_nav", anim = FALSE)
+          show_all_sections()
+          return()
+        }
 
-      # sections view
-      shinyjs::show("kwallm_sections_nav", anim = FALSE)
+        # sections view
+        shinyjs::show("kwallm_sections_nav", anim = FALSE)
 
-      cur <- current_section()
-      shinyWidgets::updateRadioGroupButtons(
-        session = session,
-        inputId = "kwallm_sections_step",
-        selected = as.character(cur)
-      )
+        cur <- current_section()
+        shinyWidgets::updateRadioGroupButtons(
+          session = session,
+          inputId = "kwallm_sections_step",
+          selected = as.character(cur)
+        )
 
-      show_single_section(cur, direction = "none")
-      update_section_nav_buttons(cur)
-    }, ignoreInit = TRUE)
+        show_single_section(cur, direction = "none")
+      },
+      ignoreInit = TRUE
+    )
 
     # Section navigation behaviour ------------------------------------------
 
-    observeEvent(input$kwallm_sections_step, {
-      new <- suppressWarnings(as.integer(input$kwallm_sections_step))
-      if (is.na(new) || new < 1L || new > n_sections) {
-        return()
-      }
+    observeEvent(input$kwallm_sections_step,
+      {
+        new <- suppressWarnings(as.integer(input$kwallm_sections_step))
+        if (is.na(new) || new < 1L || new > n_sections) {
+          return()
+        }
 
-      old <- current_section()
-      current_section(new)
+        old <- current_section()
+        current_section(new)
 
-      if (!identical(input$kwallm_layout_view, "sections")) {
-        return()
-      }
+        if (!identical(input$kwallm_layout_view, "sections")) {
+          return()
+        }
 
-      direction <- if (new > old) {
-        "right"
-      } else if (new < old) {
-        "left"
-      } else {
-        "none"
-      }
+        direction <- if (new > old) {
+          "right"
+        } else if (new < old) {
+          "left"
+        } else {
+          "none"
+        }
 
-      show_single_section(new, direction = direction)
-      update_section_nav_buttons(new)
-    }, ignoreInit = TRUE)
+        show_single_section(new, direction = direction)
+      },
+      ignoreInit = TRUE
+    )
 
-    observeEvent(input$kwallm_sections_prev, {
-      if (!identical(input$kwallm_layout_view, "sections")) {
-        return()
-      }
-      cur <- current_section()
-      if (cur <= 1L) {
-        return()
-      }
-      shinyWidgets::updateRadioGroupButtons(
-        session = session,
-        inputId = "kwallm_sections_step",
-        selected = as.character(cur - 1L)
-      )
-    }, ignoreInit = TRUE)
+    observeEvent(input$kwallm_sections_prev,
+      {
+        if (!identical(input$kwallm_layout_view, "sections")) {
+          return()
+        }
+        cur <- current_section()
+        if (cur <= 1L) {
+          return()
+        }
+        shinyWidgets::updateRadioGroupButtons(
+          session = session,
+          inputId = "kwallm_sections_step",
+          selected = as.character(cur - 1L)
+        )
+      },
+      ignoreInit = TRUE
+    )
 
-    observeEvent(input$kwallm_sections_next, {
-      if (!identical(input$kwallm_layout_view, "sections")) {
-        return()
-      }
-      cur <- current_section()
-      if (cur >= n_sections) {
-        return()
-      }
-      shinyWidgets::updateRadioGroupButtons(
-        session = session,
-        inputId = "kwallm_sections_step",
-        selected = as.character(cur + 1L)
-      )
-    }, ignoreInit = TRUE)
+    observeEvent(input$kwallm_sections_next,
+      {
+        if (!identical(input$kwallm_layout_view, "sections")) {
+          return()
+        }
+        cur <- current_section()
+        if (cur >= n_sections) {
+          return()
+        }
+        shinyWidgets::updateRadioGroupButtons(
+          session = session,
+          inputId = "kwallm_sections_step",
+          selected = as.character(cur + 1L)
+        )
+      },
+      ignoreInit = TRUE
+    )
 
     # UI ---------------------------------------------------------------
     output$main_ui <- renderUI({
@@ -343,10 +339,8 @@ main_server <- function(
               )
             )
           ),
-
           hr(),
           uiOutput("azure_auth_unauthorized_ui"),
-
           div(
             class = "card-container",
             div(
@@ -370,7 +364,30 @@ main_server <- function(
                 size = "sm",
                 justified = TRUE
               ),
-              uiOutput("kwallm_sections_progress"),
+              # Static progress bar - updated via JS for smooth animation
+              div(
+                class = "kwallm-sections-progress",
+                tags$div(
+                  class = "d-flex justify-content-between align-items-center mb-1",
+                  tags$small(
+                    id = "kwallm_sections_progress_text",
+                    class = "text-muted",
+                    paste0(lang()$t("Sectie"), " 1/", n_sections)
+                  )
+                ),
+                div(
+                  class = "progress",
+                  div(
+                    id = "kwallm_sections_progress_bar",
+                    class = "progress-bar",
+                    role = "progressbar",
+                    style = "width: 0%;",
+                    `aria-valuenow` = 0,
+                    `aria-valuemin` = 0,
+                    `aria-valuemax` = 100
+                  )
+                )
+              ),
               div(
                 class = "d-flex justify-content-between gap-2 mt-2",
                 actionButton(
@@ -423,12 +440,9 @@ main_server <- function(
               write_paragraphs_toggle_ui("write_paragraphs_toggle"),
               div()
             ),
-
             uiOutput("kwallm_processing_global"),
-
             div(style = "height: 75px;"),
           ),
-
           hr()
         ),
 
@@ -459,7 +473,9 @@ main_server <- function(
 
     if (azure_auth) {
       user_info <- get_azure_auth(session, output)
-      if (is.null(user_info)) return()
+      if (is.null(user_info)) {
+        return()
+      }
     }
 
     # 1 Text management ----------------------------------------------
@@ -654,6 +670,15 @@ main_server <- function(
 
     # 6 Language -----------------------------------------------------
     lang <- language_server("language", processing)
+
+    # 7 Disable layout toggle during processing ----------------------
+    observe({
+      if (isTRUE(processing())) {
+        shinyjs::disable("kwallm_layout_view")
+      } else {
+        shinyjs::enable("kwallm_layout_view")
+      }
+    })
   }
 
   return(server)
