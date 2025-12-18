@@ -383,7 +383,7 @@ main_server <- function(
                       ),
                       lang()$t(" Ideeën of verbeterpunten voor de app? "),
                       lang()$t(
-                        "<a href='https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new' target='_blank'>Open een issue in de GitHub-repository</a>."
+                        "<a href='https://github.com/KennispuntTwente/KWALLM/issues/new' target='_blank'>Open een issue in de GitHub-repository</a>."
                       ),
                       lang()$t(
                         " Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?"

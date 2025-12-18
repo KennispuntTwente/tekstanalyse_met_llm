@@ -79,7 +79,7 @@ and optionally an environment such as [RStudio](https://www.rstudio.com/products
 [RTools](https://cran.r-project.org/bin/windows/Rtools/) may be required to build packages that this application needs.
 The required R packages are automatically installed via the 'renv' package.
 
-1. `git clone https://github.com/kennispunttwente/tekstanalyse_met_llm.git` (or: download
+1. `git clone https://github.com/KennispuntTwente/KWALLM.git` (or: download
 the zip of the repository and unzip it)
 
 2. Open an R environment in the folder (in RStudio this can be done by opening the .Rproj file)
@@ -92,7 +92,7 @@ The application can also be used as a desktop application. This can be useful
 for users who are not familiar with R or Docker.
 
 A pre-built desktop application for Windows 10/11 (x64) is
-available under [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases).
+available under [releases](https://github.com/KennispuntTwente/KWALLM/releases).
 This application contains all necessary dependencies and can be used directly.
 
 1. Download the release (`kwallm-text-analysis-app-win32-x64.7z`)
@@ -134,7 +134,7 @@ a specific configuration.
 This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) in collaboration with [GGD Twente](https://www.ggdtwente.nl/). Together, we work on generative AI applications for the public good.
 
 Suggestions or ideas for the app? 
-[Open an issue on GitHub](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
+[Open an issue on GitHub](https://github.com/KennispuntTwente/KWALLM/issues/new).
 
 Kennispunt Twente is a (Dutch) non-profit organization focused on data, insights, and knowledge. Interested in what we can do for your organization, for example in generative AI?
 Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our developers](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
@@ -301,7 +301,7 @@ en optioneel een omgeving zoals [RStudio](https://www.rstudio.com/products/rstud
 Mogelijk is [RTools](https://cran.r-project.org/bin/windows/Rtools/) nodig om packages te bouwen die deze applicatie nodig heeft.
 Via het package 'renv' worden de benodigde R-packages automatisch geïnstalleerd.
 
-1. `git clone https://github.com/kennispunttwente/tekstanalyse_met_llm.git` (of: download
+1. `git clone https://github.com/KennispuntTwente/KWALLM.git` (of: download
 de zip van de repository en unzip deze)
 
 2. Open een R-omgeving in de map (in RStudio kan dit door het .Rproj-bestand te openen)
@@ -313,7 +313,7 @@ de zip van de repository en unzip deze)
 De applicatie kan ook gebruikt worden als desktop-applicatie. Dit kan handig zijn
 voor gebruikers die niet bekend zijn met R of Docker.
 
-Onder [releases](https://github.com/KennispuntTwente/tekstanalyse_met_llm/releases) is een pre-built desktop-applicatie beschikbaar voor Windows 10/11 (x64).
+Onder [releases](https://github.com/KennispuntTwente/KWALLM/releases) is een pre-built desktop-applicatie beschikbaar voor Windows 10/11 (x64).
 Deze applicatie bevat alle benodigde dependencies en kan direct worden gebruikt.
 
 1. Download de release (`kwallm-text-analysis-app-win32-x64.7z`)
@@ -358,7 +358,7 @@ Deze app is ontwikkeld door [Kennispunt Twente](https://www.kennispunttwente.nl)
 toepassingen met generatieve AI ten behoeve van de samenleving.
 
 Ideeën of verbeterpunten voor de app?
-[Open een issue in de GitHub-repository](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
+[Open een issue in de GitHub-repository](https://github.com/KennispuntTwente/KWALLM/issues/new).
 
 Kennispunt Twente is een non-profit organisatie voor data, inzicht en kennis. 
 Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?

@@ -27,12 +27,12 @@ RUN R -q -e "install.packages('renv', repos='https://cloud.r-project.org'); renv
 FROM ubuntu:noble
 
 LABEL org.opencontainers.image.title="KWALLM: Text analysis with LLM" \
-      org.opencontainers.image.version="See version tag at https://github.com/KennispuntTwente/tekstanalyse_met_llm/pkgs/" \
+      org.opencontainers.image.version="See version tag at https://github.com/KennispuntTwente/KWALLM/pkgs/" \
       org.opencontainers.image.description="Application for (automated) qualitative text analysis with large language models (LLMs)." \
       org.opencontainers.image.authors="Luka Koning <l.koning@kennispunttwente.nl>" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.vendor="Kennispunt Twente" \
-      org.opencontainers.image.source="https://github.com/KennispuntTwente/tekstanalyse_met_llm" \
+      org.opencontainers.image.source="https://github.com/KennispuntTwente/KWALLM" \
       org.opencontainers.image.base.name="ubuntu:24.04"
 
 ENV TZ=Europe/Amsterdam \

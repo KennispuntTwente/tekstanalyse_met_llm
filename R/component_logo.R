@@ -68,7 +68,7 @@ kpt_logo_ui <- function(
 github_logo_ui <- function(
   id,
   logo_src = "www/github_avatar.png",
-  repo_url = "https://github.com/kennispunttwente/tekstanalyse_met_llm"
+  repo_url = "https://github.com/KennispuntTwente/KWALLM"
 ) {
   ns <- NS(id)
   tagList(
