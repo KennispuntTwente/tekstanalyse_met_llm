@@ -391,9 +391,9 @@ test_that("{shinytest2} recording: standard process - categorization", {
   app$stop()
 })
 
-test_that("{shinytest2} recording: topic extraction - horizontal mode", {
+test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   app <- AppDriver$new(
-    name = "topic extraction - horizontal mode",
+    name = "topic modelling - horizontal mode",
     height = 1400,
     width = 2400,
     load_timeout = 30000,
