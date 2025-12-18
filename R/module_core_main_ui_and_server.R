@@ -82,6 +82,20 @@ main_server <- function(
       # See style_css_js.R kwallmUpdateNavButtons()
     }
 
+    # Keep prev/next button visibility in sync (works even when UI is re-rendered)
+    observe({
+      view <- input$kwallm_layout_view
+      sec <- current_section()
+      session$sendCustomMessage(
+        "kwallm_nav_buttons",
+        list(
+          view = view,
+          section = sec,
+          n_sections = n_sections
+        )
+      )
+    })
+
     # Progress UI (only shown in "sections" mode) ----------------------------
 
     output$kwallm_sections_progress <- renderUI({
@@ -198,15 +212,6 @@ main_server <- function(
         session = session,
         inputId = "kwallm_sections_step",
         selected = as.character(cur + 1L)
-      )
-    }, ignoreInit = TRUE)
-
-    # Go to processing section button handler
-    observeEvent(input$kwallm_goto_processing, {
-      shinyWidgets::updateRadioGroupButtons(
-        session = session,
-        inputId = "kwallm_sections_step",
-        selected = as.character(n_sections)
       )
     }, ignoreInit = TRUE)
 
@@ -378,38 +383,6 @@ main_server <- function(
                   lang()$t("Volgende"),
                   class = "btn btn-primary btn-sm"
                 )
-              ),
-              # Floating processing status (visible when processing and not on section 5)
-              div(
-                id = "kwallm_floating_processing",
-                class = "kwallm-floating-processing",
-                style = "display: none;",
-                tags$hr(style = "margin: 0.75rem 0;"),
-                div(
-                  class = "d-flex align-items-center gap-2",
-                  div(
-                    class = "flex-grow-1",
-                    div(
-                      id = "kwallm_floating_progress_bar",
-                      class = "progress",
-                      style = "height: 0.5rem;",
-                      div(
-                        id = "kwallm_floating_progress_fill",
-                        class = "progress-bar",
-                        role = "progressbar",
-                        style = "width: 0%;",
-                        `aria-valuenow` = "0",
-                        `aria-valuemin` = "0",
-                        `aria-valuemax` = "100"
-                      )
-                    )
-                  ),
-                  actionButton(
-                    "kwallm_goto_processing",
-                    lang()$t("Bekijk"),
-                    class = "btn btn-outline-primary btn-sm"
-                  )
-                )
               )
             ),
             div(
@@ -448,8 +421,10 @@ main_server <- function(
               interrater_toggle_ui("interrater_toggle"),
               human_in_the_loop_toggle_ui("human_in_the_loop_toggle"),
               write_paragraphs_toggle_ui("write_paragraphs_toggle"),
-              processing_ui("processing")
+              div()
             ),
+
+            uiOutput("kwallm_processing_global"),
 
             div(style = "height: 75px;"),
           ),
@@ -640,15 +615,41 @@ main_server <- function(
       lang = lang
     )
 
-    # Show/hide floating processing panel based on processing state and section
-    observe({
-      is_processing <- isTRUE(processing())
-      is_sections_mode <- identical(input$kwallm_layout_view, "sections")
-      not_on_last_section <- current_section() < n_sections
+    # Processing UI placement ------------------------------------------------
+    # Always render the processing UI in regular document flow (below the cards).
+    # Visibility rules:
+    # - Vertical view: visible (section 5 is visible)
+    # - Sections view, before start: only visible on section 5
+    # - After start: visible on every section
+    output$kwallm_processing_global <- renderUI({
+      req(lang())
 
-      show_floating <- is_processing && is_sections_mode && not_on_last_section
+      has_started <- FALSE
+      has_started_r <- attr(processing, "has_started")
+      if (is.function(has_started_r)) {
+        has_started <- isTRUE(has_started_r())
+      } else {
+        has_started <- isTRUE(processing())
+      }
 
-      session$sendCustomMessage("kwallm_floating_processing", list(show = show_floating))
+      layout_view <- input$kwallm_layout_view
+
+      if (isTRUE(has_started)) {
+        return(processing_ui("processing"))
+      }
+
+      if (identical(layout_view, "vertical")) {
+        return(processing_ui("processing"))
+      }
+
+      if (identical(layout_view, "sections")) {
+        if (current_section() < n_sections) {
+          return(NULL)
+        }
+        return(processing_ui("processing"))
+      }
+
+      NULL
     })
 
     # 6 Language -----------------------------------------------------
