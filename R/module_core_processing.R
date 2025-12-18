@@ -261,7 +261,7 @@ processing_server <- function(
 
             # If multiple categories, convert from JSON array string to
             #   multiple binary columns
-            if (mode == "Categorisatie" & assign_multiple_categories) {
+            if (mode == "Categorisatie" && assign_multiple_categories) {
               # Parse the JSON array strings into vector-column
               results <- results |>
                 dplyr::mutate(
@@ -284,7 +284,7 @@ processing_server <- function(
             }
 
             # If categorization, write paragraphs
-            if (mode == "Categorisatie" & write_paragraphs) {
+            if (mode == "Categorisatie" && write_paragraphs) {
               # Make list per category, with all texts assigned to that category
               categories_texts <- list()
               if (!assign_multiple_categories) {
@@ -1262,7 +1262,7 @@ processing_server <- function(
 
           if (
             mode() %in%
-              c("Categorisatie", "Onderwerpextractie") &
+              c("Categorisatie", "Onderwerpextractie") &&
               length(unique(all_categories)) < 2
           ) {
             shiny::showNotification(paste0(

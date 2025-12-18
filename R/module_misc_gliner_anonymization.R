@@ -39,7 +39,7 @@ gliner_server <- function(
       # To start/initialize the module from the main server:
       start <- function() {
         if (
-          !getOption("anonymization__gliner_model", FALSE) |
+          !getOption("anonymization__gliner_model", FALSE) ||
             length(pii_texts()) == 0
         ) {
           return$enabled <- FALSE
