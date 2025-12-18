@@ -75,8 +75,8 @@ test_that("text_upload_server: txt single-text mode returns one combined text", 
 
       expect_true(is.character(raw_texts()))
       expect_equal(length(raw_texts()), 1)
-      expect_true(grepl("a", raw_texts()[[1]]))
-      expect_true(grepl("b", raw_texts()[[1]]))
+      expect_true(grepl("a", raw_texts()[[1]], fixed = TRUE))
+      expect_true(grepl("b", raw_texts()[[1]], fixed = TRUE))
     }
   )
 })

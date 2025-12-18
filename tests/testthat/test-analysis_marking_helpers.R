@@ -35,7 +35,7 @@ test_that("best_literal_substring handles curly quotes", {
   )
 
   expect_false(is.na(result$match))
-  expect_true(grepl("hello", result$match))
+  expect_true(grepl("hello", result$match, fixed = TRUE))
 })
 
 test_that("best_literal_substring handles em-dash normalization", {
@@ -45,7 +45,7 @@ test_that("best_literal_substring handles em-dash normalization", {
   )
 
   expect_false(is.na(result$match))
-  expect_true(grepl("one", result$match))
+  expect_true(grepl("one", result$match, fixed = TRUE))
 })
 
 test_that("best_literal_substring returns NA for no match", {

@@ -87,7 +87,7 @@ test_that("text_management_server: regex default produces anonymized + squished 
       ))
 
       # squish happened
-      expect_false(grepl("  ", joined))
+      expect_false(grepl("  ", joined, fixed = TRUE))
     }
   )
 })

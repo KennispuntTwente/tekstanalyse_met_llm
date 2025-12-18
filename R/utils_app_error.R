@@ -19,10 +19,7 @@ app_error <- function(
 ) {
   # Downgrade IPC error which occurs after interrupting process
   if (
-    isTRUE(grepl(
-      "Cannot pop from destroyed TextFileSource",
-      try(conditionMessage(error), silent = TRUE)
-    ))
+    isTRUE(grepl("Cannot pop from destroyed TextFileSource", try(conditionMessage(error), silent = TRUE), fixed = TRUE))
   ) {
     fatal <- FALSE
   }

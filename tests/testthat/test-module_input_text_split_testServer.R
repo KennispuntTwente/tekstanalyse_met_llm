@@ -175,7 +175,7 @@ test_that("text_split_server: clicking split produces split texts (sync-mocked f
 
       expect_true(is.character(texts()))
       expect_true(length(texts()) > length(raw_texts()))
-      expect_true(all(grepl("__", texts())))
+      expect_true(all(grepl("__", texts(), fixed = TRUE)))
 
       # Changing raw texts resets prior split results.
       raw_texts(c("gamma"))
