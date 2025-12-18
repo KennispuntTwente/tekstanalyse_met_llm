@@ -89,6 +89,7 @@ processing_server <- function(
       #   succes: reactiveVal to keep track of whether the processing
       #     has been finished succesfully. Used for automated testing
       processing <- reactiveVal(FALSE)
+      started <- reactiveVal(FALSE)
       results_df <- reactiveVal(NULL)
       final_results_df <- reactiveVal(NULL)
       irr_done <- reactiveVal(FALSE)
@@ -105,6 +106,7 @@ processing_server <- function(
 
       shiny::exportTestValues(
         processing = processing(),
+        started = started(),
         success = success(),
         final_results_df = final_results_df()
       )
@@ -171,6 +173,7 @@ processing_server <- function(
         }
         req(isFALSE(context_window$any_fit_problem))
 
+        started(TRUE)
         # Set processing state
         processing(TRUE)
         analysis_started_at(Sys.time())
@@ -258,7 +261,7 @@ processing_server <- function(
 
             # If multiple categories, convert from JSON array string to
             #   multiple binary columns
-            if (mode == "Categorisatie" & assign_multiple_categories) {
+            if (mode == "Categorisatie" && assign_multiple_categories) {
               # Parse the JSON array strings into vector-column
               results <- results |>
                 dplyr::mutate(
@@ -281,7 +284,7 @@ processing_server <- function(
             }
 
             # If categorization, write paragraphs
-            if (mode == "Categorisatie" & write_paragraphs) {
+            if (mode == "Categorisatie" && write_paragraphs) {
               # Make list per category, with all texts assigned to that category
               categories_texts <- list()
               if (!assign_multiple_categories) {
@@ -497,6 +500,7 @@ processing_server <- function(
         req(isFALSE(context_window$any_fit_problem))
         req(isFALSE(context_window$too_many_chunks))
 
+        started(TRUE)
         # Set processing state
         processing(TRUE)
         analysis_started_at(Sys.time())
@@ -1063,6 +1067,7 @@ processing_server <- function(
         req(context_window$max_tokens)
         req(context_window$overlap)
 
+        started(TRUE)
         # Set processing state
         processing(TRUE)
         analysis_started_at(Sys.time())
@@ -1257,7 +1262,7 @@ processing_server <- function(
 
           if (
             mode() %in%
-              c("Categorisatie", "Onderwerpextractie") &
+              c("Categorisatie", "Onderwerpextractie") &&
               length(unique(all_categories)) < 2
           ) {
             shiny::showNotification(paste0(
@@ -1892,7 +1897,17 @@ processing_server <- function(
 
       # Processing button --------------------------------------------
       output$process_button <- renderUI({
-        req(mode(), lang(), is.null(results_df()))
+        req(mode(), lang())
+
+        # Once processing has started, keep the start button hidden.
+        if (
+          isTRUE(started()) ||
+            isTRUE(processing()) ||
+            isTRUE(preparing_download()) ||
+            !is.null(zip_file())
+        ) {
+          return(NULL)
+        }
 
         # Count how many preprocessed texts we have
         preproc <- texts$preprocessed
@@ -2046,7 +2061,23 @@ processing_server <- function(
         session$reload()
       })
 
-      return(processing)
+      processing_fn <- function() {
+        processing()
+      }
+
+      attr(processing_fn, "has_started") <- reactive({
+        isTRUE(started()) ||
+          isTRUE(processing()) ||
+          !is.null(results_df()) ||
+          isTRUE(preparing_download()) ||
+          !is.null(zip_file())
+      })
+
+      attr(processing_fn, "has_results") <- reactive({
+        !is.null(zip_file())
+      })
+
+      return(processing_fn)
     }
   )
 }

@@ -55,6 +55,10 @@
         "en": "View contact information"
       },
       {
+        "nl": "Over deze app",
+        "en": "About this app"
+      },
+      {
         "nl": "Upload teksten",
         "en": "Upload texts"
       },
@@ -136,6 +140,10 @@
       {
         "nl": "Opslaan",
         "en": "Save"
+      },
+      {
+        "nl": "Bekijk",
+        "en": "View"
       },
       {
         "nl": "Teksten",
@@ -1396,6 +1404,34 @@
       {
         "nl": "Splitsing resulteerde niet in meer teksten",
         "en": "Splitting did not result in more texts"
+      },
+      {
+        "nl": "Verticaal",
+        "en": "Vertical"
+      },
+      {
+        "nl": "Secties",
+        "en": "Sections"
+      },
+      {
+        "nl": "Onderzoek & modus",
+        "en": "Research & mode"
+      },
+      {
+        "nl": "Analyse",
+        "en": "Analysis"
+      },
+      {
+        "nl": "LLM & context",
+        "en": "LLM & context"
+      },
+      {
+        "nl": "Uitvoeren",
+        "en": "Run"
+      },
+      {
+        "nl": "Sectie",
+        "en": "Section"
       }
     ]
 }

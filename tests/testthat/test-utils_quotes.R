@@ -106,10 +106,13 @@ test_that("verify_and_decorate_quotes handles multiple quotes correctly", {
   )
   # alpha and gamma should have check-circle, beta should have warning
   # Count occurrences
-  n_success <- lengths(regmatches(out, gregexpr("check-circle-fill", out)))
+  n_success <- lengths(regmatches(
+    out,
+    gregexpr("check-circle-fill", out, fixed = TRUE)
+  ))
   n_warning <- lengths(regmatches(
     out,
-    gregexpr("exclamation-triangle-fill", out)
+    gregexpr("exclamation-triangle-fill", out, fixed = TRUE)
   ))
   expect_equal(n_success, 2) # alpha and gamma
   expect_equal(n_warning, 1) # beta

@@ -36,7 +36,7 @@ icon_toggle_button <- function(
   icon_content <- if (!is.null(img_src)) {
     tags$img(
       src = img_src,
-      height = gsub("px", "", icon_height),
+      height = gsub("px", "", icon_height, fixed = TRUE),
       alt = title
     )
   } else {

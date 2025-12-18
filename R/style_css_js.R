@@ -4,6 +4,11 @@
 # 1 Function ---------------------------------------------------------
 css_js_head <- function() {
   tags$head(
+    # Bootstrap Icons CDN
+    tags$link(
+      rel = "stylesheet",
+      href = "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    ),
     tags$style(HTML(
       "
       .well {
@@ -37,6 +42,7 @@ css_js_head <- function() {
         white-space: nowrap;
         overflow: hidden;
         border-radius: 0.25rem;
+        transition: width 0.3s ease-out;
       }
       #progress_text {
         color: #6c757d; /* Medium gray progress text */
@@ -206,6 +212,74 @@ css_js_head <- function() {
         opacity: 1 !important;
         will-change: auto !important;
       }
+
+      /* --- KWALLM: sectioned (horizontal) layout ------------------------- */
+      .kwallm-sections-nav {
+        position: sticky;
+        top: 0.5rem;
+        z-index: 20;
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+        border: 1px solid #dee2e6;
+        background-color: rgba(248, 249, 250, 0.96);
+        backdrop-filter: blur(6px);
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+        opacity: 1;
+        transform: translateY(0);
+        transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+      }
+
+      .kwallm-sections-nav.kwallm-nav-hidden {
+        opacity: 0;
+        transform: translateY(-10px);
+        pointer-events: none;
+      }
+
+      .kwallm-sections-nav .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        justify-content: center;
+        gap: 0.35rem;
+      }
+
+      .kwallm-sections-nav .btn-group > .btn {
+        border-radius: 999px !important;
+        transition: all 0.15s ease-out;
+      }
+
+      .kwallm-sections-nav .btn-group > .btn.active {
+        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.35);
+        transform: scale(1.02);
+      }
+
+      .kwallm-sections-progress .progress {
+        height: 0.35rem;
+        margin-bottom: 0;
+      }
+
+      .kwallm-sections-progress .progress-bar {
+        transition: width 0.35s ease-out;
+      }
+
+      @keyframes kwallm-slide-in-right {
+        from { opacity: 0; transform: translateX(18px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+
+      @keyframes kwallm-slide-in-left {
+        from { opacity: 0; transform: translateX(-18px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+
+      .kwallm-slide-in-right {
+        animation: kwallm-slide-in-right 220ms ease-out both;
+      }
+
+      .kwallm-slide-in-left {
+        animation: kwallm-slide-in-left 220ms ease-out both;
+      }
       "
     )),
     tags$style(HTML(
@@ -241,6 +315,133 @@ css_js_head <- function() {
       "
       $(document).on('click', 'a.action-button', function(e) {
         e.preventDefault();
+      });
+
+      // KWALLM: Blur any button in a btn-group after click so keyboard nav works for sections
+      $(document).on('click', '.btn-group .btn, .btn-group-container .btn', function() {
+        document.activeElement.blur();
+      });
+
+      // KWALLM: Keyboard navigation for sections (← / →)
+      $(document).on('keydown', function(e) {
+        // Only handle arrow keys
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+
+        // Only handle if in sections mode
+        var layoutView = $('input[name=kwallm_layout_view]:checked').val();
+        if (layoutView !== 'sections') return;
+
+        // Don't trigger if user is typing in an input/textarea/select
+        var tag = e.target.tagName.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+        // If focus is on a button inside a btn-group, blur it first
+        if ($(e.target).is('.btn-group .btn, .btn-group-container .btn, button')) {
+          e.target.blur();
+        }
+
+        e.preventDefault();
+        var btnId = e.key === 'ArrowLeft' ? 'kwallm_sections_prev' : 'kwallm_sections_next';
+        var btn = $('#' + btnId);
+        if (btn.length && !btn.prop('disabled')) {
+          btn.click();
+          btn.blur(); // Don't leave focus on the nav button either
+        }
+      });
+
+      // KWALLM: Update prev/next button state immediately on section change (client-side)
+      var kwallmNumSections = 5;
+      function kwallmUpdateNavButtons(sectionNum) {
+        var prevBtn = $('#kwallm_sections_prev');
+        var nextBtn = $('#kwallm_sections_next');
+        if (sectionNum <= 1) {
+          prevBtn.prop('disabled', true);
+        } else {
+          prevBtn.prop('disabled', false);
+        }
+        if (sectionNum >= kwallmNumSections) {
+          nextBtn.prop('disabled', true);
+        } else {
+          nextBtn.prop('disabled', false);
+        }
+      }
+
+      // Listen for section step button changes
+      $(document).on('change', 'input[name=kwallm_sections_step]', function() {
+        var val = parseInt($(this).val(), 10);
+        if (!isNaN(val)) {
+          kwallmUpdateNavButtons(val);
+        }
+      });
+
+      // Also run on initial load if in sections mode
+      $(document).on('shiny:connected', function() {
+        setTimeout(function() {
+          var checkedStep = $('input[name=kwallm_sections_step]:checked').val();
+          if (checkedStep) {
+            kwallmUpdateNavButtons(parseInt(checkedStep, 10));
+          }
+        }, 100);
+      });
+
+      // Server-driven updates (reliable when selection is changed programmatically)
+      Shiny.addCustomMessageHandler('kwallm_nav_buttons', function(message) {
+        try {
+          if (!message) return;
+
+          if (message.view !== 'sections') {
+            // In vertical view, enable both buttons (they are not used)
+            $('#kwallm_sections_prev').prop('disabled', false);
+            $('#kwallm_sections_next').prop('disabled', false);
+            return;
+          }
+
+          if (message.n_sections) {
+            kwallmNumSections = message.n_sections;
+          }
+          kwallmUpdateNavButtons(parseInt(message.section, 10));
+        } catch (e) {
+          // no-op
+        }
+      });
+
+      // KWALLM: Persist layout preference in localStorage
+      // Skip localStorage restoration in test mode to preserve programmatic defaults
+      $(document).on('shiny:connected', function() {
+        // In test mode, Shiny sets body[data-shiny-testmode], skip localStorage restore
+        if (document.body && document.body.hasAttribute('data-shiny-testmode')) {
+          return;
+        }
+        var saved = localStorage.getItem('kwallm_layout_view');
+        if (saved && (saved === 'vertical' || saved === 'sections')) {
+          // Update the radio button to saved preference
+          $('input[name=kwallm_layout_view][value=' + saved + ']').prop('checked', true).trigger('change');
+          Shiny.setInputValue('kwallm_layout_view', saved);
+        }
+      });
+
+      $(document).on('change', 'input[name=kwallm_layout_view]', function() {
+        var val = $(this).val();
+        if (val) {
+          localStorage.setItem('kwallm_layout_view', val);
+        }
+      });
+
+      // KWALLM: Update progress bar smoothly (without DOM replacement)
+      Shiny.addCustomMessageHandler('kwallm_sections_progress_update', function(message) {
+        try {
+          var bar = document.getElementById('kwallm_sections_progress_bar');
+          var text = document.getElementById('kwallm_sections_progress_text');
+          if (bar) {
+            bar.style.width = message.pct + '%';
+            bar.setAttribute('aria-valuenow', message.pct);
+          }
+          if (text) {
+            text.textContent = message.text;
+          }
+        } catch (e) {
+          // no-op
+        }
       });
 
       // ---- KWALLM: modal open/close auto logging -------------------------

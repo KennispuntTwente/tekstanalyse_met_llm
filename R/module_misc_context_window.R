@@ -319,6 +319,7 @@ context_window_server <- function(
         )
         req(texts$preprocessed)
         req(rv$base_prompt_text)
+        req(rv$n_tokens_context_window)
 
         texts <- texts$preprocessed
         base_prompt_text <- rv$base_prompt_text

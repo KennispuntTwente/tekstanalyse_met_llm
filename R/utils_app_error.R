@@ -21,7 +21,8 @@ app_error <- function(
   if (
     isTRUE(grepl(
       "Cannot pop from destroyed TextFileSource",
-      try(conditionMessage(error), silent = TRUE)
+      try(conditionMessage(error), silent = TRUE),
+      fixed = TRUE
     ))
   ) {
     fatal <- FALSE
