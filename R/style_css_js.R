@@ -406,7 +406,12 @@ css_js_head <- function() {
       });
 
       // KWALLM: Persist layout preference in localStorage
+      // Skip localStorage restoration in test mode to preserve programmatic defaults
       $(document).on('shiny:connected', function() {
+        // In test mode, Shiny sets body[data-shiny-testmode], skip localStorage restore
+        if (document.body && document.body.hasAttribute('data-shiny-testmode')) {
+          return;
+        }
         var saved = localStorage.getItem('kwallm_layout_view');
         if (saved && (saved === 'vertical' || saved === 'sections')) {
           // Update the radio button to saved preference
