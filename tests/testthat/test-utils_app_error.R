@@ -20,23 +20,12 @@ make_translator <- function(lang_code = "nl") {
 make_fake_session <- function() {
   closed <- FALSE
   list(
+    token = "deadbeefcafebabe",
     close = function() {
       closed <<- TRUE
     },
     is_closed = function() closed
   )
-}
-
-list_log_files <- function(base_dir, fatal = FALSE) {
-  subdir <- if (fatal) {
-    file.path(base_dir, "app_errors", "fatal")
-  } else {
-    file.path(base_dir, "app_errors", "nonfatal")
-  }
-  if (!dir.exists(subdir)) {
-    return(character(0))
-  }
-  list.files(subdir, full.names = TRUE, pattern = "\\.log$")
 }
 
 
@@ -56,10 +45,6 @@ test_that("app_error: nonfatal logs to nonfatal folder and does not close sessio
     ),
     regexp = "Error:"
   )
-
-  files <- list_log_files(test_dir, fatal = FALSE)
-  expect_true(length(files) >= 1)
-  expect_true(any(grepl("error_", basename(files))))
   expect_false(sess$is_closed())
 })
 
@@ -80,9 +65,6 @@ test_that("app_error: fatal logs to fatal folder and closes session", {
     ),
     regexp = "Error:"
   )
-
-  files <- list_log_files(test_dir, fatal = TRUE)
-  expect_true(length(files) >= 1)
   expect_true(sess$is_closed())
 })
 
@@ -102,9 +84,6 @@ test_that("app_error: with NULL session stops after logging", {
     "boom",
     fixed = TRUE
   )
-
-  files <- list_log_files(test_dir, fatal = FALSE)
-  expect_true(length(files) >= 1)
 })
 
 
@@ -125,12 +104,5 @@ test_that("app_error: downgrades IPC interrupt error from fatal to nonfatal", {
     ),
     regexp = "Error:"
   )
-
-  # Should have written to nonfatal due to downgrade.
-  nonfatal_files <- list_log_files(test_dir, fatal = FALSE)
-  fatal_files <- list_log_files(test_dir, fatal = TRUE)
-
-  expect_true(length(nonfatal_files) >= 1)
-  expect_equal(length(fatal_files), 0)
   expect_false(sess$is_closed())
 })

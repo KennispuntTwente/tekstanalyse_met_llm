@@ -95,6 +95,18 @@ text_upload_server <- function(
       )
     })
 
+    observeEvent(
+      input$txt_split_lines,
+      {
+        req(file_type() == "txt")
+        req(input$txt_split_lines %in% c(lang()$t("Nee"), lang()$t("Ja")))
+        log_action(
+          "txt_split_lines_changed",
+          details = sprintf("value=%s", input$txt_split_lines)
+        )
+      },
+      ignoreInit = TRUE
+    )
     # ---- Helpers ------------------------------------------------------------
     discard_empty <- function(x) {
       x <- x[!is.na(x)]
@@ -146,6 +158,16 @@ text_upload_server <- function(
     observe({
       req(input$text_file)
 
+      # Log file upload
+      log_info(
+        sprintf(
+          "File uploaded: name=%s, type=%s",
+          input$text_file$name,
+          tools::file_ext(input$text_file$name)
+        ),
+        component = "upload"
+      )
+
       # Reset all state -------------------------------------------------------
       raw_texts(NULL)
       uploaded_data(NULL)
@@ -175,6 +197,13 @@ text_upload_server <- function(
             raw_texts(df$text)
           },
           error = function(e) {
+            log_error(
+              sprintf(
+                "Upload read error: file_type=txt, error=%s",
+                conditionMessage(e)
+              ),
+              component = "upload"
+            )
             showNotification(
               paste(lang()$t("Error bij lezen van tekstbestand:"), e$message),
               type = "error"
@@ -188,6 +217,14 @@ text_upload_server <- function(
             uploaded_data(df)
           },
           error = function(e) {
+            log_error(
+              sprintf(
+                "Upload read error: file_type=%s, error=%s",
+                file_ext,
+                conditionMessage(e)
+              ),
+              component = "upload"
+            )
             showNotification(
               paste(
                 lang()$t("Error bij lezen van CSV/TSV bestand:"),
@@ -205,6 +242,13 @@ text_upload_server <- function(
             # Wait for user to choose sheet before loading data
           },
           error = function(e) {
+            log_error(
+              sprintf(
+                "Upload read error: file_type=xlsx, error=%s",
+                conditionMessage(e)
+              ),
+              component = "upload"
+            )
             showNotification(
               paste(lang()$t("Error bij lezen van Excel-bestand:"), e$message),
               type = "error"
@@ -218,6 +262,13 @@ text_upload_server <- function(
             uploaded_data(df)
           },
           error = function(e) {
+            log_error(
+              sprintf(
+                "Upload read error: file_type=sav, error=%s",
+                conditionMessage(e)
+              ),
+              component = "upload"
+            )
             showNotification(
               paste(lang()$t("Error bij lezen van SAV-bestand:"), e$message),
               type = "error"
@@ -225,6 +276,14 @@ text_upload_server <- function(
           }
         )
       } else {
+        log_warn(
+          sprintf(
+            "Unsupported upload file type: name=%s, file_type=%s",
+            input$text_file$name,
+            file_ext
+          ),
+          component = "upload"
+        )
         showNotification(
           lang()$t("Niet ondersteund bestandstype"),
           type = "error"
@@ -284,6 +343,7 @@ text_upload_server <- function(
         {
           df <- readxl::read_excel(file_path, sheet = input$sheet)
           uploaded_data(df)
+          log_action("sheet_selected", details = input$sheet)
         },
         error = function(e) {
           showNotification(
@@ -314,6 +374,7 @@ text_upload_server <- function(
       req(filtered_data())
       col <- input$column
       if (!is.null(col) && nzchar(col)) {
+        log_action("column_selected", details = col)
         txt <- filtered_data()[[col]]
         raw_texts(discard_empty(txt))
       }
@@ -342,6 +403,11 @@ text_upload_server <- function(
         footer = NULL,
 
         bslib::page(
+          tags$div(
+            style = "display:none;",
+            `data-kwallm-modal-id` = "filter_modal",
+            `data-kwallm-modal-details` = "module=text_upload"
+          ),
           p(lang()$t(
             "Je kunt hier de data filteren op basis van waarden in een kolom. Selecteer een kolom en kies waarden. Rijen zonder de gekozen waarden worden uitgesloten."
           )),
@@ -472,11 +538,20 @@ text_upload_server <- function(
         col = if (file_type() == "txt") "text" else input$filter_col,
         vals = input$filter_vals
       ))
+      log_action(
+        "filter_applied",
+        details = sprintf(
+          "col=%s, n_vals=%d",
+          if (file_type() == "txt") "text" else input$filter_col,
+          length(input$filter_vals)
+        )
+      )
       removeModal()
     })
 
     observeEvent(input$clear_filter, {
       filter_spec(NULL)
+      log_action("filter_cleared")
       removeModal()
     })
 

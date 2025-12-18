@@ -38,16 +38,12 @@ edit_topics_server <- function(
         )
       }
 
-      if (isTRUE(getOption("shiny.testmode"))) {
-        observe({
-          shiny::exportTestValues(
-            started = started(),
-            reduction_in_progress = reduction_in_progress(),
-            rereduced_topics = rereduced_topics(),
-            topics_table_data = topics_table_data()
-          )
-        })
-      }
+      shiny::exportTestValues(
+        started = started(),
+        reduction_in_progress = reduction_in_progress(),
+        rereduced_topics = rereduced_topics(),
+        topics_table_data = topics_table_data()
+      )
 
       ## ── first-run modal ────────────────────────────────────────
       observe({
@@ -62,6 +58,15 @@ edit_topics_server <- function(
           easyClose = FALSE,
           tagList(
             shinyjs::useShinyjs(),
+            tags$div(
+              style = "display:none;",
+              `data-kwallm-modal-id` = "edit_topics_modal",
+              `data-kwallm-modal-details` = sprintf(
+                "module_id=%s, n_topics=%d",
+                id,
+                length(topics() %||% character(0))
+              )
+            ),
             lang()$t("Controleer de onderwerpen en pas ze aan waar nodig."),
             br(),
             HTML(lang()$t("<i>Dubbel-klik op een cel om te bewerken.</i>")),
@@ -176,6 +181,10 @@ edit_topics_server <- function(
       # add / delete-empty / reset rows -------------------------------
       observeEvent(input$add_topic, {
         df <- topics_table_data()
+        log_action(
+          "topic_added",
+          details = sprintf("n_rows_before=%d", nrow(df))
+        )
         topics_table_data(dplyr::bind_rows(
           df,
           data.frame(topic = "", exclusive = FALSE)
@@ -184,11 +193,28 @@ edit_topics_server <- function(
 
       observeEvent(input$delete_empty, {
         df <- topics_table_data()
+        n_before <- nrow(df)
         df$topic <- trimws(df$topic)
-        topics_table_data(df[df$topic != "", , drop = FALSE])
+        df2 <- df[df$topic != "", , drop = FALSE]
+        log_action(
+          "topic_empty_rows_deleted",
+          details = sprintf(
+            "n_rows_before=%d n_rows_after=%d",
+            n_before,
+            nrow(df2)
+          )
+        )
+        topics_table_data(df2)
       })
 
       observeEvent(input$reset_topics, {
+        log_action(
+          "topics_reset",
+          details = sprintf(
+            "n_topics_initial=%d",
+            length(initial_topics() %||% character(0))
+          )
+        )
         topics_table_data(build_df(initial_topics(), initial_exclusive()))
       })
 
@@ -208,6 +234,15 @@ edit_topics_server <- function(
         updated_topics <- trimws(df$topic[df$topic != ""])
         updated_exclusive <- trimws(df$topic[df$exclusive & df$topic != ""])
 
+        log_action(
+          "topics_confirmed",
+          details = sprintf(
+            "n_topics=%d n_exclusive=%d",
+            length(updated_topics),
+            length(updated_exclusive)
+          )
+        )
+
         if (anyDuplicated(updated_topics)) {
           shiny::showNotification(
             lang()$t("Onderwerpen moeten uniek zijn."),
@@ -226,6 +261,17 @@ edit_topics_server <- function(
         exclusive_topics(updated_exclusive)
         removeModal()
         edited_topics(updated_topics)
+
+        # Log topic editing result
+        log_info(
+          sprintf(
+            "Topics edited (human-in-loop): n_original=%d, n_final=%d, n_exclusive=%d",
+            length(initial_topics()),
+            length(updated_topics),
+            length(updated_exclusive)
+          ),
+          component = "topics"
+        )
       })
 
       # re-reduce  ----------------------------------------------------
@@ -250,8 +296,21 @@ edit_topics_server <- function(
         reduction_in_progress(TRUE)
         rereduced_topics(NULL)
 
+        # Log topic re-reduction start
+        log_info(
+          sprintf(
+            "Topics re-reduction started: n_topics=%d",
+            length(updated_topics)
+          ),
+          component = "topics"
+        )
+
+        log_ctx <- log_context_capture(is_async = TRUE)
+
         future_promise(
           {
+            log_context_apply(log_ctx)
+
             reduce_topics(
               updated_topics,
               research_background,
@@ -270,7 +329,9 @@ edit_topics_server <- function(
             get_context_window_size_in_tokens = get_context_window_size_in_tokens,
             tiktoken_load_tokenizer = tiktoken_load_tokenizer,
             count_tokens = count_tokens,
-            async_message_printer = async_message_printer
+            async_message_printer = async_message_printer,
+            log_ctx = log_ctx,
+            log_context_apply = log_context_apply
           ),
           seed = NULL
         ) %...>%
@@ -316,6 +377,15 @@ edit_topics_server <- function(
 
         topics_table_data(build_df(new_topics, current_exclusive))
         reduction_in_progress(FALSE)
+
+        # Log topic re-reduction result
+        log_info(
+          sprintf(
+            "Topics re-reduction complete: n_final=%d",
+            length(new_topics)
+          ),
+          component = "topics"
+        )
       })
 
       # global enable/disable during re-reduce ----------------------

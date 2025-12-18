@@ -37,6 +37,7 @@ mark_texts <- function(
   }
 
   # Set initial progress
+  log_info("Marking Step 1: Splitting texts...", component = "analysis")
   try(progress_primary$set_with_total(
     1,
     total_steps,
@@ -95,6 +96,7 @@ mark_texts <- function(
   total_combinations <- nrow(df) * length(codes)
   current_count <- 0
   try({
+    log_info("Marking Step 2: Marking texts...", component = "analysis")
     progress_primary$set_with_total(
       2,
       total_steps,
@@ -114,6 +116,16 @@ mark_texts <- function(
     dplyr::mutate(
       marked_text = purrr::map2(sub_text, code, function(txt, cd) {
         current_count <<- current_count + 1
+        if (current_count == 1 || current_count %% 10 == 0) {
+          log_info(
+            sprintf(
+              "Marking progress: %d/%d",
+              current_count,
+              total_combinations
+            ),
+            component = "analysis"
+          )
+        }
         try({
           progress_secondary$set_with_total(
             current_count,
@@ -182,6 +194,7 @@ mark_texts <- function(
   # Write paragraphs if requested
   if (write_paragraphs) {
     try({
+      log_info("Marking Step 4: Writing paragraphs...", component = "analysis")
       progress_primary$set_with_total(
         3,
         total_steps,

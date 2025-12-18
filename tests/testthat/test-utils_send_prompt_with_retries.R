@@ -11,6 +11,14 @@ create_mock_result <- function(response = "test response") {
   )
 }
 
+# Helper to create a mock llm_provider object
+create_mock_llm_provider <- function(model = "test-model") {
+  list(
+    parameters = list(model = model),
+    clone = function() create_mock_llm_provider(model)
+  )
+}
+
 test_that("send_prompt_with_retries returns response on successful first try", {
   source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
 
@@ -22,6 +30,7 @@ test_that("send_prompt_with_retries returns response on successful first try", {
 
   result <- send_prompt_with_retries(
     prompt = "test prompt",
+    llm_provider = create_mock_llm_provider(),
     max_tries = 3,
     retry_delay_seconds = 0
   )
@@ -49,6 +58,7 @@ test_that("send_prompt_with_retries retries on error and eventually succeeds", {
 
   result <- send_prompt_with_retries(
     prompt = "test prompt",
+    llm_provider = create_mock_llm_provider(),
     max_tries = 5,
     retry_delay_seconds = 0 # No delay for tests
   )
@@ -71,6 +81,7 @@ test_that("send_prompt_with_retries stops after max_tries with error", {
   expect_error(
     send_prompt_with_retries(
       prompt = "test prompt",
+      llm_provider = create_mock_llm_provider(),
       max_tries = 3,
       retry_delay_seconds = 0
     ),
@@ -92,6 +103,7 @@ test_that("send_prompt_with_retries errors when response is NULL", {
   expect_error(
     send_prompt_with_retries(
       prompt = "test prompt",
+      llm_provider = create_mock_llm_provider(),
       max_tries = 1,
       retry_delay_seconds = 0
     ),
@@ -120,6 +132,7 @@ test_that("send_prompt_with_retries respects max_interactions parameter", {
 
   send_prompt_with_retries(
     prompt = "test",
+    llm_provider = create_mock_llm_provider(),
     max_tries = 1,
     max_interactions = 42,
     retry_delay_seconds = 0
@@ -137,5 +150,6 @@ test_that("send_prompt_with_retries uses default options", {
   expect_true("max_tries" %in% names(fn_formals))
   expect_true("retry_delay_seconds" %in% names(fn_formals))
   expect_true("max_interactions" %in% names(fn_formals))
-  expect_true("debug_logging" %in% names(fn_formals))
+  expect_true("stream_callback" %in% names(fn_formals))
+  expect_true("llm_provider" %in% names(fn_formals))
 })

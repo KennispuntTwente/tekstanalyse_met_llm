@@ -73,7 +73,14 @@ interrater_server <- function(
           size = "l",
           easyClose = FALSE,
           footer = NULL,
-          uiOutput(ns("dynamic_content_area"))
+          tagList(
+            tags$div(
+              style = "display:none;",
+              `data-kwallm-modal-id` = "interrater_modal",
+              `data-kwallm-modal-details` = sprintf("module_id=%s", id)
+            ),
+            uiOutput(ns("dynamic_content_area"))
+          )
         ))
       }
       # Make available to the main server:
@@ -365,6 +372,18 @@ interrater_server <- function(
           return()
         }
 
+        log_action(
+          "irr_start_rating_clicked",
+          details = sprintf(
+            "mode=%s sample_type=%s sample_size=%d total_items=%d assign_multiple=%s",
+            mode,
+            input$sample_type %||% "unknown",
+            n_sample,
+            total_n,
+            assign_multiple_categories
+          )
+        )
+
         # Perform random sampling
         sampled_indices <- sample(
           seq_len(total_n),
@@ -379,11 +398,39 @@ interrater_server <- function(
         current_item_index(1)
         return$result <- NULL
         module_state("rating")
+
+        # Log IRR session start
+        log_info(
+          sprintf(
+            "IRR session started: mode=%s, sample_size=%d, total_items=%d, assign_multiple=%s",
+            mode,
+            n_sample,
+            total_n,
+            assign_multiple_categories
+          ),
+          component = "irr"
+        )
       })
 
       # Reset button; returns to configuration state
       observeEvent(input$reset_module, {
         req(module_state() == "rating")
+
+        df_sample <- sampled_data_rv()
+        total_items <- if (is.data.frame(df_sample)) {
+          nrow(df_sample)
+        } else {
+          NA_integer_
+        }
+        log_action(
+          "irr_reset_clicked",
+          details = sprintf(
+            "mode=%s item_index=%d total_items=%s",
+            mode,
+            current_item_index() %||% NA_integer_,
+            as.character(total_items)
+          )
+        )
 
         # Reset relevant states
         module_state("configure_sample")
@@ -424,6 +471,23 @@ interrater_server <- function(
       observeEvent(input$go_back, {
         req(module_state() == "rating")
         req(current_item_index() > 1)
+
+        df_sample <- sampled_data_rv()
+        total_items <- if (is.data.frame(df_sample)) {
+          nrow(df_sample)
+        } else {
+          NA_integer_
+        }
+        log_action(
+          "irr_back_clicked",
+          details = sprintf(
+            "mode=%s from_index=%d to_index=%d total_items=%s",
+            mode,
+            current_item_index(),
+            current_item_index() - 1,
+            as.character(total_items)
+          )
+        )
         current_item_index(current_item_index() - 1)
       })
 
@@ -497,6 +561,17 @@ interrater_server <- function(
         current_ratings[[as.character(current_index)]] <- user_input
         user_ratings_store(current_ratings)
 
+        log_action(
+          "irr_item_submitted",
+          details = sprintf(
+            "mode=%s item_index=%d total_items=%d last=%s",
+            mode,
+            current_index,
+            total_items,
+            isTRUE(current_index >= total_items)
+          )
+        )
+
         # Move to next item OR calculate final result
         if (current_index < total_items) {
           current_item_index(current_index + 1)
@@ -569,6 +644,19 @@ interrater_server <- function(
 
                 # Combine everything into one list
                 result_list <- c(as.list(t_test_summary), summary_stats)
+
+                # Log IRR t-test results
+                log_info(
+                  sprintf(
+                    "IRR completed (t-test): n=%d, user_mean=%.2f, llm_mean=%.2f, p=%.4f",
+                    length(user_scores),
+                    summary_stats$user_mean,
+                    summary_stats$llm_mean,
+                    t_test_summary$p.value[[1]]
+                  ),
+                  component = "irr"
+                )
+
                 result_list
               } else {
                 # Kappa for categorical data
@@ -629,6 +717,18 @@ interrater_server <- function(
                 # Make suitable object type
                 class(kappa_output) <- "list"
 
+                # Log IRR Kappa results
+                log_info(
+                  sprintf(
+                    "IRR completed (Kappa): n=%d, kappa=%.3f, z=%.3f, p=%.4f",
+                    kappa_output$subjects,
+                    kappa_output$value,
+                    kappa_output$statistic,
+                    kappa_output$p.value
+                  ),
+                  component = "irr"
+                )
+
                 # Return
                 kappa_output
               }
@@ -648,6 +748,7 @@ interrater_server <- function(
 
           return$result <- calculation_result
           return$done <- TRUE
+          log_action("irr_calculation_finished")
           removeModal()
         }
       })

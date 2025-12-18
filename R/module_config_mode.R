@@ -100,6 +100,7 @@ mode_server <- function(
         }
 
         mode(new_mode)
+        log_action("mode_changed", details = new_mode)
       })
 
       # When processing, disable the mode selection

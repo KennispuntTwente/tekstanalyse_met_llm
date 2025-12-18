@@ -230,12 +230,28 @@ text_split_server <- function(
       shinyjs::disable("split_texts")
       # Set message
       semchunk_message(lang()$t("..."))
+
+      # Log split action start
+      log_info(
+        sprintf(
+          "Text split started: max_tokens=%d, overlap=%d, n_texts=%d",
+          input$max_tokens,
+          input$overlap %||% 0,
+          length(raw_texts())
+        ),
+        component = "split"
+      )
+
       # Start queue consumer
       queue$consumer$start(millis = 50)
 
       # Async text splitting
+      log_ctx <- log_context_capture(is_async = TRUE)
+
       promises::future_promise(
         {
+          log_context_apply(log_ctx)
+
           split_texts_with_semchunk(
             texts = raw_texts,
             chunk_size = chunk_size,
@@ -250,7 +266,9 @@ text_split_server <- function(
           queue = queue,
           split_texts_with_semchunk = split_texts_with_semchunk,
           semchunk_load_chunker = semchunk_load_chunker,
-          async_message_printer = async_message_printer
+          async_message_printer = async_message_printer,
+          log_ctx = log_ctx,
+          log_context_apply = log_context_apply
         ),
         seed = NULL
       ) %...>%
@@ -263,6 +281,7 @@ text_split_server <- function(
             semchunk_message(lang()$t(
               "Splitsing resulteerde niet in meer teksten"
             ))
+            log_info("Text split: no change", component = "split")
           } else {
             n <- length(raw_texts())
             m <- length(split_texts())
@@ -274,6 +293,10 @@ text_split_server <- function(
               m,
               lang()$t(" teksten")
             ))
+            log_info(
+              sprintf("Text split complete: %d -> %d texts", n, m),
+              component = "split"
+            )
           }
 
           shinyjs::enable("split_texts")
@@ -281,7 +304,10 @@ text_split_server <- function(
         } %...!%
         {
           error <- .
-          print(error)
+          log_error(
+            paste("Text split error:", error$message %||% as.character(error)),
+            component = "split"
+          )
 
           split_in_progress(FALSE)
           split_texts(NULL)
@@ -308,26 +334,56 @@ text_split_server <- function(
     })
 
     # Ensure max_tokens value stays valid
-    observeEvent(input$max_tokens, {
-      req(input$max_tokens)
-      max_tokens_val(input$max_tokens)
+    observeEvent(
+      input$max_tokens,
+      {
+        req(input$max_tokens)
+        req(isTRUE(enabled))
 
-      # Ensure minimum value
-      if (input$max_tokens < 1) {
-        updateNumericInput(session, "max_tokens", value = 1)
-      }
-    })
+        new_val <- max(1, input$max_tokens)
+        max_tokens_val(new_val)
+
+        if (input$max_tokens != new_val) {
+          updateNumericInput(session, "max_tokens", value = new_val)
+        }
+
+        log_action(
+          "max_tokens_changed",
+          details = sprintf(
+            "splitting=%s value=%d",
+            isTRUE(splitting()),
+            new_val
+          )
+        )
+      },
+      ignoreInit = TRUE
+    )
 
     # Ensure overlap value stays valid
-    observeEvent(input$overlap, {
-      req(input$overlap)
-      overlap_val(input$overlap)
+    observeEvent(
+      input$overlap,
+      {
+        req(input$overlap)
+        req(isTRUE(enabled))
 
-      # Ensure minimum value
-      if (input$overlap < 0) {
-        updateNumericInput(session, "overlap", value = 0)
-      }
-    })
+        new_val <- max(0, input$overlap)
+        overlap_val(new_val)
+
+        if (input$overlap != new_val) {
+          updateNumericInput(session, "overlap", value = new_val)
+        }
+
+        log_action(
+          "overlap_changed",
+          details = sprintf(
+            "splitting=%s value=%d",
+            isTRUE(splitting()),
+            new_val
+          )
+        )
+      },
+      ignoreInit = TRUE
+    )
 
     # Disable inputs when processing -------------------------------
 

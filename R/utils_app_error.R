@@ -29,8 +29,19 @@ app_error <- function(
 
   error <- capture.output(print(error)) |> paste0(collapse = "\n")
 
+  session_id <- "system"
+  if (
+    !is.null(shiny_session) &&
+      !is.null(shiny_session$token) &&
+      nzchar(shiny_session$token)
+  ) {
+    session_id <- substr(shiny_session$token, 1, 8)
+  } else if (exists("get_session_id", mode = "function")) {
+    session_id <- tryCatch(get_session_id(), error = function(e) "system")
+  }
+
   current_time <- Sys.time()
-  formatted_time <- format(current_time, "%Y-%m-%d %H:%M:%S")
+  formatted_time <- format(current_time, "%Y-%m-%d %H:%M:%S%z")
   log_message <- paste0(
     "Error: ",
     error,
@@ -38,23 +49,25 @@ app_error <- function(
     "When: ",
     when,
     "\n",
+    "Session ID: ",
+    session_id,
+    "\n",
     "Time: ",
     formatted_time,
     "\n"
   )
-  print(log_message)
 
-  # Define subdirectory based on error type
-  log_dir <- if (fatal) "app_errors/fatal" else "app_errors/nonfatal"
-  if (!dir.exists(log_dir)) {
-    dir.create(log_dir, recursive = TRUE)
-  }
+  cat(log_message)
 
-  log_file <- file.path(
-    log_dir,
-    paste0("error_", format(current_time, "%Y%m%d_%H%M%S"), ".log")
+  # Log error using the centralized logger
+  tryCatch(
+    log_error(
+      sprintf("Error occurred: %s | When: %s", error, when),
+      component = "error",
+      fatal = fatal
+    ),
+    error = function(e) invisible(NULL)
   )
-  write(log_message, file = log_file, append = TRUE)
 
   if (is.null(shiny_session)) {
     stop(error)
@@ -120,6 +133,11 @@ app_error <- function(
     showModal(modalDialog(
       title = "Error",
       tagList(
+        tags$div(
+          style = "display:none;",
+          `data-kwallm-modal-id` = "app_error_modal",
+          `data-kwallm-modal-details` = sprintf("fatal=%s", fatal)
+        ),
         p(lang$t(
           "Er gebeurde iets onverwachts, waardoor de app is gestopt. Sorry!"
         )),
@@ -136,7 +154,7 @@ app_error <- function(
     shiny_session$close()
   } else {
     showNotification(
-      paste("Error:", error),
+      paste0("Session ID: ", session_id, " | Error: ", error),
       type = "error",
       duration = NULL
     )
