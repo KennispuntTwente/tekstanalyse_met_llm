@@ -17,23 +17,19 @@ human_in_the_loop_toggle_server <- function(
   mode,
   lang = default_lang()
 ) {
+  # Call the reusable component - note: passing raw strings, component will translate
   yes_no_toggle_card_server(
     id = id,
-    title = lang()$t("Human-in-the-loop"),
+    title = "Human-in-the-loop",
     tooltip_text = paste0(
-      lang()$t(
-        "Indien je dit aanzet, kun je de de onderwerpen die het taalmodel heeft geïdentificeerd in de teksten bekijken en bewerken."
-      ),
-      lang()$t(
-        " Dit kan je dan doen dan voordat de onderwerpen worden toegewezen aan de teksten."
-      ),
-      lang()$t(
-        " Je kan bijvoorbeeld zelf bepaalde onderwerpen toevoegen, verwijderen, samenvoegen, of uitsplitsen."
-      )
+      "Indien je dit aanzet, kun je de de onderwerpen die het taalmodel heeft geïdentificeerd in de teksten bekijken en bewerken.",
+      " Dit kan je dan doen dan voordat de onderwerpen worden toegewezen aan de teksten.",
+      " Je kan bijvoorbeeld zelf bepaalde onderwerpen toevoegen, verwijderen, samenvoegen, of uitsplitsen."
     ),
-    question_text = lang()$t("Zelf onderwerpen bewerken?"),
+    question_text = "Zelf onderwerpen bewerken?",
     default_value = FALSE,
     show_when = reactive(mode() == "Onderwerpextractie"),
+    translate_texts = TRUE, # Tell component to translate the texts reactively
     processing = processing,
     lang = lang
   )
