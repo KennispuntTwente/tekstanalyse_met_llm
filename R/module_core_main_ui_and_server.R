@@ -171,10 +171,12 @@ main_server <- function(
         if (identical(view, "vertical")) {
           shinyjs::hide("kwallm_sections_nav", anim = FALSE)
           show_all_sections()
+          log_action("layout_view_changed", details = "vertical")
           return()
         }
 
         # sections view
+        log_action("layout_view_changed", details = "sections")
         shinyjs::show("kwallm_sections_nav", anim = FALSE)
 
         cur <- current_section()
@@ -214,6 +216,11 @@ main_server <- function(
         }
 
         show_single_section(new, direction = direction)
+
+        log_action(
+          "section_navigated",
+          details = paste0("section=", new, ", from=", old, ", method=step")
+        )
       },
       ignoreInit = TRUE
     )
@@ -232,6 +239,11 @@ main_server <- function(
           inputId = "kwallm_sections_step",
           selected = as.character(cur - 1L)
         )
+
+        log_action(
+          "section_navigated",
+          details = paste0("section=", cur - 1L, ", from=", cur, ", method=prev")
+        )
       },
       ignoreInit = TRUE
     )
@@ -249,6 +261,11 @@ main_server <- function(
           session = session,
           inputId = "kwallm_sections_step",
           selected = as.character(cur + 1L)
+        )
+
+        log_action(
+          "section_navigated",
+          details = paste0("section=", cur + 1L, ", from=", cur, ", method=next")
         )
       },
       ignoreInit = TRUE
