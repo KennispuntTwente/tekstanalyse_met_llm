@@ -59,7 +59,8 @@ main_server <- function(
         modal_id <- as.character(evt$id)
 
         # Log as e.g. `filter_modal_opened` / `filter_modal_closed`
-        action <- switch(type,
+        action <- switch(
+          type,
           opened = paste0(modal_id, "_opened"),
           closed = paste0(modal_id, "_closed"),
           paste0(modal_id, "_event")
@@ -161,7 +162,8 @@ main_server <- function(
 
     # Layout toggle behaviour ------------------------------------------------
 
-    observeEvent(input$kwallm_layout_view,
+    observeEvent(
+      input$kwallm_layout_view,
       {
         view <- input$kwallm_layout_view
         if (is.null(view) || !view %in% c("vertical", "sections")) {
@@ -193,7 +195,8 @@ main_server <- function(
 
     # Section navigation behaviour ------------------------------------------
 
-    observeEvent(input$kwallm_sections_step,
+    observeEvent(
+      input$kwallm_sections_step,
       {
         new <- suppressWarnings(as.integer(input$kwallm_sections_step))
         if (is.na(new) || new < 1L || new > n_sections) {
@@ -225,7 +228,8 @@ main_server <- function(
       ignoreInit = TRUE
     )
 
-    observeEvent(input$kwallm_sections_prev,
+    observeEvent(
+      input$kwallm_sections_prev,
       {
         if (!identical(input$kwallm_layout_view, "sections")) {
           return()
@@ -242,13 +246,20 @@ main_server <- function(
 
         log_action(
           "section_navigated",
-          details = paste0("section=", cur - 1L, ", from=", cur, ", method=prev")
+          details = paste0(
+            "section=",
+            cur - 1L,
+            ", from=",
+            cur,
+            ", method=prev"
+          )
         )
       },
       ignoreInit = TRUE
     )
 
-    observeEvent(input$kwallm_sections_next,
+    observeEvent(
+      input$kwallm_sections_next,
       {
         if (!identical(input$kwallm_layout_view, "sections")) {
           return()
@@ -265,7 +276,13 @@ main_server <- function(
 
         log_action(
           "section_navigated",
-          details = paste0("section=", cur + 1L, ", from=", cur, ", method=next")
+          details = paste0(
+            "section=",
+            cur + 1L,
+            ", from=",
+            cur,
+            ", method=next"
+          )
         )
       },
       ignoreInit = TRUE
@@ -349,7 +366,11 @@ main_server <- function(
                     lang()$t("Secties")
                   )
                 ),
-                selected = if (isTRUE(getOption("shiny.testmode"))) "vertical" else "sections",
+                selected = if (isTRUE(getOption("shiny.testmode"))) {
+                  "vertical"
+                } else {
+                  "sections"
+                },
                 size = "sm"
               )
             )
