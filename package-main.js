@@ -1,5 +1,5 @@
 const { app, BrowserWindow } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const waitOn = require('wait-on');
 const path = require('path');
 const net = require('net');
@@ -21,6 +21,86 @@ log('App starting...');
 let splashWin;
 let mainWin;
 let shinyProcess = null;
+let isQuitting = false;
+let killInProgress = false;
+
+function isAlive(pid) {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function killProcessTreeWindows(pid, reason) {
+  return new Promise((resolve) => {
+    if (!pid) return resolve();
+    log(`Attempting Windows taskkill for PID ${pid} (${reason})...`);
+    const child = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: true });
+    child.on('error', (err) => {
+      log(`[WARNING] taskkill failed to start: ${err.message}`);
+      resolve();
+    });
+    child.on('exit', (code) => {
+      log(`taskkill exited with code ${code} (reason: ${reason})`);
+      resolve();
+    });
+  });
+}
+
+function killProcessTreePosix(pid, reason) {
+  return new Promise((resolve) => {
+    if (!pid) return resolve();
+    log(`Attempting tree-kill for PID ${pid} (${reason})...`);
+    treeKill(pid, 'SIGTERM', (err) => {
+      if (err) log(`[WARNING] tree-kill SIGTERM failed: ${err.message}`);
+      resolve();
+    });
+  });
+}
+
+async function killShinyProcessTree(reason) {
+  if (killInProgress) return;
+  killInProgress = true;
+
+  try {
+    if (!shinyProcess || !shinyProcess.pid) return;
+    const pid = shinyProcess.pid;
+
+    if (!isAlive(pid)) {
+      log(`Shiny PID ${pid} already not alive (${reason}).`);
+      return;
+    }
+
+    log(`Killing Shiny process tree (PID ${pid})... (${reason})`);
+
+    if (process.platform === 'win32') {
+      await killProcessTreeWindows(pid, reason);
+    } else {
+      await killProcessTreePosix(pid, reason);
+    }
+
+    // Fallback: if still alive after a short grace period, force kill.
+    await new Promise((r) => setTimeout(r, 1200));
+    if (isAlive(pid)) {
+      log(`[WARNING] Shiny PID ${pid} still alive; forcing termination (${reason}).`);
+      if (process.platform === 'win32') {
+        await killProcessTreeWindows(pid, `${reason}:force`);
+      } else {
+        await new Promise((resolve) => {
+          treeKill(pid, 'SIGKILL', (err) => {
+            if (err) log(`[WARNING] tree-kill SIGKILL failed: ${err.message}`);
+            resolve();
+          });
+        });
+      }
+    }
+  } finally {
+    killInProgress = false;
+  }
+}
 
 function getFreePort(defaultPort = 21471) {
   return new Promise((resolve) => {
@@ -86,6 +166,16 @@ async function launchShinyApp(port) {
 
     shinyProcess.on('exit', (code) => {
       log(`Shiny process exited with code ${code}`);
+      // If Shiny dies unexpectedly, close the UI to avoid a stuck Electron window.
+      if (!isQuitting) {
+        try {
+          if (mainWin && !mainWin.isDestroyed()) mainWin.close();
+          if (splashWin && !splashWin.isDestroyed()) splashWin.close();
+        } catch (e) {
+          log(`[WARNING] Failed to close windows after Shiny exit: ${e.message}`);
+        }
+        app.quit();
+      }
     });
 
     resolve();
@@ -178,6 +268,14 @@ function createMainWindow(port) {
     return { action: 'deny' };
   });
   //mainWin.webContents.openDevTools();
+
+  // Ensure that closing the window triggers a quit (and cleanup) on all platforms.
+  mainWin.on('close', () => {
+    if (!isQuitting) {
+      isQuitting = true;
+      app.quit();
+    }
+  });
 }
 
 app.whenReady().then(async () => {
@@ -201,12 +299,44 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => {
-  if (shinyProcess && shinyProcess.pid) {
-    log('Killing Shiny process...');
-    treeKill(shinyProcess.pid, 'SIGTERM', (err) => {
-      if (err) console.error('Failed to kill process tree:', err);
-      else log('Shiny process tree killed');
+app.on('before-quit', (event) => {
+  // Make sure we terminate R + all its children before exiting Electron.
+  if (killInProgress) return;
+  isQuitting = true;
+  event.preventDefault();
+
+  killShinyProcessTree('before-quit')
+    .catch((err) => log(`[WARNING] killShinyProcessTree failed: ${err.message}`))
+    .finally(() => {
+      log('Exiting Electron after cleanup.');
+      app.exit(0);
     });
-  }
 });
+
+// Best-effort cleanup when Electron receives termination signals.
+// Note: `exit` cannot run async work, so we use spawnSync on Windows.
+function syncKillOnExit(reason) {
+  try {
+    if (shinyProcess && shinyProcess.pid && isAlive(shinyProcess.pid)) {
+      const pid = shinyProcess.pid;
+      log(`syncKillOnExit: ${reason}, PID ${pid}`);
+      if (process.platform === 'win32') {
+        spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: true });
+      } else {
+        treeKill(pid, 'SIGKILL');
+      }
+    }
+  } catch (e) {
+    // Ignore errors during forced shutdown.
+  }
+}
+
+process.on('SIGINT', () => {
+  isQuitting = true;
+  killShinyProcessTree('SIGINT').finally(() => app.exit(0));
+});
+process.on('SIGTERM', () => {
+  isQuitting = true;
+  killShinyProcessTree('SIGTERM').finally(() => app.exit(0));
+});
+process.on('exit', () => syncKillOnExit('process-exit'));

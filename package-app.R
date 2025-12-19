@@ -186,10 +186,33 @@ args <- commandArgs(trailingOnly = TRUE)
 port <- if (length(args) > 0) as.numeric(args[1]) else 3838
 options(shiny.port = port)
 
+server_fn <- main_server(
+  preconfigured_main_models = preconfigured_models_main,
+  preconfigured_large_models = preconfigured_models_large
+)
+
+server_wrapped <- function(input, output, session) {
+  # Best-effort cleanup for multisession workers.
+  # Registered via shiny::onStop() for compatibility with older Shiny versions.
+  shiny::onStop(function() {
+    try(
+      {
+        future::plan("sequential")
+      },
+      silent = TRUE
+    )
+    try(
+      {
+        future::ClusterRegistry("stop")
+      },
+      silent = TRUE
+    )
+  })
+
+  server_fn(input, output, session)
+}
+
 shiny::shinyApp(
   ui = main_ui(),
-  server = main_server(
-    preconfigured_main_models = preconfigured_models_main,
-    preconfigured_large_models = preconfigured_models_large
-  )
+  server = server_wrapped
 )
