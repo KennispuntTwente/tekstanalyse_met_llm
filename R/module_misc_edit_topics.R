@@ -319,19 +319,20 @@ edit_topics_server <- function(
             )
           },
           packages = c("tidyprompt", "tidyverse"),
-          globals = list(
-            send_prompt_with_retries = send_prompt_with_retries,
-            reduce_topics = reduce_topics,
-            updated_topics = updated_topics,
-            research_background = research_background(),
-            llm_provider = llm_provider,
-            lang = lang(),
-            get_context_window_size_in_tokens = get_context_window_size_in_tokens,
-            tiktoken_load_tokenizer = tiktoken_load_tokenizer,
-            count_tokens = count_tokens,
-            async_message_printer = async_message_printer,
-            log_ctx = log_ctx,
-            log_context_apply = log_context_apply
+          globals = c(
+            list(
+              send_prompt_with_retries = send_prompt_with_retries,
+              reduce_topics = reduce_topics,
+              updated_topics = updated_topics,
+              research_background = research_background(),
+              llm_provider = llm_provider,
+              lang = lang(),
+              get_context_window_size_in_tokens = get_context_window_size_in_tokens,
+              tiktoken_load_tokenizer = tiktoken_load_tokenizer,
+              count_tokens = count_tokens,
+              async_message_printer = async_message_printer
+            ),
+            log_async_globals(log_ctx)
           ),
           seed = NULL
         ) %...>%
