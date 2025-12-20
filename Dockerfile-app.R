@@ -115,7 +115,7 @@ options(
   llm_provider__can_configure_oai = TRUE,
   llm_provider__default_oai_url = "https://api.openai.com/v1/chat/completions",
   llm_provider__can_configure_ollama = TRUE,
-  llm_provider__default_ollama_url = "http://localhost:11434/api/chat",
+  llm_provider__default_ollama_url = "http://host.docker.internal:11434/api/chat",
 
   # - Language for app interface & results (Dutch (nl) or English (en));
   #   see R/language.R
