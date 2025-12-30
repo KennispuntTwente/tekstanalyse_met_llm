@@ -132,3 +132,62 @@ test_that("verify_and_decorate_quotes uses Dutch tooltips when lang='nl'", {
   # Dutch tooltip should be present
   expect_match(out, "Quote geverifieerd")
 })
+
+test_that("verify_and_decorate_quotes handles NA supporting_texts (no error)", {
+  source(here::here("R", "utils_quotes.R"), local = TRUE)
+
+  paragraph <- 'Contains "alpha".'
+  expect_warning(
+    expect_error(
+      out <- verify_and_decorate_quotes(
+        paragraph,
+        supporting_texts = NA_character_,
+        lang = "en",
+        escape_html = FALSE
+      ),
+      NA
+    ),
+    NA
+  )
+
+  # With no supporting texts, quote should be marked missing
+  expect_match(out, "exclamation-triangle-fill")
+})
+
+test_that("verify_and_decorate_quotes does not call str_detect with empty patterns", {
+  source(here::here("R", "utils_quotes.R"), local = TRUE)
+
+  # After cleaning trailing punctuation/symbols, this becomes an empty query.
+  paragraph <- 'He said "!!!".'
+  supporting <- "some text"
+  expect_warning(
+    expect_error(
+      out <- verify_and_decorate_quotes(
+        paragraph,
+        supporting_texts = supporting,
+        lang = "en",
+        escape_html = FALSE
+      ),
+      NA
+    ),
+    NA
+  )
+  expect_match(out, "exclamation-triangle-fill")
+})
+
+test_that("verify_and_decorate_quotes drops NA within supporting_texts vectors", {
+  source(here::here("R", "utils_quotes.R"), local = TRUE)
+
+  paragraph <- 'He said "hello".'
+  supporting <- c(NA_character_, "Hello world")
+  expect_error(
+    out <- verify_and_decorate_quotes(
+      paragraph,
+      supporting_texts = supporting,
+      lang = "en",
+      escape_html = FALSE
+    ),
+    NA
+  )
+  expect_match(out, "check-circle-fill")
+})
