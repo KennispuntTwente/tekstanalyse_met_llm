@@ -109,6 +109,16 @@ options(
   send_prompt_with_retries__retry_delay_seconds = 3,
   send_prompt_with_retries__max_interactions = 10,
 
+  # - Prompt/response tracing (privacy-sensitive; disabled by default)
+  #   1) Log prompts & replies to a separate trace file (under logs/prompt_logs/)
+  #   2) Log prompts & replies via the regular app logger (DEBUG)
+  #   Optional: override the trace file location
+  #     see: R/utils_send_prompt_with_retries.R
+  send_prompt_with_retries__log_prompts_to_file = FALSE,
+  send_prompt_with_retries__log_prompts_to_logs = FALSE,
+  send_prompt_with_retries__prompt_trace_file = NULL,
+  send_prompt_with_retries__prompt_trace_retention_files = 30, # Keep last N prompt log files (NULL = indefinite)
+
   # - Maximum number of texts to process at once;
   #     see: R/processing.R
   processing__max_texts = 3000,

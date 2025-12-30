@@ -153,3 +153,165 @@ test_that("send_prompt_with_retries uses default options", {
   expect_true("stream_callback" %in% names(fn_formals))
   expect_true("llm_provider" %in% names(fn_formals))
 })
+
+test_that("prompt tracing to regular logs includes correlated prompt_id", {
+  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+
+  # Capture log output
+  debug_messages <- character(0)
+  log_debug <- function(msg, component = NULL) {
+    debug_messages <<- c(debug_messages, as.character(msg))
+    invisible(NULL)
+  }
+  log_warn <- function(...) invisible(NULL)
+  log_error <- function(...) invisible(NULL)
+
+  withr::local_options(
+    send_prompt_with_retries__log_prompts_to_logs = TRUE,
+    send_prompt_with_retries__log_prompts_to_file = FALSE,
+    kwallm__prompt_trace_last_cleanup = NULL
+  )
+
+  local_mocked_bindings(
+    send_prompt = function(...) create_mock_result("hello"),
+    .package = "tidyprompt"
+  )
+
+  res <- send_prompt_with_retries(
+    prompt = "test prompt",
+    llm_provider = create_mock_llm_provider(),
+    max_tries = 1,
+    retry_delay_seconds = 0
+  )
+  expect_equal(res, "hello")
+
+  send_msgs <- grep("LLM prompt send: prompt_id=", debug_messages, value = TRUE)
+  reply_msgs <- grep("LLM reply received: prompt_id=", debug_messages, value = TRUE)
+  expect_true(length(send_msgs) >= 1)
+  expect_true(length(reply_msgs) >= 1)
+
+  extract_id <- function(x) {
+    m <- regexec("prompt_id=([^,\\s]+)", x)
+    reg <- regmatches(x, m)
+    if (length(reg) == 0 || length(reg[[1]]) < 2) return(NA_character_)
+    reg[[1]][2]
+  }
+
+  send_id <- extract_id(send_msgs[[1]])
+  reply_id <- extract_id(reply_msgs[[1]])
+  expect_true(nzchar(send_id))
+  expect_equal(reply_id, send_id)
+})
+
+test_that("prompt tracing to file writes prompt and response with same prompt_id", {
+  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+
+  tmpdir <- withr::local_tempdir()
+  trace_file <- file.path(tmpdir, "prompt_trace_2099-01-01.log")
+
+  # Avoid depending on logger helpers here.
+  log_debug <- function(...) invisible(NULL)
+  log_warn <- function(...) invisible(NULL)
+  log_error <- function(...) invisible(NULL)
+
+  withr::local_options(
+    send_prompt_with_retries__log_prompts_to_file = TRUE,
+    send_prompt_with_retries__log_prompts_to_logs = FALSE,
+    send_prompt_with_retries__prompt_trace_file = trace_file,
+    send_prompt_with_retries__prompt_trace_retention_files = NULL,
+    kwallm__prompt_trace_last_cleanup = NULL
+  )
+
+  local_mocked_bindings(
+    send_prompt = function(...) create_mock_result("world"),
+    .package = "tidyprompt"
+  )
+
+  send_prompt_with_retries(
+    prompt = "test prompt",
+    llm_provider = create_mock_llm_provider(),
+    max_tries = 1,
+    retry_delay_seconds = 0
+  )
+
+  expect_true(file.exists(trace_file))
+  lines <- readLines(trace_file, warn = FALSE)
+
+  expect_true(any(grepl("---- PROMPT_SEND ----", lines, fixed = TRUE)))
+  expect_true(any(grepl("---- RESPONSE_RECEIVED ----", lines, fixed = TRUE)))
+  expect_true(any(grepl("prompt_text:", lines, fixed = TRUE)))
+  expect_true(any(grepl("response_text:", lines, fixed = TRUE)))
+
+  extract_first_id_after <- function(marker) {
+    i <- which(lines == marker)
+    if (length(i) == 0) return(NA_character_)
+    sub <- lines[(i[[1]] + 1):min(length(lines), i[[1]] + 20)]
+    id_line <- sub[grepl("^prompt_id=", sub)]
+    if (length(id_line) == 0) return(NA_character_)
+    sub("^prompt_id=", "", id_line[[1]])
+  }
+
+  id_send <- extract_first_id_after("---- PROMPT_SEND ----")
+  id_reply <- extract_first_id_after("---- RESPONSE_RECEIVED ----")
+  expect_true(nzchar(id_send))
+  expect_equal(id_reply, id_send)
+})
+
+test_that("prompt trace retention deletes older trace files only", {
+  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+
+  tmpdir <- withr::local_tempdir()
+
+  # Create 4 historical trace files and one unrelated file
+  historical <- file.path(
+    tmpdir,
+    paste0(
+      "prompt_trace_2099-01-0",
+      1:4,
+      ".log"
+    )
+  )
+  vapply(historical, function(f) {
+    writeLines(c("x"), f)
+    TRUE
+  }, logical(1))
+
+  unrelated <- file.path(tmpdir, "do_not_delete.log")
+  writeLines("keep", unrelated)
+
+  # Make mtimes increasing with the day number
+  for (idx in seq_along(historical)) {
+    try(Sys.setFileTime(historical[[idx]], as.POSIXct(sprintf("2099-01-0%d 00:00:00", idx), tz = "UTC")), silent = TRUE)
+  }
+
+  # Current trace file
+  trace_file <- file.path(tmpdir, "prompt_trace_2099-01-05.log")
+
+  log_debug <- function(...) invisible(NULL)
+  log_warn <- function(...) invisible(NULL)
+  log_error <- function(...) invisible(NULL)
+
+  withr::local_options(
+    send_prompt_with_retries__log_prompts_to_file = TRUE,
+    send_prompt_with_retries__log_prompts_to_logs = FALSE,
+    send_prompt_with_retries__prompt_trace_file = trace_file,
+    send_prompt_with_retries__prompt_trace_retention_files = 2,
+    kwallm__prompt_trace_last_cleanup = NULL
+  )
+
+  local_mocked_bindings(
+    send_prompt = function(...) create_mock_result("ok"),
+    .package = "tidyprompt"
+  )
+
+  send_prompt_with_retries(
+    prompt = "test prompt",
+    llm_provider = create_mock_llm_provider(),
+    max_tries = 1,
+    retry_delay_seconds = 0
+  )
+
+  remaining <- list.files(tmpdir, pattern = "^prompt_trace_.*\\.log$", full.names = TRUE)
+  expect_lte(length(remaining), 2)
+  expect_true(file.exists(unrelated))
+})
