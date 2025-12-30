@@ -132,11 +132,11 @@ test_that("apply_retention_policy keeps newest N log files", {
   writeLines("b", f2)
   writeLines("c", f3)
 
-  # Ensure ordering by modification time (oldest first)
+  # Make mtimes misleading on purpose; retention should follow filename dates.
   t0 <- Sys.time()
-  Sys.setFileTime(f1, t0 - 300)
-  Sys.setFileTime(f2, t0 - 200)
-  Sys.setFileTime(f3, t0 - 100)
+  Sys.setFileTime(f1, t0) # newest mtime, but oldest date
+  Sys.setFileTime(f2, t0 - 300) # oldest mtime, middle date
+  Sys.setFileTime(f3, t0 - 200) # middle mtime, newest date
 
   .apply_retention_policy(log_dir, retention = 2)
 

@@ -185,15 +185,27 @@ test_that("prompt tracing to regular logs includes correlated prompt_id", {
   )
   expect_equal(res, "hello")
 
-  send_msgs <- grep("LLM prompt send: prompt_id=", debug_messages, value = TRUE)
-  reply_msgs <- grep("LLM reply received: prompt_id=", debug_messages, value = TRUE)
+  send_msgs <- grep(
+    "LLM prompt send: prompt_id=",
+    debug_messages,
+    value = TRUE,
+    fixed = TRUE
+  )
+  reply_msgs <- grep(
+    "LLM reply received: prompt_id=",
+    debug_messages,
+    value = TRUE,
+    fixed = TRUE
+  )
   expect_true(length(send_msgs) >= 1)
   expect_true(length(reply_msgs) >= 1)
 
   extract_id <- function(x) {
     m <- regexec("prompt_id=([^,\\s]+)", x)
     reg <- regmatches(x, m)
-    if (length(reg) == 0 || length(reg[[1]]) < 2) return(NA_character_)
+    if (length(reg) == 0 || length(reg[[1]]) < 2) {
+      return(NA_character_)
+    }
     reg[[1]][2]
   }
 
@@ -244,10 +256,14 @@ test_that("prompt tracing to file writes prompt and response with same prompt_id
 
   extract_first_id_after <- function(marker) {
     i <- which(lines == marker)
-    if (length(i) == 0) return(NA_character_)
+    if (length(i) == 0) {
+      return(NA_character_)
+    }
     sub <- lines[(i[[1]] + 1):min(length(lines), i[[1]] + 20)]
     id_line <- sub[grepl("^prompt_id=", sub)]
-    if (length(id_line) == 0) return(NA_character_)
+    if (length(id_line) == 0) {
+      return(NA_character_)
+    }
     sub("^prompt_id=", "", id_line[[1]])
   }
 
@@ -271,17 +287,27 @@ test_that("prompt trace retention deletes older trace files only", {
       ".log"
     )
   )
-  vapply(historical, function(f) {
-    writeLines(c("x"), f)
-    TRUE
-  }, logical(1))
+  vapply(
+    historical,
+    function(f) {
+      writeLines(c("x"), f)
+      TRUE
+    },
+    logical(1)
+  )
 
   unrelated <- file.path(tmpdir, "do_not_delete.log")
   writeLines("keep", unrelated)
 
   # Make mtimes increasing with the day number
   for (idx in seq_along(historical)) {
-    try(Sys.setFileTime(historical[[idx]], as.POSIXct(sprintf("2099-01-0%d 00:00:00", idx), tz = "UTC")), silent = TRUE)
+    try(
+      Sys.setFileTime(
+        historical[[idx]],
+        as.POSIXct(sprintf("2099-01-0%d 00:00:00", idx), tz = "UTC")
+      ),
+      silent = TRUE
+    )
   }
 
   # Current trace file
@@ -311,7 +337,11 @@ test_that("prompt trace retention deletes older trace files only", {
     retry_delay_seconds = 0
   )
 
-  remaining <- list.files(tmpdir, pattern = "^prompt_trace_.*\\.log$", full.names = TRUE)
+  remaining <- list.files(
+    tmpdir,
+    pattern = "^prompt_trace_.*\\.log$",
+    full.names = TRUE
+  )
   expect_lte(length(remaining), 2)
   expect_true(file.exists(unrelated))
 })

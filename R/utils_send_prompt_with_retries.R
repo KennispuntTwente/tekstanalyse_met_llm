@@ -40,7 +40,11 @@ send_prompt_with_retries <- function(
   # Log LLM call start
   tryCatch(
     log_debug(
-      sprintf("LLM call started: prompt_id=%s, model=%s", prompt_id, model_name),
+      sprintf(
+        "LLM call started: prompt_id=%s, model=%s",
+        prompt_id,
+        model_name
+      ),
       component = "llm"
     ),
     error = function(e) NULL
@@ -82,7 +86,11 @@ send_prompt_with_retries <- function(
           # Log initial prompt (debug only)
           tryCatch(
             log_debug(
-              sprintf("Sending prompt: prompt_id=%s, model=%s", prompt_id, model_name),
+              sprintf(
+                "Sending prompt: prompt_id=%s, model=%s",
+                prompt_id,
+                model_name
+              ),
               component = "llm_trace"
             ),
             error = function(e) NULL
@@ -158,7 +166,11 @@ send_prompt_with_retries <- function(
     # Log invalid response
     tryCatch(
       log_error(
-        sprintf("LLM returned NULL response: prompt_id=%s, model=%s", prompt_id, model_name),
+        sprintf(
+          "LLM returned NULL response: prompt_id=%s, model=%s",
+          prompt_id,
+          model_name
+        ),
         component = "llm"
       ),
       error = function(e) NULL
@@ -228,15 +240,24 @@ send_prompt_with_retries <- function(
 
 .kwallm__prompt_trace_retention_files <- function() {
   # Number of prompt trace files to keep. NULL = keep indefinitely.
-  retention <- getOption("send_prompt_with_retries__prompt_trace_retention_files", NULL)
+  retention <- getOption(
+    "send_prompt_with_retries__prompt_trace_retention_files",
+    NULL
+  )
   if (is.null(retention)) {
     # Convenience fallback: reuse main logger retention if configured
     retention <- getOption("logger__retention", NULL)
   }
-  if (is.null(retention)) return(NULL)
-  if (!is.numeric(retention) || length(retention) != 1) return(NULL)
+  if (is.null(retention)) {
+    return(NULL)
+  }
+  if (!is.numeric(retention) || length(retention) != 1) {
+    return(NULL)
+  }
   retention <- as.integer(retention)
-  if (is.na(retention) || retention <= 0) return(NULL)
+  if (is.na(retention) || retention <= 0) {
+    return(NULL)
+  }
   retention
 }
 
@@ -254,7 +275,10 @@ send_prompt_with_retries <- function(
   )
 }
 
-.kwallm__prompt_trace_append <- function(lines, file_path = .kwallm__prompt_trace_file_path()) {
+.kwallm__prompt_trace_append <- function(
+  lines,
+  file_path = .kwallm__prompt_trace_file_path()
+) {
   dir.create(dirname(file_path), recursive = TRUE, showWarnings = FALSE)
   cat(paste0(lines, collapse = "\n"), "\n", file = file_path, append = TRUE)
   .kwallm__prompt_trace_cleanup(file_path)
@@ -263,7 +287,9 @@ send_prompt_with_retries <- function(
 
 .kwallm__prompt_trace_cleanup <- function(file_path) {
   retention <- .kwallm__prompt_trace_retention_files()
-  if (is.null(retention)) return(invisible(NULL))
+  if (is.null(retention)) {
+    return(invisible(NULL))
+  }
 
   # Avoid doing filesystem scans too frequently.
   last <- getOption("kwallm__prompt_trace_last_cleanup", NULL)
@@ -275,7 +301,9 @@ send_prompt_with_retries <- function(
   options(kwallm__prompt_trace_last_cleanup = Sys.time())
 
   dir <- dirname(file_path)
-  if (!dir.exists(dir)) return(invisible(NULL))
+  if (!dir.exists(dir)) {
+    return(invisible(NULL))
+  }
 
   # Only target our own trace files.
   trace_files <- list.files(
@@ -284,17 +312,27 @@ send_prompt_with_retries <- function(
     full.names = TRUE,
     ignore.case = FALSE
   )
-  if (length(trace_files) <= retention) return(invisible(NULL))
+  if (length(trace_files) <= retention) {
+    return(invisible(NULL))
+  }
 
   # Prefer ordering by date embedded in filename (prompt_trace_YYYY-MM-DD.log),
   # since mtimes can be unreliable across platforms/filesystems.
   base <- basename(trace_files)
-  date_str <- sub("^prompt_trace_([0-9]{4}-[0-9]{2}-[0-9]{2})\\.log$", "\\1", base)
+  date_str <- sub(
+    "^prompt_trace_([0-9]{4}-[0-9]{2}-[0-9]{2})\\.log$",
+    "\\1",
+    base
+  )
   parsed_date <- suppressWarnings(as.Date(date_str))
   parsed_date[is.na(parsed_date) | date_str == base] <- NA
 
   info <- tryCatch(file.info(trace_files), error = function(e) NULL)
-  mtime <- if (!is.null(info) && !is.null(info$mtime)) info$mtime else rep(as.POSIXct(NA), length(trace_files))
+  mtime <- if (!is.null(info) && !is.null(info$mtime)) {
+    info$mtime
+  } else {
+    rep(as.POSIXct(NA), length(trace_files))
+  }
 
   # Order old -> new (by parsed date, then mtime, then name)
   ord <- order(parsed_date, mtime, base, decreasing = FALSE, na.last = TRUE)
@@ -307,7 +345,9 @@ send_prompt_with_retries <- function(
 }
 
 .kwallm__prompt_trace_serialize <- function(x) {
-  if (is.null(x)) return("NULL")
+  if (is.null(x)) {
+    return("NULL")
+  }
 
   if (is.character(x)) {
     return(paste(x, collapse = ""))
@@ -329,20 +369,36 @@ send_prompt_with_retries <- function(
     {
       if (is.list(prompt)) {
         # Common patterns: prompt$messages or prompt$chat_history
-        if (!is.null(prompt$messages) && is.data.frame(prompt$messages) && "content" %in% names(prompt$messages)) {
+        if (
+          !is.null(prompt$messages) &&
+            is.data.frame(prompt$messages) &&
+            "content" %in% names(prompt$messages)
+        ) {
           return(paste(prompt$messages$content, collapse = "\n\n"))
         }
-        if (!is.null(prompt$chat_history) && is.data.frame(prompt$chat_history) && "content" %in% names(prompt$chat_history)) {
+        if (
+          !is.null(prompt$chat_history) &&
+            is.data.frame(prompt$chat_history) &&
+            "content" %in% names(prompt$chat_history)
+        ) {
           return(paste(prompt$chat_history$content, collapse = "\n\n"))
         }
       }
       .kwallm__prompt_trace_serialize(prompt)
     },
-    error = function(e) paste0("<failed-to-serialize-prompt: ", conditionMessage(e), ">")
+    error = function(e) {
+      paste0("<failed-to-serialize-prompt: ", conditionMessage(e), ">")
+    }
   )
 }
 
-.kwallm__prompt_trace_log_send <- function(prompt_id, model_name, attempt, max_tries, prompt_text) {
+.kwallm__prompt_trace_log_send <- function(
+  prompt_id,
+  model_name,
+  attempt,
+  max_tries,
+  prompt_text
+) {
   if (.kwallm__prompt_trace_enabled_to_logs()) {
     tryCatch(
       log_debug(
@@ -364,7 +420,10 @@ send_prompt_with_retries <- function(
     tryCatch(
       .kwallm__prompt_trace_append(c(
         "---- PROMPT_SEND ----",
-        paste0("time_utc=", format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")),
+        paste0(
+          "time_utc=",
+          format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
+        ),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempt=", attempt),
@@ -378,7 +437,13 @@ send_prompt_with_retries <- function(
   }
 }
 
-.kwallm__prompt_trace_log_reply <- function(prompt_id, model_name, attempts, duration_ms, response_text) {
+.kwallm__prompt_trace_log_reply <- function(
+  prompt_id,
+  model_name,
+  attempts,
+  duration_ms,
+  response_text
+) {
   if (.kwallm__prompt_trace_enabled_to_logs()) {
     tryCatch(
       log_debug(
@@ -400,7 +465,10 @@ send_prompt_with_retries <- function(
     tryCatch(
       .kwallm__prompt_trace_append(c(
         "---- RESPONSE_RECEIVED ----",
-        paste0("time_utc=", format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")),
+        paste0(
+          "time_utc=",
+          format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
+        ),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempts=", attempts),
@@ -414,7 +482,13 @@ send_prompt_with_retries <- function(
   }
 }
 
-.kwallm__prompt_trace_log_error <- function(prompt_id, model_name, attempt, max_tries, err_message) {
+.kwallm__prompt_trace_log_error <- function(
+  prompt_id,
+  model_name,
+  attempt,
+  max_tries,
+  err_message
+) {
   if (.kwallm__prompt_trace_enabled_to_logs()) {
     tryCatch(
       log_warn(
@@ -436,7 +510,10 @@ send_prompt_with_retries <- function(
     tryCatch(
       .kwallm__prompt_trace_append(c(
         "---- CALL_ERROR ----",
-        paste0("time_utc=", format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")),
+        paste0(
+          "time_utc=",
+          format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
+        ),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempt=", attempt),

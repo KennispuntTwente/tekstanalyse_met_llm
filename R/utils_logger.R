@@ -443,13 +443,26 @@ log_async_globals <- function(log_ctx = NULL) {
   )
 
   if (length(log_files) > retention) {
-    # Sort by modification time (oldest first)
-    file_info <- file.info(log_files)
-    sorted_files <- log_files[order(file_info$mtime)]
+    # Prefer ordering by date embedded in filename (YYYY-MM-DD.log).
+    # mtimes can be unreliable when files are copied/restored.
+    base <- basename(log_files)
+    date_str <- sub("^(\\d{4}-\\d{2}-\\d{2})\\.log$", "\\1", base)
+    parsed_date <- suppressWarnings(as.Date(date_str))
+    parsed_date[is.na(parsed_date) | date_str == base] <- NA
+
+    file_info <- tryCatch(file.info(log_files), error = function(e) NULL)
+    mtime <- if (!is.null(file_info) && !is.null(file_info$mtime)) {
+      file_info$mtime
+    } else {
+      rep(as.POSIXct(NA), length(log_files))
+    }
+
+    # Order old -> new by parsed date, then mtime, then name
+    sorted_files <- log_files[order(parsed_date, mtime, base, na.last = TRUE)]
 
     # Remove oldest files
     files_to_remove <- head(sorted_files, length(log_files) - retention)
-    file.remove(files_to_remove)
+    tryCatch(file.remove(files_to_remove), error = function(e) NULL)
   }
 }
 
