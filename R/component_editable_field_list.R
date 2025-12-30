@@ -259,13 +259,19 @@ editable_field_list_server <- function(
         }
       })
 
+      # Add/remove buttons: disabled when not editing OR when processing
       if (!editing_now || isTRUE(processing_now)) {
         shinyjs::disable("addField")
         shinyjs::disable("removeField")
-        shinyjs::disable("toggleEdit")
       } else {
         shinyjs::enable("addField")
         shinyjs::enable("removeField")
+      }
+
+      # Toggle edit button: only disabled when processing (always available to switch modes)
+      if (isTRUE(processing_now)) {
+        shinyjs::disable("toggleEdit")
+      } else {
         shinyjs::enable("toggleEdit")
       }
     }
