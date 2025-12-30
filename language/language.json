@@ -1186,6 +1186,14 @@
         "en": " Use the save/edit button to save (or edit) the codes."
       },
       {
+        "nl": "Je moet eerst de codes opslaan voordat je verder kunt gaan.",
+        "en": "You must save the codes before you can continue."
+      },
+      {
+        "nl": "Je moet minimaal 1 code opgeven.",
+        "en": "You must specify at least 1 code."
+      },
+      {
         "nl": "Verwerk",
         "en": "Process"
       },

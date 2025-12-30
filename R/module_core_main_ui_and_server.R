@@ -9,6 +9,7 @@
 # To run, see 'app.R'
 
 ## Main UI -----------------------------------------------------------
+
 main_ui <- function() {
   bslib::page(
     theme = bs_theme(
@@ -23,6 +24,7 @@ main_ui <- function() {
 
 
 # Main server ------------------------------------------------------
+
 # Here we build the main server for the Shiny app
 
 main_server <- function(
@@ -32,6 +34,48 @@ main_server <- function(
   gliner_model = NULL
 ) {
   server <- function(input, output, session) {
+    # Session logging -------------------------------------------------------
+
+    session_id <- session$token
+    log_session_start(session_id)
+    session$onSessionEnded(function() {
+      log_session_end(session_id)
+    })
+
+    # Modal logging ---------------------------------------------------------
+
+    # See `css_js_head()` JS: emits `input$kwallm_modal_event` with
+    # {type: 'opened'|'closed', id: '<modal_id>', details: '<optional>', ts: <ms>}
+
+    observeEvent(
+      input$kwallm_modal_event,
+      {
+        evt <- input$kwallm_modal_event
+        if (is.null(evt) || is.null(evt$type) || is.null(evt$id)) {
+          return()
+        }
+
+        type <- as.character(evt$type)
+        modal_id <- as.character(evt$id)
+
+        # Log as e.g. `filter_modal_opened` / `filter_modal_closed`
+        action <- switch(
+          type,
+          opened = paste0(modal_id, "_opened"),
+          closed = paste0(modal_id, "_closed"),
+          paste0(modal_id, "_event")
+        )
+
+        details <- NULL
+        if (!is.null(evt$details) && nzchar(as.character(evt$details))) {
+          details <- as.character(evt$details)
+        }
+
+        log_action(action, details = details)
+      },
+      ignoreInit = TRUE
+    )
+
     # Layout state -----------------------------------------------------------
 
     n_sections <- 5L
@@ -77,10 +121,8 @@ main_server <- function(
       }
     }
 
-    update_section_nav_buttons <- function(i) {
-      # Button visibility is now handled client-side in JavaScript for instant updates
-      # See style_css_js.R kwallmUpdateNavButtons()
-    }
+    # Note: Button visibility is handled client-side in JavaScript
+    # See style_css_js.R kwallmUpdateNavButtons()
 
     # Keep prev/next button visibility in sync (works even when UI is re-rendered)
     observe({
@@ -97,8 +139,10 @@ main_server <- function(
     })
 
     # Progress UI (only shown in "sections" mode) ----------------------------
+    # Update progress bar via custom message for smooth CSS animation
+    # (renderUI would replace DOM, breaking the transition)
 
-    output$kwallm_sections_progress <- renderUI({
+    observe({
       req(lang())
       cur <- current_section()
       pct <- if (n_sections <= 1L) {
@@ -107,25 +151,11 @@ main_server <- function(
         round((cur - 1L) / (n_sections - 1L) * 100L)
       }
 
-      div(
-        class = "kwallm-sections-progress",
-        tags$div(
-          class = "d-flex justify-content-between align-items-center mb-1",
-          tags$small(
-            class = "text-muted",
-            paste0(lang()$t("Sectie"), " ", cur, "/", n_sections)
-          )
-        ),
-        div(
-          class = "progress",
-          div(
-            class = "progress-bar",
-            role = "progressbar",
-            style = sprintf("width: %s%%;", pct),
-            `aria-valuenow` = pct,
-            `aria-valuemin` = 0,
-            `aria-valuemax` = 100
-          )
+      session$sendCustomMessage(
+        "kwallm_sections_progress_update",
+        list(
+          pct = pct,
+          text = paste0(lang()$t("Sectie"), " ", cur, "/", n_sections)
         )
       )
     })
@@ -143,10 +173,12 @@ main_server <- function(
         if (identical(view, "vertical")) {
           shinyjs::hide("kwallm_sections_nav", anim = FALSE)
           show_all_sections()
+          log_action("layout_view_changed", details = "vertical")
           return()
         }
 
         # sections view
+        log_action("layout_view_changed", details = "sections")
         shinyjs::show("kwallm_sections_nav", anim = FALSE)
 
         cur <- current_section()
@@ -157,43 +189,6 @@ main_server <- function(
         )
 
         show_single_section(cur, direction = "none")
-        update_section_nav_buttons(cur)
-      },
-      ignoreInit = FALSE
-    )
-
-    # Re-apply layout after language changes re-render the UI.
-    # Without this, sections can become visible again (appearing like "vertical").
-    observeEvent(
-      lang(),
-      {
-        view_now <- isolate(input$kwallm_layout_view) %||% "sections"
-        cur_now <- isolate(current_section())
-        session$onFlushed(
-          function() {
-            view <- view_now
-            if (!view %in% c("vertical", "sections")) {
-              return()
-            }
-
-            if (identical(view, "vertical")) {
-              shinyjs::hide("kwallm_sections_nav", anim = FALSE)
-              show_all_sections()
-              return()
-            }
-
-            shinyjs::show("kwallm_sections_nav", anim = FALSE)
-            cur <- cur_now
-            shinyWidgets::updateRadioGroupButtons(
-              session = session,
-              inputId = "kwallm_sections_step",
-              selected = as.character(cur)
-            )
-            show_single_section(cur, direction = "none")
-            update_section_nav_buttons(cur)
-          },
-          once = TRUE
-        )
       },
       ignoreInit = TRUE
     )
@@ -224,7 +219,11 @@ main_server <- function(
         }
 
         show_single_section(new, direction = direction)
-        update_section_nav_buttons(new)
+
+        log_action(
+          "section_navigated",
+          details = paste0("section=", new, ", from=", old, ", method=step")
+        )
       },
       ignoreInit = TRUE
     )
@@ -243,6 +242,17 @@ main_server <- function(
           session = session,
           inputId = "kwallm_sections_step",
           selected = as.character(cur - 1L)
+        )
+
+        log_action(
+          "section_navigated",
+          details = paste0(
+            "section=",
+            cur - 1L,
+            ", from=",
+            cur,
+            ", method=prev"
+          )
         )
       },
       ignoreInit = TRUE
@@ -263,11 +273,23 @@ main_server <- function(
           inputId = "kwallm_sections_step",
           selected = as.character(cur + 1L)
         )
+
+        log_action(
+          "section_navigated",
+          details = paste0(
+            "section=",
+            cur + 1L,
+            ", from=",
+            cur,
+            ", method=next"
+          )
+        )
       },
       ignoreInit = TRUE
     )
 
     # UI ---------------------------------------------------------------
+
     output$main_ui <- renderUI({
       base_ui <- tagList(
         # Main header area with user/admin UI and title
@@ -344,12 +366,11 @@ main_server <- function(
                     lang()$t("Secties")
                   )
                 ),
-                selected = isolate(input$kwallm_layout_view) %||%
-                  if (isTRUE(getOption("shiny.testmode"))) {
-                    "vertical"
-                  } else {
-                    "sections"
-                  },
+                selected = if (isTRUE(getOption("shiny.testmode"))) {
+                  "vertical"
+                } else {
+                  "sections"
+                },
                 size = "sm"
               )
             )
@@ -400,10 +421,8 @@ main_server <- function(
               )
             )
           ),
-
           hr(),
           uiOutput("azure_auth_unauthorized_ui"),
-
           div(
             class = "card-container",
             div(
@@ -427,7 +446,30 @@ main_server <- function(
                 size = "sm",
                 justified = TRUE
               ),
-              uiOutput("kwallm_sections_progress"),
+              # Static progress bar - updated via JS for smooth animation
+              div(
+                class = "kwallm-sections-progress",
+                tags$div(
+                  class = "d-flex justify-content-between align-items-center mb-1",
+                  tags$small(
+                    id = "kwallm_sections_progress_text",
+                    class = "text-muted",
+                    paste0(lang()$t("Sectie"), " 1/", n_sections)
+                  )
+                ),
+                div(
+                  class = "progress",
+                  div(
+                    id = "kwallm_sections_progress_bar",
+                    class = "progress-bar",
+                    role = "progressbar",
+                    style = "width: 0%;",
+                    `aria-valuenow` = 0,
+                    `aria-valuemin` = 0,
+                    `aria-valuemax` = 100
+                  )
+                )
+              ),
               div(
                 class = "d-flex justify-content-between gap-2 mt-2",
                 actionButton(
@@ -480,12 +522,9 @@ main_server <- function(
               write_paragraphs_toggle_ui("write_paragraphs_toggle"),
               div()
             ),
-
             uiOutput("kwallm_processing_global"),
-
             div(style = "height: 75px;"),
           ),
-
           hr()
         ),
 
@@ -510,16 +549,20 @@ main_server <- function(
     })
 
     # 0 Authentication -----------------------------------------------
+
     # When deploying to server, you could implement, e.g.,
     #   Azure AD authentication here
     # See for example R/azure_auth.R
 
     if (azure_auth) {
       user_info <- get_azure_auth(session, output)
-      if (is.null(user_info)) return()
+      if (is.null(user_info)) {
+        return()
+      }
     }
 
     # 1 Text management ----------------------------------------------
+
     # Text upload
     raw_texts <- text_upload_server("text_upload", processing, lang)
 
@@ -563,6 +606,7 @@ main_server <- function(
     )
 
     # 2 Mode management ----------------------------------------------
+
     # Obtain mode
     mode <- mode_server("mode", processing, lang)
 
@@ -602,6 +646,7 @@ main_server <- function(
     )
 
     # 3 Model management ---------------------------------------------
+
     # Determine if we have preconfigured LLM providers or not
     # Are both preconfigured_llm_provider and preconfigured_main_models provided?
     has_preconfigured_llm_provider <- if (
@@ -631,6 +676,7 @@ main_server <- function(
     )
 
     # 4 Category & score fields --------------------------------------
+
     categories <- categories_server(
       "categories",
       mode = mode,
@@ -653,6 +699,7 @@ main_server <- function(
     )
 
     # 5 Processing ---------------------------------------------------
+
     processing <- processing_server(
       id = "processing",
       mode = mode,
@@ -710,7 +757,17 @@ main_server <- function(
     })
 
     # 6 Language -----------------------------------------------------
+
     lang <- language_server("language", processing)
+
+    # 7 Disable layout toggle during processing ----------------------
+    observe({
+      if (isTRUE(processing())) {
+        shinyjs::disable("kwallm_layout_view")
+      } else {
+        shinyjs::enable("kwallm_layout_view")
+      }
+    })
   }
 
   return(server)

@@ -280,6 +280,21 @@ css_js_head <- function() {
       .kwallm-slide-in-left {
         animation: kwallm-slide-in-left 220ms ease-out both;
       }
+
+      /* Sticky footer: ensure footer stays at bottom of viewport */
+      .kwallm-page-wrapper {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      .kwallm-main-content {
+        flex: 1 0 auto;
+      }
+
+      .kwallm-footer {
+        flex-shrink: 0;
+      }
       "
     )),
     tags$style(HTML(
