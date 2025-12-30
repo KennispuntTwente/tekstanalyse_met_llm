@@ -343,7 +343,24 @@ log_context_capture <- function(
         1,
         8
       ),
-      is_async = isTRUE(is_async)
+      is_async = isTRUE(is_async),
+      # Prompt trace options (for async workers)
+      prompt_trace_to_file = getOption(
+        "send_prompt_with_retries__log_prompts_to_file",
+        FALSE
+      ),
+      prompt_trace_to_logs = getOption(
+        "send_prompt_with_retries__log_prompts_to_logs",
+        FALSE
+      ),
+      prompt_trace_file = getOption(
+        "send_prompt_with_retries__prompt_trace_file",
+        NULL
+      ),
+      prompt_trace_retention = getOption(
+        "send_prompt_with_retries__prompt_trace_retention_files",
+        NULL
+      )
     ),
     class = "kwallm_log_context"
   )
@@ -383,6 +400,28 @@ log_context_apply <- function(ctx) {
       }
       if (!is.null(ctx$retention)) {
         options(logger__retention = ctx$retention)
+      }
+
+      # Restore prompt trace options for async workers
+      if (!is.null(ctx$prompt_trace_to_file)) {
+        options(
+          send_prompt_with_retries__log_prompts_to_file = ctx$prompt_trace_to_file
+        )
+      }
+      if (!is.null(ctx$prompt_trace_to_logs)) {
+        options(
+          send_prompt_with_retries__log_prompts_to_logs = ctx$prompt_trace_to_logs
+        )
+      }
+      if (!is.null(ctx$prompt_trace_file)) {
+        options(
+          send_prompt_with_retries__prompt_trace_file = ctx$prompt_trace_file
+        )
+      }
+      if (!is.null(ctx$prompt_trace_retention)) {
+        options(
+          send_prompt_with_retries__prompt_trace_retention_files = ctx$prompt_trace_retention
+        )
       }
 
       st <- .logger_state_get()
