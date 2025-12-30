@@ -26,6 +26,9 @@ jobs:
       GITHUB_PAT:        ${{ secrets.GITHUB_TOKEN }}
       OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
       R_KEEP_PKG_SOURCE: yes
+      # Enable true async processing in tests to catch async-related bugs
+      # (e.g., objects not properly passed to future workers)
+      KWALLM_TEST_ASYNC: "true"
 
     steps:
       # 1 source code ---------------------------------------------------

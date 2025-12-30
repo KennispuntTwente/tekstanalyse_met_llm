@@ -20,7 +20,10 @@ load_dependencies("electron")
 #     `future::plan("sequential")`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
 # - See the documentation for `future::plan()` for more details
-if (!getOption("shiny.testmode", FALSE)) {
+test_mode <- getOption("shiny.testmode", FALSE)
+test_async <- tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
+  c("true", "1", "yes")
+if (!test_mode || test_async) {
   future::plan(multisession, .skip = TRUE)
 }
 
