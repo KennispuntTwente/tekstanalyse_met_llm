@@ -31,7 +31,6 @@ jobs:
       KWALLM_TEST_ASYNC: "true"
       # Enable prompt/response tracing for debugging test runs
       KWALLM_LOG_PROMPTS_TO_FILE: "true"
-      KWALLM_LOG_PROMPTS_TO_LOGS: "true"
 
     steps:
       # 1 source code ---------------------------------------------------

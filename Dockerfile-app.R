@@ -137,18 +137,12 @@ options(
   send_prompt_with_retries__max_interactions = 10,
 
   # - Prompt/response tracing (privacy-sensitive; disabled by default)
-  #   1) Log prompts & replies to a separate trace file (under logs/prompt_logs/)
-  #   2) Log prompts & replies via the regular app logger (DEBUG)
+  #   Log prompts & replies to a separate trace file (under logs/prompt_logs/)
   #   Optional: override the trace file location
   #     see: R/utils_send_prompt_with_retries.R
-  #   Note: can be enabled via KWALLM_LOG_PROMPTS_TO_FILE and KWALLM_LOG_PROMPTS_TO_LOGS env vars
+  #   Note: can be enabled via KWALLM_LOG_PROMPTS_TO_FILE env var
   send_prompt_with_retries__log_prompts_to_file = tolower(Sys.getenv(
     "KWALLM_LOG_PROMPTS_TO_FILE",
-    "false"
-  )) %in%
-    c("true", "1", "yes"),
-  send_prompt_with_retries__log_prompts_to_logs = tolower(Sys.getenv(
-    "KWALLM_LOG_PROMPTS_TO_LOGS",
     "false"
   )) %in%
     c("true", "1", "yes"),

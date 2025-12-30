@@ -154,67 +154,6 @@ test_that("send_prompt_with_retries uses default options", {
   expect_true("llm_provider" %in% names(fn_formals))
 })
 
-test_that("prompt tracing to regular logs includes correlated prompt_id", {
-  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
-
-  # Capture log output
-  debug_messages <- character(0)
-  log_debug <- function(msg, component = NULL) {
-    debug_messages <<- c(debug_messages, as.character(msg))
-    invisible(NULL)
-  }
-  log_warn <- function(...) invisible(NULL)
-  log_error <- function(...) invisible(NULL)
-
-  withr::local_options(
-    send_prompt_with_retries__log_prompts_to_logs = TRUE,
-    send_prompt_with_retries__log_prompts_to_file = FALSE,
-    kwallm__prompt_trace_last_cleanup = NULL
-  )
-
-  local_mocked_bindings(
-    send_prompt = function(...) create_mock_result("hello"),
-    .package = "tidyprompt"
-  )
-
-  res <- send_prompt_with_retries(
-    prompt = "test prompt",
-    llm_provider = create_mock_llm_provider(),
-    max_tries = 1,
-    retry_delay_seconds = 0
-  )
-  expect_equal(res, "hello")
-
-  send_msgs <- grep(
-    "LLM prompt send: prompt_id=",
-    debug_messages,
-    value = TRUE,
-    fixed = TRUE
-  )
-  reply_msgs <- grep(
-    "LLM reply received: prompt_id=",
-    debug_messages,
-    value = TRUE,
-    fixed = TRUE
-  )
-  expect_true(length(send_msgs) >= 1)
-  expect_true(length(reply_msgs) >= 1)
-
-  extract_id <- function(x) {
-    m <- regexec("prompt_id=([^,\\s]+)", x)
-    reg <- regmatches(x, m)
-    if (length(reg) == 0 || length(reg[[1]]) < 2) {
-      return(NA_character_)
-    }
-    reg[[1]][2]
-  }
-
-  send_id <- extract_id(send_msgs[[1]])
-  reply_id <- extract_id(reply_msgs[[1]])
-  expect_true(nzchar(send_id))
-  expect_equal(reply_id, send_id)
-})
-
 test_that("prompt tracing to file writes prompt and response with same prompt_id", {
   source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
 
@@ -228,9 +167,9 @@ test_that("prompt tracing to file writes prompt and response with same prompt_id
 
   withr::local_options(
     send_prompt_with_retries__log_prompts_to_file = TRUE,
-    send_prompt_with_retries__log_prompts_to_logs = FALSE,
     send_prompt_with_retries__prompt_trace_file = trace_file,
     send_prompt_with_retries__prompt_trace_retention_files = NULL,
+    kwallm__log_session_id = "sess1234",
     kwallm__prompt_trace_last_cleanup = NULL
   )
 
@@ -253,6 +192,7 @@ test_that("prompt tracing to file writes prompt and response with same prompt_id
   expect_true(any(grepl("---- RESPONSE_RECEIVED ----", lines, fixed = TRUE)))
   expect_true(any(grepl("prompt_text:", lines, fixed = TRUE)))
   expect_true(any(grepl("response_text:", lines, fixed = TRUE)))
+  expect_true(any(grepl("^session_id=sess1234$", lines)))
 
   extract_first_id_after <- function(marker) {
     i <- which(lines == marker)
@@ -319,7 +259,6 @@ test_that("prompt trace retention deletes older trace files only", {
 
   withr::local_options(
     send_prompt_with_retries__log_prompts_to_file = TRUE,
-    send_prompt_with_retries__log_prompts_to_logs = FALSE,
     send_prompt_with_retries__prompt_trace_file = trace_file,
     send_prompt_with_retries__prompt_trace_retention_files = 2,
     kwallm__prompt_trace_last_cleanup = NULL

@@ -234,8 +234,16 @@ send_prompt_with_retries <- function(
     isTRUE(getOption("send_prompt_with_retries__log_prompts", FALSE))
 }
 
-.kwallm__prompt_trace_enabled_to_logs <- function() {
-  isTRUE(getOption("send_prompt_with_retries__log_prompts_to_logs", FALSE))
+.kwallm__prompt_trace_session_id <- function() {
+  sid <- tryCatch(
+    getOption("kwallm__log_session_id", NULL),
+    error = function(e) NULL
+  )
+  if (!is.null(sid) && nzchar(as.character(sid))) {
+    return(substr(as.character(sid), 1, 8))
+  }
+
+  "system"
 }
 
 .kwallm__prompt_trace_retention_files <- function() {
@@ -399,23 +407,6 @@ send_prompt_with_retries <- function(
   max_tries,
   prompt_text
 ) {
-  if (.kwallm__prompt_trace_enabled_to_logs()) {
-    tryCatch(
-      log_debug(
-        sprintf(
-          "LLM prompt send: prompt_id=%s, model=%s, attempt=%d/%d\n%s",
-          prompt_id,
-          model_name,
-          attempt,
-          max_tries,
-          prompt_text
-        ),
-        component = "llm_prompt"
-      ),
-      error = function(e) NULL
-    )
-  }
-
   if (.kwallm__prompt_trace_enabled_to_file()) {
     tryCatch(
       .kwallm__prompt_trace_append(c(
@@ -424,6 +415,7 @@ send_prompt_with_retries <- function(
           "time_utc=",
           format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
         ),
+        paste0("session_id=", .kwallm__prompt_trace_session_id()),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempt=", attempt),
@@ -444,23 +436,6 @@ send_prompt_with_retries <- function(
   duration_ms,
   response_text
 ) {
-  if (.kwallm__prompt_trace_enabled_to_logs()) {
-    tryCatch(
-      log_debug(
-        sprintf(
-          "LLM reply received: prompt_id=%s, model=%s, attempts=%d, duration=%.0fms\n%s",
-          prompt_id,
-          model_name,
-          attempts,
-          duration_ms,
-          response_text
-        ),
-        component = "llm_reply"
-      ),
-      error = function(e) NULL
-    )
-  }
-
   if (.kwallm__prompt_trace_enabled_to_file()) {
     tryCatch(
       .kwallm__prompt_trace_append(c(
@@ -469,6 +444,7 @@ send_prompt_with_retries <- function(
           "time_utc=",
           format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
         ),
+        paste0("session_id=", .kwallm__prompt_trace_session_id()),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempts=", attempts),
@@ -489,23 +465,6 @@ send_prompt_with_retries <- function(
   max_tries,
   err_message
 ) {
-  if (.kwallm__prompt_trace_enabled_to_logs()) {
-    tryCatch(
-      log_warn(
-        sprintf(
-          "LLM call error: prompt_id=%s, model=%s, attempt=%d/%d: %s",
-          prompt_id,
-          model_name,
-          attempt,
-          max_tries,
-          err_message
-        ),
-        component = "llm"
-      ),
-      error = function(e) NULL
-    )
-  }
-
   if (.kwallm__prompt_trace_enabled_to_file()) {
     tryCatch(
       .kwallm__prompt_trace_append(c(
@@ -514,6 +473,7 @@ send_prompt_with_retries <- function(
           "time_utc=",
           format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
         ),
+        paste0("session_id=", .kwallm__prompt_trace_session_id()),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempt=", attempt),
@@ -546,7 +506,7 @@ send_prompt_with_retries_async_globals <- function() {
     send_prompt_with_retries = send_prompt_with_retries,
     .kwallm__prompt_trace_new_id = .kwallm__prompt_trace_new_id,
     .kwallm__prompt_trace_enabled_to_file = .kwallm__prompt_trace_enabled_to_file,
-    .kwallm__prompt_trace_enabled_to_logs = .kwallm__prompt_trace_enabled_to_logs,
+    .kwallm__prompt_trace_session_id = .kwallm__prompt_trace_session_id,
     .kwallm__prompt_trace_retention_files = .kwallm__prompt_trace_retention_files,
     .kwallm__prompt_trace_file_path = .kwallm__prompt_trace_file_path,
     .kwallm__prompt_trace_append = .kwallm__prompt_trace_append,
