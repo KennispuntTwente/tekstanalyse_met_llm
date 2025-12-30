@@ -316,6 +316,166 @@ model_server <- function(
 
       # Handle provider/model selection ----------------------------------------
 
+      # Persist last selected model per provider (browser cookie) --------------
+      # Cookie key includes provider_mode and side (main/large). This is used to
+      # restore selections across app restarts if the model is still available.
+      cookie_key_for <- function(provider_mode, which = c("main", "large")) {
+        which <- match.arg(which)
+        sprintf("kwallm_last_model__%s__%s", provider_mode, which)
+      }
+
+      cookie_input_id_for <- function(which = c("main", "large")) {
+        which <- match.arg(which)
+        paste0("cookie_last_model_", which)
+      }
+
+      request_cookie_model <- function(
+        provider_mode,
+        which = c("main", "large")
+      ) {
+        which <- match.arg(which)
+        allow_testmode <- identical(
+          Sys.getenv("KWALLM_ENABLE_COOKIE_IO_IN_TESTMODE"),
+          "1"
+        )
+        session$sendCustomMessage(
+          type = "kwallm_cookie_get",
+          message = list(
+            name = cookie_key_for(provider_mode, which),
+            input_id = ns(cookie_input_id_for(which)),
+            allow_testmode = allow_testmode
+          )
+        )
+      }
+
+      set_cookie_model <- function(
+        provider_mode,
+        which = c("main", "large"),
+        value
+      ) {
+        which <- match.arg(which)
+        allow_testmode <- identical(
+          Sys.getenv("KWALLM_ENABLE_COOKIE_IO_IN_TESTMODE"),
+          "1"
+        )
+        session$sendCustomMessage(
+          type = "kwallm_cookie_set",
+          message = list(
+            name = cookie_key_for(provider_mode, which),
+            value = value,
+            days = 365,
+            allow_testmode = allow_testmode
+          )
+        )
+      }
+
+      # Track whether we already restored from cookie per provider mode.
+      # This prevents repeatedly overriding user selections.
+      cookie_restored <- reactiveValues(
+        preconfigured = list(main = FALSE, large = FALSE),
+        openai = list(main = FALSE, large = FALSE),
+        ollama = list(main = FALSE, large = FALSE)
+      )
+
+      # Request cookie values when provider mode changes and when model lists
+      # change (e.g., after pinging available models).
+      observeEvent(
+        list(current_mode(), llm_provider_rv$configured_models),
+        ignoreInit = FALSE,
+        handlerExpr = {
+          mode <- current_mode()
+          request_cookie_model(mode, "main")
+          request_cookie_model(mode, "large")
+        }
+      )
+
+      # Auto-restore cookie selection only when this session has no saved choice
+      # for the current provider_mode.
+      attempt_restore_from_cookie <- function(which = c("main", "large")) {
+        which <- match.arg(which)
+        mode <- current_mode()
+
+        # Only restore once per mode/side.
+        if (isTRUE(cookie_restored[[mode]][[which]])) {
+          return(invisible(NULL))
+        }
+
+        cookie_val <- input[[cookie_input_id_for(which)]]
+        if (is.null(cookie_val) || !nzchar(cookie_val)) {
+          return(invisible(NULL))
+        }
+
+        choices <- if (mode == "preconfigured") {
+          if (which == "main") {
+            names(preconfigured_llm_provider_model_main)
+          } else {
+            names(preconfigured_llm_provider_model_large)
+          }
+        } else {
+          llm_provider_rv$configured_models
+        }
+        req(choices)
+
+        if (!(cookie_val %in% choices)) {
+          return(invisible(NULL))
+        }
+
+        input_id <- if (which == "main") "main_model" else "large_model"
+        if (
+          is.null(input[[input_id]]) || identical(input[[input_id]], cookie_val)
+        ) {
+          return(invisible(NULL))
+        }
+
+        # Only override if the user hasn't made an explicit non-default choice.
+        # Shiny will often auto-select the first option; in that case we want
+        # the cookie to take precedence.
+        current_selected <- input[[input_id]]
+        first_choice <- choices[[1]]
+        saved_choice <- if (which == "main") {
+          saved[[mode]]$main_choice
+        } else {
+          saved[[mode]]$large_choice
+        }
+
+        # Case A: no session choice saved yet -> safe
+        # Case B: session choice equals the first option -> treat as default
+        can_override <- is.null(saved_choice) ||
+          identical(saved_choice, first_choice) ||
+          identical(current_selected, first_choice)
+        if (!isTRUE(can_override)) {
+          return(invisible(NULL))
+        }
+
+        updateSelectInput(session, input_id, selected = cookie_val)
+        cookie_restored[[mode]][[which]] <- TRUE
+        invisible(NULL)
+      }
+
+      observeEvent(
+        list(
+          input[[cookie_input_id_for("main")]],
+          current_mode(),
+          llm_provider_rv$configured_models
+        ),
+        ignoreInit = TRUE,
+        handlerExpr = {
+          attempt_restore_from_cookie("main")
+        }
+      )
+
+      observeEvent(
+        list(
+          input[[cookie_input_id_for("large")]],
+          current_mode(),
+          llm_provider_rv$configured_models
+        ),
+        ignoreInit = TRUE,
+        handlerExpr = {
+          attempt_restore_from_cookie("large")
+        }
+      )
+
       # Select main
       output$main_model_selector_ui <- renderUI({
         mode <- current_mode()
@@ -476,6 +636,27 @@ model_server <- function(
         log_action(
           "model_selected",
           details = sprintf("large=%s", input$large_model)
+        )
+      })
+
+      # Persist selections, but do not write cookies on initial default values.
+      observeEvent(input$main_model, ignoreInit = TRUE, {
+        req(input$main_model)
+        req(llm_provider_rv$provider_mode)
+        set_cookie_model(
+          llm_provider_rv$provider_mode,
+          "main",
+          input$main_model
+        )
+      })
+
+      observeEvent(input$large_model, ignoreInit = TRUE, {
+        req(input$large_model)
+        req(llm_provider_rv$provider_mode)
+        set_cookie_model(
+          llm_provider_rv$provider_mode,
+          "large",
+          input$large_model
         )
       })
 

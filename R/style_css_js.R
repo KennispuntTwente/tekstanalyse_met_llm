@@ -444,6 +444,80 @@ css_js_head <- function() {
         }
       });
 
+      // ---- KWALLM: cookie helpers (for persisting UI state) ------------
+      // We use cookies (not localStorage) so settings persist per-browser
+      // and can be read without depending on storage APIs in locked-down envs.
+      // In Shiny test mode (shinytest2), skip cookie IO to keep tests deterministic.
+      function kwallmIsTestMode() {
+        try {
+          return (document.body && document.body.hasAttribute('data-shiny-testmode'));
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function kwallmSetCookie(name, value, days) {
+        try {
+          if (!name) return;
+          var expires = '';
+          if (typeof days === 'number' && !isNaN(days)) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = '; expires=' + date.toUTCString();
+          }
+          var v = (value === null || value === undefined) ? '' : String(value);
+          document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(v) + expires + '; path=/';
+        } catch (e) {
+          // no-op
+        }
+      }
+
+      function kwallmGetCookie(name) {
+        try {
+          if (!name) return null;
+          var nameEQ = encodeURIComponent(name) + '=';
+          var ca = document.cookie.split(';');
+          for (var i = 0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) === 0) {
+              var raw = c.substring(nameEQ.length, c.length);
+              var decoded = decodeURIComponent(raw || '');
+              return decoded || null;
+            }
+          }
+          return null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      // Server -> browser: set cookie
+      Shiny.addCustomMessageHandler('kwallm_cookie_set', function(message) {
+        try {
+          if (kwallmIsTestMode() && !(message && message.allow_testmode === true)) return;
+          if (!message || !message.name) return;
+          kwallmSetCookie(message.name, message.value, message.days || 365);
+        } catch (e) {
+          // no-op
+        }
+      });
+
+      // Server -> browser: read cookie and send back as Shiny input
+      // message: { name: 'cookie_name', input_id: 'ns(cookie_value_input)' }
+      Shiny.addCustomMessageHandler('kwallm_cookie_get', function(message) {
+        try {
+          if (kwallmIsTestMode() && !(message && message.allow_testmode === true)) return;
+          if (!message || !message.name || !message.input_id) return;
+          var val = kwallmGetCookie(message.name);
+          if (window.Shiny && window.Shiny.setInputValue) {
+            window.Shiny.setInputValue(message.input_id, val, { priority: 'event' });
+          }
+        } catch (e) {
+          // no-op
+        }
+      });
+
       // ---- KWALLM: modal open/close auto logging -------------------------
       // Shiny renders modals using Bootstrap's .modal. We attach a marker element
       // inside each modal with attributes:
