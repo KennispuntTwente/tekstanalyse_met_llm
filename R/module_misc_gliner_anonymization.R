@@ -394,16 +394,17 @@ gliner_server <- function(
                 # Return a named list; original texts are names
                 setNames(pii_texts)
             },
-            globals = list(
-              gliner_model = gliner_model,
-              gliner_load_model = gliner_load_model,
-              log_ctx = log_ctx,
-              log_context_apply = log_context_apply,
-              pii_texts = pii_texts(),
-              labels = labels,
-              progress = progress,
-              queue = queue,
-              async_message_printer = async_message_printer
+            globals = c(
+              log_async_globals(log_ctx),
+              list(
+                gliner_model = gliner_model,
+                gliner_load_model = gliner_load_model,
+                pii_texts = pii_texts(),
+                labels = labels,
+                progress = progress,
+                queue = queue,
+                async_message_printer = async_message_printer
+              )
             ),
             seed = NULL
           ) %...>%

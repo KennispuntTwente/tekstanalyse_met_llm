@@ -259,16 +259,17 @@ text_split_server <- function(
             queue = queue
           )
         },
-        globals = list(
-          raw_texts = raw_texts(),
-          chunk_size = max_tokens_val(),
-          overlap = overlap_val(),
-          queue = queue,
-          split_texts_with_semchunk = split_texts_with_semchunk,
-          semchunk_load_chunker = semchunk_load_chunker,
-          async_message_printer = async_message_printer,
-          log_ctx = log_ctx,
-          log_context_apply = log_context_apply
+        globals = c(
+          log_async_globals(log_ctx),
+          list(
+            raw_texts = raw_texts(),
+            chunk_size = max_tokens_val(),
+            overlap = overlap_val(),
+            queue = queue,
+            split_texts_with_semchunk = split_texts_with_semchunk,
+            semchunk_load_chunker = semchunk_load_chunker,
+            async_message_printer = async_message_printer
+          )
         ),
         seed = NULL
       ) %...>%
