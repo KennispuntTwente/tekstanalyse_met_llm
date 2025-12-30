@@ -20,11 +20,32 @@ load_dependencies("electron")
 #     `future::plan("sequential")`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
 # - See the documentation for `future::plan()` for more details
+
 test_mode <- getOption("shiny.testmode", FALSE)
 test_async <- tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
   c("true", "1", "yes")
+
 if (!test_mode || test_async) {
-  future::plan(multisession, .skip = TRUE)
+  if (!exists("future_plan")) {
+    future_plan <- future::plan(future::multisession)
+  }
+
+  log_info(
+    sprintf(
+      "Using %s async workers",
+      future::nbrOfWorkers()
+    ),
+    component = "startup"
+  )
+} else {
+  log_info(
+    paste0(
+      "Using no async workers",
+      " (note: progress bar & LLM streaming may lag behind;",
+      " concurrent app users also not supported)"
+    ),
+    component = "startup"
+  )
 }
 
 
