@@ -946,6 +946,10 @@
         "en": " You can make categories exclusive in the category editor (categorization mode) or when editing topics (topic extraction mode; enable 'human in the loop')."
       },
       {
+        "nl": "Mag het model meerdere categorieën toekennen aan een tekst, of slechts één categorie? Indien je het model meerdere categorieën laat toewijzen, kan je alsnog specifieke categorieën als 'exclusief' aanmerken. Als een exlusieve categorie wordt toegewezen aan een tekst, mogen daarnaast geen andere categorieën worden toegewezen aan de tekst. Je kunt categorieën exclusief maken in de categorie-editor (modus 'categorisatie') of bij het bewerken van de onderwerpen (modus 'onderwerpextractie'; zet 'human-in-the-loop' aan).",
+        "en": "May the model assign multiple categories to a text, or only one category? If you allow the model to assign multiple categories, you can still mark specific categories as 'exclusive'. If an exclusive category is assigned to a text, no other categories may be assigned to that text. You can make categories exclusive in the category editor (categorization mode) or when editing topics (topic extraction mode; enable 'human in the loop')."
+      },
+      {
         "nl": "Wil je een steekproef trekken van de teksten om interrater-reliability te berekenen?",
         "en": "Do you want to draw a sample of the texts to calculate interrater reliability?"
       },
@@ -956,6 +960,10 @@
       {
         "nl": " Je beoordelingen worden vergeleken met die van het taalmodel (bij categorisatie/onderwerpextractie wordt Cohen's Kappa berekend; bij scoren wordt een paired t-test uitgevoerd).",
         "en": " Your assessments will be compared with those of the model (Cohen's Kappa is calculated for categorization/topic extraction; for scoring, a paired t-test is performed)."
+      },
+      {
+        "nl": "Wil je een steekproef trekken van de teksten om interrater-reliability te berekenen? Nadat het model de teksten heeft geanalyseerd, zal een venster openen waarin je zelf teksten kunt beoordelen. Je beoordelingen worden vergeleken met die van het taalmodel (bij categorisatie/onderwerpextractie wordt Cohen's Kappa berekend; bij scoren wordt een paired t-test uitgevoerd).",
+        "en": "Do you want to draw a sample of the texts to calculate interrater reliability? After the model has analyzed the texts, a window will open where you can assess texts yourself. Your assessments will be compared with those of the model (Cohen's Kappa is calculated for categorization/topic extraction; for scoring, a paired t-test is performed)."
       },
       {
         "nl": "Splits teksten",
