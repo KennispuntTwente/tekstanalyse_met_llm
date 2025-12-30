@@ -30,12 +30,28 @@ jobs:
       group: cleanup-images
 
     steps:
-      - name: Delete orphan / untagged images safely
+      - name: Delete orphan / untagged app images safely
         uses: dataaxiom/ghcr-cleanup-action@cd0cdb900b5dbf3a6f2cc869f0dbb0b8211f50c4
         with:
           # ---- what to clean ---------------------------------------------
           owner: kennispunttwente
           packages: tekstanalyse_met_llm
+          delete-untagged: true
+          delete-partial-images: true
+          delete-ghost-images: true
+          # ---- housekeeping ----------------------------------------------
+          validate: true
+          log-level: info
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run == 'true' }}
+          # ---- auth -------------------------------------------------------
+          token: ${{ secrets.GHCR_PAT }}
+
+      - name: Delete orphan / untagged base images safely
+        uses: dataaxiom/ghcr-cleanup-action@cd0cdb900b5dbf3a6f2cc869f0dbb0b8211f50c4
+        with:
+          # ---- what to clean ---------------------------------------------
+          owner: kennispunttwente
+          packages: tekstanalyse_met_llm-base
           delete-untagged: true
           delete-partial-images: true
           delete-ghost-images: true
