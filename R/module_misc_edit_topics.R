@@ -321,7 +321,6 @@ edit_topics_server <- function(
           packages = c("tidyprompt", "tidyverse"),
           globals = c(
             list(
-              send_prompt_with_retries = send_prompt_with_retries,
               reduce_topics = reduce_topics,
               updated_topics = updated_topics,
               research_background = research_background(),
@@ -332,7 +331,8 @@ edit_topics_server <- function(
               count_tokens = count_tokens,
               async_message_printer = async_message_printer
             ),
-            log_async_globals(log_ctx)
+            log_async_globals(log_ctx),
+            send_prompt_with_retries_async_globals()
           ),
           seed = NULL
         ) %...>%

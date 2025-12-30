@@ -222,6 +222,7 @@ marking_codes_server <- function(
           },
           globals = c(
             log_async_globals(log_ctx),
+            send_prompt_with_retries_async_globals(),
             list(
               texts = texts$preprocessed,
               research_background = research_background(),
@@ -230,7 +231,6 @@ marking_codes_server <- function(
               interrupter = interrupter,
               language = lang()$get_translation_language(),
               generate_codes_by_reading_texts = generate_codes_by_reading_texts,
-              send_prompt_with_retries = send_prompt_with_retries,
               get_context_window_size_in_tokens = get_context_window_size_in_tokens,
               create_text_chunks = create_text_chunks,
               create_candidate_topics = create_candidate_topics,

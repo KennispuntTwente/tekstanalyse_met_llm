@@ -380,7 +380,6 @@ processing_server <- function(
               prompt_score = prompt_score,
               assign_multiple_categories = assign_multiple_categories(),
               write_paragraph = write_paragraph,
-              send_prompt_with_retries = send_prompt_with_retries,
               write_paragraphs = write_paragraphs(),
               get_context_window_size_in_tokens = get_context_window_size_in_tokens,
               tiktoken_load_tokenizer = tiktoken_load_tokenizer,
@@ -394,7 +393,8 @@ processing_server <- function(
               streaming_enabled = getOption("paragraph_streaming", TRUE) &&
                 isTRUE(models$main$parameters$stream)
             ),
-            log_async_globals(log_ctx)
+            log_async_globals(log_ctx),
+            send_prompt_with_retries_async_globals()
           ),
           packages = c("tidyprompt", "tidyverse", "glue", "fs", "uuid"),
           seed = NULL
@@ -594,8 +594,8 @@ processing_server <- function(
           },
           globals = c(
             log_async_globals(log_ctx),
+            send_prompt_with_retries_async_globals(),
             list(
-              send_prompt_with_retries = send_prompt_with_retries,
               create_candidate_topics = create_candidate_topics,
               prompt_candidate_topics = prompt_candidate_topics,
               reduce_topics = reduce_topics,
@@ -934,9 +934,9 @@ processing_server <- function(
             texts_with_topics
           },
           globals = c(
+            send_prompt_with_retries_async_globals(),
             list(
               topics = topics(),
-              send_prompt_with_retries = send_prompt_with_retries,
               create_candidate_topics = create_candidate_topics,
               prompt_candidate_topics = prompt_candidate_topics,
               reduce_topics = reduce_topics,
@@ -1125,7 +1125,6 @@ processing_server <- function(
               async_message_printer = async_message_printer,
               lang = lang(),
               semchunk_load_chunker = semchunk_load_chunker,
-              send_prompt_with_retries = send_prompt_with_retries,
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
               interrupter = interrupter,
@@ -1142,7 +1141,8 @@ processing_server <- function(
               streaming_enabled = getOption("paragraph_streaming", TRUE) &&
                 isTRUE(models$main$parameters$stream)
             ),
-            log_async_globals(log_ctx)
+            log_async_globals(log_ctx),
+            send_prompt_with_retries_async_globals()
           ),
           packages = c(
             "tidyprompt",
