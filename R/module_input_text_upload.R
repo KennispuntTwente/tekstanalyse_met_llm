@@ -182,7 +182,7 @@ text_upload_server <- function(
         tryCatch(
           {
             # read every line first
-            txt_lines <- readLines(file_path, encoding = "UTF-8")
+            txt_lines <- readLines(file_path, encoding = "UTF-8", warn = FALSE)
 
             split_lines <- isTRUE(input$txt_split_lines == lang()$t("Ja"))
 

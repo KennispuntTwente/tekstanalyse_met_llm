@@ -1383,7 +1383,7 @@ processing_server <- function(
               if (grepl("\\.txt$", excel_file)) {
                 stop(paste0(
                   "Excel file generation error: ",
-                  readLines(excel_file)
+                  readLines(excel_file, warn = FALSE)
                 ))
               }
 
@@ -1402,7 +1402,7 @@ processing_server <- function(
                 if (grepl("\\.txt$", rmarkdown)) {
                   stop(paste0(
                     "Rmarkdown file generation error: ",
-                    readLines(rmarkdown)
+                    readLines(rmarkdown, warn = FALSE)
                   ))
                 }
               }

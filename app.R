@@ -91,6 +91,14 @@ options(
   # Set max size of memory transfer between main & async processes
   future.globals.maxSize = 3 * 1024^3, # 3 GB
 
+  # Silence future console spam about connection tracking.
+  # Some HTTP client libraries keep curl connections pooled for reuse,
+  # which can trigger false positives when running inside multisession futures.
+  future.connections.onMisuse = "ignore",
+
+  # Silence tidyprompt warning about auto-detecting JSON mode.
+  tidyprompt.warn.auto.json = FALSE,
+
   # - Retry behaviour upon LLM API errors;
   #   max tries defines the maximum number of retries
   #   in connecting to the LLM API, while max interactions

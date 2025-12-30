@@ -59,7 +59,8 @@ send_prompt_with_retries <- function(
           tidyprompt::send_prompt(
             llm_provider,
             return_mode = "full",
-            max_interactions = max_interactions
+            max_interactions = max_interactions,
+            verbose = FALSE
           )
 
         if (tries == 1) {
