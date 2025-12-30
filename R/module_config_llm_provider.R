@@ -517,10 +517,10 @@ llm_provider_server <- function(
       available_models_openai <- reactiveVal(NULL)
       available_models_ollama <- reactiveVal(NULL)
 
-      # Expose model lists for automated tests (safe outside reactive context)
+      # Expose model lists for automated tests (reactive, so they update)
       shiny::exportTestValues(
-        available_models_openai = shiny::isolate(available_models_openai()),
-        available_models_ollama = shiny::isolate(available_models_ollama())
+        available_models_openai = available_models_openai(),
+        available_models_ollama = available_models_ollama()
       )
 
       # Keep track of requests for available models
@@ -601,60 +601,124 @@ llm_provider_server <- function(
 
         future(
           {
-            if (provider_mode == "openai") {
-              # For OpenAI url, reduce the URL first to base URL
-              # e.g., "https://api.openai.com/v1"
-              # (remove everything after version; no trailing slash)
-              openai_base_url <- openai_url |>
-                stringr::str_replace("(.*?/v\\d+).*", "\\1") |>
-                stringr::str_remove("/+$")
+            # IMPORTANT: in futures, do not let raw httr/curl error conditions
+            # escape, because they can be non-serializable and get replaced by
+            # generic future::evalFuture() errors. Always return a simple list.
 
-              res <- httr::GET(
-                paste0(openai_base_url, "/models"),
-                httr::add_headers(
-                  Authorization = paste("Bearer", api_key_input)
-                )
-              )
-
-              if (httr::http_error(res)) {
-                stop(sprintf(
-                  "Error (%s): %s",
-                  httr::status_code(res),
-                  httr::content(res, as = "text", encoding = "UTF-8")
-                ))
+            safe_trim <- function(x, max_chars = 2000) {
+              x <- as.character(x %||% "")
+              if (nchar(x) > max_chars) {
+                paste0(substr(x, 1, max_chars), "…")
+              } else {
+                x
               }
-
-              httr::content(res)$data |> purrr::map_chr("id")
-            } else if (provider_mode == "ollama") {
-              # Make base URL for Ollama too
-              # (also here: no trailing slash)
-              ollama_base_url <- ollama_url |>
-                stringr::str_replace("(.*?/api).*", "\\1") |>
-                stringr::str_remove("/+$")
-
-              res <- httr::GET(
-                url = paste0(ollama_base_url, "/tags"),
-                httr::add_headers(`Content-Type` = "application/json")
-              )
-
-              if (httr::http_error(res)) {
-                stop(sprintf(
-                  "Error (%s): %s",
-                  httr::status_code(res),
-                  httr::content(res, as = "text", encoding = "UTF-8")
-                ))
-              }
-
-              content <- httr::content(
-                res,
-                as = "parsed",
-                type = "application/json"
-              )
-
-              vapply(content$models, function(x) x$name, character(1))
-            } else {
-              character(0)
             }
+
+            tryCatch(
+              {
+                if (provider_mode == "openai") {
+                  # For OpenAI url, reduce the URL first to base URL
+                  # e.g., "https://api.openai.com/v1"
+                  # (remove everything after version; no trailing slash)
+                  openai_base_url <- openai_url |>
+                    stringr::str_replace("(.*?/v\\d+).*", "\\1") |>
+                    stringr::str_remove("/+$")
+
+                  request_url <- paste0(openai_base_url, "/models")
+
+                  res <- httr::GET(
+                    request_url,
+                    httr::add_headers(
+                      Authorization = paste("Bearer", api_key_input)
+                    )
+                  )
+
+                  if (httr::http_error(res)) {
+                    status <- httr::status_code(res)
+                    body <- httr::content(res, as = "text", encoding = "UTF-8")
+                    return(list(
+                      ok = FALSE,
+                      provider = "openai",
+                      request_url = request_url,
+                      status_code = status,
+                      response_body = safe_trim(body),
+                      error = sprintf("HTTP %s", status)
+                    ))
+                  }
+
+                  models <- httr::content(res)$data |> purrr::map_chr("id")
+                  return(list(
+                    ok = TRUE,
+                    provider = "openai",
+                    request_url = request_url,
+                    models = models
+                  ))
+                }
+
+                if (provider_mode == "ollama") {
+                  # Make base URL for Ollama too
+                  # (also here: no trailing slash)
+                  ollama_base_url <- ollama_url |>
+                    stringr::str_replace("(.*?/api).*", "\\1") |>
+                    stringr::str_remove("/+$")
+
+                  request_url <- paste0(ollama_base_url, "/tags")
+
+                  res <- httr::GET(
+                    url = request_url,
+                    httr::add_headers(`Content-Type` = "application/json")
+                  )
+
+                  if (httr::http_error(res)) {
+                    status <- httr::status_code(res)
+                    body <- httr::content(res, as = "text", encoding = "UTF-8")
+                    return(list(
+                      ok = FALSE,
+                      provider = "ollama",
+                      request_url = request_url,
+                      status_code = status,
+                      response_body = safe_trim(body),
+                      error = sprintf("HTTP %s", status)
+                    ))
+                  }
+
+                  content <- httr::content(
+                    res,
+                    as = "parsed",
+                    type = "application/json"
+                  )
+
+                  models <- vapply(
+                    content$models,
+                    function(x) x$name,
+                    character(1)
+                  )
+                  return(list(
+                    ok = TRUE,
+                    provider = "ollama",
+                    request_url = request_url,
+                    models = models
+                  ))
+                }
+
+                list(
+                  ok = FALSE,
+                  provider = provider_mode %||% "unknown",
+                  request_url = NA_character_,
+                  error = "Unsupported provider mode"
+                )
+              },
+              error = function(e) {
+                # Network / TLS / DNS errors etc. (no HTTP response available)
+                list(
+                  ok = FALSE,
+                  provider = provider_mode %||% "unknown",
+                  request_url = NA_character_,
+                  error = safe_trim(conditionMessage(e)),
+                  error_class = paste(class(e), collapse = "|")
+                )
+              }
+            )
           },
           globals = list(
             openai_url = openai_url(),
@@ -663,13 +727,7 @@ llm_provider_server <- function(
             provider_mode = provider_mode
           )
         ) %...>%
-          (function(models) {
-            if (provider_mode == "openai") {
-              available_models_openai(models)
-            } else if (provider_mode == "ollama") {
-              available_models_ollama(models)
-            }
-
+          (function(result) {
             elapsed_ms <- as.integer(round(
               1000 *
                 as.numeric(difftime(
@@ -678,31 +736,102 @@ llm_provider_server <- function(
                   units = "secs"
                 ))
             ))
+
+            # Success path
+            if (isTRUE(result$ok)) {
+              models <- result$models %||% character(0)
+              if (provider_mode == "openai") {
+                available_models_openai(models)
+              } else if (provider_mode == "ollama") {
+                available_models_ollama(models)
+              }
+
+              log_action(
+                "models_ping_succeeded",
+                details = sprintf(
+                  "provider=%s n_models=%d elapsed_ms=%d",
+                  provider_mode %||% "unknown",
+                  length(models),
+                  elapsed_ms
+                )
+              )
+              showNotification(
+                lang()$t("Succes: modellen opgehaald"),
+                type = "message",
+                duration = 3
+              )
+              log_info(
+                sprintf(
+                  "Models fetched: provider=%s, n_models=%d",
+                  provider_mode,
+                  length(models)
+                ),
+                component = "llm"
+              )
+              return(NULL)
+            }
+
+            # Failure path with optional HTTP response details
+            status_part <- if (
+              !is.null(result$status_code) && !is.na(result$status_code)
+            ) {
+              paste0("HTTP ", result$status_code)
+            } else {
+              NULL
+            }
+            url_part <- if (
+              !is.null(result$request_url) &&
+                !is.na(result$request_url) &&
+                nzchar(result$request_url)
+            ) {
+              paste0("URL: ", result$request_url)
+            } else {
+              NULL
+            }
+            body_part <- if (
+              !is.null(result$response_body) && nzchar(result$response_body)
+            ) {
+              paste0("Response: ", result$response_body)
+            } else {
+              NULL
+            }
+            err_text <- result$error %||% "Unknown error"
+            err_text_short <- substr(err_text, 1, 200)
+
             log_action(
-              "models_ping_succeeded",
+              "models_ping_failed",
               details = sprintf(
-                "provider=%s n_models=%d elapsed_ms=%d",
+                "provider=%s elapsed_ms=%d error=%s status=%s url=%s",
                 provider_mode %||% "unknown",
-                length(models),
-                elapsed_ms
+                elapsed_ms,
+                err_text_short,
+                result$status_code %||% "",
+                result$request_url %||% ""
               )
             )
-
-            showNotification(
-              lang()$t("Succes: modellen opgehaald"),
-              type = "message",
-              duration = 3
-            )
-            log_info(
+            log_warn(
               sprintf(
-                "Models fetched: provider=%s, n_models=%d",
+                "Models fetch failed: provider=%s, error=%s",
                 provider_mode,
-                length(models)
+                err_text_short
               ),
               component = "llm"
             )
+
+            showNotification(
+              paste(
+                lang()$t("Error: modellen niet opgehaald -"),
+                paste(
+                  c(status_part, err_text, url_part, body_part),
+                  collapse = " | "
+                )
+              ),
+              type = "error",
+              duration = 12
+            )
           }) %...!%
           (function(e) {
+            # This should be rare now; keep as a last-resort fallback.
             elapsed_ms <- as.integer(round(
               1000 *
                 as.numeric(difftime(
@@ -726,21 +855,13 @@ llm_provider_server <- function(
                 err_msg
               )
             )
-            log_warn(
-              sprintf(
-                "Models fetch failed: provider=%s, error=%s",
-                provider_mode,
-                conditionMessage(e)
-              ),
-              component = "llm"
-            )
             showNotification(
               paste(
                 lang()$t("Error: modellen niet opgehaald -"),
-                conditionMessage(e)
+                err_msg
               ),
               type = "error",
-              duration = 8
+              duration = 12
             )
           }) %>%
           finally(function() {

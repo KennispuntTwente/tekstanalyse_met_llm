@@ -23,7 +23,13 @@ test_that("llm_provider_server: switches modes and fetches OpenAI models (mocked
       character(0)
     }
 
-    promises::promise_resolve(models)
+    # Return the same structure that the real code expects
+    promises::promise_resolve(list(
+      ok = TRUE,
+      provider = provider_mode,
+      request_url = "mock://test",
+      models = models
+    ))
   }
 
   # Source locally so the module sees our stubbed `future()`.
@@ -107,7 +113,13 @@ test_that("llm_provider_server: switches modes and fetches Ollama models (mocked
       character(0)
     }
 
-    promises::promise_resolve(models)
+    # Return the same structure that the real code expects
+    promises::promise_resolve(list(
+      ok = TRUE,
+      provider = provider_mode,
+      request_url = "mock://test",
+      models = models
+    ))
   }
 
   source(here::here("R", "module_core_processing.R"), local = TRUE)
