@@ -23,10 +23,10 @@ jobs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.get-version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 20
 
@@ -62,21 +62,21 @@ jobs:
     if: needs.check-version-and-release.outputs.should_release == 'true'
     runs-on: windows-latest
     env:
-      R_VERSION: "4.4.2"
+      R_VERSION: "4.5.1"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 20
           cache: npm
 
-      - uses: r-lib/actions/setup-r@v2
+      - uses: r-lib/actions/setup-r@bd49c52ffe281809afa6f0fecbf37483c5dd0b93
         with:
           r-version: ${{ env.R_VERSION }}
 
-      - uses: r-lib/actions/setup-renv@v2
+      - uses: r-lib/actions/setup-renv@bd49c52ffe281809afa6f0fecbf37483c5dd0b93
 
       - name: Install npm packages
         run: npm ci
@@ -101,7 +101,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Draft GitHub release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
         with:
           tag_name: v${{ needs.check-version-and-release.outputs.version }}
           target_commitish: ${{ github.sha }}
@@ -131,16 +131,16 @@ jobs:
             2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
             3. Browse to `http://localhost:3838`
 
-            Alternatively build your own image; see the 'Dockerfile' and the instructions in the [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#3-container-app).
+            Alternatively build your own image; see the 'Dockerfile' and the instructions in the [README](https://github.com/KennispuntTwente/KWALLM#3-container-app).
 
             ## Want to launch the app from R (e.g., RStudio)?
-            See the instructions in the [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#1-r-environment).
+            See the instructions in the [README](https://github.com/KennispuntTwente/KWALLM#1-r-environment).
 
             ## About this app
             This app was developed by [Kennispunt Twente](https://www.kennispunttwente.nl) in collaboration with GGD Twente.
             Together, our organizations work on applying generative AI for the benefit of society.
 
-            Ideas or suggestions? [Open an issue](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
+            Ideas or suggestions? [Open an issue](https://github.com/kennispunttwente/KWALLM/issues/new).
 
             ---
 
@@ -165,16 +165,16 @@ jobs:
             2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
             3. Open `http://localhost:3838` in je browser
 
-            Je kunt ook zelf een image bouwen; zie de 'Dockerfile' en instructies in de [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#3-container-applicatie).
+            Je kunt ook zelf een image bouwen; zie de 'Dockerfile' en instructies in de [README](https://github.com/KennispuntTwente/KWALLM#3-container-applicatie).
 
             ## Wil je de app starten vanuit jouw R-omgeving (bijv. RStudio)?
-            Lees de instructies in de [README](https://github.com/KennispuntTwente/tekstanalyse_met_llm#1-r-omgeving).
+            Lees de instructies in de [README](https://github.com/KennispuntTwente/KWALLM#1-r-omgeving).
 
             ## Over deze app
             Deze app is ontwikkeld door [Kennispunt Twente](https://www.kennispunttwente.nl) in samenwerking met GGD Twente.
             Samen werken onze organisaties aan toepassingen van generatieve AI ten behoeve van de samenleving.
 
-            Ideeën of verbeterpunten? [Open een issue](https://github.com/kennispunttwente/tekstanalyse_met_llm/issues/new).
+            Ideeën of verbeterpunten? [Open een issue](https://github.com/kennispunttwente/KWALLM/issues/new).
 
             ---
           files: ${{ env.ZIP_NAME }}

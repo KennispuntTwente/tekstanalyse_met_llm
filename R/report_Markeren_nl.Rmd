@@ -11,8 +11,8 @@ params:
 
 ```{r include=FALSE, error=TRUE}
 rl <- params$result_list
-source(here::here("R", "report_datatable_config.R"), local = TRUE)
-source(here::here("R", "report_quote_utils.R"), local = TRUE)
+source(here::here("R", "style_datatable_config.R"), local = TRUE)
+source(here::here("R", "utils_quotes.R"), local = TRUE)
 ```
 
 ## Methode
@@ -238,7 +238,7 @@ htmltools::tags$footer(
   htmltools::HTML(paste0(
     "Deze analyse is uitgevoerd met KWALLM, een open-source app voor automatische kwalitatieve tekstanalyse.<br>Ontwikkeld door ",
     "<a href='https://www.kennispunttwente.nl' target='_blank'>Kennispunt Twente</a> in samenwerking met GGD Twente.<br>",
-    "Bezoek de <a href='https://github.com/kennispunttwente/tekstanalyse_met_llm' target='_blank'>GitHub-repository</a> voor meer informatie.",
+    "Bezoek de <a href='https://github.com/kennispunttwente/KWALLM' target='_blank'>GitHub-repository</a> voor meer informatie.",
     "<br>",
     "<br>",
     format(Sys.Date(), "%Y-%m-%d")

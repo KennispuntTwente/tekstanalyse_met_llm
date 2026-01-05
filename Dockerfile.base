@@ -1,0 +1,93 @@
+# Heavy base image for KWALLM / tekstanalyse_met_llm
+# Contains: R + restored renv library, Python/uv-managed venv, and cached GLiNER model.
+
+# ─────────────────────── R builder stage (from rocker) ────────────────────────
+FROM rocker/r-ver:4.5.1 AS r-builder
+
+# Install required system dependencies for building R packages
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    libcurl4-openssl-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
+    libicu-dev \
+    libssl-dev \
+    libx11-dev \
+    libxml2-dev \
+    zlib1g-dev \
+    pandoc \
+    libnode-dev \
+    libwebp-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Europe/Amsterdam
+
+# Install renv and restore project library
+COPY renv.lock renv.lock
+RUN R -q -e "install.packages('renv', repos='https://cloud.r-project.org'); renv::restore()"
+
+# ─────────────────────────── Runtime stage ────────────────────────────────────
+FROM ubuntu:noble
+
+LABEL org.opencontainers.image.title="KWALLM: Text analysis with LLM (base)" \
+      org.opencontainers.image.version="See version tag at https://github.com/KennispuntTwente/KWALLM/pkgs/" \
+      org.opencontainers.image.description="Heavy base image containing R/renv + Python deps + cached GLiNER model." \
+      org.opencontainers.image.authors="Luka Koning <l.koning@kennispunttwente.nl>" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
+      org.opencontainers.image.vendor="Kennispunt Twente" \
+      org.opencontainers.image.source="https://github.com/KennispuntTwente/KWALLM" \
+      org.opencontainers.image.base.name="ubuntu:24.04"
+
+ENV TZ=Europe/Amsterdam \
+    OMP_NUM_THREADS=1 \
+    HF_HUB_OFFLINE=1
+
+# Minimal runtime deps needed for R (copied in) and Python tooling
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+      dirmngr gnupg ca-certificates wget curl \
+      libcurl4 libssl3 libxml2 pandoc cmake unzip tzdata \
+      libblas3 liblapack3 libopenblas0-pthread libgfortran5 libpcre2-8-0 \
+      libdeflate0 libgomp1 libpng16-16 libcairo2 libcairo2-dev \
+      libxt-dev libpng-dev libtiff-dev libpangocairo-* \
+      python3.12-dev libnode-dev libwebp-dev && \
+    ln -fs /usr/share/zoneinfo/Europe/Amsterdam /etc/localtime && \
+    dpkg-reconfigure --frontend noninteractive tzdata && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -ms /bin/bash appuser
+
+# Copy R installation (from rocker) including site-library
+COPY --from=r-builder /usr/local/bin/R* /usr/local/bin/
+COPY --from=r-builder /usr/local/bin/Rscript /usr/local/bin/
+COPY --from=r-builder /usr/local/lib/R /usr/local/lib/R
+COPY --from=r-builder /usr/local/lib/R/site-library /usr/local/lib/R/site-library
+
+# Workdir for app + Python venv
+WORKDIR /home/appuser/app
+
+# Copy only Python dependency manifests (not app source)
+COPY --chown=appuser:appuser pyproject.toml pyproject.toml
+COPY --chown=appuser:appuser uv.lock uv.lock
+
+RUN chown -R appuser:appuser /home/appuser/app && \
+    chmod -R u+rwX /home/appuser/app
+USER appuser
+
+# Install Python packages with uv (via reticulate) & cache GLiNER model
+# Keep this independent from app source; hard-code the default model name used by the app.
+ENV HF_HUB_OFFLINE=0
+RUN Rscript -e ' \
+  Sys.setenv(FOR_DISABLE_CONSOLE_CTRL_HANDLER = "1"); \
+  Sys.unsetenv("RETICULATE_PYTHON"); \
+  reticulate:::uv_exec("sync"); \
+  reticulate::use_virtualenv("./.venv"); \
+  gliner <- reticulate::import("gliner"); \
+  Sys.setenv(HF_HUB_DISABLE_SYMLINKS = "1"); \
+  gliner$GLiNER$from_pretrained("urchade/gliner_multi_pii-v1", cache_dir = "./.venv"); \
+  reticulate:::uv_exec("cache clean"); \
+ '
+ENV HF_HUB_OFFLINE=1
+
+# This base image is intended to be used by the app image.

@@ -1,98 +1,55 @@
-#### 1 Load dependencies ####
+# 1 Load dependencies ----------------------------------------------------------
 
-# Set library path explicitly to portable R library
-portable_lib <- file.path(dirname(R.home()), "library")
-.libPaths(portable_lib)
-print(paste("Using library path:", portable_lib))
-
-# Download portable WinPython
-try({
-  url <- "https://github.com/winpython/winpython/releases/download/16.6.20250620final/Winpython64-3.12.10.1dot.zip"
-  expected_sha256 <- "7a1f004aec39615977b2b245423a50115530d16af3418df77977186a555d0a40"
-  zip_file <- "WinPython.zip"
-  extract_dir <- "winpython"
-
-  if (!file.exists(extract_dir)) {
-    download.file(url, zip_file, mode = "wb")
-    actual_sha256 <- digest::digest(file = zip_file, algo = "sha256")
-
-    cat("WinPython: downloaded SHA-256:", actual_sha256, "\n")
-    if (tolower(actual_sha256) != tolower(expected_sha256)) {
-      stop("SHA-256 hash mismatch! File may be corrupted or tampered")
-    }
-
-    dir.create(extract_dir, showWarnings = FALSE)
-    unzip(zip_file, exdir = extract_dir)
-  }
-
-  python_paths <- list.files(
-    extract_dir,
-    pattern = "python.exe$",
-    recursive = TRUE,
-    full.names = TRUE
-  )
-
-  # Filter out venv-related paths
-  valid_python_paths <- python_paths[
-    !grepl("venv|scripts|nt", tolower(python_paths))
-  ]
-
-  # Pick the first valid path (or throw an error if none found)
-  if (length(valid_python_paths) == 0) {
-    stop("No valid base python.exe found")
-  }
-
-  python_path <- valid_python_paths[1]
-
-  if (is.na(python_path) || !file.exists(python_path)) {
-    stop("WinPython: executable not found")
-  }
-
-  cat("WinPython: using Python at", python_path, "\n")
-  Sys.setenv(UV_PYTHON = normalizePath(python_path))
-})
-
-# Load core packages
-library(tidyverse)
-library(tidyprompt)
-library(shiny)
-library(shinyjs)
-library(bslib)
-library(bsicons)
-library(htmltools)
-library(future)
-library(promises)
-library(DT)
-
-# Load components in R/-folder
-load_all <- function(except = c()) {
-  r_files <- list.files(
-    path = "R",
-    pattern = "\\.R$",
-    full.names = TRUE
-  )
-  for (file in r_files) {
-    if (file %in% except) next
-    source(file)
-  }
-}
-load_all()
+source("R/load_dependencies.R")
+load_dependencies("electron")
 
 
-#### 2 Settings ####
+# 2 Settings -------------------------------------------------------------------
+
+# 2.1 Asynchronous processing --------------------------------------------------
 
 # Set asynchronous processing
 # - Asynchronous processing is recommended when deploying the app to a server,
 #     where multiple users can use the app simultaneously
+# - Asynchronous processing also enables progress bar updates in the UI
+#     during the analysis of texts, and live streaming of LLM output
+#     when the LLM is writing summarizing paragraphs
 # - To enable asynchronous processing, you need to use `future::plan()`, e.g.,
 #     `future::plan(multisession)`
-# - When you asynchronous processing is not needed, you can use
+# - When asynchronous processing is not needed, you can use
 #     `future::plan("sequential")`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
 # - See the documentation for `future::plan()` for more details
-if (!getOption("shiny.testmode", FALSE)) {
-  future::plan(multisession, .skip = TRUE)
+
+test_mode <- getOption("shiny.testmode", FALSE)
+test_async <- tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
+  c("true", "1", "yes")
+
+if (!test_mode || test_async) {
+  if (!exists("future_plan")) {
+    future_plan <- future::plan(future::multisession)
+  }
+
+  log_info(
+    sprintf(
+      "Using %s async workers",
+      future::nbrOfWorkers()
+    ),
+    component = "startup"
+  )
+} else {
+  log_info(
+    paste0(
+      "Using no async workers",
+      " (note: progress bar & LLM streaming may lag behind;",
+      " concurrent app users also not supported)"
+    ),
+    component = "startup"
+  )
 }
+
+
+# 2.2 Set LLM provider & models ------------------------------------------------
 
 # Set preconfigured LLM provider and available models (optional)
 # - You can preconfigure the LLM provider and available models here
@@ -113,6 +70,9 @@ if (!getOption("shiny.testmode", FALSE)) {
 #     the model names will be shown. Names must be unique. If you want to use
 #     a specific model twice but with different settings, a named list is
 #     then required
+# - Note: LLM providers are configured with stream = TRUE by default
+#     (see R/module_config_llm_provider.R); this enables live streaming
+#     when writing paragraphs (see paragraph_streaming option below)
 preconfigured_models_main <- NULL
 preconfigured_models_large <- NULL
 if (FALSE) {
@@ -143,7 +103,9 @@ if (FALSE) {
   )
 }
 
-# Optionally set other options
+
+## 2.3 Other options -----------------------------------------------------------
+
 options(
   # - How the Shiny app is served;
   # shiny.port = 8100,
@@ -156,6 +118,14 @@ options(
   # Set max size of memory transfer between main & async processes
   future.globals.maxSize = 3 * 1024^3, # 3 GB
 
+  # Silence future console spam about connection tracking.
+  # Some HTTP client libraries keep curl connections pooled for reuse,
+  # which can trigger false positives when running inside multisession futures.
+  future.connections.onMisuse = "ignore",
+
+  # Silence tidyprompt warning about auto-detecting JSON mode.
+  tidyprompt.warn.auto.json = FALSE,
+
   # - Retry behaviour upon LLM API errors;
   #   max tries defines the maximum number of retries
   #   in connecting to the LLM API, while max interactions
@@ -166,10 +136,18 @@ options(
   send_prompt_with_retries__retry_delay_seconds = 3,
   send_prompt_with_retries__max_interactions = 10,
 
-  # - Prompt logging;
-  #   if prompts & LLM replies should be written to folder 'prompt_logs'; for debugging purposes;
-  #     see: R/send_prompt_with_retries.R
-  send_prompt_with_retries__log_prompts = FALSE,
+  # - Prompt/response tracing (privacy-sensitive; disabled by default)
+  #   Log prompts & replies to a separate trace file (under logs/prompt_logs/)
+  #   Optional: override the trace file location
+  #     see: R/utils_send_prompt_with_retries.R
+  #   Note: can be enabled via KWALLM_LOG_PROMPTS_TO_FILE env var
+  send_prompt_with_retries__log_prompts_to_file = tolower(Sys.getenv(
+    "KWALLM_LOG_PROMPTS_TO_FILE",
+    "false"
+  )) %in%
+    c("true", "1", "yes"),
+  send_prompt_with_retries__prompt_trace_file = NULL,
+  send_prompt_with_retries__prompt_trace_retention_files = 30, # Keep last N prompt log files (NULL = indefinite)
 
   # - Maximum number of texts to process at once;
   #     see: R/processing.R
@@ -188,6 +166,11 @@ options(
   #   see R/language.R
   language = "en", # Default language
   language__can_toggle = TRUE, # If user can switch language in the app
+
+  # - Enable live streaming of LLM output when writing paragraphs;
+  #   only works when LLM provider has stream = TRUE;
+  #     see R/component_llm_streaming.R
+  paragraph_streaming = TRUE,
 
   # - Default setting for anonymization of texts, and if user
   #   can toggle this setting;
@@ -214,8 +197,20 @@ options(
   topic_modelling__chunk_size_limit = 100,
   topic_modelling__number_of_chunks_limit = 50,
   topic_modelling__draws_default = 1,
-  topic_modelling__draws_limit = 5
+  topic_modelling__draws_limit = 5,
+
+  # - Logging settings;
+  #   logs are written to the 'logs/' directory;
+  #     see R/utils_logger.R
+  logger__level = "INFO", # DEBUG, INFO, WARN, ERROR
+  logger__dir = "logs", # Directory for log files
+  logger__retention = 30 # Keep last N log files (NULL = indefinite)
 )
+
+
+## 2.4 Handle test settings -----------------------------------------------------
+
+# These settings are mainly intended for automated testing of the app
 
 if (getOption("anonymization__gliner_test", FALSE)) {
   invisible(gliner_load_model(test_model = TRUE))
@@ -226,9 +221,9 @@ if (!getOption("shiny.testmode", FALSE)) {
 }
 
 
-#### 3 Run app ####
+# 3 Run app -----------------------------------------------------------------
 
-# Make images in www folder available to the app
+# Make images in 'www/' folder available to the app
 shiny::addResourcePath("www", "www")
 
 # Set Shiny port; read from arguments passed to this script
@@ -236,10 +231,33 @@ args <- commandArgs(trailingOnly = TRUE)
 port <- if (length(args) > 0) as.numeric(args[1]) else 3838
 options(shiny.port = port)
 
+server_fn <- main_server(
+  preconfigured_main_models = preconfigured_models_main,
+  preconfigured_large_models = preconfigured_models_large
+)
+
+server_wrapped <- function(input, output, session) {
+  # Best-effort cleanup for multisession workers.
+  # Registered via shiny::onStop() for compatibility with older Shiny versions.
+  shiny::onStop(function() {
+    try(
+      {
+        future::plan("sequential")
+      },
+      silent = TRUE
+    )
+    try(
+      {
+        future::ClusterRegistry("stop")
+      },
+      silent = TRUE
+    )
+  })
+
+  server_fn(input, output, session)
+}
+
 shiny::shinyApp(
   ui = main_ui(),
-  server = main_server(
-    preconfigured_main_models = preconfigured_models_main,
-    preconfigured_large_models = preconfigured_models_large
-  )
+  server = server_wrapped
 )

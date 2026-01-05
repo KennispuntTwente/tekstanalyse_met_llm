@@ -10,8 +10,8 @@ const https = require("https");
 const path = require("path");
 const fs = require("fs");
 
-const R_VERSION = "4.4.2";
-const R_SHORT_VERSION = R_VERSION.match(/^(\d+\.\d+)/)[1]; // "4.4"
+const R_VERSION = "4.5.1";
+const R_SHORT_VERSION = R_VERSION.match(/^(\d+\.\d+)/)[1];
 const R_INSTALLER_URL = `https://cran.r-project.org/bin/windows/base/old/${R_VERSION}/R-${R_VERSION}-win.exe`;
 const INSTALLER_PATH = path.resolve(__dirname, "../R-" + R_VERSION + ".exe");
 const R_DIR = path.resolve(__dirname, "../portable-r");

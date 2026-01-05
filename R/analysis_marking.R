@@ -1,16 +1,17 @@
+# Defines a function to mark texts based on qualitative codes using an LLM.
+# The function splits texts into semantic chunks, sends prompts to the LLM to identify
+# relevant sections for each qualitative cod (e.g., 'it is raining' gets marked for code 'weather'),
+# and optionally generates summary paragraphs highlighting the marked sections
+# Function can take progress indicators and an interrupter for Shiny app integration
+
 mark_texts <- function(
-  texts = c(
-    "hi my super boi, its raining!",
-    "hello my mister man, the sky is blue",
-    "hello to the world, its a hot day today",
-    "for sure! i like cake"
-  ),
-  codes = c("greeting", "weather"),
+  texts,
+  codes,
   text_size_tokens = 128,
   overlap_size_tokens = 64,
   research_background = "",
   style_prompt = "",
-  llm_provider = tidyprompt::llm_provider_openai(),
+  llm_provider,
   progress_primary = NULL,
   progress_secondary = NULL,
   interrupter = NULL,
@@ -18,7 +19,9 @@ mark_texts <- function(
     translation_json_path = "language/language.json"
   ),
   write_paragraphs = TRUE,
-  max_interactions = getOption("send_prompt_with_retries__max_interaction", 10)
+  max_interactions = getOption("send_prompt_with_retries__max_interaction", 10),
+  llm_stream_async = NULL,
+  streaming_enabled = getOption("paragraph_streaming", TRUE)
 ) {
   stopifnot(
     is.character(texts),
@@ -34,6 +37,7 @@ mark_texts <- function(
   }
 
   # Set initial progress
+  log_info("Marking Step 1: Splitting texts...", component = "analysis")
   try(progress_primary$set_with_total(
     1,
     total_steps,
@@ -68,7 +72,9 @@ mark_texts <- function(
   # Verify that longest text does not exceed token limit
   model <- llm_provider$parameters$model
   n_tokens_context_window <- get_context_window_size_in_tokens(model)
-  if (is.null(n_tokens_context_window)) n_tokens_context_window <- 2048
+  if (is.null(n_tokens_context_window)) {
+    n_tokens_context_window <- 2048
+  }
   longest_prompt_tokens <- mark_text_prompt(
     text = df$sub_text[which.max(count_tokens(df$sub_text))],
     code = codes[which.max(count_tokens(codes))]
@@ -90,6 +96,7 @@ mark_texts <- function(
   total_combinations <- nrow(df) * length(codes)
   current_count <- 0
   try({
+    log_info("Marking Step 2: Marking texts...", component = "analysis")
     progress_primary$set_with_total(
       2,
       total_steps,
@@ -109,6 +116,16 @@ mark_texts <- function(
     dplyr::mutate(
       marked_text = purrr::map2(sub_text, code, function(txt, cd) {
         current_count <<- current_count + 1
+        if (current_count == 1 || current_count %% 10 == 0) {
+          log_info(
+            sprintf(
+              "Marking progress: %d/%d",
+              current_count,
+              total_combinations
+            ),
+            component = "analysis"
+          )
+        }
         try({
           progress_secondary$set_with_total(
             current_count,
@@ -177,6 +194,7 @@ mark_texts <- function(
   # Write paragraphs if requested
   if (write_paragraphs) {
     try({
+      log_info("Marking Step 4: Writing paragraphs...", component = "analysis")
       progress_primary$set_with_total(
         3,
         total_steps,
@@ -228,6 +246,16 @@ mark_texts <- function(
       progress_secondary$show()
     })
 
+    # Create streaming callback if streaming is enabled
+    stream_callback <- NULL
+    if (streaming_enabled && !is.null(llm_stream_async)) {
+      try(llm_stream_async$show())
+      stream_callback <- function(token, meta) {
+        llm_stream_async$set(meta$partial_response %||% "")
+        invisible(TRUE)
+      }
+    }
+
     i <- -1
     paragraphs <- purrr::imap(
       text_list,
@@ -249,6 +277,11 @@ mark_texts <- function(
           )
         })
 
+        # Clear streaming panel before this paragraph
+        if (streaming_enabled && !is.null(llm_stream_async)) {
+          try(llm_stream_async$clear())
+        }
+
         paragraph <- write_paragraph(
           texts = texts,
           topic = code,
@@ -256,7 +289,8 @@ mark_texts <- function(
           style_prompt = style_prompt,
           llm_provider = llm_provider,
           language = lang$get_translation_language(),
-          focus_on_highlighted_text = TRUE
+          focus_on_highlighted_text = TRUE,
+          stream_callback = stream_callback
         )
 
         return(paragraph)
@@ -335,9 +369,12 @@ mark_text_prompt <- function(
         text_parts <- x$text_parts
 
         # Empty handling
-        if (length(text_parts) == 0) return(character(0))
-        if (length(text_parts) == 1 && identical(text_parts[1], ""))
+        if (length(text_parts) == 0) {
           return(character(0))
+        }
+        if (length(text_parts) == 1 && identical(text_parts[1], "")) {
+          return(character(0))
+        }
 
         # Find matches
         res <- find_matches(
@@ -411,7 +448,7 @@ find_matches <- function(
 
   rows <- lapply(
     needles,
-    function(nd)
+    function(nd) {
       best_literal_substring(
         needle = nd,
         haystack = haystack,
@@ -419,6 +456,7 @@ find_matches <- function(
         abs = abs,
         step_div = step_div
       )
+    }
   )
 
   tibble::tibble(
@@ -426,8 +464,9 @@ find_matches <- function(
     match = vapply(rows, `[[`, "", "match"),
     distance = vapply(
       rows,
-      function(r)
-        ifelse(is.na(r$distance), NA_integer_, as.integer(r$distance)),
+      function(r) {
+        ifelse(is.na(r$distance), NA_integer_, as.integer(r$distance))
+      },
       integer(1)
     ),
     start = vapply(
@@ -465,15 +504,20 @@ normalize_with_map <- function(s) {
     if (is_space(ch)) {
       # collapse runs of whitespace to a single space
       j <- i
-      while (j <= L && is_space(chars[j])) j <- j + 1L
+      while (j <= L && is_space(chars[j])) {
+        j <- j + 1L
+      }
       add(" ", i, j - 1L)
       i <- j
       next
     }
-    if (ch %in% c("\u2018", "\u2019")) ch <- "'" else if (
-      ch %in% c("\u201C", "\u201D")
-    )
-      ch <- "\"" else if (ch %in% c("\u2013", "\u2014")) ch <- "-"
+    if (ch %in% c("\u2018", "\u2019")) {
+      ch <- "'"
+    } else if (ch %in% c("\u201C", "\u201D")) {
+      ch <- "\""
+    } else if (ch %in% c("\u2013", "\u2014")) {
+      ch <- "-"
+    }
     add(tolower(ch), i, i)
     i <- i + 1L
   }
@@ -582,7 +626,9 @@ best_literal_substring <- function(
     cands <- list()
     for (w in seq.int(minw, maxw)) {
       last_start <- Ln - w + 1L
-      if (last_start <= 0L) next
+      if (last_start <= 0L) {
+        next
+      }
       for (i in seq.int(1L, last_start)) {
         subn <- substr(Hn, i, i + w - 1L)
         d <- stringdist::stringdist(n, subn, method = "lv")

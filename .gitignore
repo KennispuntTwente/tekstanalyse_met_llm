@@ -27,3 +27,4 @@ release_notes
 WinPython.zip
 R/report_Markeren_en.html
 /logs
+*.log
