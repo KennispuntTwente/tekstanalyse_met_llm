@@ -81,6 +81,10 @@ main_server <- function(
     n_sections <- 5L
     current_section <- reactiveVal(1L)
 
+    # Track last known layout view to restore after language change re-renders UI
+    last_layout_view <- reactiveVal(NULL)
+    last_language <- reactiveVal(NULL)
+
     show_all_sections <- function() {
       for (i in seq_len(n_sections)) {
         shinyjs::show(paste0("kwallm_section_", i), anim = FALSE)
@@ -759,6 +763,57 @@ main_server <- function(
     # 6 Language -----------------------------------------------------
 
     lang <- language_server("language", processing)
+
+    # Continuously track layout view changes (before they get lost on re-render)
+    observe({
+      view <- input$kwallm_layout_view
+      if (!is.null(view) && view %in% c("vertical", "sections")) {
+        last_layout_view(view)
+      }
+    })
+
+    # Restore layout state after language change causes UI re-render
+    # When language changes, the renderUI re-renders and resets input values.
+    # This observer detects language changes and restores the layout state.
+    observe({
+      current_lang <- lang()$get_translation_language()
+
+      # Detect language change (not first run)
+      prev_lang <- isolate(last_language())
+      if (!is.null(prev_lang) && !identical(prev_lang, current_lang)) {
+        # Language changed - schedule restoration of layout state
+        saved_view <- isolate(last_layout_view())
+        saved_section <- isolate(current_section())
+
+        if (!is.null(saved_view)) {
+          # Use longer delay to ensure UI is fully re-rendered
+          shinyjs::delay(250, {
+            # Restore layout view button
+            shinyWidgets::updateRadioGroupButtons(
+              session = session,
+              inputId = "kwallm_layout_view",
+              selected = saved_view
+            )
+
+            # Also directly apply the layout state (since observeEvent may not fire)
+            if (identical(saved_view, "vertical")) {
+              shinyjs::hide("kwallm_sections_nav", anim = FALSE)
+              show_all_sections()
+            } else if (identical(saved_view, "sections")) {
+              shinyjs::show("kwallm_sections_nav", anim = FALSE)
+              shinyWidgets::updateRadioGroupButtons(
+                session = session,
+                inputId = "kwallm_sections_step",
+                selected = as.character(saved_section)
+              )
+              show_single_section(saved_section, direction = "none")
+            }
+          })
+        }
+      }
+
+      last_language(current_lang)
+    })
 
     # 7 Disable layout toggle during processing ----------------------
     observe({

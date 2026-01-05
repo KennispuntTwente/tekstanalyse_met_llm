@@ -386,6 +386,10 @@ css_js_head <- function() {
         var val = parseInt($(this).val(), 10);
         if (!isNaN(val)) {
           kwallmUpdateNavButtons(val);
+          // Persist section step in localStorage (skip in test mode)
+          if (!(document.body && document.body.hasAttribute('data-shiny-testmode'))) {
+            localStorage.setItem('kwallm_sections_step', val.toString());
+          }
         }
       });
 
@@ -422,7 +426,44 @@ css_js_head <- function() {
 
       // KWALLM: Persist layout preference in localStorage
       // Skip localStorage restoration in test mode to preserve programmatic defaults
-      $(document).on('shiny:connected', function() {
+      
+      // Helper to apply layout view (show/hide sections nav and sections)
+      function kwallmApplyLayoutView(view) {
+        var sectionsNav = document.getElementById('kwallm_sections_nav');
+        if (!sectionsNav) return;
+        
+        if (view === 'vertical') {
+          // Hide sections nav, show all sections
+          sectionsNav.style.display = 'none';
+          for (var i = 1; i <= 5; i++) {
+            var section = document.getElementById('kwallm_section_' + i);
+            if (section) section.style.display = '';
+          }
+        } else if (view === 'sections') {
+          // Show sections nav, show only current section
+          sectionsNav.style.display = '';
+          // Try to get saved section from localStorage, fall back to checked button, then default to 1
+          var savedSection = localStorage.getItem('kwallm_sections_step');
+          var currentStep = savedSection || $('input[name=kwallm_sections_step]:checked').val() || '1';
+          var currentSection = parseInt(currentStep, 10) || 1;
+          
+          // Also update the section step button if we're using saved value
+          if (savedSection) {
+            $('input[name=kwallm_sections_step][value=' + savedSection + ']').prop('checked', true);
+            Shiny.setInputValue('kwallm_sections_step', savedSection, {priority: 'event'});
+          }
+          
+          for (var i = 1; i <= 5; i++) {
+            var section = document.getElementById('kwallm_section_' + i);
+            if (section) {
+              section.style.display = (i === currentSection) ? '' : 'none';
+            }
+          }
+        }
+      }
+      
+      // Helper to restore layout from localStorage
+      function kwallmRestoreLayoutView() {
         // In test mode, Shiny sets body[data-shiny-testmode], skip localStorage restore
         if (document.body && document.body.hasAttribute('data-shiny-testmode')) {
           return;
@@ -431,7 +472,55 @@ css_js_head <- function() {
         if (saved && (saved === 'vertical' || saved === 'sections')) {
           // Update the radio button to saved preference
           $('input[name=kwallm_layout_view][value=' + saved + ']').prop('checked', true).trigger('change');
-          Shiny.setInputValue('kwallm_layout_view', saved);
+          // Use priority: 'event' to ensure the change is always processed even if value is the same
+          Shiny.setInputValue('kwallm_layout_view', saved, {priority: 'event'});
+          // Also directly apply the layout view for immediate effect
+          kwallmApplyLayoutView(saved);
+        }
+      }
+      
+      $(document).on('shiny:connected', function() {
+        kwallmRestoreLayoutView();
+      });
+      
+      // Restore layout after UI re-renders (e.g., after language change)
+      // MutationObserver watches for when the layout controls are recreated
+      var kwallmLayoutObserver = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+            // Check if the layout controls were added
+            for (var i = 0; i < mutation.addedNodes.length; i++) {
+              var node = mutation.addedNodes[i];
+              if (node.nodeType === 1) { // Element node
+                // Check if this node or its children contain the layout controls
+                var layoutControls = node.id === 'kwallm_layout_controls' ? node : 
+                                     (node.querySelector ? node.querySelector('#kwallm_layout_controls') : null);
+                if (layoutControls) {
+                  // Delay slightly to ensure Shiny has bound the inputs
+                  setTimeout(kwallmRestoreLayoutView, 50);
+                  break;
+                }
+              }
+            }
+          }
+        });
+      });
+      
+      // Start observing once DOM is ready
+      $(document).ready(function() {
+        var mainUi = document.getElementById('main_ui');
+        if (mainUi) {
+          kwallmLayoutObserver.observe(mainUi, { childList: true, subtree: true });
+        } else {
+          // If main_ui not yet available, wait for it
+          var bodyObserver = new MutationObserver(function(mutations, obs) {
+            var mainUi = document.getElementById('main_ui');
+            if (mainUi) {
+              kwallmLayoutObserver.observe(mainUi, { childList: true, subtree: true });
+              obs.disconnect();
+            }
+          });
+          bodyObserver.observe(document.body, { childList: true, subtree: true });
         }
       });
 
