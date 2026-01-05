@@ -38,9 +38,12 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
 
     # Setup Python with reticulate & uv
     cli::cli_h3("Python")
-    cli::cli_alert_info("Executing `uv sync` to sync Python packages...")
+    cli::cli_alert_info(
+      "Executing `uv python install` & `uv sync` to sync Python packages..."
+    )
     try({
       Sys.unsetenv("RETICULATE_PYTHON")
+      reticulate:::uv_exec("python install")
       reticulate:::uv_exec("sync")
       suppressWarnings(reticulate::use_virtualenv("./.venv"))
     })
