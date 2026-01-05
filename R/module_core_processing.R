@@ -515,23 +515,6 @@ processing_server <- function(
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
 
-        # Step 1: Generate candidate topics
-        log_info(
-          "Step 1/5: Generating candidate topics...",
-          component = "analysis"
-        )
-        progress_primary$set_with_total(
-          1,
-          5,
-          lang()$t("Onderwerpen genereren...")
-        )
-        progress_secondary$show()
-        progress_secondary$set_with_total(
-          0,
-          length(context_window$text_chunks),
-          lang()$t("...")
-        )
-
         log_ctx <- log_context_capture(
           is_async = TRUE,
           mode = getOption("app__mode", "unknown")
@@ -540,6 +523,23 @@ processing_server <- function(
         future_promise(
           {
             log_context_apply(log_ctx)
+
+            # Step 1: Generate candidate topics
+            log_info(
+              "Step 1/5: Generating candidate topics...",
+              component = "analysis"
+            )
+            progress_primary$set_with_total(
+              1,
+              5,
+              lang$t("Onderwerpen genereren...")
+            )
+            progress_secondary$show()
+            progress_secondary$set_with_total(
+              0,
+              length(text_chunks),
+              lang$t("...")
+            )
 
             candidate_topics <- tryCatch(
               {
@@ -656,6 +656,7 @@ processing_server <- function(
               lang = lang()
             )
           }
+
         log_debug(
           "Started async processing for topic modelling (step 1-2)",
           component = "analysis"
