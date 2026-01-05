@@ -1,57 +1,79 @@
-#### 1 Load dependencies ####
+# 1 Load dependencies ----------------------------------------------------------
 
-# This project uses renv to manage package dependencies;
-#   see https://rstudio.github.io/renv/articles/renv.html
-if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
-
-# Install packages with renv
-renv::restore()
-
-# Setup Python with reticulate & uv
-try({
-  Sys.unsetenv("RETICULATE_PYTHON")
-  reticulate:::uv_exec("sync")
-  reticulate::use_virtualenv("./.venv")
-})
-
-# Load core packages
-library(rlang)
-library(tidyverse)
-library(tidyprompt)
-library(shiny)
-library(shinyjs)
-library(bslib)
-library(bsicons)
-library(htmltools)
-library(future)
-library(promises)
-library(DT)
-
-# Load components in R/-folder
-r_files <- list.files(
-  path = "R",
-  pattern = "\\.R$",
-  full.names = TRUE
-)
-for (file in r_files) {
-  if (!grepl("llmQuali-package\\.R|rstudio_addin\\.R|zzz\\.R", file)) {
-    source(file)
-  }
-}
+source("R/load_dependencies.R")
+load_dependencies("regular")
 
 
-#### 2 Settings ####
+# 2 Settings -------------------------------------------------------------------
+
+# 2.1 Asynchronous processing --------------------------------------------------
 
 # Set asynchronous processing
 # - Asynchronous processing is recommended when deploying the app to a server,
 #     where multiple users can use the app simultaneously
+# - Asynchronous processing also enables progress bar updates in the UI
+#     during the analysis of texts, and live streaming of LLM output
+#     when the LLM is writing summarizing paragraphs
 # - To enable asynchronous processing, you need to use `future::plan()`, e.g.,
 #     `future::plan(multisession)`
-# - When you asynchronous processing is not needed, you can use
+# - When asynchronous processing is not needed, you can use
 #     `future::plan("sequential")`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
 # - See the documentation for `future::plan()` for more details
-future::plan(multisession, .skip = TRUE)
+
+test_mode <- getOption("shiny.testmode", FALSE)
+test_async <- tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
+  c("true", "1", "yes")
+
+if (!test_mode || test_async) {
+  if (!exists("future_plan")) {
+    future_plan <- future::plan(future::multisession)
+  }
+
+  log_info(
+    sprintf(
+      "Using %s async workers",
+      future::nbrOfWorkers()
+    ),
+    component = "startup"
+  )
+} else {
+  log_info(
+    paste0(
+      "Using no async workers",
+      " (note: progress bar & LLM streaming may lag behind;",
+      " concurrent app users also not supported)"
+    ),
+    component = "startup"
+  )
+}
+
+
+# 2.2 Set LLM provider & models ------------------------------------------------
+
+# Set preconfigured LLM provider and available models (optional)
+# - You can preconfigure the LLM provider and available models here
+#   It is also possible for users to configure their own LLM provider
+#     in the interface of the app (OpenAI compatible or Ollama; see options below)
+# - This example uses the OpenAI API; you can configure any other LLM provider
+#     (e.g., Ollama, Azure OpenAI API, OpenRouter, etc.)
+# - See: https://kennispunttwente.github.io/tidyprompt/articles/getting_started.html#setup-an-llm-provider
+# - Note: your system may need to have the relevant environment variables set
+#     for the LLM provider to work, e.g., `OPENAI_API_KEY` for OpenAI
+# - Note: currently, context window size for models is hardcoded
+#     in function `get_context_window_size_in_tokens` in R/context_window.R
+#   You may want to replace this function with a more dynamic one,
+#     or add your own hardcoded values for the models you use
+#     The function will default to 2048 if a model is not recognised
+# - Note: if you make the 'preconfigured_models_...' object a named list,
+#     the names will be shown in the dropdown for the user. If you do not provide names,
+#     the model names will be shown. Names must be unique. If you want to use
+#     a specific model twice but with different settings, a named list is
+#     then required
+# - Note: LLM providers are configured with stream = TRUE by default
+#     (see R/module_config_llm_provider.R); this enables live streaming
+#     when writing paragraphs (see paragraph_streaming option below)
+
 
 # Wait for Ollama  to be up
 start_time <- Sys.time()
@@ -101,7 +123,9 @@ if (length(available_models) == 0) {
     in_shiny = FALSE
   )
 }
+
 preconfigured_models_list = list()
+
 for (model in available_models) {
   if (stringr::str_detect(model, stringr::fixed("-coder"))) next
   llm_prov <- tidyprompt::llm_provider_ollama(num_ctx = 2048)
@@ -110,13 +134,29 @@ for (model in available_models) {
   preconfigured_models_list[[length(preconfigured_models_list) + 1]] <- llm_prov
 }
 
-# Optionally set other options
+
+# 2.3 Other options -----------------------------------------------------------
+
 options(
-  # - How the Shiny app is served;
+  # - Optionally set a port and host for the Shiny app;
+  #   this is useful when deploying the app to a server
   shiny.port = 8100,
   shiny.host = "0.0.0.0",
 
-  future.globals.maxSize = 3 * 1024^3,
+  # Set max file upload size
+  # - This is the maximum size of the file that can be uploaded to the app;
+  shiny.maxRequestSize = 100 * 1024^2, # 100 MB
+
+  # Set max size of memory transfer between main & async processes
+  future.globals.maxSize = 3 * 1024^3, # 3 GB
+
+  # Silence future console spam about connection tracking.
+  # Some HTTP client libraries keep curl connections pooled for reuse,
+  # which can trigger false positives when running inside multisession futures.
+  future.connections.onMisuse = "ignore",
+
+  # Silence tidyprompt warning about auto-detecting JSON mode.
+  tidyprompt.warn.auto.json = FALSE,
 
   # - Retry behaviour upon LLM API errors;
   #   max tries defines the maximum number of retries
@@ -128,31 +168,37 @@ options(
   send_prompt_with_retries__retry_delay_seconds = 3,
   send_prompt_with_retries__max_interactions = 10,
 
-  # - Prompt logging;
-  #   if prompts & LLM replies should be written to folder 'prompt_logs',
-  #   used primarily for debugging purposes;
-  #     see: R/send_prompt_with_retries.R
-  send_prompt_with_retries__log_prompts = FALSE,
+  # - Prompt/response tracing (privacy-sensitive; disabled by default)
+  #   Log prompts & replies to a separate trace file (under logs/prompt_logs/)
+  #   Optional: override the trace file location
+  #     see: R/utils_send_prompt_with_retries.R
+  #   Note: can be enabled via KWALLM_LOG_PROMPTS_TO_FILE env var
+  send_prompt_with_retries__log_prompts_to_file = FALSE,
+  send_prompt_with_retries__prompt_trace_file = NULL,
+  send_prompt_with_retries__prompt_trace_retention_files = 30, # Keep last N prompt log files (NULL = indefinite)
 
   # - Maximum number of texts to process at once;
   #     see: R/processing.R
-  processing___max_texts = 3000,
+  processing__max_texts = 3000,
 
   # - Configuration of LLM provider by user;
   #   these enable the user to set their own OpenAI-compatible or Ollama APIs,
   #   as alternative to the preconfigured LLM provider;
   #     see: R/llm_provider.R
   llm_provider__can_configure_oai = FALSE,
-  llm_provider__default_oai_url = "https://api.openai.com/v1",
-  llm_provider__default_oai_url_chat_suffix = "/chat/completions",
-  llm_provider__can_configure_ollama = TRUE,
-  llm_provider__default_ollama_url = "http://localhost:11434/api",
-  llm_provider__default_ollama_url_chat_suffix = "/chat",
+  llm_provider__default_oai_url = "https://api.openai.com/v1/chat/completions",
+  llm_provider__can_configure_ollama = FALSE,
+  llm_provider__default_ollama_url = "http://localhost:11434/api/chat",
 
   # - Language for app interface & results (Dutch (nl) or English (en));
-  #   see R/language.R
+  #     see R/language.R
   language = "nl", # Default language
   language__can_toggle = TRUE, # If user can switch language in the app
+
+  # - Enable live streaming of LLM output when writing paragraphs;
+  #   only works when LLM provider has stream = TRUE;
+  #     see R/component_llm_streaming.R
+  paragraph_streaming = TRUE,
 
   # - Default setting for anonymization of texts, and if user
   #   can toggle this setting;
@@ -162,6 +208,11 @@ options(
   anonymization__regex = TRUE, # If the "regex" anonymization method is available
   anonymization__gliner_model = TRUE, # If the "gliner" anonymization method is available
   anonymization__gliner_test = FALSE, # If gliner model should be tested before launching the app
+
+  # - If text splitting via semantic chunking can be used
+  #   to split texts into smaller chunks for LLM processing;
+  #     see R/text_split.R
+  text_split__enabled = TRUE,
 
   # - If a topic 'unknown/not applicable' should always be added
   #   to to the list of candiate topics during topic modelling;
@@ -174,8 +225,20 @@ options(
   topic_modelling__chunk_size_limit = 100,
   topic_modelling__number_of_chunks_limit = 50,
   topic_modelling__draws_default = 1,
-  topic_modelling__draws_limit = 5
+  topic_modelling__draws_limit = 5,
+
+  # - Logging settings;
+  #   logs are written to the 'logs/' directory;
+  #     see R/utils_logger.R
+  logger__level = "DEBUG", # DEBUG, INFO, WARN, ERROR
+  logger__dir = "logs", # Directory for log files
+  logger__retention = 30 # Keep last N log files (NULL = indefinite)
 )
+
+
+## 2.4 Handle test settings -----------------------------------------------------
+
+# These settings are mainly intended for automated testing of the app
 
 if (getOption("anonymization__gliner_test", FALSE)) {
   invisible(gliner_load_model(test_model = TRUE))
@@ -186,9 +249,9 @@ if (!getOption("shiny.testmode", FALSE)) {
 }
 
 
-#### 3 Run app ####
+# 3 Run app -----------------------------------------------------------------
 
-# Make images in www folder available to the app
+# Make images in 'www/' folder available to the app
 shiny::addResourcePath("www", "www")
 
 shiny::shinyApp(
