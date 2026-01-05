@@ -274,7 +274,7 @@ model_server <- function(
           ),
           card_body(
             div(
-              class = "d-flex flex-wrap justify-content-center gap-3",
+              class = "d-flex flex-wrap justify-content-center align-items-start gap-3",
               uiOutput(ns("main_model_selector_ui")),
               uiOutput(ns("large_model_selector_ui"))
             ),
@@ -336,16 +336,20 @@ model_server <- function(
           class = "selector-container text-center",
           selectInput(
             inputId = ns("main_model"),
-            label = tagList(
-              HTML(lang()$t("Model")),
-              bslib::tooltip(
-                shiny::actionLink(
-                  ns("main_cog"),
-                  NULL,
-                  icon = shiny::icon("gear"),
-                  class = "ms-2"
-                ),
-                lang()$t("Geavanceerde instellingen voor dit model")
+            label = div(
+              div(
+                style = "min-height: 1.5em;",
+                HTML(lang()$t("Model"))
+              ),
+              div(
+                bslib::tooltip(
+                  shiny::actionLink(
+                    ns("main_cog"),
+                    NULL,
+                    icon = shiny::icon("gear")
+                  ),
+                  lang()$t("Geavanceerde instellingen voor dit model")
+                )
               )
             ),
             choices = choices,
@@ -374,27 +378,32 @@ model_server <- function(
           class = "selector-container text-center",
           selectInput(
             inputId = ns("large_model"),
-            label = span(
-              HTML(lang()$t("Model voor onderwerpreductie")),
-              bslib::tooltip(
-                bsicons::bs_icon("info-circle"),
-                paste0(
-                  lang()$t(
-                    "Bij onderwerpextractie kan je een apart model kiezen dat gebruikt zal worden voor het terugbrengen van mogelijke onderwerpen tot een finale lijst van onderwerpen."
-                  ),
-                  lang()$t(
-                    " Omdat deze stap slechts één keer gebeurt maar wel grote invloed heeft op de resultaten, wordt aangeraden om een groter model te kiezen (mogelijk een 'thinking'-model zoals OpenAI's o3 of Deepseek's R1)."
-                  )
-                )
+            label = div(
+              div(
+                style = "min-height: 1.5em;",
+                HTML(lang()$t("Model voor onderwerpreductie"))
               ),
-              bslib::tooltip(
-                shiny::actionLink(
-                  ns("large_cog"),
-                  NULL,
-                  icon = shiny::icon("gear"),
-                  class = "ms-2"
+              div(
+                bslib::tooltip(
+                  bsicons::bs_icon("info-circle"),
+                  paste0(
+                    lang()$t(
+                      "Bij onderwerpextractie kan je een apart model kiezen dat gebruikt zal worden voor het terugbrengen van mogelijke onderwerpen tot een finale lijst van onderwerpen."
+                    ),
+                    lang()$t(
+                      " Omdat deze stap slechts één keer gebeurt maar wel grote invloed heeft op de resultaten, wordt aangeraden om een groter model te kiezen (mogelijk een 'thinking'-model zoals OpenAI's o3 of Deepseek's R1)."
+                    )
+                  )
                 ),
-                lang()$t("Geavanceerde instellingen voor dit model")
+                bslib::tooltip(
+                  shiny::actionLink(
+                    ns("large_cog"),
+                    NULL,
+                    icon = shiny::icon("gear"),
+                    class = "ms-2"
+                  ),
+                  lang()$t("Geavanceerde instellingen voor dit model")
+                )
               )
             ),
             choices = choices,
