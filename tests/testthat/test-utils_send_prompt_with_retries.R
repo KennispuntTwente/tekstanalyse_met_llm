@@ -117,6 +117,126 @@ test_that("send_prompt_with_retries_async_globals works in real mirai daemon", {
   expect_equal(result, "success")
 })
 
+test_that("async globals resolve log helpers when tracing is enabled", {
+  # This test verifies that log helper functions work in mirai async contexts
+  # when called the way send_prompt_with_retries does: with pre-resolved
+  # dependencies passed via .ctx argument.
+
+  testthat::skip_if_not_installed("mirai")
+  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+
+  # Reset and start a fresh daemon
+  tryCatch(mirai::daemons(0), error = function(e) NULL)
+  Sys.sleep(0.2)
+
+  can_start_daemons <- TRUE
+  tryCatch(
+    {
+      mirai::daemons(1)
+      on.exit(mirai::daemons(0), add = TRUE)
+    },
+    error = function(e) {
+      can_start_daemons <<- FALSE
+    }
+  )
+  if (!isTRUE(can_start_daemons)) {
+    testthat::skip("mirai daemons not available in this environment")
+  }
+
+  Sys.sleep(0.5)
+
+  async_globals <- send_prompt_with_retries_async_globals()
+
+  # Test that log functions work in mirai when called with .ctx (as
+  # send_prompt_with_retries does) - this is the actual usage pattern
+  m <- mirai::mirai(
+    {
+      # Enable prompt tracing so the log code paths actually execute
+      options(send_prompt_with_retries__log_prompts = TRUE)
+      on.exit(options(send_prompt_with_retries__log_prompts = NULL), add = TRUE)
+
+      # Use a temp file to avoid polluting real logs
+      temp_log <- tempfile(fileext = ".log")
+      options(send_prompt_with_retries__prompt_trace_file = temp_log)
+      on.exit(
+        options(send_prompt_with_retries__prompt_trace_file = NULL),
+        add = TRUE
+      )
+
+      result <- tryCatch(
+        {
+          # Test 1: .kwallm__prompt_trace_enabled_to_file should return TRUE
+          enabled <- .kwallm__prompt_trace_enabled_to_file()
+          if (!isTRUE(enabled)) {
+            stop("enabled_to_file should be TRUE when option is set")
+          }
+
+          # Build .ctx the same way send_prompt_with_retries does
+          .trace_ctx <- list(
+            enabled = .kwallm__prompt_trace_enabled_to_file,
+            append = .kwallm__prompt_trace_append,
+            session_id = .kwallm__prompt_trace_session_id
+          )
+
+          # Test 2: .kwallm__prompt_trace_log_send should work with .ctx
+          .kwallm__prompt_trace_log_send(
+            prompt_id = "test-id",
+            model_name = "test-model",
+            attempt = 1,
+            max_tries = 3,
+            prompt_text = "test prompt",
+            .ctx = .trace_ctx
+          )
+
+          # Test 3: .kwallm__prompt_trace_log_reply should work with .ctx
+          .kwallm__prompt_trace_log_reply(
+            prompt_id = "test-id",
+            model_name = "test-model",
+            attempts = 1,
+            duration_ms = 100,
+            response_text = "test response",
+            .ctx = .trace_ctx
+          )
+
+          # Test 4: .kwallm__prompt_trace_log_error should work with .ctx
+          .kwallm__prompt_trace_log_error(
+            prompt_id = "test-id",
+            model_name = "test-model",
+            attempt = 1,
+            max_tries = 3,
+            err_message = "test error",
+            .ctx = .trace_ctx
+          )
+
+          # Verify something was written to the log file
+          if (!file.exists(temp_log)) {
+            stop("Log file was not created")
+          }
+          log_content <- readLines(temp_log)
+          if (length(log_content) == 0) {
+            stop("Log file is empty")
+          }
+
+          "success"
+        },
+        error = function(e) {
+          paste0("error: ", conditionMessage(e))
+        }
+      )
+      result
+    },
+    .args = async_globals
+  )
+
+  result <- m[]
+
+  if (mirai::is_error_value(result)) {
+    fail(paste("mirai worker error:", as.character(result)))
+  }
+
+  expect_equal(result, "success")
+})
+
 test_that("send_prompt_with_retries returns response on successful first try", {
   source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
 

@@ -56,7 +56,8 @@ send_prompt_with_retries <- function(
     )
   }
 
-  # Resolve helpers dynamically
+  # Resolve ALL trace helpers dynamically at start
+  # These will be passed as arguments to log functions to avoid nested resolution
   .trace_new_id <- resolve_helper(".kwallm__prompt_trace_new_id")
   .trace_extract_prompt_text <- resolve_helper(
     ".kwallm__prompt_trace_extract_prompt_text"
@@ -65,6 +66,18 @@ send_prompt_with_retries <- function(
   .trace_log_reply <- resolve_helper(".kwallm__prompt_trace_log_reply")
   .trace_log_error <- resolve_helper(".kwallm__prompt_trace_log_error")
   .trace_serialize <- resolve_helper(".kwallm__prompt_trace_serialize")
+
+  # Also resolve the dependencies needed BY the log functions
+  .trace_enabled <- resolve_helper(".kwallm__prompt_trace_enabled_to_file")
+  .trace_append <- resolve_helper(".kwallm__prompt_trace_append")
+  .trace_session_id <- resolve_helper(".kwallm__prompt_trace_session_id")
+
+  # Bundle trace context for passing to log functions
+  .trace_ctx <- list(
+    enabled = .trace_enabled,
+    append = .trace_append,
+    session_id = .trace_session_id
+  )
 
   prompt_id <- .trace_new_id()
   prompt_text <- NULL
@@ -100,7 +113,8 @@ send_prompt_with_retries <- function(
         model_name = model_name,
         attempt = tries,
         max_tries = max_tries,
-        prompt_text = prompt_text
+        prompt_text = prompt_text,
+        .ctx = .trace_ctx
       )
     }
 
@@ -137,7 +151,8 @@ send_prompt_with_retries <- function(
           model_name = model_name,
           attempt = tries,
           max_tries = max_tries,
-          err_message = conditionMessage(e)
+          err_message = conditionMessage(e),
+          .ctx = .trace_ctx
         )
 
         # Log retry attempt
@@ -245,7 +260,8 @@ send_prompt_with_retries <- function(
     model_name = model_name,
     attempts = tries,
     duration_ms = duration_ms,
-    response_text = .trace_serialize(result$response)
+    response_text = .trace_serialize(result$response),
+    .ctx = .trace_ctx
   )
 
   return(result$response)
@@ -437,17 +453,31 @@ send_prompt_with_retries <- function(
   model_name,
   attempt,
   max_tries,
-  prompt_text
+  prompt_text,
+  .ctx = NULL
 ) {
-  if (.kwallm__prompt_trace_enabled_to_file()) {
+  # Use pre-resolved context from caller, or fall back to direct calls
+  .enabled <- if (!is.null(.ctx)) {
+    .ctx$enabled
+  } else {
+    .kwallm__prompt_trace_enabled_to_file
+  }
+  .append <- if (!is.null(.ctx)) .ctx$append else .kwallm__prompt_trace_append
+  .session_id <- if (!is.null(.ctx)) {
+    .ctx$session_id
+  } else {
+    .kwallm__prompt_trace_session_id
+  }
+
+  if (.enabled()) {
     tryCatch(
-      .kwallm__prompt_trace_append(c(
+      .append(c(
         "---- PROMPT_SEND ----",
         paste0(
           "time_utc=",
           format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
         ),
-        paste0("session_id=", .kwallm__prompt_trace_session_id()),
+        paste0("session_id=", .session_id()),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempt=", attempt),
@@ -466,17 +496,31 @@ send_prompt_with_retries <- function(
   model_name,
   attempts,
   duration_ms,
-  response_text
+  response_text,
+  .ctx = NULL
 ) {
-  if (.kwallm__prompt_trace_enabled_to_file()) {
+  # Use pre-resolved context from caller, or fall back to direct calls
+  .enabled <- if (!is.null(.ctx)) {
+    .ctx$enabled
+  } else {
+    .kwallm__prompt_trace_enabled_to_file
+  }
+  .append <- if (!is.null(.ctx)) .ctx$append else .kwallm__prompt_trace_append
+  .session_id <- if (!is.null(.ctx)) {
+    .ctx$session_id
+  } else {
+    .kwallm__prompt_trace_session_id
+  }
+
+  if (.enabled()) {
     tryCatch(
-      .kwallm__prompt_trace_append(c(
+      .append(c(
         "---- RESPONSE_RECEIVED ----",
         paste0(
           "time_utc=",
           format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
         ),
-        paste0("session_id=", .kwallm__prompt_trace_session_id()),
+        paste0("session_id=", .session_id()),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempts=", attempts),
@@ -495,17 +539,31 @@ send_prompt_with_retries <- function(
   model_name,
   attempt,
   max_tries,
-  err_message
+  err_message,
+  .ctx = NULL
 ) {
-  if (.kwallm__prompt_trace_enabled_to_file()) {
+  # Use pre-resolved context from caller, or fall back to direct calls
+  .enabled <- if (!is.null(.ctx)) {
+    .ctx$enabled
+  } else {
+    .kwallm__prompt_trace_enabled_to_file
+  }
+  .append <- if (!is.null(.ctx)) .ctx$append else .kwallm__prompt_trace_append
+  .session_id <- if (!is.null(.ctx)) {
+    .ctx$session_id
+  } else {
+    .kwallm__prompt_trace_session_id
+  }
+
+  if (.enabled()) {
     tryCatch(
-      .kwallm__prompt_trace_append(c(
+      .append(c(
         "---- CALL_ERROR ----",
         paste0(
           "time_utc=",
           format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
         ),
-        paste0("session_id=", .kwallm__prompt_trace_session_id()),
+        paste0("session_id=", .session_id()),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempt=", attempt),
