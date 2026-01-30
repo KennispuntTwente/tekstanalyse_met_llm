@@ -35,7 +35,7 @@ if (!test_mode || test_async) {
   log_info(
     sprintf(
       "Using %s async workers (mirai daemons)",
-      mirai::status()$daemons
+      mirai::status()$connections
     ),
     component = "startup"
   )
