@@ -200,6 +200,18 @@ processing_server <- function(
           {
             log_context_apply(log_ctx)
 
+            # Fix environment for write_paragraph so it can find its dependencies
+            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens)
+            # These functions are passed in .args but write_paragraph was defined in
+            # the main R session, so we need to inject them into its environment
+            if (exists("write_paragraph") && is.function(write_paragraph)) {
+              wp_env <- new.env(parent = environment(write_paragraph))
+              wp_env$send_prompt_with_retries <- send_prompt_with_retries
+              wp_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
+              wp_env$count_tokens <- count_tokens
+              environment(write_paragraph) <- wp_env
+            }
+
             results <- vector("list", length(texts))
 
             for (i in seq_along(texts)) {
@@ -757,6 +769,18 @@ processing_server <- function(
           {
             log_context_apply(log_ctx)
 
+            # Fix environment for write_paragraph so it can find its dependencies
+            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens)
+            # These functions are passed in .args but write_paragraph was defined in
+            # the main R session, so we need to inject them into its environment
+            if (exists("write_paragraph") && is.function(write_paragraph)) {
+              wp_env <- new.env(parent = environment(write_paragraph))
+              wp_env$send_prompt_with_retries <- send_prompt_with_retries
+              wp_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
+              wp_env$count_tokens <- count_tokens
+              environment(write_paragraph) <- wp_env
+            }
+
             # Step 4: Assign topics
             # Writing progress on secondary progress file
             texts_with_topics <- tryCatch(
@@ -1081,6 +1105,33 @@ processing_server <- function(
         mirai::mirai(
           {
             log_context_apply(log_ctx)
+
+            # Fix environment for write_paragraph and mark_texts so they can find their dependencies
+            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens)
+            # These functions are passed in .args but were defined in the main R session,
+            # so we need to inject the dependencies into their environments
+            if (exists("write_paragraph") && is.function(write_paragraph)) {
+              wp_env <- new.env(parent = environment(write_paragraph))
+              wp_env$send_prompt_with_retries <- send_prompt_with_retries
+              wp_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
+              wp_env$count_tokens <- count_tokens
+              environment(write_paragraph) <- wp_env
+            }
+            if (exists("mark_texts") && is.function(mark_texts)) {
+              mt_env <- new.env(parent = environment(mark_texts))
+              mt_env$send_prompt_with_retries <- send_prompt_with_retries
+              mt_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
+              mt_env$count_tokens <- count_tokens
+              mt_env$semchunk_load_chunker <- semchunk_load_chunker
+              mt_env$mark_text_prompt <- mark_text_prompt
+              mt_env$write_paragraph <- write_paragraph
+              mt_env$find_matches <- find_matches
+              mt_env$normalize_with_map <- normalize_with_map
+              mt_env$best_literal_substring <- best_literal_substring
+              mt_env$fuzzy_threshold <- fuzzy_threshold
+              mt_env$normalize_for_dist <- normalize_for_dist
+              environment(mark_texts) <- mt_env
+            }
 
             mark_texts(
               texts = texts,
