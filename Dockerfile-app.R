@@ -22,18 +22,17 @@ load_dependencies("docker")
 # - See the documentation for `mirai::daemons()` for more details
 
 test_mode <- getOption("shiny.testmode", FALSE)
-test_async <- tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
-  c("true", "1", "yes")
+test_async <- isTRUE(getOption("kwallm.test_async", FALSE)) ||
+  tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in% c("true", "1", "yes")
 
 if (!test_mode || test_async) {
-  if (!exists("mirai_daemons_set")) {
+  if (!mirai::daemons_set()) {
     max_cores <- parallel::detectCores()
     n_workers <- min(
       max_cores,
       max(1L, as.integer(Sys.getenv("KWALLM_N_ASYNC_WORKERS", unset = "2")))
     )
     mirai::daemons(n_workers)
-    mirai_daemons_set <- TRUE
   }
 
   log_info(
