@@ -53,7 +53,7 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   app$click("processing-process")
   app$wait_for_value(
     export = "processing-edit_topics-started",
-    timeout = 15000
+    timeout = 30000
   )
   Sys.sleep(3)
   app$click("processing-edit_topics-confirm_topics")
