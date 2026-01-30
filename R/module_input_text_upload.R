@@ -409,7 +409,7 @@ text_upload_server <- function(
         selectInput(
           ns("by_column"),
           tagList(
-            lang()$t("Selecteer groepsvariabele (optioneel)"),
+            lang()$t("Selecteer groepsvariabele"),
             tooltip(
               bsicons::bs_icon("info-circle"),
               lang()$t(

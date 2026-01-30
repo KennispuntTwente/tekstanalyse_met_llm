@@ -94,8 +94,8 @@
         "en": "Select column with texts"
       },
       {
-        "nl": "Selecteer groepsvariabele (optioneel)",
-        "en": "Select grouping variable (optional)"
+        "nl": "Selecteer groepsvariabele",
+        "en": "Select grouping variable"
       },
       {
         "nl": "Selecteer optioneel een kolom om de resultaten op te splitsen per groep. In het rapport worden dan frequenties/statistieken per groep getoond naast de totalen.",
