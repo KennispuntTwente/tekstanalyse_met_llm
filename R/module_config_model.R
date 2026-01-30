@@ -769,7 +769,7 @@ model_server <- function(
           id = nid
         )
 
-        promises::future_promise(
+        mirai::mirai(
           {
             if (use_json) {
               json_schema <- list(
@@ -800,8 +800,7 @@ model_server <- function(
                 dplyr::pull(content)
             }
           },
-          globals = list(provider = provider, use_json = use_json),
-          packages = c("tidyprompt", "dplyr", "jsonlite", "magrittr")
+          .args = list(provider = provider, use_json = use_json)
         ) %...>%
           (function(res) {
             removeNotification(nid)

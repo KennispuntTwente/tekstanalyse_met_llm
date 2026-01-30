@@ -19,25 +19,45 @@ send_prompt_with_retries <- function(...) {
   stop("send_prompt_with_retries should not be called in this test")
 }
 
-# Deterministic future_promise stub: run synchronously and return a promise.
-future_promise <- function(
-  expr = NULL,
-  envir = parent.frame(),
+# Deterministic mirai stub: run synchronously and return a promise.
+# We replace mirai::mirai in the mirai namespace for the test.
+mirai_sync_stub <- function(
+  .expr,
   ...,
-  substitute = TRUE,
-  queue = promises::future_promise_queue()
+  .args = list(),
+  .timeout = NULL,
+  .compute = NULL
 ) {
-  dots <- list(...)
-  globals <- dots$globals
-  if (is.null(globals)) {
-    globals <- list()
-  }
+  # Combine ... and .args
+  args_from_dots <- list(...)
+  all_args <- c(args_from_dots, .args)
 
-  expr_sub <- if (isTRUE(substitute)) substitute(expr) else expr
-  eval_env <- list2env(globals, parent = envir)
+  expr_sub <- substitute(.expr)
+  eval_env <- list2env(all_args, parent = parent.frame())
   value <- eval(expr_sub, envir = eval_env)
   promises::promise_resolve(value)
 }
+
+# Patch mirai::mirai to run synchronously for all tests in this file
+mirai_ns <- asNamespace("mirai")
+old_mirai_fn <- get("mirai", envir = mirai_ns)
+
+# Define setup/teardown for this file
+setup({
+  if (bindingIsLocked("mirai", mirai_ns)) {
+    unlockBinding("mirai", mirai_ns)
+  }
+  assign("mirai", mirai_sync_stub, envir = mirai_ns)
+  lockBinding("mirai", mirai_ns)
+})
+
+teardown({
+  if (bindingIsLocked("mirai", mirai_ns)) {
+    unlockBinding("mirai", mirai_ns)
+  }
+  assign("mirai", old_mirai_fn, envir = mirai_ns)
+  lockBinding("mirai", mirai_ns)
+})
 
 reduce_topics <- function(...) {
   stop("reduce_topics should not be called unless explicitly stubbed")

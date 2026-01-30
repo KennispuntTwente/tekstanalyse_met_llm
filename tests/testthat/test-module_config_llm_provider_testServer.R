@@ -6,14 +6,17 @@ suppressWarnings(library(promises))
 testthat::skip_if_not_installed("later")
 
 test_that("llm_provider_server: switches modes and fetches OpenAI models (mocked)", {
+  # Store original mirai function
+  original_mirai <- mirai::mirai
+
   # Deterministic async stub: ignore expr, return models based on provider_mode.
   # This keeps tests fast and avoids real network.
-  future <- function(expr, globals = NULL, ...) {
-    if (is.null(globals)) {
-      globals <- list()
+  stub_mirai <- function(expr, .args = NULL, ...) {
+    if (is.null(.args)) {
+      .args <- list()
     }
 
-    provider_mode <- globals$provider_mode %||% "openai"
+    provider_mode <- .args$provider_mode %||% "openai"
 
     models <- if (identical(provider_mode, "openai")) {
       c("gpt-4.1-nano-2025-04-14", "gpt-test")
@@ -32,7 +35,18 @@ test_that("llm_provider_server: switches modes and fetches OpenAI models (mocked
     ))
   }
 
-  # Source locally so the module sees our stubbed `future()`.
+  # Replace mirai::mirai with our stub
+  assignInNamespace("mirai", stub_mirai, ns = "mirai")
+
+  # Restore on exit
+  on.exit(
+    {
+      assignInNamespace("mirai", original_mirai, ns = "mirai")
+    },
+    add = TRUE
+  )
+
+  # Source locally so the module sees our stubbed async code.
   source(here::here("R", "module_core_processing.R"), local = TRUE) # disable_when_processing
   source(here::here("R", "component_icon_button.R"), local = TRUE) # icon_toggle_button used in UI
   source(here::here("R", "component_card_header_with_tooltip.R"), local = TRUE)
@@ -97,13 +111,16 @@ test_that("llm_provider_server: switches modes and fetches OpenAI models (mocked
 
 
 test_that("llm_provider_server: switches modes and fetches Ollama models (mocked)", {
+  # Store original mirai function
+  original_mirai <- mirai::mirai
+
   # Deterministic async stub: ignore expr, return models based on provider_mode.
-  future <- function(expr, globals = NULL, ...) {
-    if (is.null(globals)) {
-      globals <- list()
+  stub_mirai <- function(expr, .args = NULL, ...) {
+    if (is.null(.args)) {
+      .args <- list()
     }
 
-    provider_mode <- globals$provider_mode %||% "ollama"
+    provider_mode <- .args$provider_mode %||% "ollama"
 
     models <- if (identical(provider_mode, "openai")) {
       c("gpt-4.1-nano-2025-04-14", "gpt-test")
@@ -121,6 +138,17 @@ test_that("llm_provider_server: switches modes and fetches Ollama models (mocked
       models = models
     ))
   }
+
+  # Replace mirai::mirai with our stub
+  assignInNamespace("mirai", stub_mirai, ns = "mirai")
+
+  # Restore on exit
+  on.exit(
+    {
+      assignInNamespace("mirai", original_mirai, ns = "mirai")
+    },
+    add = TRUE
+  )
 
   source(here::here("R", "module_core_processing.R"), local = TRUE)
   source(here::here("R", "component_icon_button.R"), local = TRUE)

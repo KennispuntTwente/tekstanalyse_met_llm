@@ -492,14 +492,14 @@ send_prompt_with_retries <- function(
 
 #' Get globals required for send_prompt_with_retries in async contexts
 #'
-#' When using `future()` / `future_promise()` with an explicit `globals = ...`,
-#' the worker runs in a separate R session and will not automatically have
+#' When using `mirai::mirai()` with an explicit `.args = ...`,
+#' the worker runs in a separate R process and will not automatically have
 #' access to the internal helper functions used by `send_prompt_with_retries()`.
 #'
 #' Use this helper to consistently export these functions alongside
 #' `send_prompt_with_retries` itself.
 #'
-#' @return A named list suitable for merging into a `globals =` list.
+#' @return A named list suitable for merging into an `.args =` list.
 #' @export
 send_prompt_with_retries_async_globals <- function() {
   list(

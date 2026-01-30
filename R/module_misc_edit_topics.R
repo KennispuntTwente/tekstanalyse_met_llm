@@ -307,7 +307,7 @@ edit_topics_server <- function(
 
         log_ctx <- log_context_capture(is_async = TRUE)
 
-        future_promise(
+        mirai::mirai(
           {
             log_context_apply(log_ctx)
 
@@ -318,8 +318,7 @@ edit_topics_server <- function(
               language = lang$get_translation_language()
             )
           },
-          packages = c("tidyprompt", "tidyverse"),
-          globals = c(
+          .args = c(
             list(
               reduce_topics = reduce_topics,
               updated_topics = updated_topics,
@@ -333,8 +332,7 @@ edit_topics_server <- function(
             ),
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals()
-          ),
-          seed = NULL
+          )
         ) %...>%
           (function(reduced_topics) {
             if (length(reduced_topics) < 2 || anyDuplicated(reduced_topics)) {
@@ -416,7 +414,7 @@ if (FALSE) {
   library(shinyjs)
   library(rhandsontable)
   library(tidyprompt)
-  library(future)
+  library(mirai)
   library(promises)
 
   ui <- bslib::page(

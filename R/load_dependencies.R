@@ -132,7 +132,7 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   library(shinyjs)
   library(bslib)
   library(htmltools)
-  library(future)
+  library(mirai)
   library(promises)
 
   # Make a fake call to 'jsonvalidate' to avoid `renv::status()` complaint

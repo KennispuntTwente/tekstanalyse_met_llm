@@ -72,25 +72,26 @@ test_that("text_split_server: returns raw texts when toggle is off", {
 })
 
 
-test_that("text_split_server: clicking split produces split texts (sync-mocked future)", {
+test_that("text_split_server: clicking split produces split texts (sync-mocked mirai)", {
   testthat::skip_if_not_installed("ipc")
+  testthat::skip_if_not_installed("mirai")
 
-  # Monkeypatch namespaced calls (ipc::shinyQueue, promises::future_promise)
+  # Monkeypatch namespaced calls (ipc::shinyQueue, mirai::mirai)
   # without requiring pkgload/devtools.
   ipc_ns <- asNamespace("ipc")
-  promises_ns <- asNamespace("promises")
+  mirai_ns <- asNamespace("mirai")
 
   old_shinyQueue <- get("shinyQueue", envir = ipc_ns)
-  old_future_promise <- get("future_promise", envir = promises_ns)
+  old_mirai <- get("mirai", envir = mirai_ns)
 
   withr::defer({
     unlockBinding("shinyQueue", ipc_ns)
     assign("shinyQueue", old_shinyQueue, envir = ipc_ns)
     lockBinding("shinyQueue", ipc_ns)
 
-    unlockBinding("future_promise", promises_ns)
-    assign("future_promise", old_future_promise, envir = promises_ns)
-    lockBinding("future_promise", promises_ns)
+    unlockBinding("mirai", mirai_ns)
+    assign("mirai", old_mirai, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
   })
 
   # Stub ipc queue so we don't need the real async queue internals.
@@ -112,32 +113,29 @@ test_that("text_split_server: clicking split produces split texts (sync-mocked f
   )
   lockBinding("shinyQueue", ipc_ns)
 
-  # Make future_promise run synchronously while still returning a promise.
-  unlockBinding("future_promise", promises_ns)
+  # Make mirai run synchronously while still returning a promise.
+  unlockBinding("mirai", mirai_ns)
   assign(
-    "future_promise",
+    "mirai",
     function(
-      expr = NULL,
-      envir = parent.frame(),
+      .expr,
       ...,
-      substitute = TRUE,
-      queue = promises::future_promise_queue()
+      .args = list(),
+      .timeout = NULL,
+      .compute = NULL
     ) {
-      dots <- list(...)
-      globals <- dots$globals
-      if (is.null(globals)) {
-        globals <- list()
-      }
+      # Combine ... and .args
+      args_from_dots <- list(...)
+      all_args <- c(args_from_dots, .args)
 
-      expr_sub <- if (isTRUE(substitute)) substitute(expr) else expr
-      env <- list2env(globals, parent = envir)
-
-      value <- eval(expr_sub, envir = env)
+      expr_sub <- substitute(.expr)
+      eval_env <- list2env(all_args, parent = parent.frame())
+      value <- eval(expr_sub, envir = eval_env)
       promises::promise_resolve(value)
     },
-    envir = promises_ns
+    envir = mirai_ns
   )
-  lockBinding("future_promise", promises_ns)
+  lockBinding("mirai", mirai_ns)
 
   shiny::testServer(
     function(input, output, session) {

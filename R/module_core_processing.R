@@ -119,7 +119,7 @@ processing_server <- function(
       #   set reactive values to keep track of processing state
       #   and store the UUID of the current processing task
       #   Prevent multiple processing tasks from running at the same time
-      #   Run asynchronous processing using future_promise
+      #   Run asynchronous processing using mirai
       #     (to prevent blocking the Shiny app)
 
       # Helper to check if number of texts is under maximum
@@ -194,7 +194,7 @@ processing_server <- function(
           mode = getOption("app__mode", "unknown")
         )
 
-        future_promise(
+        mirai::mirai(
           {
             log_context_apply(log_ctx)
 
@@ -365,7 +365,7 @@ processing_server <- function(
 
             results
           },
-          globals = c(
+          .args = c(
             list(
               llm_provider = models$main,
               texts = texts$preprocessed,
@@ -395,9 +395,7 @@ processing_server <- function(
             ),
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals()
-          ),
-          packages = c("tidyprompt", "tidyverse", "glue", "fs", "uuid"),
-          seed = NULL
+          )
         ) %...>%
           results_df() %...!%
           {
@@ -520,7 +518,7 @@ processing_server <- function(
           mode = getOption("app__mode", "unknown")
         )
 
-        future_promise(
+        mirai::mirai(
           {
             log_context_apply(log_ctx)
 
@@ -592,7 +590,7 @@ processing_server <- function(
             # Make intermediate results available
             topics
           },
-          globals = c(
+          .args = c(
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals(),
             list(
@@ -618,17 +616,7 @@ processing_server <- function(
               progress_secondary = progress_secondary$async,
               interrupter = interrupter
             )
-          ),
-          packages = c(
-            "tidyprompt",
-            "tidyverse",
-            "glue",
-            "fs",
-            "uuid",
-            "rlang",
-            "stringr"
-          ),
-          seed = NULL
+          )
         ) %...>%
           topics() %...!%
           {
@@ -763,7 +751,7 @@ processing_server <- function(
           mode = getOption("app__mode", "unknown")
         )
 
-        future_promise(
+        mirai::mirai(
           {
             log_context_apply(log_ctx)
 
@@ -934,7 +922,7 @@ processing_server <- function(
 
             texts_with_topics
           },
-          globals = c(
+          .args = c(
             send_prompt_with_retries_async_globals(),
             list(
               topics = topics(),
@@ -967,9 +955,7 @@ processing_server <- function(
                 isTRUE(models$main$parameters$stream)
             ),
             log_async_globals(log_ctx)
-          ),
-          packages = c("tidyprompt", "tidyverse", "glue", "fs", "uuid"),
-          seed = NULL
+          )
         ) %...>%
           results_df() %...!%
           {
@@ -1090,7 +1076,7 @@ processing_server <- function(
           mode = getOption("app__mode", "unknown")
         )
 
-        future_promise(
+        mirai::mirai(
           {
             log_context_apply(log_ctx)
 
@@ -1111,7 +1097,7 @@ processing_server <- function(
               streaming_enabled = streaming_enabled
             )
           },
-          globals = c(
+          .args = c(
             list(
               llm_provider = models$main,
               texts = texts$preprocessed,
@@ -1144,16 +1130,7 @@ processing_server <- function(
             ),
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals()
-          ),
-          packages = c(
-            "tidyprompt",
-            "glue",
-            "rlang",
-            "stringr",
-            "dplyr",
-            "purrr"
-          ),
-          seed = NULL
+          )
         ) %...>%
           results_df() %...!%
           {
@@ -1337,7 +1314,7 @@ processing_server <- function(
           )
 
           # Generate files async
-          future(
+          mirai::mirai(
             {
               # Generate files
               excel_file <- create_result_excel(result_list)
@@ -1433,15 +1410,14 @@ processing_server <- function(
               )
               zip_path
             },
-            globals = list(
+            .args = list(
               mode = mode(),
               create_result_excel = create_result_excel,
               create_result_rmarkdown = create_result_rmarkdown,
               result_list = result_list,
               tempdir = tempdir(),
               lang = lang()
-            ),
-            seed = NULL
+            )
           ) %...>%
             zip_file() %...!%
             {

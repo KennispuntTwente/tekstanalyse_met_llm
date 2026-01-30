@@ -14,26 +14,28 @@ load_dependencies("docker")
 # - Asynchronous processing also enables progress bar updates in the UI
 #     during the analysis of texts, and live streaming of LLM output
 #     when the LLM is writing summarizing paragraphs
-# - To enable asynchronous processing, you need to use `future::plan()`, e.g.,
-#     `future::plan(multisession)`
+# - To enable asynchronous processing, you need to use `mirai::daemons()`, e.g.,
+#     `mirai::daemons(n)` where n is the number of parallel workers
 # - When asynchronous processing is not needed, you can use
-#     `future::plan("sequential")`; note that the progress bar may lag behind
+#     `mirai::daemons(0)`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
-# - See the documentation for `future::plan()` for more details
+# - See the documentation for `mirai::daemons()` for more details
 
 test_mode <- getOption("shiny.testmode", FALSE)
 test_async <- tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
   c("true", "1", "yes")
 
 if (!test_mode || test_async) {
-  if (!exists("future_plan")) {
-    future_plan <- future::plan(future::multisession)
+  if (!exists("mirai_daemons_set")) {
+    n_workers <- max(1L, parallel::detectCores() - 1L)
+    mirai::daemons(n_workers)
+    mirai_daemons_set <- TRUE
   }
 
   log_info(
     sprintf(
-      "Using: %s async workers",
-      future::nbrOfWorkers()
+      "Using: %s async workers (mirai daemons)",
+      mirai::status()$daemons
     ),
     component = "startup"
   )
@@ -114,14 +116,6 @@ options(
   # Set max file upload size
   # - This is the maximum size of the file that can be uploaded to the app;
   shiny.maxRequestSize = 100 * 1024^2, # 100 MB
-
-  # Set max size of memory transfer between main & async processes
-  future.globals.maxSize = 3 * 1024^3, # 3 GB
-
-  # Silence future console spam about connection tracking.
-  # Some HTTP client libraries keep curl connections pooled for reuse,
-  # which can trigger false positives when running inside multisession futures.
-  future.connections.onMisuse = "ignore",
 
   # Silence tidyprompt warning about auto-detecting JSON mode.
   tidyprompt.warn.auto.json = FALSE,

@@ -207,7 +207,7 @@ marking_codes_server <- function(
         queue$consumer$start()
         log_ctx <- log_context_capture(is_async = TRUE)
 
-        future_promise(
+        mirai::mirai(
           {
             log_context_apply(log_ctx)
 
@@ -220,7 +220,7 @@ marking_codes_server <- function(
               language = language
             )
           },
-          globals = c(
+          .args = c(
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals(),
             list(
@@ -241,14 +241,7 @@ marking_codes_server <- function(
               count_tokens = count_tokens,
               async_message_printer = async_message_printer
             )
-          ),
-          packages = c(
-            "tidyprompt",
-            "purrr",
-            "dplyr",
-            "stringr"
-          ),
-          seed = NULL
+          )
         ) %...>%
           {
             generated_codes(.)

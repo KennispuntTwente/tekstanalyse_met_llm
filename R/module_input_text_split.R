@@ -248,7 +248,7 @@ text_split_server <- function(
       # Async text splitting
       log_ctx <- log_context_capture(is_async = TRUE)
 
-      promises::future_promise(
+      mirai::mirai(
         {
           log_context_apply(log_ctx)
 
@@ -259,7 +259,7 @@ text_split_server <- function(
             queue = queue
           )
         },
-        globals = c(
+        .args = c(
           log_async_globals(log_ctx),
           list(
             raw_texts = raw_texts(),
@@ -270,8 +270,7 @@ text_split_server <- function(
             semchunk_load_chunker = semchunk_load_chunker,
             async_message_printer = async_message_printer
           )
-        ),
-        seed = NULL
+        )
       ) %...>%
         {
           result <- .
@@ -439,7 +438,7 @@ if (FALSE) {
   library(shinyWidgets)
   library(bslib)
   library(shiny.i18n)
-  library(future)
+  library(mirai)
   library(promises)
 
   source("R/utils_semchunk.R")

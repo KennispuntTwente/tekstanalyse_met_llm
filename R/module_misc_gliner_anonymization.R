@@ -366,15 +366,15 @@ gliner_server <- function(
             is_async = TRUE
           )
 
-          ## 4 Spawn the future that runs GLiNER model on texts
-          future(
+          ## 4 Spawn the mirai worker that runs GLiNER model on texts
+          mirai::mirai(
             {
               log_context_apply(log_ctx)
 
               if (is.null(gliner_model)) {
                 # If we are truly in async mode, we load the model here;
                 #   because reticulate objects cannot be passed to async processes
-                #   (in that case, ensure `gliner_model` is NULL when passing it on in 'globals')
+                #   (in that case, ensure `gliner_model` is NULL when passing it on in mirai .args)
                 # If not in async, then the gliner_model may already be loaded
                 gliner_model <- gliner_load_model(queue = queue)
               }
@@ -394,7 +394,7 @@ gliner_server <- function(
                 # Return a named list; original texts are names
                 setNames(pii_texts)
             },
-            globals = c(
+            .args = c(
               log_async_globals(log_ctx),
               list(
                 gliner_model = gliner_model,
@@ -405,8 +405,7 @@ gliner_server <- function(
                 queue = queue,
                 async_message_printer = async_message_printer
               )
-            ),
-            seed = NULL
+            )
           ) %...>%
             {
               ## SUCCESS ─ tidy predictions & then set state to “evaluating”
@@ -868,7 +867,7 @@ if (FALSE) {
   library(bslib)
   library(bsicons)
   library(htmltools)
-  library(future)
+  library(mirai)
   library(promises)
   library(DT)
   library(ipc)

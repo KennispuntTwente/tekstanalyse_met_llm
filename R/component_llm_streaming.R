@@ -243,11 +243,11 @@ if (FALSE) {
   library(shiny)
   library(bslib)
   library(tidyprompt)
-  library(future)
+  library(mirai)
   library(promises)
   library(ipc)
 
-  future::plan(future::multisession)
+  mirai::daemons(2)
 
   ui <- bslib::page(
     shinyjs::useShinyjs(),
@@ -274,7 +274,7 @@ if (FALSE) {
       stream$show()
 
       # Simulate streaming with a simple example
-      future_promise(
+      mirai::mirai(
         {
           for (i in 1:10) {
             Sys.sleep(0.3)
@@ -288,7 +288,7 @@ if (FALSE) {
           }
           "Done!"
         },
-        globals = list(stream_async = stream$async)
+        .args = list(stream_async = stream$async)
       ) %...>%
         (function(result) {
           stream$append("\n\n--- Complete ---")

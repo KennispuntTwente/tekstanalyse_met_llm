@@ -23,7 +23,7 @@ This repo is a Shiny app (R) with an Electron desktop wrapper and Docker image. 
 - Topic extraction: `topic_modelling__*` governs topic modelling behaviour; context window sizing is currently hardcoded in helpers under `R/module_misc_context_window.R`.
 
 ## Async, errors, and testing
-- Async: Long-running steps use `future()` / `future_promise()` (see `R/module_core_processing.R`); progress is written via `component_progress_bar.R`/`progress_bar_server(...).$async`, and cancellation is guarded by `ipc::AsyncInterruptor`.
+- Async: Long-running steps use `mirai::mirai()` (see `R/module_core_processing.R`); daemons are configured via `mirai::daemons()` in entry points. Progress is written via `component_progress_bar.R`/`progress_bar_server(...).$async`, and cancellation is guarded by `ipc::AsyncInterruptor`.
 - Error handling: Wrap expensive work in `tryCatch(...)` and surface issues with `app_error(...)` / `handle_detailed_error()` helpers in `R/utils_*` instead of `stop()`; keep the Shiny session responsive.
 - Tests: `tests/testthat/test-shinytest2.R` drives full flows with {shinytest2}. Tests expect an OpenAI-compatible endpoint that answers `/models` and exposes a model id like `gpt-4.1-nano-2025-04-14`. Use `shiny::exportTestValues` when adding new critical reactives.
 

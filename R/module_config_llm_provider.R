@@ -599,11 +599,10 @@ llm_provider_server <- function(
           duration = 3
         )
 
-        future(
+        mirai::mirai(
           {
-            # IMPORTANT: in futures, do not let raw httr/curl error conditions
-            # escape, because they can be non-serializable and get replaced by
-            # generic future::evalFuture() errors. Always return a simple list.
+            # IMPORTANT: in mirai workers, do not let raw httr/curl error conditions
+            # escape, because they can be non-serializable. Always return a simple list.
 
             safe_trim <- function(x, max_chars = 2000) {
               x <- as.character(x %||% "")
@@ -720,7 +719,7 @@ llm_provider_server <- function(
               }
             )
           },
-          globals = list(
+          .args = list(
             openai_url = openai_url(),
             api_key_input = api_key_input(),
             ollama_url = ollama_url(),
