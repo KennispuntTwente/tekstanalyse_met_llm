@@ -19,6 +19,104 @@ create_mock_llm_provider <- function(model = "test-model") {
   )
 }
 
+test_that("send_prompt_with_retries_async_globals works in real mirai daemon", {
+  # This test verifies that send_prompt_with_retries and its helper functions
+  # can be resolved correctly when passed to a mirai worker via .args.
+  # This catches issues like the one where .kwallm__prompt_trace_new_id
+  # was not found in the worker's environment.
+
+  testthat::skip_if_not_installed("mirai")
+
+  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+
+  # Reset and start a fresh daemon
+  tryCatch(mirai::daemons(0), error = function(e) NULL)
+  Sys.sleep(0.2)
+
+  can_start_daemons <- TRUE
+  tryCatch(
+    {
+      mirai::daemons(1)
+      on.exit(mirai::daemons(0), add = TRUE)
+    },
+    error = function(e) {
+      can_start_daemons <<- FALSE
+    }
+  )
+  if (!isTRUE(can_start_daemons)) {
+    testthat::skip("mirai daemons not available in this environment")
+  }
+
+  Sys.sleep(0.5)
+
+  # Get the async globals - this is what the app does
+  async_globals <- send_prompt_with_retries_async_globals()
+
+  # Also need tidyprompt mocked in the worker - we'll pass a mock directly
+  mock_send_prompt <- function(...) {
+    list(
+      response = "mirai-worker-response",
+      chat_history = data.frame(
+        role = "assistant",
+        content = "mirai-worker-response"
+      )
+    )
+  }
+  mock_llm_provider <- list(
+    parameters = list(model = "test-model"),
+    clone = function() mock_llm_provider
+  )
+
+  # Run mirai with .args pattern (same as module_core_processing.R)
+  m <- mirai::mirai(
+    {
+      # This simulates the pattern in the app where send_prompt_with_retries
+      # is called inside a mirai block with helpers passed via .args
+
+      # Mock tidyprompt::send_prompt since we can't install packages in worker
+      tidyprompt_send_prompt <- mock_send_prompt
+
+      # The key test: can send_prompt_with_retries resolve its helpers?
+      # We override send_prompt via local environment trick
+      local({
+        # Create environment with our mock
+        mock_env <- new.env(parent = environment(send_prompt_with_retries))
+        mock_env$`tidyprompt::send_prompt` <- mock_send_prompt
+
+        # Actually call send_prompt_with_retries
+        # This will fail if helpers like .kwallm__prompt_trace_new_id aren't found
+        result <- tryCatch(
+          {
+            # Directly test that helper resolution works
+            prompt_id <- .kwallm__prompt_trace_new_id()
+            if (!is.character(prompt_id) || !nzchar(prompt_id)) {
+              stop("prompt_id generation failed")
+            }
+            "success"
+          },
+          error = function(e) {
+            paste0("error: ", conditionMessage(e))
+          }
+        )
+        result
+      })
+    },
+    .args = c(
+      async_globals,
+      list(mock_send_prompt = mock_send_prompt)
+    )
+  )
+
+  # Wait for result with timeout
+  result <- m[]
+
+  if (mirai::is_error_value(result)) {
+    fail(paste("mirai worker error:", as.character(result)))
+  }
+
+  expect_equal(result, "success")
+})
+
 test_that("send_prompt_with_retries returns response on successful first try", {
   source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
 

@@ -31,10 +31,42 @@ send_prompt_with_retries <- function(
   stream_callback = NULL
 ) {
   tries <- 0
+
   result <- NULL
   call_start_time <- Sys.time()
   model_name <- llm_provider$parameters$model %||% "unknown"
-  prompt_id <- .kwallm__prompt_trace_new_id()
+
+  # Inline helper resolver (needed for mirai async contexts where helpers
+  # are passed via .args and not in lexical scope)
+  resolve_helper <- function(name) {
+    # First try to find in calling environment chain (for mirai .args)
+    for (e in sys.frames()) {
+      if (exists(name, envir = e, inherits = FALSE)) {
+        fn <- get(name, envir = e, inherits = FALSE)
+        if (is.function(fn)) return(fn)
+      }
+    }
+    # Fall back to regular lookup (works in normal context)
+    tryCatch(
+      get(name, envir = parent.frame(2), inherits = TRUE),
+      error = function(err) {
+        # Last resort: try global environment
+        get(name, envir = globalenv(), inherits = TRUE)
+      }
+    )
+  }
+
+  # Resolve helpers dynamically
+  .trace_new_id <- resolve_helper(".kwallm__prompt_trace_new_id")
+  .trace_extract_prompt_text <- resolve_helper(
+    ".kwallm__prompt_trace_extract_prompt_text"
+  )
+  .trace_log_send <- resolve_helper(".kwallm__prompt_trace_log_send")
+  .trace_log_reply <- resolve_helper(".kwallm__prompt_trace_log_reply")
+  .trace_log_error <- resolve_helper(".kwallm__prompt_trace_log_error")
+  .trace_serialize <- resolve_helper(".kwallm__prompt_trace_serialize")
+
+  prompt_id <- .trace_new_id()
   prompt_text <- NULL
 
   # Log LLM call start
@@ -62,8 +94,8 @@ send_prompt_with_retries <- function(
 
     # Log prompt text once (first send), but include prompt_id for later correlation.
     if (tries == 1 && (is.null(prompt_text) || !is.character(prompt_text))) {
-      prompt_text <- .kwallm__prompt_trace_extract_prompt_text(prompt)
-      .kwallm__prompt_trace_log_send(
+      prompt_text <- .trace_extract_prompt_text(prompt)
+      .trace_log_send(
         prompt_id = prompt_id,
         model_name = model_name,
         attempt = tries,
@@ -100,7 +132,7 @@ send_prompt_with_retries <- function(
         result
       },
       error = function(e) {
-        .kwallm__prompt_trace_log_error(
+        .trace_log_error(
           prompt_id = prompt_id,
           model_name = model_name,
           attempt = tries,
@@ -208,12 +240,12 @@ send_prompt_with_retries <- function(
   )
 
   # Optional: log final response text (correlated via prompt_id)
-  .kwallm__prompt_trace_log_reply(
+  .trace_log_reply(
     prompt_id = prompt_id,
     model_name = model_name,
     attempts = tries,
     duration_ms = duration_ms,
-    response_text = .kwallm__prompt_trace_serialize(result$response)
+    response_text = .trace_serialize(result$response)
   )
 
   return(result$response)
