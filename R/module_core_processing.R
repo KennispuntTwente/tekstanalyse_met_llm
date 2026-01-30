@@ -201,14 +201,31 @@ processing_server <- function(
             log_context_apply(log_ctx)
 
             # Fix environment for write_paragraph so it can find its dependencies
-            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens)
+            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens,
+            # tiktoken_load_tokenizer)
             # These functions are passed in .args but write_paragraph was defined in
             # the main R session, so we need to inject them into its environment
+            # Also fix count_tokens since it calls tiktoken_load_tokenizer internally
+            # Also fix tiktoken_load_tokenizer since it calls async_message_printer
+            if (
+              exists("tiktoken_load_tokenizer") &&
+                is.function(tiktoken_load_tokenizer)
+            ) {
+              tlt_env <- new.env(parent = environment(tiktoken_load_tokenizer))
+              tlt_env$async_message_printer <- async_message_printer
+              environment(tiktoken_load_tokenizer) <- tlt_env
+            }
+            if (exists("count_tokens") && is.function(count_tokens)) {
+              ct_env <- new.env(parent = environment(count_tokens))
+              ct_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
+              environment(count_tokens) <- ct_env
+            }
             if (exists("write_paragraph") && is.function(write_paragraph)) {
               wp_env <- new.env(parent = environment(write_paragraph))
               wp_env$send_prompt_with_retries <- send_prompt_with_retries
               wp_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
               wp_env$count_tokens <- count_tokens
+              wp_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
               environment(write_paragraph) <- wp_env
             }
 
@@ -341,35 +358,40 @@ processing_server <- function(
                 }
               }
 
-              paragraphs <- purrr::map(
-                seq_along(categories_texts),
-                function(i) {
-                  # Get category name
-                  cat_name <- names(categories_texts)[[i]]
-                  cat_texts <- categories_texts[[i]]
+              paragraphs <- tryCatch(
+                {
+                  purrr::map(
+                    seq_along(categories_texts),
+                    function(i) {
+                      # Get category name
+                      cat_name <- names(categories_texts)[[i]]
+                      cat_texts <- categories_texts[[i]]
 
-                  progress_secondary$set_with_total(
-                    i,
-                    length(categories_texts),
-                    paste0(lang$t("Schrijven over '"), cat_name, "'...")
+                      progress_secondary$set_with_total(
+                        i,
+                        length(categories_texts),
+                        paste0(lang$t("Schrijven over '"), cat_name, "'...")
+                      )
+
+                      # Clear streaming panel before this paragraph
+                      if (streaming_enabled) {
+                        llm_stream_async$clear()
+                      }
+
+                      # Write paragraph about the category
+                      write_paragraph(
+                        texts = cat_texts,
+                        topic = cat_name,
+                        research_background = research_background,
+                        style_prompt = style_prompt,
+                        llm_provider = llm_provider,
+                        language = lang$get_translation_language(),
+                        stream_callback = stream_callback
+                      )
+                    }
                   )
-
-                  # Clear streaming panel before this paragraph
-                  if (streaming_enabled) {
-                    llm_stream_async$clear()
-                  }
-
-                  # Write paragraph about the category
-                  write_paragraph(
-                    texts = cat_texts,
-                    topic = cat_name,
-                    research_background = research_background,
-                    style_prompt = style_prompt,
-                    llm_provider = llm_provider,
-                    language = lang$get_translation_language(),
-                    stream_callback = stream_callback
-                  )
-                }
+                },
+                error = handle_detailed_error("Category paragraph writing")
               )
               progress_secondary$hide()
 
@@ -395,6 +417,7 @@ processing_server <- function(
               assign_multiple_categories = assign_multiple_categories(),
               write_paragraph = write_paragraph,
               write_paragraphs = write_paragraphs(),
+              handle_detailed_error = handle_detailed_error,
               get_context_window_size_in_tokens = get_context_window_size_in_tokens,
               tiktoken_load_tokenizer = tiktoken_load_tokenizer,
               count_tokens = count_tokens,
@@ -770,9 +793,25 @@ processing_server <- function(
             log_context_apply(log_ctx)
 
             # Fix environment for write_paragraph so it can find its dependencies
-            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens)
+            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens,
+            # tiktoken_load_tokenizer)
             # These functions are passed in .args but write_paragraph was defined in
             # the main R session, so we need to inject them into its environment
+            # Also fix count_tokens since it calls tiktoken_load_tokenizer internally
+            # Also fix tiktoken_load_tokenizer since it calls async_message_printer
+            if (
+              exists("tiktoken_load_tokenizer") &&
+                is.function(tiktoken_load_tokenizer)
+            ) {
+              tlt_env <- new.env(parent = environment(tiktoken_load_tokenizer))
+              tlt_env$async_message_printer <- async_message_printer
+              environment(tiktoken_load_tokenizer) <- tlt_env
+            }
+            if (exists("count_tokens") && is.function(count_tokens)) {
+              ct_env <- new.env(parent = environment(count_tokens))
+              ct_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
+              environment(count_tokens) <- ct_env
+            }
             if (exists("write_paragraph") && is.function(write_paragraph)) {
               wp_env <- new.env(parent = environment(write_paragraph))
               wp_env$send_prompt_with_retries <- send_prompt_with_retries
@@ -1107,14 +1146,31 @@ processing_server <- function(
             log_context_apply(log_ctx)
 
             # Fix environment for write_paragraph and mark_texts so they can find their dependencies
-            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens)
+            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens,
+            # tiktoken_load_tokenizer)
             # These functions are passed in .args but were defined in the main R session,
             # so we need to inject the dependencies into their environments
+            # Also fix count_tokens since it calls tiktoken_load_tokenizer internally
+            # Also fix tiktoken_load_tokenizer since it calls async_message_printer
+            if (
+              exists("tiktoken_load_tokenizer") &&
+                is.function(tiktoken_load_tokenizer)
+            ) {
+              tlt_env <- new.env(parent = environment(tiktoken_load_tokenizer))
+              tlt_env$async_message_printer <- async_message_printer
+              environment(tiktoken_load_tokenizer) <- tlt_env
+            }
+            if (exists("count_tokens") && is.function(count_tokens)) {
+              ct_env <- new.env(parent = environment(count_tokens))
+              ct_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
+              environment(count_tokens) <- ct_env
+            }
             if (exists("write_paragraph") && is.function(write_paragraph)) {
               wp_env <- new.env(parent = environment(write_paragraph))
               wp_env$send_prompt_with_retries <- send_prompt_with_retries
               wp_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
               wp_env$count_tokens <- count_tokens
+              wp_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
               environment(write_paragraph) <- wp_env
             }
             if (exists("mark_texts") && is.function(mark_texts)) {
@@ -1122,6 +1178,7 @@ processing_server <- function(
               mt_env$send_prompt_with_retries <- send_prompt_with_retries
               mt_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
               mt_env$count_tokens <- count_tokens
+              mt_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
               mt_env$semchunk_load_chunker <- semchunk_load_chunker
               mt_env$mark_text_prompt <- mark_text_prompt
               mt_env$write_paragraph <- write_paragraph

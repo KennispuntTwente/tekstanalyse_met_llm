@@ -22,8 +22,8 @@ load_dependencies("regular")
 # - See the documentation for `mirai::daemons()` for more details
 
 test_mode <- getOption("shiny.testmode", FALSE)
-test_async <- tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
-  c("true", "1", "yes")
+test_async <- isTRUE(getOption("kwallm.test_async", FALSE)) ||
+  tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in% c("true", "1", "yes")
 
 if (!test_mode || test_async) {
   if (!exists("mirai_daemons_set")) {

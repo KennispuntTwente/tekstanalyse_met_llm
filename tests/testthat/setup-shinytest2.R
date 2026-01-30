@@ -1,11 +1,13 @@
 # Load application support files into testing environment
 shinytest2::load_app_env()
 
-# Enable async mode for e2e tests - this is the primary way to run the app
-# and ensures mirai worker issues are caught by tests
+# Note: Environment variables set here with Sys.setenv() are NOT inherited by
+# the Shiny app subprocess that shinytest2 spawns (because callr, which
+# shinytest2 uses internally, doesn't inherit env vars from the parent R
+# process). To pass configuration to the app subprocess, use the `options`
+# parameter in AppDriver$new(), which IS passed to the subprocess.
+#
+# The env vars below are kept for non-shinytest2 contexts (e.g., manual testing
+# or CI jobs that set these at the shell level before running tests).
 Sys.setenv(KWALLM_TEST_ASYNC = "true")
-
-# Enable prompt tracing during e2e tests - this ensures log helper functions
-# are exercised in async contexts (catches issues like helpers not being
-# resolvable in mirai workers)
 Sys.setenv(KWALLM_LOG_PROMPTS_TO_FILE = "true")
