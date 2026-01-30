@@ -41,7 +41,7 @@ generate_grouped_freq_table_single <- function(
       )
     ) |>
     dplyr::ungroup() |>
-    dplyr::select(-.data$Group_Total)
+    dplyr::select(-"Group_Total")
 
   # Rename columns based on language
   if (language == "nl") {
@@ -127,7 +127,7 @@ generate_grouped_freq_table_multi <- function(
         0
       )
     ) |>
-    dplyr::select(-.data$Group_Total)
+    dplyr::select(-"Group_Total")
 
   # Rename columns based on language
   if (language == "nl") {
