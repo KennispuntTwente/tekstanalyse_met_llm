@@ -27,7 +27,11 @@ test_async <- tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
 
 if (!test_mode || test_async) {
   if (!exists("mirai_daemons_set")) {
-    n_workers <- max(1L, parallel::detectCores() - 1L)
+    max_cores <- parallel::detectCores()
+    n_workers <- min(
+      max_cores,
+      max(1L, as.integer(Sys.getenv("KWALLM_N_ASYNC_WORKERS", unset = "2")))
+    )
     mirai::daemons(n_workers)
     mirai_daemons_set <- TRUE
   }
