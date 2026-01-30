@@ -87,6 +87,13 @@ text_upload_server <- function(
                 style = "max-width: 300px; min-height: 100px;", # reserved height
                 uiOutput(ns("column_selector"))
               ),
+              # ---------- By column selector (grouping variable) -------------
+              div(
+                id = ns("by_column_container"),
+                class = "selector-container",
+                style = "max-width: 300px; min-height: 100px;",
+                uiOutput(ns("by_column_selector"))
+              ),
               # ---- Text mode selector (for .txt files) -------------------
               uiOutput(ns("txt_mode_ui"))
             )
@@ -118,6 +125,8 @@ text_upload_server <- function(
     raw_texts <- reactiveVal(NULL) # vector of texts returned by module
     uploaded_data <- reactiveVal(NULL) # raw data (data.frame) read from file
     sheet_names <- reactiveVal(NULL) # character vector of Excel sheet names
+    by_column <- reactiveVal(NULL) # name of optional grouping column
+    by_column_values <- reactiveVal(NULL) # values of by column aligned with texts
     filter_spec <- reactiveVal(NULL) # list(col = <chr>, vals = <chr>) | NULL
     file_type <- reactiveVal(NULL) # ◄ NEW: current file extension
 
@@ -298,8 +307,10 @@ text_upload_server <- function(
       }
       if (file_type() == "txt") {
         shinyjs::hide(ns("column_container"))
+        shinyjs::hide(ns("by_column_container"))
       } else {
         shinyjs::show(ns("column_container"))
+        shinyjs::show(ns("by_column_container"))
       }
     })
 
@@ -378,6 +389,84 @@ text_upload_server <- function(
         txt <- filtered_data()[[col]]
         raw_texts(discard_empty(txt))
       }
+    })
+
+    # ---- By column selector (grouping variable) ----------------------------
+    output$by_column_selector <- renderUI({
+      req(filtered_data())
+      if (file_type() == "txt") {
+        return(NULL)
+      }
+      cols <- names(filtered_data())
+      # Exclude the text column from available by columns
+      text_col <- input$column
+      available_cols <- setdiff(cols, text_col)
+      if (length(available_cols) == 0) {
+        return(NULL)
+      }
+
+      tagList(
+        selectInput(
+          ns("by_column"),
+          tagList(
+            lang()$t("Selecteer groepsvariabele (optioneel)"),
+            tooltip(
+              bsicons::bs_icon("info-circle"),
+              lang()$t(
+                "Selecteer optioneel een kolom om de resultaten op te splitsen per groep. In het rapport worden dan frequenties/statistieken per groep getoond naast de totalen."
+              )
+            )
+          ),
+          choices = stats::setNames(
+            c("", available_cols),
+            c("", available_cols)
+          ),
+          selected = by_column() %||% ""
+        )
+      )
+    })
+
+    observeEvent(input$by_column, {
+      col <- input$by_column
+      if (is.null(col) || !nzchar(col)) {
+        by_column(NULL)
+        by_column_values(NULL)
+        log_action("by_column_cleared")
+      } else {
+        by_column(col)
+        log_action("by_column_selected", details = col)
+      }
+    })
+
+    # Update by_column_values when filtered_data, column, or by_column changes
+    observe({
+      req(filtered_data())
+      text_col <- input$column
+      by_col <- by_column()
+
+      if (is.null(text_col) || !nzchar(text_col)) {
+        by_column_values(NULL)
+        return()
+      }
+
+      if (is.null(by_col) || !nzchar(by_col)) {
+        by_column_values(NULL)
+        return()
+      }
+
+      if (!by_col %in% names(filtered_data())) {
+        by_column_values(NULL)
+        return()
+      }
+
+      # Get the by column values aligned with the text column
+      df <- filtered_data()
+      text_vals <- df[[text_col]]
+      by_vals <- df[[by_col]]
+
+      # Only keep rows that have non-empty text (matching discard_empty logic)
+      keep <- !is.na(text_vals) & stringr::str_trim(text_vals) != ""
+      by_column_values(by_vals[keep])
     })
 
     # ---- Filter icon (dynamic colour) --------------------------------------
@@ -571,14 +660,26 @@ text_upload_server <- function(
     # ---- Disable inputs while processing -----------------------------------
     disable_when_processing(
       processing,
-      c("text_file", "sheet", "column", "filter_btn", "txt_split_lines")
+      c(
+        "text_file",
+        "sheet",
+        "column",
+        "by_column",
+        "filter_btn",
+        "txt_split_lines"
+      )
     )
 
     # ---- Reset fileInput on new session ------------------------------------
     shinyjs::reset("text_file")
 
-    # ---- Return raw texts (character vector) -------------------------------
-    return(raw_texts)
+    # ---- Return raw texts and by_column info -------------------------------
+    # Return a list with raw_texts and by_column information
+    return(list(
+      texts = raw_texts,
+      by_column_name = by_column,
+      by_column_values = by_column_values
+    ))
   })
 }
 

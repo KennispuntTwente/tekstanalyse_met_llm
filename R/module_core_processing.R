@@ -44,6 +44,8 @@ processing_server <- function(
   assign_multiple_categories = reactiveVal(TRUE),
   write_paragraphs = reactiveVal(TRUE),
   context_window,
+  by_column_name = reactiveVal(NULL),
+  by_column_values = reactiveVal(NULL),
   lang = default_lang()
 ) {
   ns <- NS(id)
@@ -1652,7 +1654,9 @@ processing_server <- function(
           research_background = research_background(),
           style_prompt = style_prompt(),
           irr = irr_result(),
-          language = lang()$get_translation_language()
+          language = lang()$get_translation_language(),
+          by_column_name = by_column_name(),
+          by_column_values = by_column_values()
         )
 
         if (mode() == "Categorisatie") {

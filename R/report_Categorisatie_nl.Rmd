@@ -13,6 +13,7 @@ params:
 rl <- params$result_list
 source(here::here("R", "style_datatable_config.R"), local = TRUE)
 source(here::here("R", "utils_quotes.R"), local = TRUE)
+source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ```
 
 ## Methode
@@ -132,6 +133,41 @@ if (!isTRUE(rl$assign_multiple_categories)) {
 }
 
 
+```
+
+```{r echo=FALSE, results='asis', error=TRUE}
+# Show grouped frequencies if by_column is specified
+if (!is.null(rl$by_column_name) && !is.null(rl$by_column_values)) {
+  cat("\n### Frequentie per groep\n\n")
+  cat(paste0(
+    "Onderstaande tabel toont hoe vaak elke categorie is toegewezen, ",
+    "uitgesplitst naar **", htmltools::htmlEscape(rl$by_column_name), "**.\n\n"
+  ))
+}
+```
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(rl$by_column_name) && !is.null(rl$by_column_values)) {
+  if (!isTRUE(rl$assign_multiple_categories)) {
+    generate_grouped_freq_table_single(
+      df = rl$df,
+      by_values = rl$by_column_values,
+      by_column_name = rl$by_column_name,
+      categories = rl$categories,
+      language = "nl"
+    )
+  } else {
+    # Get category columns (all except 'text')
+    cat_cols <- setdiff(names(rl$df), "text")
+    generate_grouped_freq_table_multi(
+      df = rl$df,
+      by_values = rl$by_column_values,
+      by_column_name = rl$by_column_name,
+      categories = cat_cols,
+      language = "nl"
+    )
+  }
+}
 ```
 
 ### Per tekst

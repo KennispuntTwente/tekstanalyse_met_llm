@@ -94,6 +94,14 @@
         "en": "Select column with texts"
       },
       {
+        "nl": "Selecteer groepsvariabele (optioneel)",
+        "en": "Select grouping variable (optional)"
+      },
+      {
+        "nl": "Selecteer optioneel een kolom om de resultaten op te splitsen per groep. In het rapport worden dan frequenties/statistieken per groep getoond naast de totalen.",
+        "en": "Optionally select a column to split results by group. The report will then show frequencies/statistics per group alongside the totals."
+      },
+      {
         "nl": "Je kunt hier de data filteren op basis van waarden in een kolom. Selecteer een kolom en kies waarden. Rijen zonder de gekozen waarden worden uitgesloten.",
         "en": "You can filter the data here based on values in a column. Select a column and choose values. Rows without the selected values will be excluded."
       },

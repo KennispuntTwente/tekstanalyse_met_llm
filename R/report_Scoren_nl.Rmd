@@ -13,6 +13,7 @@ params:
 ```{r include=FALSE, error=TRUE}
 rl <- params$result_list
 source(here::here("R", "style_datatable_config.R"), local = TRUE)
+source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ```
 
 ## Methode
@@ -96,6 +97,28 @@ rl$df |>
     extensions = 'Buttons',
     options = get_datatable_options()
   )
+```
+
+```{r echo=FALSE, results='asis', error=TRUE}
+# Show grouped statistics if by_column is specified
+if (!is.null(rl$by_column_name) && !is.null(rl$by_column_values)) {
+  cat("\n### Statistieken per groep\n\n")
+  cat(paste0(
+    "Onderstaande tabel toont scorestatistieken, ",
+    "uitgesplitst naar **", htmltools::htmlEscape(rl$by_column_name), "**.\n\n"
+  ))
+}
+```
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(rl$by_column_name) && !is.null(rl$by_column_values)) {
+  generate_grouped_score_table(
+    df = rl$df,
+    by_values = rl$by_column_values,
+    by_column_name = rl$by_column_name,
+    language = "nl"
+  )
+}
 ```
 
 ### Per tekst
