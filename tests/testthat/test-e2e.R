@@ -569,7 +569,9 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
 
   # Select text column
   app$set_inputs(`text_upload-column` = "text")
-  Sys.sleep(1)
+
+  # Wait for the by_column selector UI to render
+  Sys.sleep(2)
 
   # Select by_column (grouping variable)
   app$set_inputs(`text_upload-by_column` = "group")
@@ -610,13 +612,13 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
 
   # Set analysis options (no paragraphs/IRR for faster test)
   app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
-  app$set_inputs(`interrater_toggle-interrater_reliability` = "No")
+  app$set_inputs(`interrater_toggle-toggle` = "No")
 
   # Start processing
   app$click("processing-process")
   app$wait_for_value(
     export = "processing-success",
-    timeout = 60000
+    timeout = 30000
   )
 
   # Confirm results
