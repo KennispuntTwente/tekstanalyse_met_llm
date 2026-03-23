@@ -55,30 +55,42 @@ editable_field_list_server <- function(
     # Individual fields
     output$field_inputs <- renderUI({
       show_excl <- isTRUE(show_exclusive()) || identical(show_exclusive, TRUE)
+      fields_disabled <- !isTRUE(isEditing()) || isTRUE(processing())
 
       tagList(lapply(seq_len(n_fields()), function(i) {
         value <- txt_in_fields()[i] %||% ""
         excl_value <- exclusive_vals()[i] %||% FALSE
+        text_input <- textAreaInput(
+          ns(paste0("field", i)),
+          label = paste(lang()$t(field_label), i),
+          value = value,
+          rows = 1,
+          width = "100%"
+        )
+
+        if (fields_disabled) {
+          text_input <- shinyjs::disabled(text_input)
+        }
 
         fluidRow(
           column(
             width = if (show_excl) 10 else 12,
-            textAreaInput(
-              ns(paste0("field", i)),
-              label = paste(lang()$t(field_label), i),
-              value = value,
-              rows = 1,
-              width = "100%"
-            )
+            text_input
           ),
           if (show_excl) {
+            exclusive_input <- checkboxInput(
+              ns(paste0("exclusive", i)),
+              label = lang()$t("Exclusief"),
+              value = excl_value
+            )
+
+            if (fields_disabled) {
+              exclusive_input <- shinyjs::disabled(exclusive_input)
+            }
+
             column(
               width = 2,
-              checkboxInput(
-                ns(paste0("exclusive", i)),
-                label = lang()$t("Exclusief"),
-                value = excl_value
-              )
+              exclusive_input
             )
           }
         )
@@ -88,31 +100,46 @@ editable_field_list_server <- function(
     # Edit button
     output$editButtonUI <- renderUI({
       button_label <- if (isEditing()) icon("save") else icon("pencil")
-      actionButton(
+      edit_button <- actionButton(
         ns("toggleEdit"),
         label = tagList(button_label, ""),
         class = "btn btn-primary",
         style = "min-width: 75px;"
       )
+
+      if (isTRUE(processing())) {
+        edit_button <- shinyjs::disabled(edit_button)
+      }
+
+      edit_button
     })
 
     # Container with buttons and fields
     output$fields_container <- renderUI({
+      buttons_disabled <- !isTRUE(isEditing()) || isTRUE(processing())
+      add_button <- actionButton(
+        ns("addField"),
+        label = icon("plus"),
+        class = "btn btn-success category-button",
+        style = "min-width: 75px;"
+      )
+      remove_button <- actionButton(
+        ns("removeField"),
+        label = icon("minus"),
+        class = "btn btn-danger category-button",
+        style = "min-width: 75px;"
+      )
+
+      if (buttons_disabled) {
+        add_button <- shinyjs::disabled(add_button)
+        remove_button <- shinyjs::disabled(remove_button)
+      }
+
       tagList(
         div(
           class = "category-button-container",
-          actionButton(
-            ns("addField"),
-            label = icon("plus"),
-            class = "btn btn-success category-button",
-            style = "min-width: 75px;"
-          ),
-          actionButton(
-            ns("removeField"),
-            label = icon("minus"),
-            class = "btn btn-danger category-button",
-            style = "min-width: 75px;"
-          ),
+          add_button,
+          remove_button,
           uiOutput(ns("editButtonUI"))
         ),
         uiOutput(ns("field_inputs"))
@@ -277,6 +304,7 @@ editable_field_list_server <- function(
     }
 
     observe({
+      lang()
       show_exclusive()
       isEditing()
       processing()
