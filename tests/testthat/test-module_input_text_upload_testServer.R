@@ -295,3 +295,76 @@ test_that("text_upload_server: clearing by_column works", {
     }
   )
 })
+
+
+test_that("text_upload_server: reuploading the same xlsx file refreshes sheet-backed data", {
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("en")
+      processing <- reactiveVal(FALSE)
+
+      upload_result <- text_upload_server(
+        id = "text_upload",
+        processing = processing,
+        lang = lang
+      )
+
+      raw_texts <- upload_result$texts
+      by_col_name <- upload_result$by_column_name
+      by_col_values <- upload_result$by_column_values
+
+      list(
+        raw_texts = raw_texts,
+        by_col_name = by_col_name,
+        by_col_values = by_col_values
+      )
+    },
+    {
+      path <- withr::local_tempfile(fileext = ".xlsx")
+      first_data <- data.frame(
+        text = c("Alpha", "Beta"),
+        group = c("G1", "G2"),
+        stringsAsFactors = FALSE
+      )
+      second_data <- data.frame(
+        text = c("Delta", "Epsilon", "Zeta"),
+        group = c("H1", "H1", "H2"),
+        stringsAsFactors = FALSE
+      )
+
+      writexl::write_xlsx(list(Sheet1 = first_data), path)
+
+      session$setInputs(
+        `text_upload-text_file` = make_fileinput_df(
+          path,
+          "data.xlsx",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+      )
+      session$flushReact()
+      session$setInputs(`text_upload-column` = "text")
+      session$flushReact()
+      session$setInputs(`text_upload-by_column` = "group")
+      session$flushReact()
+
+      expect_equal(sort(raw_texts()), sort(first_data$text))
+      expect_equal(by_col_name(), "group")
+      expect_equal(by_col_values(), first_data$group)
+
+      writexl::write_xlsx(list(Sheet1 = second_data), path)
+
+      session$setInputs(
+        `text_upload-text_file` = make_fileinput_df(
+          path,
+          "data.xlsx",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+      )
+      session$flushReact()
+
+      expect_equal(sort(raw_texts()), sort(second_data$text))
+      expect_equal(by_col_name(), "group")
+      expect_equal(by_col_values(), second_data$group)
+    }
+  )
+})
