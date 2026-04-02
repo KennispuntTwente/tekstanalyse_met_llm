@@ -202,3 +202,102 @@ prompt_multi_category <- function(
 
   return(prompt)
 }
+
+
+#' Categorize a batch of texts
+#'
+#' Standalone batch function that categorizes each text using an LLM.
+#' Uses \code{prompt_category()} or \code{prompt_multi_category()} internally.
+#'
+#' @param texts Character vector of texts to categorize
+#' @param categories Character vector of possible categories
+#' @param research_background Background information about the research (single string)
+#' @param llm_provider A tidyprompt LLM provider object
+#' @param assign_multiple_categories If TRUE, allow assigning multiple categories per text
+#' @param exclusive_categories Character vector of categories that are mutually exclusive
+#'   (only used when assign_multiple_categories = TRUE)
+#' @param verbose If TRUE, set verbose mode on the LLM provider
+#' @param show_progress If TRUE, print progress to console
+#' @param on_progress Optional callback function(i, n, text) called after each text
+#' @param interrupter Optional object with \code{$execInterrupts()} method for
+#'   cancellation support (e.g., \code{ipc::AsyncInterruptor})
+#'
+#' @return A data.frame with columns \code{text} and \code{result}.
+#'   When \code{assign_multiple_categories = TRUE}, \code{result} contains
+#'   JSON array strings of selected categories.
+#' @export
+categorize_texts <- function(
+  texts,
+  categories,
+  research_background = "",
+  llm_provider,
+  assign_multiple_categories = FALSE,
+  exclusive_categories = c(),
+  verbose = FALSE,
+  show_progress = FALSE,
+  on_progress = NULL,
+  interrupter = NULL
+) {
+  stopifnot(
+    is.character(texts),
+    length(texts) > 0,
+    is.character(categories),
+    length(categories) > 0,
+    is.character(research_background),
+    length(research_background) == 1
+  )
+  if (assign_multiple_categories) {
+    stopifnot(all(exclusive_categories %in% categories))
+  }
+
+  llm_provider <- llm_provider$clone()
+  llm_provider$verbose <- verbose
+  n <- length(texts)
+  results <- vector("list", n)
+
+  for (i in seq_along(texts)) {
+    if (!is.null(interrupter)) {
+      interrupter$execInterrupts()
+    }
+
+    text <- texts[[i]]
+    if (show_progress) {
+      cat(sprintf("Processing %d of %d (%.1f%%)\n", i, n, (i / n) * 100))
+    }
+
+    prompt <- if (assign_multiple_categories) {
+      prompt_multi_category(
+        text = text,
+        categories = categories,
+        research_background = research_background,
+        exclusive_categories = exclusive_categories
+      )
+    } else {
+      prompt_category(
+        text = text,
+        categories = categories,
+        research_background = research_background
+      )
+    }
+
+    result <- send_prompt_with_retries(prompt, llm_provider)
+    results[[i]] <- result
+
+    if (!is.null(on_progress)) {
+      on_progress(i, n, text)
+    }
+
+    if (is.na(result)) break
+  }
+
+  results <- unlist(results)
+  if (anyNA(results)) {
+    results <- rep(NA, n)
+  }
+
+  data.frame(
+    text = texts,
+    result = results,
+    stringsAsFactors = FALSE
+  )
+}

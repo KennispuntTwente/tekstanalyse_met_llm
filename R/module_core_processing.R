@@ -229,66 +229,59 @@ processing_server <- function(
               environment(write_paragraph) <- wp_env
             }
 
-            results <- vector("list", length(texts))
+            # Fix environment for categorize_texts / score_texts so they can
+            # find send_prompt_with_retries and prompt builders in the worker
+            if (exists("categorize_texts") && is.function(categorize_texts)) {
+              ct_fn_env <- new.env(parent = environment(categorize_texts))
+              ct_fn_env$send_prompt_with_retries <- send_prompt_with_retries
+              ct_fn_env$prompt_category <- prompt_category
+              ct_fn_env$prompt_multi_category <- prompt_multi_category
+              environment(categorize_texts) <- ct_fn_env
+            }
+            if (exists("score_texts") && is.function(score_texts)) {
+              st_fn_env <- new.env(parent = environment(score_texts))
+              st_fn_env$send_prompt_with_retries <- send_prompt_with_retries
+              st_fn_env$prompt_score <- prompt_score
+              environment(score_texts) <- st_fn_env
+            }
 
-            for (i in seq_along(texts)) {
-              interrupter$execInterrupts()
-              text <- texts[[i]]
-
-              prompt <- if (mode == "Categorisatie") {
-                if (!assign_multiple_categories) {
-                  prompt_category(
-                    text = text,
-                    research_background = research_background,
-                    categories = categories
-                  )
-                } else {
-                  prompt_multi_category(
-                    text = text,
-                    research_background = research_background,
-                    categories = categories,
-                    exclusive_categories = exclusive_categories
-                  )
-                }
-              } else {
-                prompt_score(
-                  text,
-                  research_background,
-                  scoring_characteristic
-                )
-              }
-
-              result <- send_prompt_with_retries(
-                prompt,
-                llm_provider = llm_provider
-              )
-              results[[i]] <- result
-
-              progress_primary$set_with_total(i, length(texts), text)
-              if (i == 1 || i %% 5 == 0 || i == length(texts)) {
+            # Progress callback for the batch functions
+            on_progress <- function(i, n, text) {
+              progress_primary$set_with_total(i, n, text)
+              if (i == 1 || i %% 5 == 0 || i == n) {
                 log_info(
                   sprintf(
                     "Categorization/Scoring progress: %d/%d",
                     i,
-                    length(texts)
+                    n
                   ),
                   component = "analysis"
                 )
               }
-
-              if (is.na(result)) break
             }
 
-            # Turn into data frame
-            results <- unlist(results)
-            if (anyNA(results)) {
-              results <- rep(NA, length(texts))
+            # Run categorization or scoring via standalone batch functions
+            results <- if (mode == "Categorisatie") {
+              categorize_texts(
+                texts = texts,
+                categories = categories,
+                research_background = research_background,
+                llm_provider = llm_provider,
+                assign_multiple_categories = assign_multiple_categories,
+                exclusive_categories = exclusive_categories,
+                on_progress = on_progress,
+                interrupter = interrupter
+              )
+            } else {
+              score_texts(
+                texts = texts,
+                scoring_characteristic = scoring_characteristic,
+                research_background = research_background,
+                llm_provider = llm_provider,
+                on_progress = on_progress,
+                interrupter = interrupter
+              )
             }
-            results <- data.frame(
-              text = texts,
-              result = results,
-              stringsAsFactors = FALSE
-            )
 
             # If multiple categories, convert from JSON array string to
             #   multiple binary columns
@@ -411,6 +404,8 @@ processing_server <- function(
               categories = categories$texts(),
               exclusive_categories = categories$exclusive_texts(),
               scoring_characteristic = scoring_characteristic(),
+              categorize_texts = categorize_texts,
+              score_texts = score_texts,
               prompt_category = prompt_category,
               prompt_multi_category = prompt_multi_category,
               prompt_score = prompt_score,
@@ -819,41 +814,31 @@ processing_server <- function(
               wp_env$count_tokens <- count_tokens
               environment(write_paragraph) <- wp_env
             }
+            if (exists("assign_topics") && is.function(assign_topics)) {
+              at_env <- new.env(parent = environment(assign_topics))
+              at_env$send_prompt_with_retries <- send_prompt_with_retries
+              at_env$prompt_category <- prompt_category
+              at_env$prompt_multi_category <- prompt_multi_category
+              environment(assign_topics) <- at_env
+            }
 
-            # Step 4: Assign topics
-            # Writing progress on secondary progress file
+            # Step 4: Assign topics via standalone batch function
+            on_progress <- function(i, n, text) {
+              progress_secondary$set_with_total(i, n, text)
+            }
+
             texts_with_topics <- tryCatch(
               {
-                results <- tibble::tibble(
-                  text = character(),
-                  result = character()
+                results <- assign_topics(
+                  texts = texts,
+                  topics = topics,
+                  research_background = research_background,
+                  llm_provider = llm_provider,
+                  assign_multiple_categories = assign_multiple_categories,
+                  exclusive_topics = exclusive_topics,
+                  on_progress = on_progress,
+                  interrupter = interrupter
                 )
-
-                for (i in seq_along(texts)) {
-                  interrupter$execInterrupts()
-                  text <- texts[[i]]
-                  result <- assign_topics(
-                    c(text),
-                    topics,
-                    research_background,
-                    llm_provider,
-                    assign_multiple_categories = assign_multiple_categories,
-                    exclusive_topics = exclusive_topics
-                  )
-                  result <- result$result
-
-                  progress_secondary$set_with_total(
-                    i,
-                    length(texts),
-                    text
-                  )
-
-                  # Append to results
-                  results <- dplyr::bind_rows(
-                    results,
-                    tibble::tibble(text = text, result = as.character(result))
-                  )
-                }
                 progress_secondary$hide()
 
                 # If multiple categories, convert from JSON array string to

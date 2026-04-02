@@ -2,6 +2,12 @@
 
 library(testthat)
 
+create_test_provider <- function(model = "test-model") {
+  provider <- list(parameters = list(model = model))
+  provider$clone <- function() provider
+  provider
+}
+
 test_that("prompt_candidate_topics returns a usable prompt object", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
@@ -43,4 +49,50 @@ test_that("prompt_candidate_topics respects language parameter", {
 
   prompt_text <- tidyprompt::construct_prompt_text(prompt_nl)
   expect_match(prompt_text, "Dutch")
+})
+
+test_that("assign_topics supports progress, interruption, and early NA", {
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  call_count <- 0
+  interrupt_count <- 0
+  progress_events <- list()
+
+  send_prompt_with_retries <- function(prompt, llm_provider) {
+    call_count <<- call_count + 1
+    if (call_count == 1) {
+      return("Topic A")
+    }
+
+    NA_character_
+  }
+
+  interrupter <- list(
+    execInterrupts = function() {
+      interrupt_count <<- interrupt_count + 1
+    }
+  )
+
+  result <- assign_topics(
+    texts = c("text a", "text b", "text c"),
+    topics = c("Topic A", "Topic B"),
+    llm_provider = create_test_provider(),
+    on_progress = function(i, n, text) {
+      progress_events[[length(progress_events) + 1]] <<- list(
+        i = i,
+        n = n,
+        text = text
+      )
+    },
+    interrupter = interrupter
+  )
+
+  expect_equal(result$text, c("text a", "text b", "text c"))
+  expect_true(all(is.na(result$result)))
+  expect_equal(call_count, 2)
+  expect_equal(interrupt_count, 2)
+  expect_length(progress_events, 2)
+  expect_equal(progress_events[[1]], list(i = 1, n = 3, text = "text a"))
+  expect_equal(progress_events[[2]], list(i = 2, n = 3, text = "text b"))
 })

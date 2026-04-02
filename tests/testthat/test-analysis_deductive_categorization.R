@@ -4,6 +4,12 @@
 
 library(testthat)
 
+create_test_provider <- function(model = "test-model") {
+  provider <- list(parameters = list(model = model))
+  provider$clone <- function() provider
+  provider
+}
+
 test_that("prompt_category validates input arguments", {
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
 
@@ -127,4 +133,49 @@ test_that("prompt_multi_category includes exclusive category annotation", {
   prompt_text <- tidyprompt::construct_prompt_text(prompt)
   expect_match(prompt_text, "\\[exclusive\\]")
   expect_match(prompt_text, "unclear")
+})
+
+test_that("categorize_texts supports progress, interruption, and early NA", {
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  call_count <- 0
+  interrupt_count <- 0
+  progress_events <- list()
+
+  send_prompt_with_retries <- function(prompt, llm_provider) {
+    call_count <<- call_count + 1
+    if (call_count == 1) {
+      return("cat1")
+    }
+
+    NA_character_
+  }
+
+  interrupter <- list(
+    execInterrupts = function() {
+      interrupt_count <<- interrupt_count + 1
+    }
+  )
+
+  result <- categorize_texts(
+    texts = c("text a", "text b", "text c"),
+    categories = c("cat1", "cat2"),
+    llm_provider = create_test_provider(),
+    on_progress = function(i, n, text) {
+      progress_events[[length(progress_events) + 1]] <<- list(
+        i = i,
+        n = n,
+        text = text
+      )
+    },
+    interrupter = interrupter
+  )
+
+  expect_equal(result$text, c("text a", "text b", "text c"))
+  expect_true(all(is.na(result$result)))
+  expect_equal(call_count, 2)
+  expect_equal(interrupt_count, 2)
+  expect_length(progress_events, 2)
+  expect_equal(progress_events[[1]], list(i = 1, n = 3, text = "text a"))
+  expect_equal(progress_events[[2]], list(i = 2, n = 3, text = "text b"))
 })

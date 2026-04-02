@@ -51,3 +51,84 @@ prompt_score <- function(
 
   return(prompt)
 }
+
+
+#' Score a batch of texts
+#'
+#' Standalone batch function that scores each text on a characteristic using an LLM.
+#' Uses \code{prompt_score()} internally.
+#'
+#' @param texts Character vector of texts to score
+#' @param scoring_characteristic Characteristic to score texts on
+#'   (e.g., "emotional load", "clarity")
+#' @param research_background Background information about the research (single string)
+#' @param llm_provider A tidyprompt LLM provider object
+#' @param verbose If TRUE, set verbose mode on the LLM provider
+#' @param show_progress If TRUE, print progress to console
+#' @param on_progress Optional callback function(i, n, text) called after each text
+#' @param interrupter Optional object with \code{$execInterrupts()} method for
+#'   cancellation support (e.g., \code{ipc::AsyncInterruptor})
+#'
+#' @return A data.frame with columns \code{text} and \code{result} (numeric 0-100).
+#' @export
+score_texts <- function(
+  texts,
+  scoring_characteristic,
+  research_background = "",
+  llm_provider,
+  verbose = FALSE,
+  show_progress = FALSE,
+  on_progress = NULL,
+  interrupter = NULL
+) {
+  stopifnot(
+    is.character(texts),
+    length(texts) > 0,
+    is.character(scoring_characteristic),
+    length(scoring_characteristic) == 1,
+    is.character(research_background),
+    length(research_background) == 1
+  )
+
+  llm_provider <- llm_provider$clone()
+  llm_provider$verbose <- verbose
+  n <- length(texts)
+  results <- vector("list", n)
+
+  for (i in seq_along(texts)) {
+    if (!is.null(interrupter)) {
+      interrupter$execInterrupts()
+    }
+
+    text <- texts[[i]]
+    if (show_progress) {
+      cat(sprintf("Processing %d of %d (%.1f%%)\n", i, n, (i / n) * 100))
+    }
+
+    prompt <- prompt_score(
+      text = text,
+      research_background = research_background,
+      scoring_characteristic = scoring_characteristic
+    )
+
+    result <- send_prompt_with_retries(prompt, llm_provider)
+    results[[i]] <- result
+
+    if (!is.null(on_progress)) {
+      on_progress(i, n, text)
+    }
+
+    if (is.na(result)) break
+  }
+
+  results <- unlist(results)
+  if (anyNA(results)) {
+    results <- rep(NA, n)
+  }
+
+  data.frame(
+    text = texts,
+    result = results,
+    stringsAsFactors = FALSE
+  )
+}

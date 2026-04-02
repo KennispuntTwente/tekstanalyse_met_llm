@@ -3,6 +3,12 @@
 
 library(testthat)
 
+create_test_provider <- function(model = "test-model") {
+  provider <- list(parameters = list(model = model))
+  provider$clone <- function() provider
+  provider
+}
+
 test_that("prompt_score validates input arguments", {
   source(
     here::here("R", "analysis_deductive_scoring_characteristic.R"),
@@ -99,4 +105,52 @@ test_that("prompt_score works with empty research background", {
   prompt_text <- tidyprompt::construct_prompt_text(prompt)
   expect_true(nchar(prompt_text) > 0)
   expect_match(prompt_text, "clarity", fixed = TRUE)
+})
+
+test_that("score_texts supports progress, interruption, and early NA", {
+  source(
+    here::here("R", "analysis_deductive_scoring_characteristic.R"),
+    local = TRUE
+  )
+
+  call_count <- 0
+  interrupt_count <- 0
+  progress_events <- list()
+
+  send_prompt_with_retries <- function(prompt, llm_provider) {
+    call_count <<- call_count + 1
+    if (call_count == 1) {
+      return(42)
+    }
+
+    NA_real_
+  }
+
+  interrupter <- list(
+    execInterrupts = function() {
+      interrupt_count <<- interrupt_count + 1
+    }
+  )
+
+  result <- score_texts(
+    texts = c("text a", "text b", "text c"),
+    scoring_characteristic = "clarity",
+    llm_provider = create_test_provider(),
+    on_progress = function(i, n, text) {
+      progress_events[[length(progress_events) + 1]] <<- list(
+        i = i,
+        n = n,
+        text = text
+      )
+    },
+    interrupter = interrupter
+  )
+
+  expect_equal(result$text, c("text a", "text b", "text c"))
+  expect_true(all(is.na(result$result)))
+  expect_equal(call_count, 2)
+  expect_equal(interrupt_count, 2)
+  expect_length(progress_events, 2)
+  expect_equal(progress_events[[1]], list(i = 1, n = 3, text = "text a"))
+  expect_equal(progress_events[[2]], list(i = 2, n = 3, text = "text b"))
 })

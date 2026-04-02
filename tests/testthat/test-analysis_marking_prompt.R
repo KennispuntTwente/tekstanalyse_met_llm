@@ -121,3 +121,68 @@ test_that("normalize_for_dist is consistent with normalize_with_map", {
     )
   }
 })
+
+test_that("mark_texts works with lang = NULL", {
+  source(here::here("R", "analysis_marking.R"), local = TRUE)
+
+  withr::defer({
+    rm(
+      list = grep("^semchunker_", ls(envir = .GlobalEnv), value = TRUE),
+      envir = .GlobalEnv
+    )
+  })
+
+  log_info <- function(...) invisible(NULL)
+  semchunk_load_chunker <- function(chunk_size) {
+    force(chunk_size)
+    function(text, overlap = 0) {
+      force(overlap)
+      text
+    }
+  }
+  get_context_window_size_in_tokens <- function(model) {
+    force(model)
+    2048
+  }
+  count_tokens <- function(x) {
+    nchar(x)
+  }
+  send_prompt_with_retries <- function(
+    prompt,
+    llm_provider,
+    max_interactions = 10
+  ) {
+    force(prompt)
+    force(llm_provider)
+    force(max_interactions)
+    character(0)
+  }
+
+  progress_messages <- character()
+  progress_stub <- list(
+    set_with_total = function(i, total, txt) {
+      expect_type(txt, "character")
+      expect_length(txt, 1)
+      progress_messages <<- c(progress_messages, txt)
+      invisible(NULL)
+    },
+    show = function() invisible(NULL),
+    hide = function() invisible(NULL)
+  )
+
+  result <- mark_texts(
+    texts = "A short text",
+    codes = "Code A",
+    llm_provider = list(parameters = list(model = "unit-test-model")),
+    progress_primary = progress_stub,
+    progress_secondary = progress_stub,
+    lang = NULL,
+    write_paragraphs = FALSE
+  )
+
+  expect_s3_class(result, "tbl_df")
+  expect_true(all(
+    c("text", "sub_text", "code", "marked_text") %in% names(result)
+  ))
+  expect_true(length(progress_messages) >= 3)
+})

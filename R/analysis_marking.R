@@ -15,9 +15,7 @@ mark_texts <- function(
   progress_primary = NULL,
   progress_secondary = NULL,
   interrupter = NULL,
-  lang = shiny.i18n::Translator$new(
-    translation_json_path = "language/language.json"
-  ),
+  lang = NULL,
   write_paragraphs = TRUE,
   max_interactions = getOption("send_prompt_with_retries__max_interaction", 10),
   llm_stream_async = NULL,
@@ -36,13 +34,55 @@ mark_texts <- function(
     total_steps <- total_steps + 1
   }
 
+  translate <- function(text) {
+    if (is.null(lang)) {
+      return(text)
+    }
+
+    lang$t(text)
+  }
+
+  paragraph_language <- if (is.null(lang)) {
+    "en"
+  } else {
+    lang$get_translation_language()
+  }
+
+  progress_set_with_total <- function(progress, i, total, txt) {
+    if (is.null(progress)) {
+      return(invisible(NULL))
+    }
+
+    progress$set_with_total(i, total, txt)
+  }
+
+  progress_show <- function(progress) {
+    if (is.null(progress)) {
+      return(invisible(NULL))
+    }
+
+    progress$show()
+  }
+
+  progress_hide <- function(progress) {
+    if (is.null(progress)) {
+      return(invisible(NULL))
+    }
+
+    progress$hide()
+  }
+
   # Set initial progress
   log_info("Marking Step 1: Splitting texts...", component = "analysis")
-  try(progress_primary$set_with_total(
-    1,
-    total_steps,
-    lang$t("Teksten splitsen...")
-  ))
+  try(
+    progress_set_with_total(
+      progress_primary,
+      1,
+      total_steps,
+      translate("Teksten splitsen...")
+    ),
+    silent = TRUE
+  )
 
   # Load chunker
   chunker_name <- paste0("semchunker_", text_size_tokens)
@@ -95,22 +135,27 @@ mark_texts <- function(
   # Create own row for each text, sub_text, code, and marked_text
   total_combinations <- nrow(df) * length(codes)
   current_count <- 0
-  try({
-    log_info("Marking Step 2: Marking texts...", component = "analysis")
-    progress_primary$set_with_total(
-      2,
-      total_steps,
-      lang$t(
-        "Teksten markeren..."
+  try(
+    {
+      log_info("Marking Step 2: Marking texts...", component = "analysis")
+      progress_set_with_total(
+        progress_primary,
+        2,
+        total_steps,
+        translate(
+          "Teksten markeren..."
+        )
       )
-    )
-    progress_secondary$show()
-    progress_secondary$set_with_total(
-      current_count,
-      total_combinations,
-      "..."
-    )
-  })
+      progress_show(progress_secondary)
+      progress_set_with_total(
+        progress_secondary,
+        current_count,
+        total_combinations,
+        "..."
+      )
+    },
+    silent = TRUE
+  )
   df_result <- df |>
     tidyr::crossing(code = codes) |>
     dplyr::mutate(
@@ -126,17 +171,21 @@ mark_texts <- function(
             component = "analysis"
           )
         }
-        try({
-          progress_secondary$set_with_total(
-            current_count,
-            total_combinations,
-            paste0(
-              lang$t("Tekst markeren voor code '"),
-              cd,
-              "'..."
+        try(
+          {
+            progress_set_with_total(
+              progress_secondary,
+              current_count,
+              total_combinations,
+              paste0(
+                translate("Tekst markeren voor code '"),
+                cd,
+                "'..."
+              )
             )
-          )
-        })
+          },
+          silent = TRUE
+        )
 
         if (!is.null(interrupter)) {
           interrupter$execInterrupts()
@@ -158,16 +207,20 @@ mark_texts <- function(
       })
     ) |>
     tidyr::unnest(marked_text) # This creates one row per marked section
-  try({
-    progress_secondary$hide()
-    progress_primary$set_with_total(
-      2.5,
-      total_steps,
-      lang$t(
-        "Resultaten opschonen..."
+  try(
+    {
+      progress_hide(progress_secondary)
+      progress_set_with_total(
+        progress_primary,
+        2.5,
+        total_steps,
+        translate(
+          "Resultaten opschonen..."
+        )
       )
-    )
-  })
+    },
+    silent = TRUE
+  )
 
   # Clean up the result: remove NA marked_text, normalize, and check for substrings
   # (substring is when overlapped text parts are present in other marked sections;
@@ -193,14 +246,21 @@ mark_texts <- function(
 
   # Write paragraphs if requested
   if (write_paragraphs) {
-    try({
-      log_info("Marking Step 4: Writing paragraphs...", component = "analysis")
-      progress_primary$set_with_total(
-        3,
-        total_steps,
-        lang$t("Rapport schrijven...")
-      )
-    })
+    try(
+      {
+        log_info(
+          "Marking Step 4: Writing paragraphs...",
+          component = "analysis"
+        )
+        progress_set_with_total(
+          progress_primary,
+          3,
+          total_steps,
+          translate("Rapport schrijven...")
+        )
+      },
+      silent = TRUE
+    )
 
     # Collect the marked snippets for each text-code combo;
     #  this will be used to highlight the marked texts for each original text & code
@@ -237,14 +297,18 @@ mark_texts <- function(
       tibble::deframe()
 
     # Create paragraphs for each code
-    try({
-      progress_secondary$set_with_total(
-        0,
-        length(text_list),
-        "..."
-      )
-      progress_secondary$show()
-    })
+    try(
+      {
+        progress_set_with_total(
+          progress_secondary,
+          0,
+          length(text_list),
+          "..."
+        )
+        progress_show(progress_secondary)
+      },
+      silent = TRUE
+    )
 
     # Create streaming callback if streaming is enabled
     stream_callback <- NULL
@@ -265,17 +329,21 @@ mark_texts <- function(
           interrupter$execInterrupts()
         }
 
-        try({
-          progress_secondary$set_with_total(
-            i,
-            length(text_list),
-            paste0(
-              lang$t("Schrijven over '"),
-              code,
-              "'..."
+        try(
+          {
+            progress_set_with_total(
+              progress_secondary,
+              i,
+              length(text_list),
+              paste0(
+                translate("Schrijven over '"),
+                code,
+                "'..."
+              )
             )
-          )
-        })
+          },
+          silent = TRUE
+        )
 
         # Clear streaming panel before this paragraph
         if (streaming_enabled && !is.null(llm_stream_async)) {
@@ -288,7 +356,7 @@ mark_texts <- function(
           research_background = research_background,
           style_prompt = style_prompt,
           llm_provider = llm_provider,
-          language = lang$get_translation_language(),
+          language = paragraph_language,
           focus_on_highlighted_text = TRUE,
           stream_callback = stream_callback
         )
@@ -296,14 +364,18 @@ mark_texts <- function(
         return(paragraph)
       }
     )
-    try({
-      progress_secondary$hide()
-      progress_primary$set_with_total(
-        3.5,
-        total_steps,
-        lang$t("Afronden...")
-      )
-    })
+    try(
+      {
+        progress_hide(progress_secondary)
+        progress_set_with_total(
+          progress_primary,
+          3.5,
+          total_steps,
+          translate("Afronden...")
+        )
+      },
+      silent = TRUE
+    )
 
     # Set paragraphs as an attribute of the result
     attr(df_result_clean, "paragraphs") <- paragraphs

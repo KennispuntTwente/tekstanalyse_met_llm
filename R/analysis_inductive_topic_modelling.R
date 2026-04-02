@@ -513,7 +513,9 @@ assign_topics <- function(
   assign_multiple_categories = FALSE,
   exclusive_topics = c(),
   verbose = FALSE,
-  show_progress = FALSE
+  show_progress = FALSE,
+  on_progress = NULL,
+  interrupter = NULL
 ) {
   stopifnot(
     is.character(texts),
@@ -528,8 +530,14 @@ assign_topics <- function(
   llm_provider <- llm_provider$clone()
   llm_provider$verbose <- verbose
   n <- length(texts)
+  results <- vector("list", n)
 
-  process_text <- function(text, i) {
+  for (i in seq_along(texts)) {
+    if (!is.null(interrupter)) {
+      interrupter$execInterrupts()
+    }
+
+    text <- texts[[i]]
     if (show_progress) {
       cat(sprintf("Processing %d of %d (%.1f%%)\n", i, n, (i / n) * 100))
     }
@@ -550,17 +558,25 @@ assign_topics <- function(
     }
 
     result <- send_prompt_with_retries(prompt, llm_provider)
+    results[[i]] <- result
 
-    tibble::tibble(
-      text = text,
-      result = result
-    )
+    if (!is.null(on_progress)) {
+      on_progress(i, n, text)
+    }
+
+    if (is.na(result)) break
   }
 
-  texts_with_topics <- purrr::imap(texts, process_text) |>
-    dplyr::bind_rows()
+  results <- unlist(results)
+  if (anyNA(results)) {
+    results <- rep(NA, n)
+  }
 
-  return(texts_with_topics)
+  data.frame(
+    text = texts,
+    result = results,
+    stringsAsFactors = FALSE
+  )
 }
 
 

@@ -1,6 +1,6 @@
 library(testthat)
 
-source(here::here("R", "module_misc_context_window.R"), local = TRUE)
+source(here::here("R", "utils_context_window.R"), local = TRUE)
 
 
 test_that("get_context_window_size_in_tokens: known models map to expected sizes", {
