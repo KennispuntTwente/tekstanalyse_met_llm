@@ -199,51 +199,7 @@ processing_server <- function(
         mirai::mirai(
           {
             log_context_apply(log_ctx)
-
-            # Fix environment for write_paragraph so it can find its dependencies
-            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens,
-            # tiktoken_load_tokenizer)
-            # These functions are passed in .args but write_paragraph was defined in
-            # the main R session, so we need to inject them into its environment
-            # Also fix count_tokens since it calls tiktoken_load_tokenizer internally
-            # Also fix tiktoken_load_tokenizer since it calls async_message_printer
-            if (
-              exists("tiktoken_load_tokenizer") &&
-                is.function(tiktoken_load_tokenizer)
-            ) {
-              tlt_env <- new.env(parent = environment(tiktoken_load_tokenizer))
-              tlt_env$async_message_printer <- async_message_printer
-              environment(tiktoken_load_tokenizer) <- tlt_env
-            }
-            if (exists("count_tokens") && is.function(count_tokens)) {
-              ct_env <- new.env(parent = environment(count_tokens))
-              ct_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
-              environment(count_tokens) <- ct_env
-            }
-            if (exists("write_paragraph") && is.function(write_paragraph)) {
-              wp_env <- new.env(parent = environment(write_paragraph))
-              wp_env$send_prompt_with_retries <- send_prompt_with_retries
-              wp_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
-              wp_env$count_tokens <- count_tokens
-              wp_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
-              environment(write_paragraph) <- wp_env
-            }
-
-            # Fix environment for categorize_texts / score_texts so they can
-            # find send_prompt_with_retries and prompt builders in the worker
-            if (exists("categorize_texts") && is.function(categorize_texts)) {
-              ct_fn_env <- new.env(parent = environment(categorize_texts))
-              ct_fn_env$send_prompt_with_retries <- send_prompt_with_retries
-              ct_fn_env$prompt_category <- prompt_category
-              ct_fn_env$prompt_multi_category <- prompt_multi_category
-              environment(categorize_texts) <- ct_fn_env
-            }
-            if (exists("score_texts") && is.function(score_texts)) {
-              st_fn_env <- new.env(parent = environment(score_texts))
-              st_fn_env$send_prompt_with_retries <- send_prompt_with_retries
-              st_fn_env$prompt_score <- prompt_score
-              environment(score_texts) <- st_fn_env
-            }
+            prepare_async_analysis_worker("categorization_scoring")
 
             # Progress callback for the batch functions
             on_progress <- function(i, n, text) {
@@ -404,19 +360,9 @@ processing_server <- function(
               categories = categories$texts(),
               exclusive_categories = categories$exclusive_texts(),
               scoring_characteristic = scoring_characteristic(),
-              categorize_texts = categorize_texts,
-              score_texts = score_texts,
-              prompt_category = prompt_category,
-              prompt_multi_category = prompt_multi_category,
-              prompt_score = prompt_score,
               assign_multiple_categories = assign_multiple_categories(),
-              write_paragraph = write_paragraph,
               write_paragraphs = write_paragraphs(),
               handle_detailed_error = handle_detailed_error,
-              get_context_window_size_in_tokens = get_context_window_size_in_tokens,
-              tiktoken_load_tokenizer = tiktoken_load_tokenizer,
-              count_tokens = count_tokens,
-              async_message_printer = async_message_printer,
               lang = lang(),
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
@@ -425,6 +371,8 @@ processing_server <- function(
               streaming_enabled = getOption("paragraph_streaming", TRUE) &&
                 isTRUE(models$main$parameters$stream)
             ),
+            analysis_async_categorization_globals(),
+            analysis_async_tokenizer_globals(),
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals()
           )
@@ -626,12 +574,6 @@ processing_server <- function(
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals(),
             list(
-              create_candidate_topics = create_candidate_topics,
-              prompt_candidate_topics = prompt_candidate_topics,
-              reduce_topics = reduce_topics,
-              prompt_category = prompt_category,
-              prompt_multi_category = prompt_multi_category,
-              assign_topics = assign_topics,
               llm_provider_main = models$main,
               llm_provider_large = models$large,
               texts = texts$preprocessed,
@@ -639,15 +581,13 @@ processing_server <- function(
               mode = mode(),
               handle_detailed_error = handle_detailed_error,
               text_chunks = context_window$text_chunks,
-              get_context_window_size_in_tokens = get_context_window_size_in_tokens,
-              tiktoken_load_tokenizer = tiktoken_load_tokenizer,
-              count_tokens = count_tokens,
-              async_message_printer = async_message_printer,
               lang = lang(),
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
               interrupter = interrupter
-            )
+            ),
+            analysis_async_topic_modelling_globals(),
+            analysis_async_tokenizer_globals()
           )
         ) %...>%
           topics() %...!%
@@ -786,41 +726,7 @@ processing_server <- function(
         mirai::mirai(
           {
             log_context_apply(log_ctx)
-
-            # Fix environment for write_paragraph so it can find its dependencies
-            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens,
-            # tiktoken_load_tokenizer)
-            # These functions are passed in .args but write_paragraph was defined in
-            # the main R session, so we need to inject them into its environment
-            # Also fix count_tokens since it calls tiktoken_load_tokenizer internally
-            # Also fix tiktoken_load_tokenizer since it calls async_message_printer
-            if (
-              exists("tiktoken_load_tokenizer") &&
-                is.function(tiktoken_load_tokenizer)
-            ) {
-              tlt_env <- new.env(parent = environment(tiktoken_load_tokenizer))
-              tlt_env$async_message_printer <- async_message_printer
-              environment(tiktoken_load_tokenizer) <- tlt_env
-            }
-            if (exists("count_tokens") && is.function(count_tokens)) {
-              ct_env <- new.env(parent = environment(count_tokens))
-              ct_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
-              environment(count_tokens) <- ct_env
-            }
-            if (exists("write_paragraph") && is.function(write_paragraph)) {
-              wp_env <- new.env(parent = environment(write_paragraph))
-              wp_env$send_prompt_with_retries <- send_prompt_with_retries
-              wp_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
-              wp_env$count_tokens <- count_tokens
-              environment(write_paragraph) <- wp_env
-            }
-            if (exists("assign_topics") && is.function(assign_topics)) {
-              at_env <- new.env(parent = environment(assign_topics))
-              at_env$send_prompt_with_retries <- send_prompt_with_retries
-              at_env$prompt_category <- prompt_category
-              at_env$prompt_multi_category <- prompt_multi_category
-              environment(assign_topics) <- at_env
-            }
+            prepare_async_analysis_worker("topic_assignment")
 
             # Step 4: Assign topics via standalone batch function
             on_progress <- function(i, n, text) {
@@ -976,13 +882,6 @@ processing_server <- function(
             send_prompt_with_retries_async_globals(),
             list(
               topics = topics(),
-              create_candidate_topics = create_candidate_topics,
-              prompt_candidate_topics = prompt_candidate_topics,
-              reduce_topics = reduce_topics,
-              prompt_category = prompt_category,
-              prompt_multi_category = prompt_multi_category,
-              assign_topics = assign_topics,
-              write_paragraph = write_paragraph,
               llm_provider = models$main,
               texts = texts$preprocessed,
               research_background = research_background(),
@@ -991,10 +890,6 @@ processing_server <- function(
               assign_multiple_categories = assign_multiple_categories(),
               write_paragraphs = write_paragraphs(),
               handle_detailed_error = handle_detailed_error,
-              get_context_window_size_in_tokens = get_context_window_size_in_tokens,
-              tiktoken_load_tokenizer = tiktoken_load_tokenizer,
-              count_tokens = count_tokens,
-              async_message_printer = async_message_printer,
               lang = lang(),
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
@@ -1004,6 +899,9 @@ processing_server <- function(
               streaming_enabled = getOption("paragraph_streaming", TRUE) &&
                 isTRUE(models$main$parameters$stream)
             ),
+            analysis_async_topic_modelling_globals(),
+            analysis_async_paragraph_globals(),
+            analysis_async_tokenizer_globals(),
             log_async_globals(log_ctx)
           )
         ) %...>%
@@ -1129,51 +1027,7 @@ processing_server <- function(
         mirai::mirai(
           {
             log_context_apply(log_ctx)
-
-            # Fix environment for write_paragraph and mark_texts so they can find their dependencies
-            # (send_prompt_with_retries, get_context_window_size_in_tokens, count_tokens,
-            # tiktoken_load_tokenizer)
-            # These functions are passed in .args but were defined in the main R session,
-            # so we need to inject the dependencies into their environments
-            # Also fix count_tokens since it calls tiktoken_load_tokenizer internally
-            # Also fix tiktoken_load_tokenizer since it calls async_message_printer
-            if (
-              exists("tiktoken_load_tokenizer") &&
-                is.function(tiktoken_load_tokenizer)
-            ) {
-              tlt_env <- new.env(parent = environment(tiktoken_load_tokenizer))
-              tlt_env$async_message_printer <- async_message_printer
-              environment(tiktoken_load_tokenizer) <- tlt_env
-            }
-            if (exists("count_tokens") && is.function(count_tokens)) {
-              ct_env <- new.env(parent = environment(count_tokens))
-              ct_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
-              environment(count_tokens) <- ct_env
-            }
-            if (exists("write_paragraph") && is.function(write_paragraph)) {
-              wp_env <- new.env(parent = environment(write_paragraph))
-              wp_env$send_prompt_with_retries <- send_prompt_with_retries
-              wp_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
-              wp_env$count_tokens <- count_tokens
-              wp_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
-              environment(write_paragraph) <- wp_env
-            }
-            if (exists("mark_texts") && is.function(mark_texts)) {
-              mt_env <- new.env(parent = environment(mark_texts))
-              mt_env$send_prompt_with_retries <- send_prompt_with_retries
-              mt_env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
-              mt_env$count_tokens <- count_tokens
-              mt_env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
-              mt_env$semchunk_load_chunker <- semchunk_load_chunker
-              mt_env$mark_text_prompt <- mark_text_prompt
-              mt_env$write_paragraph <- write_paragraph
-              mt_env$find_matches <- find_matches
-              mt_env$normalize_with_map <- normalize_with_map
-              mt_env$best_literal_substring <- best_literal_substring
-              mt_env$fuzzy_threshold <- fuzzy_threshold
-              mt_env$normalize_for_dist <- normalize_for_dist
-              environment(mark_texts) <- mt_env
-            }
+            prepare_async_analysis_worker("marking")
 
             mark_texts(
               texts = texts,
@@ -1199,30 +1053,19 @@ processing_server <- function(
               research_background = research_background(),
               style_prompt = style_prompt(),
               codes = codes$texts(),
-              mark_texts = mark_texts,
-              mark_text_prompt = mark_text_prompt,
-              get_context_window_size_in_tokens = get_context_window_size_in_tokens,
-              tiktoken_load_tokenizer = tiktoken_load_tokenizer,
-              count_tokens = count_tokens,
-              async_message_printer = async_message_printer,
               lang = lang(),
-              semchunk_load_chunker = semchunk_load_chunker,
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
               interrupter = interrupter,
-              write_paragraph = write_paragraph,
               write_paragraphs = write_paragraphs(),
               text_size_tokens = context_window$max_tokens,
               overlap_size_tokens = context_window$overlap,
-              find_matches = find_matches,
-              normalize_with_map = normalize_with_map,
-              best_literal_substring = best_literal_substring,
-              fuzzy_threshold = fuzzy_threshold,
-              normalize_for_dist = normalize_for_dist,
               llm_stream_async = llm_stream$async,
               streaming_enabled = getOption("paragraph_streaming", TRUE) &&
                 isTRUE(models$main$parameters$stream)
             ),
+            analysis_async_marking_globals(),
+            analysis_async_tokenizer_globals(),
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals()
           )

@@ -320,16 +320,13 @@ edit_topics_server <- function(
           },
           .args = c(
             list(
-              reduce_topics = reduce_topics,
               updated_topics = updated_topics,
               research_background = research_background(),
               llm_provider = llm_provider,
-              lang = lang(),
-              get_context_window_size_in_tokens = get_context_window_size_in_tokens,
-              tiktoken_load_tokenizer = tiktoken_load_tokenizer,
-              count_tokens = count_tokens,
-              async_message_printer = async_message_printer
+              lang = lang()
             ),
+            analysis_async_topic_reduction_globals(),
+            analysis_async_tokenizer_globals(),
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals()
           )

@@ -229,18 +229,10 @@ marking_codes_server <- function(
               llm_provider = llm_provider,
               queue = queue,
               interrupter = interrupter,
-              language = lang()$get_translation_language(),
-              generate_codes_by_reading_texts = generate_codes_by_reading_texts,
-              get_context_window_size_in_tokens = get_context_window_size_in_tokens,
-              create_text_chunks = create_text_chunks,
-              create_candidate_topics = create_candidate_topics,
-              prompt_candidate_topics = prompt_candidate_topics,
-              reduce_topics = reduce_topics,
-              semchunk_load_chunker = semchunk_load_chunker,
-              tiktoken_load_tokenizer = tiktoken_load_tokenizer,
-              count_tokens = count_tokens,
-              async_message_printer = async_message_printer
-            )
+              language = lang()$get_translation_language()
+            ),
+            analysis_async_code_generation_globals(),
+            analysis_async_tokenizer_globals()
           )
         ) %...>%
           {
