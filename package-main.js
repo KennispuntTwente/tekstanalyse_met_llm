@@ -183,9 +183,10 @@ async function launchShinyApp(port) {
 }
 
 async function waitForShiny(port) {
+  const TIMEOUT_MS = 90 * 1000; // 90 seconds
   return new Promise((resolve, reject) => {
-    waitOn({ resources: [`http://127.0.0.1:${port}`] }, (err) => {
-      if (err) reject(err);
+    waitOn({ resources: [`http://127.0.0.1:${port}`], timeout: TIMEOUT_MS }, (err) => {
+      if (err) reject(new Error(`Shiny did not become ready within ${TIMEOUT_MS / 1000}s: ${err.message}`));
       else resolve();
     });
   });

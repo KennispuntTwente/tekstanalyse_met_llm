@@ -93,7 +93,8 @@ for users who are not familiar with R or Docker.
 
 A pre-built desktop application for Windows 10/11 (x64) is
 available under [releases](https://github.com/KennispuntTwente/KWALLM/releases).
-This application contains all necessary dependencies and can be used directly.
+This application contains a portable R environment and Pandoc.
+On first launch, it will download a portable Python environment (~40 MB); an internet connection is required for this initial setup.
 
 1. Download the release (`kwallm-text-analysis-app-win32-x64-v<version>.zip`)
 
@@ -314,7 +315,8 @@ De applicatie kan ook gebruikt worden als desktop-applicatie. Dit kan handig zij
 voor gebruikers die niet bekend zijn met R of Docker.
 
 Onder [releases](https://github.com/KennispuntTwente/KWALLM/releases) is een pre-built desktop-applicatie beschikbaar voor Windows 10/11 (x64).
-Deze applicatie bevat alle benodigde dependencies en kan direct worden gebruikt.
+Deze applicatie bevat een draagbare R-omgeving en Pandoc.
+Bij de eerste keer opstarten wordt een draagbare Python-omgeving (~40 MB) gedownload; hiervoor is een internetverbinding nodig.
 
 1. Download de release (`kwallm-text-analysis-app-win32-x64-v<version>.zip`)
    
