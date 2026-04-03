@@ -51,6 +51,72 @@ test_that("prompt_candidate_topics respects language parameter", {
   expect_match(prompt_text, "Dutch")
 })
 
+test_that("create_candidate_topics supports progress and interruption", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  prompt_candidate_topics <- function(
+    text_chunk,
+    research_background = "",
+    language = c("nl", "en")
+  ) {
+    force(text_chunk)
+    force(research_background)
+    match.arg(language)
+    list(text_chunk = text_chunk)
+  }
+
+  interrupt_count <- 0
+  progress_events <- list()
+
+  send_prompt_with_retries <- function(prompt, llm_provider) {
+    force(llm_provider)
+    list(topics = paste0("topic:", prompt$text_chunk))
+  }
+
+  interrupter <- list(
+    execInterrupts = function() {
+      interrupt_count <<- interrupt_count + 1
+    }
+  )
+
+  result <- create_candidate_topics(
+    text_chunks = list(c("alpha"), c("beta", "gamma")),
+    research_background = "background",
+    llm_provider = create_test_provider(),
+    on_progress = function(i, n, chunk, chunk_result) {
+      progress_events[[length(progress_events) + 1]] <<- list(
+        i = i,
+        n = n,
+        chunk = chunk,
+        result = chunk_result
+      )
+    },
+    interrupter = interrupter
+  )
+
+  expect_equal(result, c("topic:alpha", "topic:beta", "topic:gamma"))
+  expect_equal(interrupt_count, 2)
+  expect_length(progress_events, 2)
+  expect_equal(
+    progress_events[[1]],
+    list(
+      i = 1,
+      n = 2,
+      chunk = c("alpha"),
+      result = c("topic:alpha")
+    )
+  )
+  expect_equal(
+    progress_events[[2]],
+    list(
+      i = 2,
+      n = 2,
+      chunk = c("beta", "gamma"),
+      result = c("topic:beta", "topic:gamma")
+    )
+  )
+})
+
 test_that("assign_topics supports progress, interruption, and early NA", {
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)

@@ -1,6 +1,7 @@
 library(testthat)
 library(shiny)
 
+source(here::here("R", "utils_create_text_chunks.R"), local = TRUE)
 source(here::here("R", "module_misc_context_window.R"), local = TRUE)
 
 # Minimal stubs used by this module (UI helpers + validators).

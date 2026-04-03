@@ -1,7 +1,7 @@
 library(testthat)
 
 # Source locally so we can stub count_tokens without loading reticulate/tiktoken.
-source(here::here("R", "module_misc_context_window.R"), local = TRUE)
+source(here::here("R", "utils_create_text_chunks.R"), local = TRUE)
 
 # Deterministic token counter for these tests.
 count_tokens <- function(x) {

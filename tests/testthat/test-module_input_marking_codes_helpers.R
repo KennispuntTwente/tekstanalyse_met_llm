@@ -1,7 +1,7 @@
 library(testthat)
 
 # Source locally so we can stub dependencies without loading the full app stack.
-source(here::here("R", "module_input_marking_codes.R"), local = TRUE)
+source(here::here("R", "analysis_code_generation.R"), local = TRUE)
 
 # ---- Stubs (avoid Python/LLM/network) -------------------------------------
 
@@ -49,18 +49,27 @@ create_candidate_topics <- function(
   text_chunks,
   research_background,
   llm_provider,
-  language = c("nl", "en")
+  language = c("nl", "en"),
+  on_progress = NULL,
+  interrupter = NULL
 ) {
   force(text_chunks)
   force(research_background)
   force(llm_provider)
   language <- match.arg(language)
+  force(interrupter)
 
-  if (language == "nl") {
+  result <- if (language == "nl") {
     c("Code 1", "Code 2")
   } else {
     c("Code 1", "Code 2")
   }
+
+  if (!is.null(on_progress)) {
+    on_progress(1, length(text_chunks), text_chunks[[1]], result)
+  }
+
+  result
 }
 
 reduce_topics <- function(

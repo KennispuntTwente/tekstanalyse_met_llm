@@ -19,6 +19,10 @@
 #' @param text_chunks A list of text chunks, where each chunk is a vector of texts
 #' @param research_background Background information about the research (optional)
 #' @param llm_provider A tidyprompt LLM provider object
+#' @param on_progress Optional callback function called after each processed
+#'   chunk as \code{on_progress(i, n, chunk, result)}.
+#' @param interrupter Optional object with \code{$execInterrupts()} method for
+#'   cancellation support.
 #'
 #' @return A character vector of candidate topics
 #' @export
@@ -26,7 +30,9 @@ create_candidate_topics <- function(
   text_chunks,
   research_background = "",
   llm_provider,
-  language = c("nl", "en")
+  language = c("nl", "en"),
+  on_progress = NULL,
+  interrupter = NULL
 ) {
   language <- match.arg(language)
   stopifnot(
@@ -37,7 +43,14 @@ create_candidate_topics <- function(
     length(research_background) == 1
   )
 
-  candidate_topics <- purrr::map(text_chunks, function(chunk) {
+  candidate_topics <- vector("list", length(text_chunks))
+
+  for (i in seq_along(text_chunks)) {
+    if (!is.null(interrupter)) {
+      interrupter$execInterrupts()
+    }
+
+    chunk <- text_chunks[[i]]
     # (A chunk is a vector of texts)
     # Create a prompt for the chunk; present texts to LLM,
     # ask to return a list of potential topics
@@ -49,8 +62,12 @@ create_candidate_topics <- function(
 
     result <- send_prompt_with_retries(prompt, llm_provider)
 
-    return(result$topics)
-  })
+    candidate_topics[[i]] <- result$topics
+
+    if (!is.null(on_progress)) {
+      on_progress(i, length(text_chunks), chunk, result$topics)
+    }
+  }
 
   candidate_topics <- candidate_topics |> purrr::flatten_chr()
 

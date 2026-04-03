@@ -500,30 +500,20 @@ processing_server <- function(
             )
 
             candidate_topics <- tryCatch(
-              {
-                results <- c()
-                for (i in seq_along(text_chunks)) {
-                  interrupter$execInterrupts()
-                  text_chunk <- text_chunks[[i]]
-
-                  result <- create_candidate_topics(
-                    list(text_chunk),
-                    research_background,
-                    llm_provider_main,
-                    language = lang$get_translation_language()
-                  )
-
+              create_candidate_topics(
+                text_chunks = text_chunks,
+                research_background = research_background,
+                llm_provider = llm_provider_main,
+                language = lang$get_translation_language(),
+                on_progress = function(i, n, chunk, result) {
                   progress_secondary$set_with_total(
                     i,
-                    length(text_chunks),
+                    n,
                     paste(result, collapse = ",")
                   )
-
-                  results <- c(results, result)
-                }
-
-                results
-              },
+                },
+                interrupter = interrupter
+              ),
               error = handle_detailed_error("Candidate topic generation")
             )
             progress_secondary$hide()
