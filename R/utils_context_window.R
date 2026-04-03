@@ -5,6 +5,24 @@ get_context_window_size_in_tokens <- function(model) {
   if (
     model %in%
       c(
+        "kwallm-fake-main-1024"
+      )
+  ) {
+    return(1024)
+  }
+
+  if (
+    model %in%
+      c(
+        "kwallm-fake-reducer-320"
+      )
+  ) {
+    return(320)
+  }
+
+  if (
+    model %in%
+      c(
         "gpt-4.1-mini-2025-04-14",
         "gpt-4.1-2025-04-14",
         "gpt-4.1",

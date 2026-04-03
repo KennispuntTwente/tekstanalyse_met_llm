@@ -78,31 +78,37 @@ if (!test_mode || test_async) {
 # - Note: LLM providers are configured with stream = TRUE by default
 #     (see R/module_config_llm_provider.R); this enables live streaming
 #     when writing paragraphs (see paragraph_streaming option below)
-preconfigured_models_main <- list(
-  tidyprompt::llm_provider_openai()$set_parameters(list(
-    model = "gpt-5-mini",
-    reasoning = list(
-      effort = "low"
-    )
-  )),
-  tidyprompt::llm_provider_openai()$set_parameters(list(
-    model = "gpt-4.1-mini"
-  )),
-  tidyprompt::llm_provider_openai()$set_parameters(list(
-    model = "gpt-4.1-nano"
-  ))
-)
-preconfigured_models_large <- list(
-  tidyprompt::llm_provider_openai()$set_parameters(list(
-    model = "gpt-4.1-mini"
-  )),
-  tidyprompt::llm_provider_openai()$set_parameters(list(
-    model = "gpt-4.1-nano"
-  )),
-  tidyprompt::llm_provider_openai()$set_parameters(list(
-    model = "o4-mini"
-  ))
-)
+if (kwallm_test_llm_enabled()) {
+  test_models <- kwallm_test_llm_models()
+  preconfigured_models_main <- test_models$main
+  preconfigured_models_large <- test_models$large
+} else {
+  preconfigured_models_main <- list(
+    tidyprompt::llm_provider_openai()$set_parameters(list(
+      model = "gpt-5-mini",
+      reasoning = list(
+        effort = "low"
+      )
+    )),
+    tidyprompt::llm_provider_openai()$set_parameters(list(
+      model = "gpt-4.1-mini"
+    )),
+    tidyprompt::llm_provider_openai()$set_parameters(list(
+      model = "gpt-4.1-nano"
+    ))
+  )
+  preconfigured_models_large <- list(
+    tidyprompt::llm_provider_openai()$set_parameters(list(
+      model = "gpt-4.1-mini"
+    )),
+    tidyprompt::llm_provider_openai()$set_parameters(list(
+      model = "gpt-4.1-nano"
+    )),
+    tidyprompt::llm_provider_openai()$set_parameters(list(
+      model = "o4-mini"
+    ))
+  )
+}
 
 
 ## 2.3 Other options -----------------------------------------------------------
@@ -189,7 +195,10 @@ options(
   #     see R/context_window.R
   topic_modelling__chunk_size_default = 25,
   topic_modelling__chunk_size_limit = 100,
-  topic_modelling__number_of_chunks_limit = 50,
+  topic_modelling__number_of_chunks_limit = getOption(
+    "topic_modelling__number_of_chunks_limit",
+    50
+  ),
   topic_modelling__draws_default = 1,
   topic_modelling__draws_limit = 5,
 
