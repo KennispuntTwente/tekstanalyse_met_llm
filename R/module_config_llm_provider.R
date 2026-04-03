@@ -27,9 +27,14 @@ llm_provider_server <- function(
 
       # Main card UI -----------------------------------------------------------
 
-      # Decide to render the card; only render if can at least configure Ollama or OpenAI
+      # Decide to render the card; render if there is a preconfigured provider
+      #   or if the user can configure at least one provider
       output$llm_provider_card <- renderUI({
-        req(isTRUE(can_configure_oai) || isTRUE(can_configure_ollama))
+        req(
+          isTRUE(has_preconfigured_llm_provider) ||
+            isTRUE(can_configure_oai) ||
+            isTRUE(can_configure_ollama)
+        )
 
         tagList(
           tags$style(HTML(

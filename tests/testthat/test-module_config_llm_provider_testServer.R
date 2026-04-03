@@ -199,6 +199,57 @@ test_that("llm_provider_server: switches modes and fetches Ollama models (mocked
 })
 
 
+test_that("llm_provider_server: preconfigured-only mode works when both can_configure flags are FALSE", {
+  library(bslib)
+
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+  source(here::here("R", "component_icon_button.R"), local = TRUE)
+  source(here::here("R", "component_card_header_with_tooltip.R"), local = TRUE)
+  source(here::here("R", "component_description_box.R"), local = TRUE)
+  source(here::here("R", "module_config_llm_provider.R"), local = TRUE)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      processing <- reactiveVal(FALSE)
+
+      llm_provider_rv <- llm_provider_server(
+        id = "llm_provider",
+        processing = processing,
+        has_preconfigured_llm_provider = TRUE,
+        can_configure_oai = FALSE,
+        can_configure_ollama = FALSE,
+        lang = lang
+      )
+
+      list(
+        lang = lang,
+        processing = processing,
+        llm_provider_rv = llm_provider_rv
+      )
+    },
+    {
+      # The card must render (not be hidden by the req guard).
+      rendered_card <- output$`llm_provider-llm_provider_card`$html
+      expect_true(
+        nchar(rendered_card) > 0,
+        info = "Provider card should render when preconfigured provider is available"
+      )
+
+      # Mode should default to preconfigured.
+      expect_equal(llm_provider_rv$provider_mode, "preconfigured")
+
+      # No configured provider in preconfigured mode (model module handles it).
+      expect_null(llm_provider_rv$llm_provider_configured)
+
+      # The mode description should be rendered.
+      rendered_desc <- output$`llm_provider-mode_description`$html
+      expect_true(nchar(rendered_desc) > 0)
+    }
+  )
+})
+
+
 test_that("llm_provider_server: env OPENAI_API_KEY is never rendered into the browser", {
   secret <- "sk-secret-test-key-do-not-leak-12345"
   withr::local_envvar(OPENAI_API_KEY = secret)
