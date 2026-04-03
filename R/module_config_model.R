@@ -454,7 +454,7 @@ model_server <- function(
         save_selection("main")
         update_json_mode_ui("main")
         update_temperature_ui(session, input, models, "main")
-        update_top_p_ui(session, input, models, "large")
+        update_top_p_ui(session, input, models, "main")
         main_provider_updated(Sys.time())
         log_action(
           "model_selected",
