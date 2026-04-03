@@ -119,11 +119,13 @@ test_that("text_upload_server: csv with by_column returns correct grouping value
       raw_texts <- upload_result$texts
       by_col_name <- upload_result$by_column_name
       by_col_values <- upload_result$by_column_values
+      by_col_lookup <- upload_result$by_column_lookup
 
       list(
         raw_texts = raw_texts,
         by_col_name = by_col_name,
         by_col_values = by_col_values,
+        by_col_lookup = by_col_lookup,
         lang = lang
       )
     },
@@ -166,6 +168,16 @@ test_that("text_upload_server: csv with by_column returns correct grouping value
 
       # Verify by_column_values aligned with texts
       expect_equal(by_col_values(), c("Group1", "Group1", "Group2"))
+
+      # Verify by_column_lookup is a data.frame with the full text-group mapping
+      expect_equal(
+        by_col_lookup(),
+        data.frame(
+          text = c("Text A", "Text B", "Text C"),
+          by_value = c("Group1", "Group1", "Group2"),
+          stringsAsFactors = FALSE
+        )
+      )
     }
   )
 })
@@ -186,11 +198,13 @@ test_that("text_upload_server: by_column is NULL when not selected", {
       raw_texts <- upload_result$texts
       by_col_name <- upload_result$by_column_name
       by_col_values <- upload_result$by_column_values
+      by_col_lookup <- upload_result$by_column_lookup
 
       list(
         raw_texts = raw_texts,
         by_col_name = by_col_name,
         by_col_values = by_col_values,
+        by_col_lookup = by_col_lookup,
         lang = lang
       )
     },
@@ -227,6 +241,7 @@ test_that("text_upload_server: by_column is NULL when not selected", {
       # Verify by_column is NULL
       expect_null(by_col_name())
       expect_null(by_col_values())
+      expect_null(by_col_lookup())
     }
   )
 })
@@ -247,11 +262,13 @@ test_that("text_upload_server: clearing by_column works", {
       raw_texts <- upload_result$texts
       by_col_name <- upload_result$by_column_name
       by_col_values <- upload_result$by_column_values
+      by_col_lookup <- upload_result$by_column_lookup
 
       list(
         raw_texts = raw_texts,
         by_col_name = by_col_name,
         by_col_values = by_col_values,
+        by_col_lookup = by_col_lookup,
         lang = lang
       )
     },
@@ -292,6 +309,7 @@ test_that("text_upload_server: clearing by_column works", {
       # Verify by_column is cleared
       expect_null(by_col_name())
       expect_null(by_col_values())
+      expect_null(by_col_lookup())
     }
   )
 })
@@ -312,11 +330,13 @@ test_that("text_upload_server: reuploading the same xlsx file refreshes sheet-ba
       raw_texts <- upload_result$texts
       by_col_name <- upload_result$by_column_name
       by_col_values <- upload_result$by_column_values
+      by_col_lookup <- upload_result$by_column_lookup
 
       list(
         raw_texts = raw_texts,
         by_col_name = by_col_name,
-        by_col_values = by_col_values
+        by_col_values = by_col_values,
+        by_col_lookup = by_col_lookup
       )
     },
     {
@@ -350,6 +370,14 @@ test_that("text_upload_server: reuploading the same xlsx file refreshes sheet-ba
       expect_equal(sort(raw_texts()), sort(first_data$text))
       expect_equal(by_col_name(), "group")
       expect_equal(by_col_values(), first_data$group)
+      expect_equal(
+        by_col_lookup(),
+        data.frame(
+          text = first_data$text,
+          by_value = first_data$group,
+          stringsAsFactors = FALSE
+        )
+      )
 
       writexl::write_xlsx(list(Sheet1 = second_data), path)
 
@@ -365,6 +393,14 @@ test_that("text_upload_server: reuploading the same xlsx file refreshes sheet-ba
       expect_equal(sort(raw_texts()), sort(second_data$text))
       expect_equal(by_col_name(), "group")
       expect_equal(by_col_values(), second_data$group)
+      expect_equal(
+        by_col_lookup(),
+        data.frame(
+          text = second_data$text,
+          by_value = second_data$group,
+          stringsAsFactors = FALSE
+        )
+      )
     }
   )
 })
