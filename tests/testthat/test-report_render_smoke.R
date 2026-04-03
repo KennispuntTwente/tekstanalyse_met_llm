@@ -147,3 +147,84 @@ test_that("report templates render (smoke)", {
     }
   })
 })
+
+
+test_that("Categorisatie report renders with by_column_* set", {
+  testthat::skip_if_not_installed("rmarkdown")
+  testthat::skip_if_not_installed("knitr")
+  testthat::skip_if_not_installed("here")
+  testthat::skip_if_not_installed("htmltools")
+  testthat::skip_if_not_installed("bslib")
+  testthat::skip_if_not_installed("DT")
+  testthat::skip_if_not_installed("dplyr")
+  testthat::skip_if_not_installed("tidyr")
+  testthat::skip_if_not_installed("stringr")
+  testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+
+  irr_kappa <- list(
+    subjects = 10,
+    raters = 2,
+    irr.name = "Kappa",
+    stat.name = "z",
+    statistic = 1.0,
+    p.value = 0.5,
+    value = 0.4
+  )
+
+  result_list <- list(
+    df = data.frame(
+      text = c("Text 1", "Text 2", "Text 3"),
+      result = c("A", "B", "A"),
+      stringsAsFactors = FALSE
+    ),
+    categories = c("A", "B"),
+    model = "test-model",
+    assign_multiple_categories = FALSE,
+    research_background = "",
+    irr = irr_kappa,
+    paragraphs = NULL,
+    by_column_name = "group",
+    by_column_values = c("G1", "G1", "G2")
+  )
+
+  out_dir <- withr::local_tempdir()
+
+  report_paths <- list.files(
+    here::here("R"),
+    pattern = "^report_Categorisatie_.*\\.Rmd$",
+    full.names = TRUE
+  )
+  expect_true(length(report_paths) > 0)
+
+  withr::with_dir(here::here(), {
+    for (report_path in report_paths) {
+      out_file <- file.path(
+        out_dir,
+        paste0(tools::file_path_sans_ext(basename(report_path)), ".html")
+      )
+
+      res <- try(
+        rmarkdown::render(
+          input = report_path,
+          output_file = out_file,
+          params = list(result_list = result_list),
+          quiet = TRUE,
+          envir = new.env(parent = globalenv())
+        ),
+        silent = TRUE
+      )
+
+      if (inherits(res, "try-error")) {
+        stop(paste0(
+          "Render with by_column failed for ",
+          basename(report_path),
+          ": ",
+          as.character(res)
+        ))
+      }
+
+      expect_true(file.exists(out_file))
+      expect_true(file.info(out_file)$size > 0)
+    }
+  })
+})

@@ -322,7 +322,12 @@ text_upload_server <- function(
       text_vals <- df[[text_col]]
       by_vals <- df[[by_col]]
       keep <- !is.na(text_vals) & stringr::str_trim(text_vals) != ""
-      by_column_values(by_vals[keep])
+      # Align with discard_empty(): unique() keeps the first occurrence
+      # of each text, so drop subsequent duplicates here as well.
+      text_kept <- text_vals[keep]
+      by_kept <- by_vals[keep]
+      first_occurrence <- !duplicated(text_kept)
+      by_column_values(by_kept[first_occurrence])
       invisible(NULL)
     }
 

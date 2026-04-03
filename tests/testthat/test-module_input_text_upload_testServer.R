@@ -368,3 +368,66 @@ test_that("text_upload_server: reuploading the same xlsx file refreshes sheet-ba
     }
   )
 })
+
+
+test_that("text_upload_server: duplicate texts get by_column_values aligned after dedup", {
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("en")
+      processing <- reactiveVal(FALSE)
+
+      upload_result <- text_upload_server(
+        id = "text_upload",
+        processing = processing,
+        lang = lang
+      )
+
+      raw_texts <- upload_result$texts
+      by_col_name <- upload_result$by_column_name
+      by_col_values <- upload_result$by_column_values
+
+      list(
+        raw_texts = raw_texts,
+        by_col_name = by_col_name,
+        by_col_values = by_col_values,
+        lang = lang
+      )
+    },
+    {
+      # CSV with a duplicated text in two different groups
+      path <- withr::local_tempfile(fileext = ".csv")
+      vroom::vroom_write(
+        data.frame(
+          text = c("Text A", "Text A", "Text B"),
+          group = c("Group1", "Group2", "Group2"),
+          stringsAsFactors = FALSE
+        ),
+        path,
+        delim = ","
+      )
+
+      session$setInputs(
+        `text_upload-text_file` = make_fileinput_df(
+          path,
+          "data.csv",
+          "text/csv"
+        )
+      )
+      session$flushReact()
+
+      session$setInputs(`text_upload-column` = "text")
+      session$flushReact()
+
+      session$setInputs(`text_upload-by_column` = "group")
+      session$flushReact()
+
+      # discard_empty() applies unique() -> 2 unique texts
+      expect_equal(length(raw_texts()), 2)
+      expect_equal(sort(raw_texts()), sort(c("Text A", "Text B")))
+
+      # by_column_values must be same length as raw_texts (first occurrence kept)
+      expect_equal(length(by_col_values()), length(raw_texts()))
+      expect_equal(by_col_values(), c("Group1", "Group2"))
+    }
+  )
+})
