@@ -197,3 +197,63 @@ test_that("llm_provider_server: switches modes and fetches Ollama models (mocked
     }
   )
 })
+
+
+test_that("llm_provider_server: env OPENAI_API_KEY is never rendered into the browser", {
+  secret <- "sk-secret-test-key-do-not-leak-12345"
+  withr::local_envvar(OPENAI_API_KEY = secret)
+
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+  source(here::here("R", "component_icon_button.R"), local = TRUE)
+  source(here::here("R", "component_card_header_with_tooltip.R"), local = TRUE)
+  source(here::here("R", "component_description_box.R"), local = TRUE)
+  source(here::here("R", "module_config_llm_provider.R"), local = TRUE)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      processing <- reactiveVal(FALSE)
+
+      llm_provider_rv <- llm_provider_server(
+        id = "llm_provider",
+        processing = processing,
+        has_preconfigured_llm_provider = TRUE,
+        can_configure_oai = TRUE,
+        can_configure_ollama = TRUE,
+        lang = lang
+      )
+
+      list(
+        lang = lang,
+        processing = processing,
+        llm_provider_rv = llm_provider_rv
+      )
+    },
+    {
+      # Switch to OpenAI mode to trigger the API key input renderUI.
+      session$setInputs(`llm_provider-select_openai` = 1)
+      session$flushReact()
+
+      # The env key must be active server-side (provider is configured).
+      expect_true(!is.null(llm_provider_rv$llm_provider_configured))
+
+      # Rendered HTML must NOT contain the secret.
+      rendered_html <- output$`llm_provider-api_key_input`$html
+      expect_false(
+        grepl(secret, rendered_html, fixed = TRUE),
+        info = "Server-side OPENAI_API_KEY must never appear in browser HTML"
+      )
+
+      # The placeholder should hint that an env key is present.
+      expect_true(
+        grepl("env", rendered_html, fixed = TRUE),
+        info = "Placeholder should indicate an env key is configured"
+      )
+
+      # A user-entered key should override the env key.
+      session$setInputs(`llm_provider-api_key_text` = "user-provided-key")
+      session$flushReact()
+      expect_true(!is.null(llm_provider_rv$llm_provider_configured))
+    }
+  )
+})

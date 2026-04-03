@@ -381,12 +381,22 @@ llm_provider_server <- function(
 
       # API key  ---------------------------------------------------------------
 
-      initial_api_key <- Sys.getenv("OPENAI_API_KEY")
-      api_key_input <- reactiveVal(initial_api_key)
-      prev_api_key_has_value <- reactiveVal(nchar(initial_api_key %||% "") > 0)
+      env_api_key <- Sys.getenv("OPENAI_API_KEY")
+      # Server-side effective key; never rendered into the browser DOM.
+      api_key_input <- reactiveVal(env_api_key)
+      prev_api_key_has_value <- reactiveVal(nchar(env_api_key %||% "") > 0)
+
+      # Track whether the user has explicitly entered a key so the initial
+      # empty-string from the rendered input does not overwrite the env var.
+      user_entered_api_key <- reactiveVal(FALSE)
 
       # Reactively update API key (updating URLs only when 'get models' is clicked)
-      observeEvent(input$api_key_text, api_key_input(input$api_key_text))
+      observeEvent(input$api_key_text, {
+        if (user_entered_api_key() || nchar(input$api_key_text %||% "") > 0) {
+          user_entered_api_key(TRUE)
+          api_key_input(input$api_key_text)
+        }
+      })
 
       # Log set/cleared transitions (avoid per-keystroke logging)
       observeEvent(
@@ -447,7 +457,12 @@ llm_provider_server <- function(
                   id = ns_api,
                   type = "password",
                   class = "form-control",
-                  value = api_key_input(),
+                  value = "",
+                  placeholder = if (nchar(env_api_key) > 0) {
+                    "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (env)"
+                  } else {
+                    ""
+                  },
                   style = "width: 100%;" # Ensure full width inside the input group
                 ),
                 tags$button(
