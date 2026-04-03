@@ -25,7 +25,7 @@ This repo is a Shiny app (R) with an Electron desktop wrapper and Docker image. 
 ## Async, errors, and testing
 - Async: Long-running steps use `mirai::mirai()` (see `R/module_core_processing.R`); daemons are configured via `mirai::daemons()` in entry points. Progress is written via `component_progress_bar.R`/`progress_bar_server(...).$async`, and cancellation is guarded by `ipc::AsyncInterruptor`.
 - Error handling: Wrap expensive work in `tryCatch(...)` and surface issues with `app_error(...)` / `handle_detailed_error()` helpers in `R/utils_*` instead of `stop()`; keep the Shiny session responsive.
-- Tests: `tests/testthat/test-shinytest2.R` drives full flows with {shinytest2}. Tests expect an OpenAI-compatible endpoint that answers `/models` and exposes a model id like `gpt-4.1-nano-2025-04-14`. Use `shiny::exportTestValues` when adding new critical reactives.
+- Tests: `tests/testthat/test-e2e-*.R` drive full end-to-end flows with {shinytest2}. Tests expect an OpenAI-compatible endpoint that answers `/models` and exposes a model id like `gpt-4.1-nano-2025-04-14`. Use `shiny::exportTestValues` when adding new critical reactives.
 
 ## Python integration (via `reticulate`)
 - Tokenization: `R/utils_tokenizer.R` (or `R/tokenizer.R` in older branches) loads Python `tiktoken` via `reticulate` and a uv-managed venv (`reticulate:::uv_exec('sync')`, `reticulate::use_virtualenv('./.venv')`). Keep all Python deps declared in `pyproject.toml`.

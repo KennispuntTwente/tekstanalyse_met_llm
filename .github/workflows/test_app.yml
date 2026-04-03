@@ -1,6 +1,6 @@
 name: (0) Test app
 
-# This workflow runs the 'shinytest2' tests as defined in tests/testthat/test-shinytest2.R
+# This workflow runs the shinytest2 end-to-end tests (tests/testthat/test-e2e-*.R)
 # These tests verify that basic procedures in the app function
 # Workflow derived from https://github.com/rstudio/shinytest2/tree/main/actions/test-app/example-test-app-description.yaml
 

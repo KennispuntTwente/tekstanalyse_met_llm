@@ -66,10 +66,11 @@ if (!test_mode || test_async) {
 # - Note: your system may need to have the relevant environment variables set
 #     for the LLM provider to work, e.g., `OPENAI_API_KEY` for OpenAI
 # - Note: currently, context window size for models is hardcoded
-#     in function `get_context_window_size_in_tokens` in R/context_window.R
+#     in function `get_context_window_size_in_tokens` in R/utils_context_window.R
 #   You may want to replace this function with a more dynamic one,
 #     or add your own hardcoded values for the models you use
-#     The function will default to 2048 if a model is not recognised
+#     The function will return NULL if a model is not recognised;
+#     the context window module then falls back to 2048
 # - Note: if you make the 'preconfigured_models_...' object a named list,
 #     the names will be shown in the dropdown for the user. If you do not provide names,
 #     the model names will be shown. Names must be unique. If you want to use
@@ -192,7 +193,7 @@ options(
   #     see R/topic_modelling.R
   topic_modelling__always_add_not_applicable = TRUE,
   # - Parameters for text chunking;
-  #     see R/context_window.R
+  #     see R/module_misc_context_window.R
   topic_modelling__chunk_size_default = 25,
   topic_modelling__chunk_size_limit = 100,
   topic_modelling__number_of_chunks_limit = getOption(
