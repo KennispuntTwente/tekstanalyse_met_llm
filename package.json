@@ -14,7 +14,7 @@
   },
   "devDependencies": {
     "@electron/packager": "^18.3.6",
-    "electron": "^28.3.3"
+    "electron": "^41.1.1"
   },
   "dependencies": {
     "axios": "^1.9.0",
