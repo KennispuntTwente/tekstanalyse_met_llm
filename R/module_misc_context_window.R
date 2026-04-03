@@ -218,7 +218,7 @@ context_window_server <- function(
       observe({
         req(models$main)
         size <- get_context_window_size_in_tokens(models$main$parameters$model)
-        context_window_known <- is.null(size)
+        context_window_known <- !is.null(size)
 
         size <- ifelse(
           is.null(size),

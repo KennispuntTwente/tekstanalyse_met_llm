@@ -20,3 +20,15 @@ test_that("get_context_window_size_in_tokens: known models map to expected sizes
 test_that("get_context_window_size_in_tokens: unknown models return NULL", {
   expect_null(get_context_window_size_in_tokens("some-unknown-model"))
 })
+
+
+test_that("context_window_known logic: TRUE for known models, FALSE for unknown", {
+  # This mirrors the logic in module_misc_context_window.R:
+
+  #   context_window_known <- !is.null(size)
+  known_size <- get_context_window_size_in_tokens("gpt-4o-mini")
+  expect_true(!is.null(known_size)) # context_window_known should be TRUE
+
+  unknown_size <- get_context_window_size_in_tokens("some-unknown-model")
+  expect_false(!is.null(unknown_size)) # context_window_known should be FALSE
+})
