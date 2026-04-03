@@ -177,16 +177,6 @@ analysis_async_categorization_globals <- function(env = parent.frame()) {
 }
 
 
-#' Globals shared by async paragraph-writing workers
-#'
-#' @return Named list for `mirai::mirai(..., .args = ...)`.
-analysis_async_paragraph_globals <- function(env = parent.frame()) {
-  list(
-    write_paragraph = get("write_paragraph", envir = env, inherits = TRUE)
-  )
-}
-
-
 #' Globals shared by async worker helpers in processing flows
 #'
 #' Used by async workers in `module_core_processing` so they can call the small
@@ -195,11 +185,6 @@ analysis_async_paragraph_globals <- function(env = parent.frame()) {
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
 analysis_async_processing_globals <- function(env = parent.frame()) {
   list(
-    expand_multi_label_results = get(
-      "expand_multi_label_results",
-      envir = env,
-      inherits = TRUE
-    ),
     collect_grouped_texts = get(
       "collect_grouped_texts",
       envir = env,
@@ -207,6 +192,11 @@ analysis_async_processing_globals <- function(env = parent.frame()) {
     ),
     write_grouped_paragraphs = get(
       "write_grouped_paragraphs",
+      envir = env,
+      inherits = TRUE
+    ),
+    write_paragraph = get(
+      "write_paragraph",
       envir = env,
       inherits = TRUE
     )

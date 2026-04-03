@@ -379,10 +379,6 @@ processing_server <- function(
               )
             }
 
-            if (mode == "Categorisatie" && assign_multiple_categories) {
-              results <- expand_multi_label_results(results, categories)
-            }
-
             # If categorization, write paragraphs
             if (mode == "Categorisatie" && write_paragraphs) {
               paragraphs <- tryCatch(
@@ -698,10 +694,6 @@ processing_server <- function(
                 )
                 progress_secondary$hide()
 
-                if (assign_multiple_categories) {
-                  results <- expand_multi_label_results(results, topics)
-                }
-
                 results
               },
               error = handle_detailed_error("Topic assignment")
@@ -767,7 +759,6 @@ processing_server <- function(
                 isTRUE(models$main$parameters$stream)
             ),
             analysis_async_topic_modelling_globals(),
-            analysis_async_paragraph_globals(),
             analysis_async_worker_setup_globals(),
             analysis_async_processing_globals(),
             analysis_async_tokenizer_globals(),

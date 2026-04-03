@@ -74,7 +74,6 @@ test_that("analysis async globals helpers expose the expected names", {
     "tiktoken_load_tokenizer",
     "count_tokens",
     "async_message_printer",
-    "expand_multi_label_results",
     "collect_grouped_texts",
     "write_grouped_paragraphs",
     "mark_texts",
@@ -122,9 +121,9 @@ test_that("analysis async globals helpers expose the expected names", {
   expect_named(
     analysis_async_processing_globals(),
     c(
-      "expand_multi_label_results",
       "collect_grouped_texts",
-      "write_grouped_paragraphs"
+      "write_grouped_paragraphs",
+      "write_paragraph"
     )
   )
 

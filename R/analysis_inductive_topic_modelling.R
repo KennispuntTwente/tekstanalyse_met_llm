@@ -581,7 +581,30 @@ assign_topics <- function(
       on_progress(i, n, text)
     }
 
-    if (is.na(result)) break
+    if (length(result) == 1 && is.na(result)) break
+  }
+
+  if (assign_multiple_categories) {
+    results_df <- data.frame(
+      text = texts,
+      stringsAsFactors = FALSE
+    )
+    normalized_results <- purrr::map(results, function(x) {
+      if (length(x) == 1 && is.na(x)) {
+        return(NA_character_)
+      }
+
+      as.character(x)
+    })
+
+    for (topic in topics) {
+      results_df[[topic]] <- purrr::map_lgl(
+        normalized_results,
+        ~ if (length(.x) == 1 && is.na(.x)) NA else topic %in% .x
+      )
+    }
+
+    return(results_df)
   }
 
   results <- unlist(results)

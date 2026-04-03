@@ -117,7 +117,38 @@ test_that("create_candidate_topics supports progress and interruption", {
   )
 })
 
+test_that("assign_topics returns binary columns for multi-label output", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  send_prompt_with_retries <- function(prompt, llm_provider) {
+    force(llm_provider)
+
+    if (
+      grepl("text a", tidyprompt::construct_prompt_text(prompt), fixed = TRUE)
+    ) {
+      return("Topic A")
+    }
+
+    c("Topic A", "Topic B")
+  }
+
+  result <- assign_topics(
+    texts = c("text a", "text b"),
+    topics = c("Topic A", "Topic B"),
+    llm_provider = create_test_provider(),
+    assign_multiple_categories = TRUE
+  )
+
+  expect_false("result" %in% names(result))
+  expect_identical(result$text, c("text a", "text b"))
+  expect_identical(result[["Topic A"]], c(TRUE, TRUE))
+  expect_identical(result[["Topic B"]], c(FALSE, TRUE))
+})
+
 test_that("assign_topics supports progress, interruption, and early NA", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 

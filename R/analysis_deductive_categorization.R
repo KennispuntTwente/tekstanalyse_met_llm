@@ -194,9 +194,7 @@ prompt_multi_category <- function(
           }
         }
 
-        return(
-          jsonlite::toJSON(categories_selected, auto_unbox = FALSE)
-        )
+        return(categories_selected)
       }
     )
 
@@ -222,9 +220,10 @@ prompt_multi_category <- function(
 #' @param interrupter Optional object with \code{$execInterrupts()} method for
 #'   cancellation support (e.g., \code{ipc::AsyncInterruptor})
 #'
-#' @return A data.frame with columns \code{text} and \code{result}.
-#'   When \code{assign_multiple_categories = TRUE}, \code{result} contains
-#'   JSON array strings of selected categories.
+#' @return A data.frame with column \code{text}. When
+#'   \code{assign_multiple_categories = FALSE}, the result also contains a
+#'   single \code{result} column. When \code{assign_multiple_categories = TRUE},
+#'   the result contains one logical column per category.
 #' @export
 categorize_texts <- function(
   texts,
@@ -287,7 +286,30 @@ categorize_texts <- function(
       on_progress(i, n, text)
     }
 
-    if (is.na(result)) break
+    if (length(result) == 1 && is.na(result)) break
+  }
+
+  if (assign_multiple_categories) {
+    results_df <- data.frame(
+      text = texts,
+      stringsAsFactors = FALSE
+    )
+    normalized_results <- purrr::map(results, function(x) {
+      if (length(x) == 1 && is.na(x)) {
+        return(NA_character_)
+      }
+
+      as.character(x)
+    })
+
+    for (category in categories) {
+      results_df[[category]] <- purrr::map_lgl(
+        normalized_results,
+        ~ if (length(.x) == 1 && is.na(.x)) NA else category %in% .x
+      )
+    }
+
+    return(results_df)
   }
 
   results <- unlist(results)

@@ -135,7 +135,38 @@ test_that("prompt_multi_category includes exclusive category annotation", {
   expect_match(prompt_text, "unclear")
 })
 
+test_that("categorize_texts returns binary columns for multi-label output", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  send_prompt_with_retries <- function(prompt, llm_provider) {
+    force(prompt)
+    force(llm_provider)
+
+    if (
+      grepl("text a", tidyprompt::construct_prompt_text(prompt), fixed = TRUE)
+    ) {
+      return("cat1")
+    }
+
+    c("cat1", "cat2")
+  }
+
+  result <- categorize_texts(
+    texts = c("text a", "text b"),
+    categories = c("cat1", "cat2"),
+    llm_provider = create_test_provider(),
+    assign_multiple_categories = TRUE
+  )
+
+  expect_false("result" %in% names(result))
+  expect_identical(result$text, c("text a", "text b"))
+  expect_identical(result$cat1, c(TRUE, TRUE))
+  expect_identical(result$cat2, c(FALSE, TRUE))
+})
+
 test_that("categorize_texts supports progress, interruption, and early NA", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
 
   call_count <- 0

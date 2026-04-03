@@ -1,18 +1,3 @@
-test_that("expand_multi_label_results converts JSON arrays into binary columns", {
-  results <- data.frame(
-    text = c("a", "b"),
-    result = c("[\"x\"]", "[\"x\", \"y\"]"),
-    stringsAsFactors = FALSE
-  )
-
-  expanded <- expand_multi_label_results(results, c("x", "y"))
-
-  expect_false("result" %in% names(expanded))
-  expect_identical(expanded$x, c(TRUE, TRUE))
-  expect_identical(expanded$y, c(FALSE, TRUE))
-})
-
-
 test_that("collect_grouped_texts groups by result or binary columns", {
   single_results <- data.frame(
     text = c("a", "b", "c"),

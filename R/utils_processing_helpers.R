@@ -12,41 +12,6 @@ processing_mode_supports_report <- function(mode) {
   mode %in% c("Categorisatie", "Scoren", "Onderwerpextractie", "Markeren")
 }
 
-
-#' Expand multi-label JSON results into binary columns
-#'
-#' Used in async categorization and topic-assignment workers.
-#' It converts the JSON array returned by the model into one logical column per
-#' label so the rest of the processing flow can work with regular data frames.
-#'
-#' @param results Data frame with at least `text` and `result` columns.
-#'   `result` must contain JSON arrays encoded as character strings.
-#' @param labels Character vector with the labels that should become columns.
-#'
-#' @return A data frame where `result` is replaced by one logical column per
-#'   label.
-expand_multi_label_results <- function(results, labels) {
-  stopifnot(is.data.frame(results), is.character(labels))
-
-  results <- results |>
-    dplyr::mutate(
-      result = purrr::map(result, jsonlite::fromJSON)
-    )
-
-  expanded <- results |>
-    dplyr::select(-result)
-
-  for (label in labels) {
-    expanded[[label]] <- purrr::map_lgl(
-      results$result,
-      ~ label %in% .x
-    )
-  }
-
-  expanded
-}
-
-
 #' Collect texts per label from processing results
 #'
 #' Used before paragraph writing in `module_core_processing`.

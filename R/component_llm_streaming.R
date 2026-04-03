@@ -195,49 +195,7 @@ AsyncStreamController <- R6::R6Class(
   )
 )
 
-
-# 4 Streaming Callback Factory --------------------------------------------
-
-#' Create a streaming callback for tidyprompt providers
-#'
-#' Creates a callback function compatible with tidyprompt's stream_callback
-#' parameter. The callback sends streaming tokens to a Shiny reactive via
-#' an ipc::shinyQueue.
-#'
-#' @param queue An ipc::shinyQueue object for async communication
-#' @param mode One of "token" (append each token) or "partial" (replace with partial response)
-#'
-#' @return A function suitable for use as stream_callback in a tidyprompt provider
-#' @export
-create_stream_callback <- function(queue, mode = c("partial", "token")) {
-  mode <- match.arg(mode)
-
-  function(token, meta) {
-    if (mode == "partial") {
-      # Replace entire text with accumulated partial response
-      try(queue$producer$fireAssignReactive(
-        "stream_text",
-        meta$partial_response %||% ""
-      ))
-    } else {
-      # Append just the new token (less reliable due to queue timing)
-      current_text <- ""
-      try({
-        current_text <- queue$producer$fireEval({
-          stream_text()
-        })
-      })
-      try(queue$producer$fireAssignReactive(
-        "stream_text",
-        paste0(current_text, token)
-      ))
-    }
-    invisible(TRUE)
-  }
-}
-
-
-# 5 Example/development usage ---------------------------------------------
+# 4 Example/development usage ---------------------------------------------
 
 if (FALSE) {
   library(shiny)
