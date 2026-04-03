@@ -436,6 +436,7 @@ processing_server <- function(
                 isTRUE(models$main$parameters$stream)
             ),
             analysis_async_categorization_globals(),
+            analysis_async_worker_setup_globals(),
             analysis_async_processing_globals(),
             analysis_async_tokenizer_globals(),
             log_async_globals(log_ctx),
@@ -777,6 +778,7 @@ processing_server <- function(
             ),
             analysis_async_topic_modelling_globals(),
             analysis_async_paragraph_globals(),
+            analysis_async_worker_setup_globals(),
             analysis_async_processing_globals(),
             analysis_async_tokenizer_globals(),
             log_async_globals(log_ctx)
@@ -898,6 +900,7 @@ processing_server <- function(
                 isTRUE(models$main$parameters$stream)
             ),
             analysis_async_marking_globals(),
+            analysis_async_worker_setup_globals(),
             analysis_async_tokenizer_globals(),
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals()

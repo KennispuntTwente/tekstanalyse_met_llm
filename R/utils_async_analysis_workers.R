@@ -142,17 +142,37 @@ analysis_async_tokenizer_globals <- function() {
 }
 
 
+#' Globals shared by async worker setup helpers
+#'
+#' @param env Environment used to resolve helper bindings.
+#'
+#' @return Named list for `mirai::mirai(..., .args = ...)`.
+analysis_async_worker_setup_globals <- function(env = parent.frame()) {
+  list(
+    prepare_async_analysis_worker = get(
+      "prepare_async_analysis_worker",
+      envir = env,
+      inherits = TRUE
+    )
+  )
+}
+
+
 #' Globals shared by async categorization/scoring workers
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
-analysis_async_categorization_globals <- function() {
+analysis_async_categorization_globals <- function(env = parent.frame()) {
   list(
-    categorize_texts = categorize_texts,
-    score_texts = score_texts,
-    prompt_category = prompt_category,
-    prompt_multi_category = prompt_multi_category,
-    prompt_score = prompt_score,
-    write_paragraph = write_paragraph
+    categorize_texts = get("categorize_texts", envir = env, inherits = TRUE),
+    score_texts = get("score_texts", envir = env, inherits = TRUE),
+    prompt_category = get("prompt_category", envir = env, inherits = TRUE),
+    prompt_multi_category = get(
+      "prompt_multi_category",
+      envir = env,
+      inherits = TRUE
+    ),
+    prompt_score = get("prompt_score", envir = env, inherits = TRUE),
+    write_paragraph = get("write_paragraph", envir = env, inherits = TRUE)
   )
 }
 
@@ -160,9 +180,9 @@ analysis_async_categorization_globals <- function() {
 #' Globals shared by async paragraph-writing workers
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
-analysis_async_paragraph_globals <- function() {
+analysis_async_paragraph_globals <- function(env = parent.frame()) {
   list(
-    write_paragraph = write_paragraph
+    write_paragraph = get("write_paragraph", envir = env, inherits = TRUE)
   )
 }
 
@@ -173,11 +193,23 @@ analysis_async_paragraph_globals <- function() {
 #' helper functions that keep the worker bodies readable.
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
-analysis_async_processing_globals <- function() {
+analysis_async_processing_globals <- function(env = parent.frame()) {
   list(
-    expand_multi_label_results = expand_multi_label_results,
-    collect_grouped_texts = collect_grouped_texts,
-    write_grouped_paragraphs = write_grouped_paragraphs
+    expand_multi_label_results = get(
+      "expand_multi_label_results",
+      envir = env,
+      inherits = TRUE
+    ),
+    collect_grouped_texts = get(
+      "collect_grouped_texts",
+      envir = env,
+      inherits = TRUE
+    ),
+    write_grouped_paragraphs = get(
+      "write_grouped_paragraphs",
+      envir = env,
+      inherits = TRUE
+    )
   )
 }
 
@@ -185,14 +217,26 @@ analysis_async_processing_globals <- function() {
 #' Globals shared by async topic-modelling workers
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
-analysis_async_topic_modelling_globals <- function() {
+analysis_async_topic_modelling_globals <- function(env = parent.frame()) {
   list(
-    create_candidate_topics = create_candidate_topics,
-    prompt_candidate_topics = prompt_candidate_topics,
-    reduce_topics = reduce_topics,
-    assign_topics = assign_topics,
-    prompt_category = prompt_category,
-    prompt_multi_category = prompt_multi_category
+    create_candidate_topics = get(
+      "create_candidate_topics",
+      envir = env,
+      inherits = TRUE
+    ),
+    prompt_candidate_topics = get(
+      "prompt_candidate_topics",
+      envir = env,
+      inherits = TRUE
+    ),
+    reduce_topics = get("reduce_topics", envir = env, inherits = TRUE),
+    assign_topics = get("assign_topics", envir = env, inherits = TRUE),
+    prompt_category = get("prompt_category", envir = env, inherits = TRUE),
+    prompt_multi_category = get(
+      "prompt_multi_category",
+      envir = env,
+      inherits = TRUE
+    )
   )
 }
 
@@ -200,9 +244,9 @@ analysis_async_topic_modelling_globals <- function() {
 #' Globals shared by async topic-reduction workers
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
-analysis_async_topic_reduction_globals <- function() {
+analysis_async_topic_reduction_globals <- function(env = parent.frame()) {
   list(
-    reduce_topics = reduce_topics
+    reduce_topics = get("reduce_topics", envir = env, inherits = TRUE)
   )
 }
 
@@ -210,17 +254,29 @@ analysis_async_topic_reduction_globals <- function() {
 #' Globals shared by async marking workers
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
-analysis_async_marking_globals <- function() {
+analysis_async_marking_globals <- function(env = parent.frame()) {
   list(
-    mark_texts = mark_texts,
-    mark_text_prompt = mark_text_prompt,
-    semchunk_load_chunker = semchunk_load_chunker,
-    write_paragraph = write_paragraph,
-    find_matches = find_matches,
-    normalize_with_map = normalize_with_map,
-    best_literal_substring = best_literal_substring,
-    fuzzy_threshold = fuzzy_threshold,
-    normalize_for_dist = normalize_for_dist
+    mark_texts = get("mark_texts", envir = env, inherits = TRUE),
+    mark_text_prompt = get("mark_text_prompt", envir = env, inherits = TRUE),
+    semchunk_load_chunker = get(
+      "semchunk_load_chunker",
+      envir = env,
+      inherits = TRUE
+    ),
+    write_paragraph = get("write_paragraph", envir = env, inherits = TRUE),
+    find_matches = get("find_matches", envir = env, inherits = TRUE),
+    normalize_with_map = get(
+      "normalize_with_map",
+      envir = env,
+      inherits = TRUE
+    ),
+    best_literal_substring = get(
+      "best_literal_substring",
+      envir = env,
+      inherits = TRUE
+    ),
+    fuzzy_threshold = get("fuzzy_threshold", envir = env, inherits = TRUE),
+    normalize_for_dist = get("normalize_for_dist", envir = env, inherits = TRUE)
   )
 }
 
@@ -228,13 +284,33 @@ analysis_async_marking_globals <- function() {
 #' Globals shared by async code-generation workers
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
-analysis_async_code_generation_globals <- function() {
+analysis_async_code_generation_globals <- function(env = parent.frame()) {
   list(
-    generate_codes_by_reading_texts = generate_codes_by_reading_texts,
-    create_text_chunks = create_text_chunks,
-    create_candidate_topics = create_candidate_topics,
-    prompt_candidate_topics = prompt_candidate_topics,
-    reduce_topics = reduce_topics,
-    semchunk_load_chunker = semchunk_load_chunker
+    generate_codes_by_reading_texts = get(
+      "generate_codes_by_reading_texts",
+      envir = env,
+      inherits = TRUE
+    ),
+    create_text_chunks = get(
+      "create_text_chunks",
+      envir = env,
+      inherits = TRUE
+    ),
+    create_candidate_topics = get(
+      "create_candidate_topics",
+      envir = env,
+      inherits = TRUE
+    ),
+    prompt_candidate_topics = get(
+      "prompt_candidate_topics",
+      envir = env,
+      inherits = TRUE
+    ),
+    reduce_topics = get("reduce_topics", envir = env, inherits = TRUE),
+    semchunk_load_chunker = get(
+      "semchunk_load_chunker",
+      envir = env,
+      inherits = TRUE
+    )
   )
 }
