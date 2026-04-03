@@ -123,6 +123,17 @@ generate_codes_by_reading_texts <- function(
     n_tokens_context_window = n_tokens_context_window,
     base_prompt_text = base_prompt_text
   )
+
+  if (is.null(chunks) || length(chunks) == 0) {
+    stop(
+      "Cannot generate codes: at least one text exceeds the context window ",
+      "after subtracting prompt overhead (",
+      n_tokens_context_window,
+      " tokens available). Try using a model with a larger context window or ",
+      "shorter input texts."
+    )
+  }
+
   print_message(paste0(
     "Created ",
     length(chunks),
