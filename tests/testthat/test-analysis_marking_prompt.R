@@ -186,3 +186,20 @@ test_that("mark_texts works with lang = NULL", {
   ))
   expect_true(length(progress_messages) >= 3)
 })
+
+test_that("mark_texts and mark_text_prompt respect send_prompt_with_retries__max_interactions option", {
+  source(here::here("R", "analysis_marking.R"), local = TRUE)
+
+  # Set the canonical (plural) option to a non-default value
+  withr::local_options(send_prompt_with_retries__max_interactions = 3)
+
+  # mark_texts default should pick up the option
+  mark_texts_defaults <- formals(mark_texts)
+  resolved <- eval(mark_texts_defaults$max_interactions)
+  expect_equal(resolved, 3)
+
+  # mark_text_prompt default should pick up the option
+  mark_text_prompt_defaults <- formals(mark_text_prompt)
+  resolved2 <- eval(mark_text_prompt_defaults$max_interactions)
+  expect_equal(resolved2, 3)
+})

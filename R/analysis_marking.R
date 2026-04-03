@@ -17,7 +17,10 @@ mark_texts <- function(
   interrupter = NULL,
   lang = NULL,
   write_paragraphs = TRUE,
-  max_interactions = getOption("send_prompt_with_retries__max_interaction", 10),
+  max_interactions = getOption(
+    "send_prompt_with_retries__max_interactions",
+    10
+  ),
   llm_stream_async = NULL,
   streaming_enabled = getOption("paragraph_streaming", TRUE)
 ) {
@@ -389,7 +392,7 @@ mark_text_prompt <- function(
   text,
   code,
   research_background = "",
-  max_interactions = getOption("send_prompt_with_retries__max_interaction", 10)
+  max_interactions = getOption("send_prompt_with_retries__max_interactions", 10)
 ) {
   prompt <- "You are given a qualitative 'code' and a 'text'.\nYour task is to mark the relevant parts in the text that correspond to the code."
   if (!is.null(research_background) && research_background != "") {
