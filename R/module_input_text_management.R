@@ -36,22 +36,42 @@ text_management_server <- function(
     stop("At least one anonymization method must be enabled via options.")
   }
 
-  # Ensure the default anonymization method is also enabled
+  # Resolve the default anonymization method, falling back if the configured
+
+  # default is not enabled (documented order: regex -> gliner -> none).
   opt_default <- getOption("anonymization__default", "regex")
   if (!(opt_default %in% c("none", "regex", "gliner"))) {
-    stop("Invalid default anonymization method specified in options.")
+    warning(
+      "Invalid default anonymization method '",
+      opt_default,
+      "'; falling back."
+    )
+    opt_default <- NA_character_
   }
-  # Check that default method is also enabled in options
-  if (opt_default == "none" && !getOption("anonymization__none", TRUE)) {
-    stop("Default anonymization method 'none' is not enabled in options.")
-  }
-  if (opt_default == "regex" && !getOption("anonymization__regex", TRUE)) {
-    stop("Default anonymization method 'regex' is not enabled in options.")
-  }
-  if (
-    opt_default == "gliner" && !getOption("anonymization__gliner_model", FALSE)
-  ) {
-    stop("Default anonymization method 'gliner' is not enabled in options.")
+
+  default_is_enabled <- switch(
+    as.character(opt_default),
+    none = isTRUE(getOption("anonymization__none", TRUE)),
+    regex = isTRUE(getOption("anonymization__regex", TRUE)),
+    gliner = isTRUE(getOption("anonymization__gliner_model", FALSE)),
+    FALSE
+  )
+
+  if (!default_is_enabled) {
+    fallback_map <- list(
+      regex = isTRUE(getOption("anonymization__regex", TRUE)),
+      gliner = isTRUE(getOption("anonymization__gliner_model", FALSE)),
+      none = isTRUE(getOption("anonymization__none", TRUE))
+    )
+    resolved <- names(which(unlist(fallback_map)))[1]
+    warning(
+      "Default anonymization method '",
+      opt_default,
+      "' is not enabled; falling back to '",
+      resolved,
+      "'."
+    )
+    opt_default <- resolved
   }
 
   moduleServer(id, function(input, output, session) {
