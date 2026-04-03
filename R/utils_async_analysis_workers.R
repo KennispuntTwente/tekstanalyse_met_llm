@@ -49,7 +49,7 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
 .analysis_async_dependency_map <- function(task) {
   switch(
     task,
-    categorization_scoring = list(
+    categorization = list(
       tiktoken_load_tokenizer = "async_message_printer",
       count_tokens = "tiktoken_load_tokenizer",
       write_paragraph = c(
@@ -62,7 +62,9 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "send_prompt_with_retries",
         "prompt_category",
         "prompt_multi_category"
-      ),
+      )
+    ),
+    scoring = list(
       score_texts = c(
         "send_prompt_with_retries",
         "prompt_score"
@@ -114,7 +116,7 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
 
 #' Prepare function environments for an async analysis worker
 #'
-#' @param task Worker profile. One of `"categorization_scoring"`,
+#' @param task Worker profile. One of `"categorization"`, `"scoring"`,
 #'   `"topic_assignment"` or `"marking"`.
 #' @param env Environment containing the function objects used by the worker.
 #'
@@ -158,21 +160,30 @@ analysis_async_worker_setup_globals <- function(env = parent.frame()) {
 }
 
 
-#' Globals shared by async categorization/scoring workers
+#' Globals shared by async categorization workers
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
 analysis_async_categorization_globals <- function(env = parent.frame()) {
   list(
     categorize_texts = get("categorize_texts", envir = env, inherits = TRUE),
-    score_texts = get("score_texts", envir = env, inherits = TRUE),
     prompt_category = get("prompt_category", envir = env, inherits = TRUE),
     prompt_multi_category = get(
       "prompt_multi_category",
       envir = env,
       inherits = TRUE
     ),
-    prompt_score = get("prompt_score", envir = env, inherits = TRUE),
     write_paragraph = get("write_paragraph", envir = env, inherits = TRUE)
+  )
+}
+
+
+#' Globals shared by async scoring workers
+#'
+#' @return Named list for `mirai::mirai(..., .args = ...)`.
+analysis_async_scoring_globals <- function(env = parent.frame()) {
+  list(
+    score_texts = get("score_texts", envir = env, inherits = TRUE),
+    prompt_score = get("prompt_score", envir = env, inherits = TRUE)
   )
 }
 

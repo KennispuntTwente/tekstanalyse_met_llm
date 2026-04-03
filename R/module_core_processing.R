@@ -272,17 +272,12 @@ processing_server <- function(
         invisible(NULL)
       }
 
-      ## 2.3 Categorisatie & scoren --------------------------------------------
+      ## 2.3 Categorisatie -----------------------------------------------------
 
-      # Handles the categorization and scoring modes.
-      # This groups their validation rules and async launch logic together.
+      # Handles the categorization mode.
+      # Validation and async launch logic stay local to this mode.
 
-      # Validation and async launch helpers for the categorization and scoring
-      # modes live together here.
-
-      # Helper function to check if categories are valid
-      categories_are_valid <- function() {
-        # User must be done editing categories
+      categorization_inputs_are_valid <- function() {
         if (categories$editing()) {
           shiny::showNotification(
             lang()$t(
@@ -293,7 +288,6 @@ processing_server <- function(
           return(FALSE)
         }
 
-        # User must have at least 2 non-empty categories
         if (categories$unique_non_empty_count() < 2) {
           shiny::showNotification(
             lang()$t("Je moet minimaal 2 categorieen opgeven."),
@@ -302,34 +296,15 @@ processing_server <- function(
           return(FALSE)
         }
 
-        return(TRUE)
+        TRUE
       }
 
-      # Helper function to check if scoring characteristic is valid
-      scoring_characteristic_is_valid <- function() {
-        # User must have at least 1 non-empty scoring characteristic
-        if (isTRUE(nchar(scoring_characteristic()) < 1)) {
-          shiny::showNotification(
-            lang()$t("Geef een karakteristiek op."),
-            type = "error"
-          )
-          return(FALSE)
-        }
-
-        return(TRUE)
-      }
-
-      # Starts the async worker for categorization or scoring.
-      # Kept separate so the shared process observer only dispatches by mode.
-      start_categorization_or_scoring <- function() {
+      start_categorization <- function() {
         req(texts$preprocessed)
         if (!number_of_texts_under_maximum()) {
           return()
         }
-        if (mode() == "Categorisatie" && !categories_are_valid()) {
-          return()
-        }
-        if (mode() == "Scoren" && !scoring_characteristic_is_valid()) {
+        if (!categorization_inputs_are_valid()) {
           return()
         }
         req(isFALSE(context_window$any_fit_problem))
@@ -339,48 +314,30 @@ processing_server <- function(
         promise <- mirai::mirai(
           {
             log_context_apply(log_ctx)
-            prepare_async_analysis_worker("categorization_scoring")
+            prepare_async_analysis_worker("categorization")
 
-            # Progress callback for the batch functions
             on_progress <- function(i, n, text) {
               progress_primary$set_with_total(i, n, text)
               if (i == 1 || i %% 5 == 0 || i == n) {
                 log_info(
-                  sprintf(
-                    "Categorization/Scoring progress: %d/%d",
-                    i,
-                    n
-                  ),
+                  sprintf("Categorization progress: %d/%d", i, n),
                   component = "analysis"
                 )
               }
             }
 
-            # Run categorization or scoring via standalone batch functions
-            results <- if (mode == "Categorisatie") {
-              categorize_texts(
-                texts = texts,
-                categories = categories,
-                research_background = research_background,
-                llm_provider = llm_provider,
-                assign_multiple_categories = assign_multiple_categories,
-                exclusive_categories = exclusive_categories,
-                on_progress = on_progress,
-                interrupter = interrupter
-              )
-            } else {
-              score_texts(
-                texts = texts,
-                scoring_characteristic = scoring_characteristic,
-                research_background = research_background,
-                llm_provider = llm_provider,
-                on_progress = on_progress,
-                interrupter = interrupter
-              )
-            }
+            results <- categorize_texts(
+              texts = texts,
+              categories = categories,
+              research_background = research_background,
+              llm_provider = llm_provider,
+              assign_multiple_categories = assign_multiple_categories,
+              exclusive_categories = exclusive_categories,
+              on_progress = on_progress,
+              interrupter = interrupter
+            )
 
-            # If categorization, write paragraphs
-            if (mode == "Categorisatie" && write_paragraphs) {
+            if (write_paragraphs) {
               paragraphs <- tryCatch(
                 {
                   categories_texts <- collect_grouped_texts(
@@ -404,7 +361,6 @@ processing_server <- function(
                 error = handle_detailed_error("Category paragraph writing")
               )
 
-              # Add as attribute to the results
               attr(results, "paragraphs") <- paragraphs
             }
 
@@ -416,10 +372,8 @@ processing_server <- function(
               texts = texts$preprocessed,
               research_background = research_background(),
               style_prompt = style_prompt(),
-              mode = mode(),
               categories = categories$texts(),
               exclusive_categories = categories$exclusive_texts(),
-              scoring_characteristic = scoring_characteristic(),
               assign_multiple_categories = assign_multiple_categories(),
               write_paragraphs = write_paragraphs(),
               handle_detailed_error = handle_detailed_error,
@@ -439,15 +393,93 @@ processing_server <- function(
             send_prompt_with_retries_async_globals()
           )
         )
+
         bind_async_result(
           promise = promise,
           setter = results_df,
-          when = "main processing of categorization/scoring",
-          debug_message = "Started async processing for categorization/scoring"
+          when = "main processing of categorization",
+          debug_message = "Started async processing for categorization"
         )
       }
 
-      ## 2.4 Onderwerpextractie ------------------------------------------------
+      ## 2.4 Scoren ------------------------------------------------------------
+
+      # Handles the scoring mode.
+      # Validation and async launch logic stay local to this mode.
+
+      scoring_input_is_valid <- function() {
+        if (isTRUE(nchar(scoring_characteristic()) < 1)) {
+          shiny::showNotification(
+            lang()$t("Geef een karakteristiek op."),
+            type = "error"
+          )
+          return(FALSE)
+        }
+
+        TRUE
+      }
+
+      start_scoring <- function() {
+        req(texts$preprocessed)
+        if (!number_of_texts_under_maximum()) {
+          return()
+        }
+        if (!scoring_input_is_valid()) {
+          return()
+        }
+        req(isFALSE(context_window$any_fit_problem))
+
+        log_ctx <- start_processing_run()
+
+        promise <- mirai::mirai(
+          {
+            log_context_apply(log_ctx)
+            prepare_async_analysis_worker("scoring")
+
+            on_progress <- function(i, n, text) {
+              progress_primary$set_with_total(i, n, text)
+              if (i == 1 || i %% 5 == 0 || i == n) {
+                log_info(
+                  sprintf("Scoring progress: %d/%d", i, n),
+                  component = "analysis"
+                )
+              }
+            }
+
+            score_texts(
+              texts = texts,
+              scoring_characteristic = scoring_characteristic,
+              research_background = research_background,
+              llm_provider = llm_provider,
+              on_progress = on_progress,
+              interrupter = interrupter
+            )
+          },
+          .args = c(
+            list(
+              llm_provider = models$main,
+              texts = texts$preprocessed,
+              research_background = research_background(),
+              scoring_characteristic = scoring_characteristic(),
+              progress_primary = progress_primary$async,
+              interrupter = interrupter
+            ),
+            analysis_async_scoring_globals(),
+            analysis_async_worker_setup_globals(),
+            log_async_globals(log_ctx),
+            send_prompt_with_retries_async_globals()
+          )
+        )
+
+        bind_async_result(
+          promise = promise,
+          setter = results_df,
+          when = "main processing of scoring",
+          debug_message = "Started async processing for scoring"
+        )
+      }
+
+      ## 2.5 Onderwerpextractie ------------------------------------------------
 
       # Handles the topic-modelling flow from start to finish.
       # This covers topic generation, optional editing, and final assignment.
@@ -455,7 +487,7 @@ processing_server <- function(
       # Topic-modelling flow: first generate/reduce topics, then optionally let
       # the user edit them, then assign topics and write paragraphs.
 
-      ### 2.4.1 Topic generation -----------------------------------------------
+      ### 2.5.1 Topic generation -----------------------------------------------
 
       # Generates candidate topics and reduces them to a usable list.
       # This is the first async step before any human review happens.
@@ -566,7 +598,7 @@ processing_server <- function(
         )
       }
 
-      ### 2.4.2 Topic editing --------------------------------------------------
+      ### 2.5.2 Topic editing --------------------------------------------------
 
       # Reacts when generated topics are ready.
       # This either auto-confirms them or opens the editing step for the user.
@@ -627,7 +659,7 @@ processing_server <- function(
         )
       })
 
-      ### 2.4.3 Topic assignment -----------------------------------------------
+      ### 2.5.3 Topic assignment -----------------------------------------------
 
       # Starts the final topic step after topics are confirmed.
       # This assigns topics to texts and optionally writes report paragraphs.
@@ -783,7 +815,7 @@ processing_server <- function(
         start_topic_assignment()
       })
 
-      ## 2.5 Markeren ----------------------------------------------------------
+      ## 2.6 Markeren ----------------------------------------------------------
 
       # Handles the marking mode.
       # This groups the marking validation and async worker launch together.
@@ -896,7 +928,7 @@ processing_server <- function(
         )
       }
 
-      ## 2.6 Shared dispatch & result prep -------------------------------------
+      ## 2.7 Shared dispatch & result prep -------------------------------------
 
       # Handles the shared pieces after the mode-specific launchers.
       # This routes the process button, finalizes UI, and prepares result data.
@@ -915,8 +947,12 @@ processing_server <- function(
         log_processing_click()
 
         current_mode <- mode()
-        if (current_mode %in% c("Categorisatie", "Scoren")) {
-          start_categorization_or_scoring()
+        if (current_mode == "Categorisatie") {
+          start_categorization()
+          return()
+        }
+        if (current_mode == "Scoren") {
+          start_scoring()
           return()
         }
         if (current_mode == "Onderwerpextractie") {
@@ -1074,12 +1110,12 @@ processing_server <- function(
         shinyjs::hide("process")
       }
 
-      ## 2.7 Post-processing & downloads ---------------------------------------
+      ## 2.8 Post-processing & downloads ---------------------------------------
 
       # Runs after worker results come back.
       # This joins results, handles IRR, builds files, and exposes downloads.
 
-      ### 2.7.1 Worker results -------------------------------------------------
+      ### 2.8.1 Worker results -------------------------------------------------
 
       # Handles the first result coming back from a worker.
       # This restores raw texts, finishes the UI, and starts IRR when needed.
@@ -1176,7 +1212,7 @@ processing_server <- function(
         }
       })
 
-      ### 2.7.2 IRR completion -------------------------------------------------
+      ### 2.8.2 IRR completion -------------------------------------------------
 
       # Continues once inter-rater reliability is done or skipped.
       # This builds the result bundle and starts download preparation.
@@ -1208,7 +1244,7 @@ processing_server <- function(
         autoDestroy = TRUE
       )
 
-      ### 2.7.3 Download preparation UI ----------------------------------------
+      ### 2.8.3 Download preparation UI ----------------------------------------
 
       # Shows the loading state while files are being prepared.
       # This switches to the download and restart controls once ready.
@@ -1237,7 +1273,7 @@ processing_server <- function(
         }
       })
 
-      ### 2.7.4 Download ready UI ----------------------------------------------
+      ### 2.8.4 Download ready UI ----------------------------------------------
 
       # Runs when the zip file is ready for the user.
       # This logs timing, exposes the download handler, and shows restart.
@@ -1389,7 +1425,7 @@ processing_server <- function(
         success(TRUE)
       })
 
-      ### 2.7.5 Restart flow ---------------------------------------------------
+      ### 2.8.5 Restart flow ---------------------------------------------------
 
       # Lets the user start over after a completed run.
       # This shows a confirmation modal and reloads the session if confirmed.
@@ -1429,12 +1465,12 @@ processing_server <- function(
         session$reload()
       })
 
-      ## 2.8 UI controls -------------------------------------------------------
+      ## 2.9 UI controls -------------------------------------------------------
 
       # Sets up the UI controllers around the processing flow.
       # These pieces drive progress, streaming, start/cancel, and restart.
 
-      ### 2.8.1 Progress bars --------------------------------------------------
+      ### 2.9.1 Progress bars --------------------------------------------------
 
       # Shows primary and secondary progress during processing.
       # These controllers are shared by the async workers and UI updates.
@@ -1445,7 +1481,7 @@ processing_server <- function(
         initially_hidden = TRUE
       )
 
-      ### 2.8.2 LLM streaming --------------------------------------------------
+      ### 2.9.2 LLM streaming --------------------------------------------------
 
       # Shows live paragraph streaming when supported by the model.
       # This gives the user feedback while report paragraphs are being written.
@@ -1455,7 +1491,7 @@ processing_server <- function(
         initially_hidden = TRUE
       )
 
-      ### 2.8.3 Processing button ----------------------------------------------
+      ### 2.9.3 Processing button ----------------------------------------------
 
       # Renders the main start button for the current mode.
       # This keeps the label and disabled state in sync with the current inputs.
@@ -1504,7 +1540,7 @@ processing_server <- function(
         )
       })
 
-      ### 2.8.4 Interruption & cancel ------------------------------------------
+      ### 2.9.4 Interruption & cancel ------------------------------------------
 
       # Handles cancellation and session shutdown while processing runs.
       # This makes sure async work can be stopped cleanly when needed.
@@ -1588,7 +1624,7 @@ processing_server <- function(
         session$reload()
       })
 
-      ## 2.9 Return value ------------------------------------------------------
+      ## 2.10 Return value -----------------------------------------------------
 
       # Returns a small processing interface to other modules.
       # The function reports current state and exposes simple reactive flags.

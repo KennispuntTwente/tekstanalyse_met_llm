@@ -25,44 +25,53 @@ test_that("async_inject_dependencies binds worker dependencies in a child env", 
 
 
 test_that("prepare_async_analysis_worker injects the expected dependencies", {
-  worker_env <- new.env(parent = emptyenv())
+  categorization_env <- new.env(parent = emptyenv())
 
-  worker_env$async_message_printer <- function(...) NULL
-  worker_env$send_prompt_with_retries <- function(...) NULL
-  worker_env$get_context_window_size_in_tokens <- function(...) 1024
-  worker_env$count_tokens <- function(...) 1
-  worker_env$tiktoken_load_tokenizer <- function(...) NULL
-  worker_env$prompt_category <- function(...) NULL
-  worker_env$prompt_multi_category <- function(...) NULL
-  worker_env$prompt_score <- function(...) NULL
-  worker_env$write_paragraph <- function(...) NULL
-  worker_env$categorize_texts <- function(...) NULL
-  worker_env$score_texts <- function(...) NULL
+  categorization_env$async_message_printer <- function(...) NULL
+  categorization_env$send_prompt_with_retries <- function(...) NULL
+  categorization_env$get_context_window_size_in_tokens <- function(...) 1024
+  categorization_env$count_tokens <- function(...) 1
+  categorization_env$tiktoken_load_tokenizer <- function(...) NULL
+  categorization_env$prompt_category <- function(...) NULL
+  categorization_env$prompt_multi_category <- function(...) NULL
+  categorization_env$write_paragraph <- function(...) NULL
+  categorization_env$categorize_texts <- function(...) NULL
 
   prepare_async_analysis_worker(
-    task = "categorization_scoring",
-    env = worker_env
+    task = "categorization",
+    env = categorization_env
   )
 
   expect_true(exists(
     "async_message_printer",
-    envir = environment(worker_env$tiktoken_load_tokenizer)
+    envir = environment(categorization_env$tiktoken_load_tokenizer)
   ))
   expect_true(exists(
     "tiktoken_load_tokenizer",
-    envir = environment(worker_env$count_tokens)
+    envir = environment(categorization_env$count_tokens)
   ))
   expect_true(exists(
     "send_prompt_with_retries",
-    envir = environment(worker_env$write_paragraph)
+    envir = environment(categorization_env$write_paragraph)
   ))
   expect_true(exists(
     "prompt_category",
-    envir = environment(worker_env$categorize_texts)
+    envir = environment(categorization_env$categorize_texts)
   ))
+
+  scoring_env <- new.env(parent = emptyenv())
+  scoring_env$send_prompt_with_retries <- function(...) NULL
+  scoring_env$prompt_score <- function(...) NULL
+  scoring_env$score_texts <- function(...) NULL
+
+  prepare_async_analysis_worker(
+    task = "scoring",
+    env = scoring_env
+  )
+
   expect_true(exists(
     "prompt_score",
-    envir = environment(worker_env$score_texts)
+    envir = environment(scoring_env$score_texts)
   ))
 })
 
@@ -74,6 +83,11 @@ test_that("analysis async globals helpers expose the expected names", {
     "tiktoken_load_tokenizer",
     "count_tokens",
     "async_message_printer",
+    "categorize_texts",
+    "prompt_category",
+    "prompt_multi_category",
+    "score_texts",
+    "prompt_score",
     "collect_grouped_texts",
     "write_grouped_paragraphs",
     "mark_texts",
@@ -124,6 +138,24 @@ test_that("analysis async globals helpers expose the expected names", {
       "collect_grouped_texts",
       "write_grouped_paragraphs",
       "write_paragraph"
+    )
+  )
+
+  expect_named(
+    analysis_async_categorization_globals(),
+    c(
+      "categorize_texts",
+      "prompt_category",
+      "prompt_multi_category",
+      "write_paragraph"
+    )
+  )
+
+  expect_named(
+    analysis_async_scoring_globals(),
+    c(
+      "score_texts",
+      "prompt_score"
     )
   )
 
