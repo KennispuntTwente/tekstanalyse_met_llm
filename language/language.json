@@ -518,8 +518,8 @@
         "en": " of "
       },
       {
-        "nl": "</i><br><br><b>Geef een score (1–100):</b>",
-        "en": "</i><br><br><b>Give a score (1–100):</b>"
+        "nl": "</i><br><br><b>Geef een score (0–100):</b>",
+        "en": "</i><br><br><b>Give a score (0–100):</b>"
       },
       {
         "nl": "</i><br><br><b>Categorie:</b><br><i>",
@@ -538,8 +538,8 @@
         "en": "Invalid sample size"
       },
       {
-        "nl": "Voer een geldige score in tussen 1 en 100.",
-        "en": "Enter a valid score between 1 and 100."
+        "nl": "Voer een geldige score in tussen 0 en 100.",
+        "en": "Enter a valid score between 0 and 100."
       },
       {
         "nl": "Beantwoord met 'Ja' of 'Nee' voor deze categorie.",

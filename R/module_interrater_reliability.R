@@ -267,10 +267,10 @@ interrater_server <- function(
                 label = HTML(paste0(
                   "<i>",
                   htmltools::htmlEscape(item_text),
-                  lang()$t("</i><br><br><b>Geef een score (1–100):</b>")
+                  lang()$t("</i><br><br><b>Geef een score (0–100):</b>")
                 )),
                 value = selected_choice %||% NA,
-                min = 1,
+                min = 0,
                 max = 100,
                 step = 1
               )
@@ -527,11 +527,11 @@ interrater_server <- function(
           if (
             is.null(user_input) ||
               !is.numeric(user_input) ||
-              user_input < 1 ||
+              user_input < 0 ||
               user_input > 100
           ) {
             showNotification(
-              lang()$t("Voer een geldige score in tussen 1 en 100."),
+              lang()$t("Voer een geldige score in tussen 0 en 100."),
               type = "warning"
             )
             return()
@@ -865,7 +865,7 @@ if (FALSE) {
       # )
       # For testing score data:
       result = sample(
-        c(1:100),
+        c(0:100),
         75,
         replace = TRUE
       )

@@ -19,7 +19,7 @@ source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ## Methode
 
 Er zijn `r nrow(rl$df)` teksten geanalyseerd met een LLM (model: `r htmltools::htmlEscape(rl$model)`),
-waarbij het LLM gevraagd werd om een score (1-100) te geven voor
+waarbij het LLM gevraagd werd om een score (0-100) te geven voor
 in hoeverre een tekst bij het kenmerk '*`r htmltools::htmlEscape(rl$scoring_characteristic)`*' past.
 
 Elke tekst is afzonderlijk gepresenteerd aan het LLM. 
