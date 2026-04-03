@@ -221,6 +221,34 @@ join_processing_results <- function(texts_df, worker_results_df) {
 }
 
 
+#' Check whether processing results contain invalid missing values
+#'
+#' Used in `module_core_processing` after worker completion and again before
+#' download preparation. Some modes use `NA` to signal worker failure, while
+#' marking legitimately allows missing snippet columns after joining back to the
+#' original uploaded texts.
+#'
+#' @param results_df Final result data frame shown in the app.
+#' @param mode Single processing mode name.
+#'
+#' @return `TRUE` when the result shape indicates a failed analysis response,
+#'   otherwise `FALSE`.
+processing_results_have_invalid_na <- function(results_df, mode) {
+  stopifnot(is.data.frame(results_df), is.character(mode), length(mode) == 1)
+
+  if (mode == "Markeren") {
+    return(FALSE)
+  }
+
+  if ("result" %in% names(results_df)) {
+    return(anyNA(results_df$result))
+  }
+
+  result_cols <- setdiff(names(results_df), "text")
+  length(result_cols) > 0 && anyNA(results_df[result_cols])
+}
+
+
 #' Build the result bundle used for downloads and reports
 #'
 #' Used in `module_core_processing` after processing and optional

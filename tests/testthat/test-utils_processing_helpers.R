@@ -71,6 +71,37 @@ test_that("join_processing_results restores raw texts and paragraph attribute", 
 })
 
 
+test_that("processing_results_have_invalid_na is mode-aware", {
+  scoring_results <- data.frame(
+    text = c("a", "b"),
+    result = c(10, NA),
+    stringsAsFactors = FALSE
+  )
+  multi_label_results <- data.frame(
+    text = c("a", "b"),
+    topic_a = c(TRUE, NA),
+    topic_b = c(FALSE, TRUE),
+    stringsAsFactors = FALSE
+  )
+  marking_results <- data.frame(
+    text = c("a", "b"),
+    sub_text = c("a", NA),
+    code = c("x", NA),
+    marked_text = c("a", NA),
+    stringsAsFactors = FALSE
+  )
+
+  expect_true(processing_results_have_invalid_na(scoring_results, "Scoren"))
+  expect_true(
+    processing_results_have_invalid_na(
+      multi_label_results,
+      "Onderwerpextractie"
+    )
+  )
+  expect_false(processing_results_have_invalid_na(marking_results, "Markeren"))
+})
+
+
 test_that("processing_mode_supports_report matches supported modes", {
   expect_true(processing_mode_supports_report("Categorisatie"))
   expect_true(processing_mode_supports_report("Markeren"))
