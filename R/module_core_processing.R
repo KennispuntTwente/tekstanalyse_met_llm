@@ -1138,7 +1138,10 @@ processing_server <- function(
         final_results_df(df)
 
         # NA results indicate a failed worker response and should abort the flow.
-        if (anyNA(df$result)) {
+        # In multi-label mode there is no 'result' column; check the
+        # category / topic columns instead.
+        result_cols <- setdiff(names(df), "text")
+        if (length(result_cols) > 0 && anyNA(df[result_cols])) {
           log_action(
             "analysis_failed",
             details = sprintf(
@@ -1225,7 +1228,8 @@ processing_server <- function(
           result_list <- create_result_list()
 
           # Abort if invalid results still made it this far.
-          error <- anyNA(result_list$df$result)
+          result_cols <- setdiff(names(result_list$df), "text")
+          error <- length(result_cols) > 0 && anyNA(result_list$df[result_cols])
           if (error) {
             app_error(
               "Results contain NA values; processing failed",

@@ -210,3 +210,34 @@ test_that("categorize_texts supports progress, interruption, and early NA", {
   expect_equal(progress_events[[1]], list(i = 1, n = 3, text = "text a"))
   expect_equal(progress_events[[2]], list(i = 2, n = 3, text = "text b"))
 })
+
+test_that("categorize_texts multi-label: early NA produces NA category columns", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  call_count <- 0
+  send_prompt_with_retries <- function(prompt, llm_provider) {
+    call_count <<- call_count + 1
+    if (call_count == 1) {
+      return("cat1")
+    }
+    NA_character_
+  }
+
+  result <- categorize_texts(
+    texts = c("text a", "text b", "text c"),
+    categories = c("cat1", "cat2"),
+    llm_provider = create_test_provider(),
+    assign_multiple_categories = TRUE
+  )
+
+  expect_false("result" %in% names(result))
+  # All category columns should have NAs for failed rows
+  result_cols <- setdiff(names(result), "text")
+  expect_true(length(result_cols) > 0)
+  expect_true(anyNA(result[result_cols]))
+  # First text succeeded so should not be NA
+  expect_false(is.na(result$cat1[1]))
+  # Second text failed so should be NA
+  expect_true(is.na(result$cat1[2]))
+})
