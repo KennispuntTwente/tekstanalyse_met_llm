@@ -43,16 +43,31 @@ text_upload_server <- function(
         size = as.numeric(file_df$size[[1]] %||% 0),
         type = as.character(file_df$type[[1]] %||% ""),
         datapath = as.character(file_df$datapath[[1]]),
-        ext = tools::file_ext(file_name)
+        ext = tolower(tools::file_ext(file_name))
       )
     }
 
     read_txt_file <- function(file_info, split_lines) {
-      txt_lines <- readLines(
+      raw <- readBin(
         file_info$datapath,
-        encoding = "UTF-8",
-        warn = FALSE
+        "raw",
+        file.info(file_info$datapath)$size
       )
+      txt_content <- tryCatch(
+        {
+          decoded <- rawToChar(raw)
+          if (!validUTF8(decoded)) {
+            stop("not valid utf-8")
+          }
+          Encoding(decoded) <- "UTF-8"
+          decoded
+        },
+        error = function(e) {
+          # Fall back to the system's native encoding (e.g. CP1252 on Windows)
+          iconv(rawToChar(raw), from = "", to = "UTF-8", sub = "")
+        }
+      )
+      txt_lines <- strsplit(txt_content, "\r?\n")[[1]]
 
       txt <- if (isTRUE(split_lines)) {
         discard_empty(stringr::str_trim(txt_lines))
