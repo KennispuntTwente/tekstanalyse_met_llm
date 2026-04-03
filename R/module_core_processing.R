@@ -51,6 +51,7 @@ processing_server <- function(
   context_window,
   by_column_name = reactiveVal(NULL),
   by_column_lookup = reactiveVal(NULL),
+  split_in_progress = reactiveVal(FALSE),
   lang = default_lang()
 ) {
   ns <- NS(id)
@@ -1517,7 +1518,8 @@ processing_server <- function(
         # Disable if no texts OR if there is a context-window fit problem
         disable_flag <- (n_pre == 0) ||
           isTRUE(context_window$any_fit_problem) ||
-          isTRUE(context_window$too_many_chunks)
+          isTRUE(context_window$too_many_chunks) ||
+          isTRUE(split_in_progress())
 
         actionButton(
           ns("process"),
