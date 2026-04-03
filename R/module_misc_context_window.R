@@ -260,9 +260,7 @@ context_window_server <- function(
                 text = "",
                 research_background = research_background(),
                 categories = categories$texts(),
-                exclusive_categories = categories$texts()[
-                  seq_along(categories$texts()) %% 2 == 0
-                ]
+                exclusive_categories = categories$exclusive_texts()
               )
             } else {
               prompt_category(

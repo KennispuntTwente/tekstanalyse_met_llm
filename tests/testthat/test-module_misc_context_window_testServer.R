@@ -81,7 +81,8 @@ test_that("context_window_server: fit flag flips based on context window size", 
       categories <- list(
         texts = reactiveVal(c("CatA", "CatB")),
         editing = reactiveVal(FALSE),
-        unique_non_empty_count = reactiveVal(2)
+        unique_non_empty_count = reactiveVal(2),
+        exclusive_texts = reactiveVal(character())
       )
 
       codes <- list(
@@ -177,7 +178,8 @@ test_that("context_window_server: topic mode sets chunk flags and too-many-chunk
       categories <- list(
         texts = reactiveVal(c("CatA")),
         editing = reactiveVal(FALSE),
-        unique_non_empty_count = reactiveVal(1)
+        unique_non_empty_count = reactiveVal(1),
+        exclusive_texts = reactiveVal(character())
       )
 
       codes <- list(
@@ -219,6 +221,108 @@ test_that("context_window_server: topic mode sets chunk flags and too-many-chunk
       expect_identical(rv$fit_context_window_chunks, TRUE)
       expect_identical(rv$too_many_chunks, TRUE)
       expect_equal(rv$n_chunks, 3)
+    }
+  )
+})
+
+
+test_that("context_window_server: multi-label uses actual exclusive_texts, not fabricated ones", {
+  # Capture what prompt_multi_category receives for exclusive_categories.
+  captured_exclusive <- NULL
+  module_env <- environment(context_window_server)
+  old_pmc <- get("prompt_multi_category", envir = module_env)
+  withr::defer(assign("prompt_multi_category", old_pmc, envir = module_env))
+  assign(
+    "prompt_multi_category",
+    function(
+      text = "",
+      research_background = "",
+      categories = character(),
+      exclusive_categories = character(),
+      ...
+    ) {
+      captured_exclusive <<- exclusive_categories
+      list(prompt = "multi_category")
+    },
+    envir = module_env
+  )
+
+  tidyprompt_ns <- asNamespace("tidyprompt")
+  old_construct <- get("construct_prompt_text", envir = tidyprompt_ns)
+  withr::defer({
+    unlockBinding("construct_prompt_text", tidyprompt_ns)
+    assign("construct_prompt_text", old_construct, envir = tidyprompt_ns)
+    lockBinding("construct_prompt_text", tidyprompt_ns)
+  })
+
+  unlockBinding("construct_prompt_text", tidyprompt_ns)
+  assign(
+    "construct_prompt_text",
+    function(x, ...) "PROMPTTT",
+    envir = tidyprompt_ns
+  )
+  lockBinding("construct_prompt_text", tidyprompt_ns)
+
+  old_get_cw <- get_context_window_size_in_tokens
+  withr::defer({
+    get_context_window_size_in_tokens <<- old_get_cw
+  })
+  get_context_window_size_in_tokens <<- function(model) 100
+
+  shiny::testServer(
+    function(input, output, session) {
+      mode <- reactiveVal("Categorisatie")
+      lang <- make_test_lang("nl")
+
+      models <- reactiveValues(
+        main = list(parameters = list(model = "unit-test-model")),
+        large = NULL
+      )
+
+      # 4 categories, only the first is exclusive.
+      # Fabricated logic (every 2nd) would yield c("CatB", "CatD") — wrong.
+      categories <- list(
+        texts = reactiveVal(c("CatA", "CatB", "CatC", "CatD")),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(4),
+        exclusive_texts = reactiveVal(c("CatA"))
+      )
+
+      codes <- list(
+        texts = reactiveVal(c("Code1")),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(1)
+      )
+
+      texts <- reactiveValues(
+        preprocessed = c("some text"),
+        raw = character()
+      )
+
+      rv <- context_window_server(
+        id = "cw",
+        mode = mode,
+        models = models,
+        categories = categories,
+        scoring_characteristic = reactiveVal("X"),
+        codes = codes,
+        research_background = reactiveVal("background"),
+        assign_multiple_categories = reactiveVal(TRUE),
+        texts = texts,
+        processing = reactiveVal(FALSE),
+        lang = lang
+      )
+
+      list(rv = rv)
+    },
+    {
+      for (i in 1:10) {
+        session$flushReact()
+      }
+
+      # The module must have called prompt_multi_category with the real
+      # exclusive texts, not a fabricated every-second-category vector.
+      expect_identical(captured_exclusive, c("CatA"))
     }
   )
 })
