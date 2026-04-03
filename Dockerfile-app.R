@@ -214,7 +214,19 @@ if (getOption("anonymization__gliner_test", FALSE)) {
 }
 
 if (!getOption("shiny.testmode", FALSE)) {
-  try(tiktoken_load_tokenizer())
+  tryCatch(
+    tiktoken_load_tokenizer(),
+    error = function(e) {
+      log_warn(
+        paste0(
+          "Tokenizer preload failed: ",
+          conditionMessage(e),
+          ". Token counting will be unavailable until Python is working."
+        ),
+        component = "startup"
+      )
+    }
+  )
 }
 
 
