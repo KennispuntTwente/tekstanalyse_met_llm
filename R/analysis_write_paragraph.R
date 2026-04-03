@@ -112,17 +112,12 @@ write_paragraph <- function(
       )
     },
     error = function(e) {
-      paste0(
-        "Failed to write paragraph about topic.",
-        "\n Topic: ",
+      stop(paste0(
+        "Failed to write paragraph about topic '",
         topic,
-        "\n Texts: ",
-        paste(texts, collapse = ", "),
-        "\n Error: ",
-        conditionMessage(e),
-        "\n Prompt: ",
-        prompt$construct_prompt_text()
-      )
+        "': ",
+        conditionMessage(e)
+      ))
     }
   )
 
