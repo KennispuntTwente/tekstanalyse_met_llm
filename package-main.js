@@ -232,7 +232,7 @@ function createSplashWindow() {
         </style>
       </head>
       <body>
-        <h1>App is loading...</h2>
+        <h1>App is loading...</h1>
         <p>This should take no longer than 30 seconds.<br>
         (The first time may take longer, as it needs to install Python.)<br>
         Is it not working? View the log file:<br><br>
