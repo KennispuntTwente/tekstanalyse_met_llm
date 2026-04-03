@@ -137,6 +137,24 @@ mark_texts <- function(
   # For each code & sub_text, ask LLM to mark relevant sections in the text
   # Create own row for each text, sub_text, code, and marked_text
   total_combinations <- nrow(df) * length(codes)
+
+  # Guard against runaway cost: the cross-product of split chunks x codes
+  # can grow very large. Default limit is generous but prevents accidents.
+  max_combinations <- getOption("marking__max_combinations", 50000)
+  if (total_combinations > max_combinations) {
+    stop(sprintf(
+      paste0(
+        "Marking would require %d LLM calls (%d text chunks x %d codes), ",
+        "which exceeds the safety limit of %d. ",
+        "Reduce the number of texts, codes, or increase the chunk size."
+      ),
+      total_combinations,
+      nrow(df),
+      length(codes),
+      max_combinations
+    ))
+  }
+
   current_count <- 0
   try(
     {

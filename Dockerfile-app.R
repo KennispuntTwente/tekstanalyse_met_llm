@@ -151,6 +151,10 @@ options(
   #     see: R/processing.R
   processing__max_texts = 3000,
 
+  # - Maximum number of (text-chunk x code) combinations in marking mode;
+  #     see: R/analysis_marking.R
+  marking__max_combinations = 50000,
+
   # - Configuration of LLM provider by user;
   #   these enable the user to set their own OpenAI-compatible or Ollama APIs,
   #   as alternative to the preconfigured LLM provider;
