@@ -201,8 +201,7 @@ function createSplashWindow() {
     title: 'KWALLM: Text analysis with LLM',
     icon: path.join(__dirname, 'www', 'icon.ico'),
     webPreferences: {
-      contextIsolation: true,
-      preload: path.join(__dirname, 'splash-preload.js')
+      contextIsolation: true
     }
   });
 
