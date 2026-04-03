@@ -184,7 +184,11 @@ test_that("Categorisatie report renders with by_column_* set", {
     irr = irr_kappa,
     paragraphs = NULL,
     by_column_name = "group",
-    by_column_values = c("G1", "G1", "G2")
+    by_column_values = data.frame(
+      text = c("Text 1", "Text 2", "Text 3"),
+      by_value = c("G1", "G1", "G2"),
+      stringsAsFactors = FALSE
+    )
   )
 
   out_dir <- withr::local_tempdir()

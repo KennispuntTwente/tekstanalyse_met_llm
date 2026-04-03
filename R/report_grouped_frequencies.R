@@ -1,9 +1,38 @@
 # Helper functions for generating grouped frequency tables in reports
 # Used by report_*.Rmd templates when a by_column is specified
 
+# Internal: join by_values to df by text column.
+# by_values is a data frame with 'text' and 'by_value' columns.
+# When the same text appears in multiple groups the join fans out,
+# so each group occurrence is counted.
+.join_by_group <- function(df, by_values) {
+  if (is.data.frame(by_values)) {
+    lookup <- by_values
+  } else {
+    # Legacy fallback: positional vector (must match nrow)
+    stopifnot(length(by_values) == nrow(df))
+    lookup <- data.frame(
+      text = df$text,
+      by_value = by_values,
+      stringsAsFactors = FALSE
+    )
+  }
+  # Use left_join so every result row gets at least one group.
+  # relationship = "many-to-many" avoids warnings when a text maps to
+  # multiple groups or the result df has duplicate texts.
+  df |>
+    dplyr::left_join(
+      lookup,
+      by = "text",
+      relationship = "many-to-many"
+    ) |>
+    dplyr::rename(.by_group = by_value)
+}
+
 #' Generate grouped frequency table for single-category results
 #' @param df data frame with 'result' column containing category assignments
-#' @param by_values vector of group values aligned with df rows
+#' @param by_values data frame with 'text' and 'by_value' columns (or legacy
+#'   positional vector aligned with df rows)
 #' @param by_column_name name of the grouping column for display
 #' @param categories vector of all possible categories
 #' @param language "en" or "nl"
@@ -15,16 +44,17 @@ generate_grouped_freq_table_single <- function(
   categories,
   language = "en"
 ) {
-  # Add group column to df
-  df_grouped <- df |>
-    dplyr::mutate(.by_group = by_values)
+  # Join group column to df
+  df_grouped <- .join_by_group(df, by_values)
+
+  all_groups <- unique(df_grouped$.by_group)
 
   # Count per group and category
   freq_table <- df_grouped |>
     dplyr::group_by(.by_group, result) |>
     dplyr::summarise(Number = dplyr::n(), .groups = "drop") |>
     tidyr::complete(
-      .by_group = unique(by_values),
+      .by_group = all_groups,
       result = categories,
       fill = list(Number = 0)
     )
@@ -82,7 +112,8 @@ generate_grouped_freq_table_single <- function(
 
 #' Generate grouped frequency table for multi-category results
 #' @param df data frame with binary category columns
-#' @param by_values vector of group values aligned with df rows
+#' @param by_values data frame with 'text' and 'by_value' columns (or legacy
+#'   positional vector aligned with df rows)
 #' @param by_column_name name of the grouping column for display
 #' @param categories vector of category column names
 #' @param language "en" or "nl"
@@ -94,9 +125,8 @@ generate_grouped_freq_table_multi <- function(
   categories,
   language = "en"
 ) {
-  # Add group column to df
-  df_grouped <- df |>
-    dplyr::mutate(.by_group = by_values)
+  # Join group column to df
+  df_grouped <- .join_by_group(df, by_values)
 
   # Count TRUE values per group and category
   freq_table <- df_grouped |>
@@ -167,7 +197,8 @@ generate_grouped_freq_table_multi <- function(
 
 #' Generate grouped frequency table for scoring results
 #' @param df data frame with 'result' column containing numeric scores
-#' @param by_values vector of group values aligned with df rows
+#' @param by_values data frame with 'text' and 'by_value' columns (or legacy
+#'   positional vector aligned with df rows)
 #' @param by_column_name name of the grouping column for display
 #' @param language "en" or "nl"
 #' @return DT::datatable with score statistics per group
@@ -177,9 +208,8 @@ generate_grouped_score_table <- function(
   by_column_name,
   language = "en"
 ) {
-  # Add group column to df
-  df_grouped <- df |>
-    dplyr::mutate(.by_group = by_values)
+  # Join group column to df
+  df_grouped <- .join_by_group(df, by_values)
 
   # Calculate statistics per group
   stats_table <- df_grouped |>
