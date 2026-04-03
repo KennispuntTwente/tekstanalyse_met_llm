@@ -108,11 +108,20 @@ generate_codes_by_reading_texts <- function(
     n_tokens_context_window <- 2048
   }
 
+  # Subtract prompt overhead so chunks don't overflow once the prompt is added
+  base_prompt_text <- prompt_candidate_topics(
+    text_chunk = c(""),
+    research_background = research_background,
+    language = language
+  ) |>
+    tidyprompt::construct_prompt_text()
+
   chunks <- create_text_chunks(
     split_texts,
     chunk_size = 50,
     draws = 1,
-    n_tokens_context_window = n_tokens_context_window
+    n_tokens_context_window = n_tokens_context_window,
+    base_prompt_text = base_prompt_text
   )
   print_message(paste0(
     "Created ",
