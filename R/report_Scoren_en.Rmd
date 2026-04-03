@@ -45,6 +45,12 @@ if (
 ```{r echo=FALSE, results='asis', error=TRUE}
 if (!is.null(rl$irr)) {
   sensitivity_sentence <- htmltools::htmlEscape(rl$irr$sensitivity_sentence)
+  # Guard against NaN values from degenerate t-test (constant/equal scores)
+  irr_statistic <- ifelse(is.nan(rl$irr$statistic), 0, rl$irr$statistic)
+  irr_p_value <- ifelse(is.nan(rl$irr$p.value), 1, rl$irr$p.value)
+  irr_estimate <- ifelse(is.nan(rl$irr$estimate), 0, rl$irr$estimate)
+  irr_conf_low <- ifelse(is.nan(rl$irr$conf.low), NA, rl$irr$conf.low)
+  irr_conf_high <- ifelse(is.nan(rl$irr$conf.high), NA, rl$irr$conf.high)
   cat(paste0(
     "### Reliability\n",
     "The inter-rater reliability between the language model and a human rater was calculated.",
@@ -52,23 +58,23 @@ if (!is.null(rl$irr)) {
     rl$irr$subjects, " texts was taken.",
     "A paired t-test was used to compare the scores given by the language model with those given by the human rater.",
     " The mean difference between the scores is ",
-    round(rl$irr$estimate, 2), " (95% CI [",
-    round(rl$irr$conf.low, 2), ", ",
-    round(rl$irr$conf.high, 2), "];",
+    round(irr_estimate, 2), " (95% CI [",
+    round(irr_conf_low, 2), ", ",
+    round(irr_conf_high, 2), "];",
     " mean language model = ", round(rl$irr$llm_mean, 2),
     " [sd = ", round(rl$irr$llm_sd, 2), "];",
     " mean human rater = ", round(rl$irr$user_mean, 2),
     " [sd = ", round(rl$irr$user_sd, 2), "]).",
     " This is a  ",
     dplyr::case_when(
-      rl$irr$p.value < 0.05 ~ "significant",
+      irr_p_value < 0.05 ~ "significant",
       TRUE ~ "not significant"
     ),
     " difference (t(", rl$irr$parameter, ") = ",
-    round(rl$irr$statistic, 3), ", p = ", round(rl$irr$p.value, 3), ") ",
+    round(irr_statistic, 3), ", p = ", round(irr_p_value, 3), ") ",
     " and can be interpreted as ",
     dplyr::case_when(
-      rl$irr$p.value >= 0.05 ~ "an agreement between the scores of the language model and the human rater",
+      irr_p_value >= 0.05 ~ "an agreement between the scores of the language model and the human rater",
       rl$irr$llm_mean > rl$irr$user_mean ~ "an overestimation of the scores by the language model",
       rl$irr$llm_mean < rl$irr$user_mean ~ "an underestimation of the scores by the language model",
       TRUE ~ "?"

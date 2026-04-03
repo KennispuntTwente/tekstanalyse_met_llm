@@ -628,6 +628,18 @@ interrater_server <- function(
 
                 # Combine tidy t-test result with summary stats
                 t_test_summary <- t_test_result |> broom::tidy()
+
+                # Guard against degenerate cases where all score
+                # differences are zero (constant/equal scores).
+                # t.test() returns NaN for statistic and p.value in
+                # this scenario.
+                if (is.nan(t_test_summary$statistic)) {
+                  t_test_summary$statistic <- 0
+                }
+                if (is.nan(t_test_summary$p.value)) {
+                  t_test_summary$p.value <- 1
+                }
+
                 summary_stats <- list(
                   user_mean = mean(user_scores, na.rm = TRUE),
                   user_sd = sd(user_scores, na.rm = TRUE),
