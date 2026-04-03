@@ -1,6 +1,5 @@
-# Module responsible for launching the process & showing progress
-# Will also stop the app and return the results once done
-# See start of moduleServer for more details about the process
+# Module responsible for launching analysis runs, showing progress,
+# and preparing downloadable results
 
 # 1 UI -------------------------------------------------------------------------
 
@@ -64,42 +63,30 @@ processing_server <- function(
       # Keeps the reactive state for one analysis run.
       # These values track progress, results, download state, and completion.
 
-      # Basic overview of the process:
-      #   > Listen for start button click
-      #   > Start processing based on mode (categorization/scoring/topic modelling)
-      #     Processing happens async
-      #     Async because we don't want to block the Shiny app for other users
-      #     Because it is async, progress is written to a file
-      #   > Main process reads progress from the file and updates the progress bar
-      #   > When processing is done (i.e., value stored in 'results_df()'),
-      #     we join results with the original texts and store as 'final_results_df()'
-      #     (because we sent pre-processed, anonymized texts to the LLM)
-      #   > If interrater reliability is toggled, we run the interrater reliability
-      #     module
-      #   > Create result list with all the results, including metadata.
-      #     Also create Excel and Rmarkdown files with the results
-      #   > Make download available
+      ### 2.1.1 Run state ------------------------------------------------------
 
-      # Processing state management with reactive values:
-      #   processing: reactiveVal to keep track of processing state
-      #     This is used to disable input fields during processing
-      #   uuid: reactiveVal to store the UUID of the current processing task
-      #   results_df: reactiveVal to store the raw results of the processing task
-      #     (Has preprocessed texts instead of original texts)
-      #   final_results_df: reactiveVal to store the final results df
-      #     (Has original texts instead of preprocessed texts)
-      #   irr_done: reactiveVal to keep track of interrater reliability state
-      #       Goes to TRUE when interrater reliability is done or not needed
-      #   irr_result: reactiveVal to store the interrater reliability result
-      #   preparing_download: reactiveVal to indicate we are preparing the download
-      #     Enables showing a loading animation
-      #   zip_file: reactiveVal to store the path to the zip file
-      #     Is populated when the files are ready, and passed to the download handler
-      #   topics: reactiveVal to store topics
-      #   topics_definitive: reactiveVal to keep track of whether the topics are definitive
-      #     Is false when the user is editing the topics, otherwise true
-      #   success: reactiveVal to keep track of whether the processing
-      #     has finished successfully. Used for automated testing
+      # Basic overview of the process:
+      #   > Wait for the process button click
+      #   > Dispatch to the active mode's async flow
+      #   > Store the worker result in `results_df()`
+      #   > Join worker output back to the original texts in `final_results_df()`
+      #   > Optionally run interrater reliability
+      #   > Build the export bundle and expose the download UI
+
+      # Key reactive state for one analysis run:
+      #   processing: TRUE while an analysis is actively running
+      #   started: TRUE once a run has been launched, even after processing ends
+      #   results_df: raw worker output based on preprocessed texts
+      #   final_results_df: worker output joined back to original texts
+      #   irr_done: TRUE once interrater reliability is finished or skipped
+      #   irr_result: stored interrater reliability result
+      #   preparing_download: TRUE while export files are being created
+      #   zip_file: path to the prepared download bundle
+      #   topics: generated or edited topics for topic modelling
+      #   exclusive_topics: topics that must remain exclusive
+      #   topics_definitive: TRUE once the topic list is finalized
+      #   success: TRUE once the full flow reaches download-ready state
+      #   analysis_started_at: click timestamp used for end-to-end timing
       processing <- reactiveVal(FALSE)
       started <- reactiveVal(FALSE)
       results_df <- reactiveVal(NULL)
@@ -116,6 +103,9 @@ processing_server <- function(
       # Timestamp for end-to-end duration (click -> download-ready)
       analysis_started_at <- reactiveVal(NULL)
 
+      ### 2.1.2 Test exports ---------------------------------------------------
+
+      # Export a small state snapshot so tests can wait for milestones.
       shiny::exportTestValues(
         processing = processing(),
         started = started(),
@@ -123,7 +113,7 @@ processing_server <- function(
         final_results_df = final_results_df()
       )
 
-      # UUID for the current processing task
+      # Stable identifier for the current processing task and export bundle
       uuid <- uuid::UUIDgenerate()
 
       ## 2.2 Launch setup ------------------------------------------------------
@@ -131,33 +121,21 @@ processing_server <- function(
       # Prepares the shared launch rules used before any mode starts.
       # This keeps common startup checks and helper wiring in one place.
 
-      # Launch processing when button is clicked;
-      #   set reactive values to keep track of processing state
-      #   and store the UUID of the current processing task
-      #   Prevent multiple processing tasks from running at the same time
-      #   Run asynchronous processing using mirai
-      #     (to prevent blocking the Shiny app)
+      ### 2.2.1 Launch validation helpers --------------------------------------
 
-      # Helper to check if number of texts is under maximum
-      # TODO: set different maximum, or set limits per user?
+      # Keep simple launch checks in shared utilities so all modes use the same
+      # counting and max-text rule.
       number_of_texts_under_maximum <- function(
         maximum = getOption("processing__max_texts", 3000)
       ) {
-        if (length(texts$preprocessed) > maximum) {
-          shiny::showNotification(
-            paste0(
-              lang()$t("Je mag maximaal "),
-              maximum,
-              lang()$t(" teksten analyseren.")
-            ),
-            type = "error"
-          )
-          return(FALSE)
-        }
-        return(TRUE)
+        processing_texts_under_maximum(
+          preprocessed_texts = texts$preprocessed,
+          lang = lang(),
+          maximum = maximum
+        )
       }
 
-      ### 2.2.1 Shared launch helpers ------------------------------------------
+      ### 2.2.2 Shared launch helpers ------------------------------------------
 
       # These helpers are used by all modes to keep process startup,
       # promise wiring, and failure handling consistent.
@@ -277,6 +255,8 @@ processing_server <- function(
       # Handles the categorization mode.
       # Validation and async launch logic stay local to this mode.
 
+      ### 2.3.1 Validation -----------------------------------------------------
+
       categorization_inputs_are_valid <- function() {
         if (categories$editing()) {
           shiny::showNotification(
@@ -299,6 +279,9 @@ processing_server <- function(
         TRUE
       }
 
+      ### 2.3.2 Worker launch --------------------------------------------------
+
+      # Runs categorization for all texts and optionally writes category paragraphs.
       start_categorization <- function() {
         req(texts$preprocessed)
         if (!number_of_texts_under_maximum()) {
@@ -407,6 +390,8 @@ processing_server <- function(
       # Handles the scoring mode.
       # Validation and async launch logic stay local to this mode.
 
+      ### 2.4.1 Validation -----------------------------------------------------
+
       scoring_input_is_valid <- function() {
         if (isTRUE(nchar(scoring_characteristic()) < 1)) {
           shiny::showNotification(
@@ -419,6 +404,9 @@ processing_server <- function(
         TRUE
       }
 
+      ### 2.4.2 Worker launch --------------------------------------------------
+
+      # Runs scoring for all texts. Unlike categorization, no paragraph step follows.
       start_scoring <- function() {
         req(texts$preprocessed)
         if (!number_of_texts_under_maximum()) {
@@ -620,6 +608,8 @@ processing_server <- function(
           lang = lang
         )
 
+        # The edit module returns later, so this observer completes the handoff
+        # back into the main topic-modelling flow.
         edited_topics_observer <- observe(
           {
             req(edited_topics())
@@ -638,6 +628,7 @@ processing_server <- function(
         req(topics())
         req(!topics_definitive())
 
+        # Normalize the exclusive-topic list before the next step uses it.
         # Set 'Onbekend/niet van toepassing' as exclusive topic (if present)
         if (lang()$t("Onbekend/niet van toepassing") %in% topics()) {
           exclusive_topics(c(
@@ -812,6 +803,7 @@ processing_server <- function(
           return()
         }
 
+        # Topic generation/editing ends here; assignment becomes a separate step.
         start_topic_assignment()
       })
 
@@ -820,7 +812,7 @@ processing_server <- function(
       # Handles the marking mode.
       # This groups the marking validation and async worker launch together.
 
-      # Validation and async launch helpers for marking mode live here.
+      ### 2.6.1 Validation -----------------------------------------------------
 
       codes_are_valid <- function() {
         # User must be done editing codes
@@ -855,6 +847,10 @@ processing_server <- function(
         return(TRUE)
       }
 
+      ### 2.6.2 Worker launch --------------------------------------------------
+
+      # Runs the marking flow, including chunking-aware analysis and optional
+      # report paragraphs.
       # Starts the async worker for marking mode.
       # Kept separate so the marking validation and worker call do not clutter
       # the shared process observer.
@@ -935,12 +931,8 @@ processing_server <- function(
 
       ### 2.7.1 Process dispatch -----------------------------------------------
 
-      # One observer handles the process button and routes to the correct
-      # mode-specific launcher above.
-
-      # Single process-button observer for all modes.
-      # It logs the click once and dispatches to the correct mode-specific start
-      # helper.
+      # Single process-button observer.
+      # Logs the click once and dispatches to the matching mode-specific starter.
       observeEvent(input$process, {
         if (processing()) {
           return()
@@ -1130,9 +1122,6 @@ processing_server <- function(
       # Handles the first result coming back from a worker.
       # This restores raw texts, finishes the UI, and starts IRR when needed.
 
-      # Listen for processing completion
-      # Join results with original texts
-      # Launch interrater reliability module if required
       observeEvent(results_df(), {
         req(results_df())
         log_debug(
@@ -1145,11 +1134,10 @@ processing_server <- function(
           worker_results_df = results_df()
         )
 
-        # Store final results df
+        # Keep a copy that is aligned with the original uploaded texts.
         final_results_df(df)
 
-        # Verify that df actually has results
-        # (sometimes we have API failure, then result/topic contains NA values)
+        # NA results indicate a failed worker response and should abort the flow.
         if (anyNA(df$result)) {
           log_action(
             "analysis_failed",
@@ -1172,6 +1160,7 @@ processing_server <- function(
         finalize_processing_ui()
 
         if (interrater_reliability_toggle()) {
+          # Only categorization-style modes need a category set for IRR.
           all_categories <-
             if (exists("all_categories")) {
               all_categories
@@ -1198,7 +1187,7 @@ processing_server <- function(
 
           irr <- interrater_server(
             id = "rater_modal",
-            rating_data = df, # Use the prepared data
+            rating_data = df,
             text_col = "text",
             all_categories = all_categories,
             mode = mode(),
@@ -1227,8 +1216,6 @@ processing_server <- function(
       # Continues once inter-rater reliability is done or skipped.
       # This builds the result bundle and starts download preparation.
 
-      # Listen for inter-rater reliability completion
-      # Prepare files for download
       observeEvent(
         irr_done(),
         {
@@ -1237,7 +1224,7 @@ processing_server <- function(
           }
           result_list <- create_result_list()
 
-          # If any in 'result_list$df$result' are NA, show a warning
+          # Abort if invalid results still made it this far.
           error <- anyNA(result_list$df$result)
           if (error) {
             app_error(
@@ -1259,7 +1246,6 @@ processing_server <- function(
       # Shows the loading state while files are being prepared.
       # This switches to the download and restart controls once ready.
 
-      # Loading animation during download preparation
       output$download_ui <- renderUI({
         req(preparing_download())
         if (is.null(zip_file())) {
@@ -1275,7 +1261,7 @@ processing_server <- function(
             p(lang()$t("Download wordt voorbereid..."))
           )
         } else {
-          # Download & restart button
+          # Once the bundle exists, swap the spinner for the action buttons.
           tagList(
             uiOutput(ns("download_button")),
             uiOutput(ns("restart_button"))
@@ -1288,9 +1274,6 @@ processing_server <- function(
       # Runs when the zip file is ready for the user.
       # This logs timing, exposes the download handler, and shows restart.
 
-      # Listen for when download (zip file) is ready
-      # Present download button
-      # Present restart button
       observeEvent(zip_file(), {
         if (is.null(zip_file())) {
           return()
@@ -1373,7 +1356,6 @@ processing_server <- function(
           component = "output"
         )
 
-        # Create download handler
         output$download_results <- downloadHandler(
           filename = function() {
             paste0(uuid, ".zip")
@@ -1400,7 +1382,6 @@ processing_server <- function(
           contentType = "application/zip; charset=utf-8"
         )
 
-        # Render download button (this triggers the spinner while rendering)
         output$download_button <- renderUI({
           div(
             class = "text-center",
@@ -1413,7 +1394,6 @@ processing_server <- function(
           )
         })
 
-        # Render restart button
         output$restart_button <- renderUI({
           div(
             class = "text-center",
@@ -1431,7 +1411,7 @@ processing_server <- function(
           )
         })
 
-        # Set 'success' to TRUE; process is done
+        # Reaching download-ready state marks the full flow as successful.
         success(TRUE)
       })
 
@@ -1440,8 +1420,6 @@ processing_server <- function(
       # Lets the user start over after a completed run.
       # This shows a confirmation modal and reloads the session if confirmed.
 
-      # Restart button listener
-      # Launches modal dialog to confirm restart
       observeEvent(input$restart, {
         showModal(modalDialog(
           title = lang()$t("Nieuwe analyse starten?"),
@@ -1463,8 +1441,6 @@ processing_server <- function(
         ))
       })
 
-      # Confirm restart button listener
-      # Reloads the app
       observeEvent(input$confirm_restart, {
         log_action(
           "analysis_restart_confirmed",
@@ -1519,9 +1495,10 @@ processing_server <- function(
           return(NULL)
         }
 
+        # Count shown on the button reflects the preprocessed texts that will
+        # actually be sent into the active analysis flow.
         n_pre <- n_preprocessed_texts()
 
-        # Build the label based on mode
         btn_label <- switch(
           mode(),
           "Categorisatie" = paste0(lang()$t("Categoriseer"), " (", n_pre, ")"),
@@ -1533,7 +1510,6 @@ processing_server <- function(
             ")"
           ),
           "Markeren" = paste0(lang()$t("Markeer"), " (", n_pre, ")"),
-          # fallback
           paste0(lang()$t("Verwerk"), " (", n_pre, ")")
         )
 
@@ -1555,7 +1531,7 @@ processing_server <- function(
       # Handles cancellation and session shutdown while processing runs.
       # This makes sure async work can be stopped cleanly when needed.
 
-      # Interrupter can stop async processing if user quits
+      # Shared interrupter for cancellation and session shutdown.
       interrupter <- ipc::AsyncInterruptor$new()
 
       shiny::onStop(function() {
@@ -1572,9 +1548,8 @@ processing_server <- function(
 
       output$cancel_button <- renderUI({
         req(isTRUE(processing()))
-        # Not preparing download
+        # Cancellation is only available while analysis is still running.
         req(!isTRUE(preparing_download()))
-        # Not zip file ready
         req(is.null(zip_file()))
 
         actionButton(
@@ -1589,7 +1564,6 @@ processing_server <- function(
         )
       })
 
-      # Cancel button observer
       observeEvent(input$cancel, {
         req(isTRUE(processing()))
 
@@ -1598,7 +1572,6 @@ processing_server <- function(
           details = sprintf("mode=%s", mode() %||% "unknown")
         )
 
-        # Show modal dialog to confirm cancellation
         removeModal()
         showModal(modalDialog(
           title = lang()$t("Annuleren?"),
@@ -1620,7 +1593,6 @@ processing_server <- function(
         ))
       })
 
-      # Confirm cancel button observer
       observeEvent(input$confirm_cancel, {
         req(isTRUE(processing()))
 
@@ -1639,10 +1611,12 @@ processing_server <- function(
       # Returns a small processing interface to other modules.
       # The function reports current state and exposes simple reactive flags.
 
+      # The callable itself answers "is processing active right now?".
       processing_fn <- function() {
         processing()
       }
 
+      # These attributes expose coarse milestones without leaking internals.
       attr(processing_fn, "has_started") <- reactive({
         isTRUE(started()) ||
           isTRUE(processing()) ||

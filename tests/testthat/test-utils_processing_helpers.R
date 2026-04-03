@@ -21,6 +21,33 @@ test_that("collect_grouped_texts groups by result or binary columns", {
   )
 })
 
+test_that("processing_texts_under_maximum validates count and notifies", {
+  lang <- list(t = function(x) x)
+  notification <- NULL
+
+  notify_fn <- function(message, type = NULL) {
+    notification <<- list(message = message, type = type)
+    invisible(NULL)
+  }
+
+  expect_true(processing_texts_under_maximum(
+    preprocessed_texts = c("a", "b"),
+    lang = lang,
+    maximum = 2,
+    notify_fn = notify_fn
+  ))
+  expect_null(notification)
+
+  expect_false(processing_texts_under_maximum(
+    preprocessed_texts = c("a", "b", "c"),
+    lang = lang,
+    maximum = 2,
+    notify_fn = notify_fn
+  ))
+  expect_identical(notification$type, "error")
+  expect_match(notification$message, "Je mag maximaal 2 teksten analyseren\\.")
+})
+
 
 test_that("join_processing_results restores raw texts and paragraph attribute", {
   texts_df <- data.frame(

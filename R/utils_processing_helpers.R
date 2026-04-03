@@ -1,5 +1,43 @@
 # Helpers shared by the main processing module.
 
+# 1 Launch helpers -------------------------------------------------------------
+
+#' Check whether the number of texts stays under the configured maximum
+#'
+#' Used in `module_core_processing` before launching async work.
+#'
+#' @param preprocessed_texts Character vector of preprocessed texts, or `NULL`.
+#' @param lang Translator object used for the validation message.
+#' @param maximum Maximum number of texts allowed.
+#' @param notify_fn Function used to show the error notification.
+#'
+#' @return `TRUE` when processing may continue, otherwise `FALSE`.
+processing_texts_under_maximum <- function(
+  preprocessed_texts,
+  lang,
+  maximum = getOption("processing__max_texts", 3000),
+  notify_fn = shiny::showNotification
+) {
+  n_texts <- length(preprocessed_texts %||% character(0))
+
+  if (n_texts > maximum) {
+    notify_fn(
+      paste0(
+        lang$t("Je mag maximaal "),
+        maximum,
+        lang$t(" teksten analyseren.")
+      ),
+      type = "error"
+    )
+    return(FALSE)
+  }
+
+  TRUE
+}
+
+
+# 2 Report and paragraph helpers -----------------------------------------------
+
 #' Check whether a mode should generate a HTML report
 #'
 #' Used in `module_core_processing` when preparing download files.
@@ -33,15 +71,18 @@ collect_grouped_texts <- function(results, labels, assign_multiple_categories) {
   names(grouped_texts) <- labels
 
   if (!isTRUE(assign_multiple_categories)) {
+    # Single-label results store the chosen label in one `result` column.
     for (label in labels) {
       grouped_texts[[label]] <- results$text[results$result == label]
     }
   } else {
+    # Multi-label results store one logical column per label.
     for (label in labels) {
       grouped_texts[[label]] <- results$text[results[[label]]]
     }
   }
 
+  # Skip empty groups so later paragraph-writing only sees labels with texts.
   grouped_texts[
     purrr::map_lgl(grouped_texts, ~ isTRUE(length(.x) > 0))
   ]
@@ -84,11 +125,13 @@ write_grouped_paragraphs <- function(
 ) {
   stopifnot(is.list(grouped_texts), !is.null(names(grouped_texts)))
 
+  # No groups means there is nothing to summarize.
   if (!length(grouped_texts)) {
     return(list())
   }
 
   if (!is.null(progress_secondary)) {
+    # Reuse the secondary bar to show paragraph progress per group.
     progress_secondary$show()
     progress_secondary$set_with_total(0, length(grouped_texts), "...")
     on.exit(progress_secondary$hide(), add = TRUE)
@@ -96,6 +139,7 @@ write_grouped_paragraphs <- function(
 
   stream_callback <- NULL
   if (isTRUE(streaming_enabled) && !is.null(llm_stream_async)) {
+    # Stream partial paragraph text into the UI while the model is writing.
     llm_stream_async$show()
     stream_callback <- function(token, meta) {
       partial_response <- meta$partial_response
@@ -130,6 +174,7 @@ write_grouped_paragraphs <- function(
         llm_stream_async$clear()
       }
 
+      # Write one paragraph for one category/topic.
       write_paragraph(
         texts = topic_texts,
         topic = topic_name,
@@ -143,6 +188,8 @@ write_grouped_paragraphs <- function(
   )
 }
 
+
+# 3 Result assembly helpers ----------------------------------------------------
 
 #' Join worker results back to the original uploaded texts
 #'
@@ -159,6 +206,8 @@ write_grouped_paragraphs <- function(
 join_processing_results <- function(texts_df, worker_results_df) {
   stopifnot(is.data.frame(texts_df), is.data.frame(worker_results_df))
 
+  # Join by the preprocessed text the worker actually saw, then restore the raw
+  # uploaded text as the main `text` column.
   final_df <- texts_df |>
     dplyr::left_join(
       worker_results_df,
@@ -227,6 +276,7 @@ build_processing_result_list <- function(
   context_window = list(),
   prompt_text = NULL
 ) {
+  # Base fields are shared across all modes.
   result_list <- list(
     df = final_results_df,
     time = Sys.time(),
@@ -241,6 +291,7 @@ build_processing_result_list <- function(
   )
 
   if (mode == "Categorisatie") {
+    # Deductive categorization stores the configured categories and prompt.
     result_list$model <- models$main$parameters$model
     result_list$categories <- categories
     result_list$exclusive_categories <- exclusive_categories
@@ -251,12 +302,14 @@ build_processing_result_list <- function(
   }
 
   if (mode == "Scoren") {
+    # Scoring needs the main model and the characteristic definition.
     result_list$model <- models$main$parameters$model
     result_list$scoring_characteristic <- scoring_characteristic
     result_list$prompt <- prompt_text
   }
 
   if (mode == "Onderwerpextractie") {
+    # Topic extraction records both models plus chunking settings used upstream.
     result_list$model <- models$main$parameters$model
     result_list$model_reductie <- models$large$parameters$model
     result_list$topics <- topics
@@ -280,6 +333,7 @@ build_processing_result_list <- function(
   }
 
   if (mode == "Markeren") {
+    # Marking stores code definitions and chunk overlap settings.
     result_list$model <- models$main$parameters$model
     result_list$codes <- codes
     result_list$write_paragraphs <- write_paragraphs
@@ -290,12 +344,15 @@ build_processing_result_list <- function(
 
   paragraphs <- attr(final_results_df, "paragraphs")
   if (!is.null(paragraphs)) {
+    # Paragraphs are stored as an attribute on the results data frame.
     result_list$paragraphs <- paragraphs
   }
 
   result_list
 }
 
+
+# 4 Export helpers -------------------------------------------------------------
 
 #' Write the result bundle to Excel
 #'
@@ -318,6 +375,8 @@ write_processing_result_excel <- function(result_list, temp_dir = tempdir()) {
     paste0("data_", result_list$uuid, "_error.txt")
   )
 
+  # Convert each element in the result bundle to something writexl can store as
+  # one worksheet.
   safe_write_xlsx <- function(result_list, excel_file) {
     sheets <- lapply(result_list, function(x) {
       if (is.null(x)) {
@@ -338,6 +397,8 @@ write_processing_result_excel <- function(result_list, temp_dir = tempdir()) {
           return(df)
         }
 
+        # Fall back to captured printed output for list objects that do not map
+        # cleanly to a data frame.
         captured <- capture.output(print(x))
         return(data.frame(
           captured_output = captured,
@@ -462,6 +523,8 @@ create_processing_download_bundle <- function(
       stop("Output file not found, no error available")
     }
     if (grepl("\\.txt$", file)) {
+      # Export helpers write `.txt` files on failure, so surface those as real
+      # errors before zipping.
       label <- if (grepl("^data_", basename(file))) {
         "Excel file"
       } else {
@@ -479,6 +542,9 @@ create_processing_download_bundle <- function(
     temp_dir,
     paste0(uuid::UUIDgenerate(), "_results.zip")
   )
+
+  # Zip the generated files relative to the output directory so the archive
+  # contains clean filenames.
   zip::zipr(
     zipfile = zip_path,
     files = files,
@@ -487,6 +553,9 @@ create_processing_download_bundle <- function(
 
   zip_path
 }
+
+
+# 5 UI helpers -----------------------------------------------------------------
 
 #' Disable inputs when processing is active
 #'
