@@ -59,8 +59,12 @@ test_that("text_split_server: returns raw texts when toggle is off", {
       texts <- split_result$texts
       source_texts <- split_result$source_texts
 
-      list(texts = texts, source_texts = source_texts,
-           raw_texts = raw_texts, lang = lang)
+      list(
+        texts = texts,
+        source_texts = source_texts,
+        raw_texts = raw_texts,
+        lang = lang
+      )
     },
     {
       expect_equal(texts(), raw_texts())
@@ -158,8 +162,12 @@ test_that("text_split_server: clicking split produces split texts (sync-mocked m
       texts <- split_result$texts
       source_texts <- split_result$source_texts
 
-      list(texts = texts, source_texts = source_texts,
-           raw_texts = raw_texts, lang = lang)
+      list(
+        texts = texts,
+        source_texts = source_texts,
+        raw_texts = raw_texts,
+        lang = lang
+      )
     },
     {
       # Turn splitting on.

@@ -80,7 +80,7 @@ test_that(".join_by_group works with chunk-aware lookup from split texts", {
   expect_equal(nrow(out), 3)
   expect_equal(out$.by_group, c("G1", "G1", "G2"))
   # No NAs — every chunk is matched
-  expect_false(any(is.na(out$.by_group)))
+  expect_false(anyNA(out$.by_group))
 })
 
 test_that("generate_grouped_freq_table_single works with dedup data frame", {

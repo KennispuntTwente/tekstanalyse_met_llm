@@ -591,7 +591,9 @@ main_server <- function(
       sources <- split_source_texts()
       current_texts <- split_texts()
 
-      if (is.null(original_lookup) || is.null(sources) || is.null(current_texts)) {
+      if (
+        is.null(original_lookup) || is.null(sources) || is.null(current_texts)
+      ) {
         return(original_lookup)
       }
 
