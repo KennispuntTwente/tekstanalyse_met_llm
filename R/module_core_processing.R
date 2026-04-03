@@ -600,8 +600,37 @@ processing_server <- function(
 
       ### 2.5.2 Topic editing --------------------------------------------------
 
-      # Reacts when generated topics are ready.
-      # This either auto-confirms them or opens the editing step for the user.
+      # Launches the optional topic-editing step.
+      # Used after topic generation when human review is enabled.
+
+      start_topic_editing <- function() {
+        progress_primary$set_with_total(
+          2.5,
+          5,
+          lang()$t("Onderwerpen bewerken...")
+        )
+
+        edited_topics <- edit_topics_server(
+          "edit_topics",
+          topics = topics,
+          exclusive_topics = exclusive_topics,
+          llm_provider = models$large,
+          research_background = research_background,
+          assign_multiple_categories = assign_multiple_categories,
+          lang = lang
+        )
+
+        edited_topics_observer <- observe(
+          {
+            req(edited_topics())
+            topics(edited_topics())
+            topics_definitive(TRUE)
+            edited_topics_observer$suspend()
+          },
+          suspended = FALSE,
+          autoDestroy = TRUE
+        )
+      }
 
       # Listens for topics becoming available.
       # Opens editing when human review is enabled, otherwise auto-confirms.
@@ -627,36 +656,7 @@ processing_server <- function(
           return()
         }
 
-        # Human in the loop, so launch topic editing...
-        progress_primary$set_with_total(
-          2.5,
-          5,
-          lang()$t("Onderwerpen bewerken...")
-        )
-
-        # Launch modal dialog to edit topics
-        edited_topics <- edit_topics_server(
-          "edit_topics",
-          topics = topics,
-          exclusive_topics = exclusive_topics,
-          llm_provider = models$large,
-          research_background = research_background,
-          assign_multiple_categories = assign_multiple_categories,
-          lang = lang
-        )
-
-        # When edited_topics is no longer NULL,
-        #   set the topics and mark them as definitive
-        edited_topics_observer <- observe(
-          {
-            req(edited_topics())
-            topics(edited_topics())
-            topics_definitive(TRUE)
-            edited_topics_observer$suspend()
-          },
-          suspended = FALSE,
-          autoDestroy = TRUE
-        )
+        start_topic_editing()
       })
 
       ### 2.5.3 Topic assignment -----------------------------------------------
