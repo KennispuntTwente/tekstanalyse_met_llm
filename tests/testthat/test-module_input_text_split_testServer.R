@@ -49,24 +49,29 @@ test_that("text_split_server: returns raw texts when toggle is off", {
       processing <- reactiveVal(FALSE)
       lang <- make_test_lang("nl")
 
-      texts <- text_split_server(
+      split_result <- text_split_server(
         id = "split",
         raw_texts = raw_texts,
         processing = processing,
         lang = lang,
         enabled = TRUE
       )
+      texts <- split_result$texts
+      source_texts <- split_result$source_texts
 
-      list(texts = texts, raw_texts = raw_texts, lang = lang)
+      list(texts = texts, source_texts = source_texts,
+           raw_texts = raw_texts, lang = lang)
     },
     {
       expect_equal(texts(), raw_texts())
+      expect_null(source_texts())
 
       # Explicitly set toggle to "Nee" (default) to ensure stability.
       session$setInputs(`split-toggle` = lang()$t("Nee"))
       session$flushReact()
 
       expect_equal(texts(), raw_texts())
+      expect_null(source_texts())
     }
   )
 })
@@ -143,15 +148,18 @@ test_that("text_split_server: clicking split produces split texts (sync-mocked m
       processing <- reactiveVal(FALSE)
       lang <- make_test_lang("nl")
 
-      texts <- text_split_server(
+      split_result <- text_split_server(
         id = "split",
         raw_texts = raw_texts,
         processing = processing,
         lang = lang,
         enabled = TRUE
       )
+      texts <- split_result$texts
+      source_texts <- split_result$source_texts
 
-      list(texts = texts, raw_texts = raw_texts, lang = lang)
+      list(texts = texts, source_texts = source_texts,
+           raw_texts = raw_texts, lang = lang)
     },
     {
       # Turn splitting on.
@@ -175,11 +183,16 @@ test_that("text_split_server: clicking split produces split texts (sync-mocked m
       expect_true(length(texts()) > length(raw_texts()))
       expect_true(all(grepl("__", texts(), fixed = TRUE)))
 
+      # source_texts maps each chunk back to its original text
+      expect_equal(length(source_texts()), length(texts()))
+      expect_true(all(source_texts() %in% c("alpha", "beta")))
+
       # Changing raw texts resets prior split results.
       raw_texts(c("gamma"))
       session$flushReact()
 
       expect_equal(texts(), c("gamma"))
+      expect_null(source_texts())
     }
   )
 })

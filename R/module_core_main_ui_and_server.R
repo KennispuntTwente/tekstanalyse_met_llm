@@ -574,12 +574,46 @@ main_server <- function(
     by_column_lookup <- text_upload_result$by_column_lookup
 
     # Split texts
-    split_texts <- text_split_server(
+    split_result <- text_split_server(
       "text_split",
       processing = processing,
       raw_texts = raw_texts,
       lang = lang
     )
+    split_texts <- split_result$texts
+    split_source_texts <- split_result$source_texts
+    split_in_progress <- split_result$split_in_progress
+
+    # When splitting is active, remap the by_column_lookup so that each
+    # chunk is associated with the groups of its original (source) text.
+    split_by_column_lookup <- reactive({
+      original_lookup <- by_column_lookup()
+      sources <- split_source_texts()
+      current_texts <- split_texts()
+
+      if (is.null(original_lookup) || is.null(sources) || is.null(current_texts)) {
+        return(original_lookup)
+      }
+
+      # Build a new lookup: for each chunk, find the groups of its source text.
+      chunk_df <- data.frame(
+        chunk_text = current_texts,
+        source_text = sources,
+        stringsAsFactors = FALSE
+      )
+      merged <- merge(
+        chunk_df,
+        original_lookup,
+        by.x = "source_text",
+        by.y = "text",
+        all.x = TRUE
+      )
+      data.frame(
+        text = merged$chunk_text,
+        by_value = merged$by_value,
+        stringsAsFactors = FALSE
+      )
+    })
 
     # Pre-process texts, show table
     texts <- text_management_server(
@@ -724,7 +758,8 @@ main_server <- function(
       write_paragraphs = write_paragraphs_toggle,
       context_window = context_window,
       by_column_name = by_column_name,
-      by_column_lookup = by_column_lookup,
+      by_column_lookup = split_by_column_lookup,
+      split_in_progress = split_in_progress,
       lang = lang
     )
 

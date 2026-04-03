@@ -60,6 +60,29 @@ test_that(".join_by_group handles result df rows without a group match", {
   expect_equal(out$.by_group, c("G1", NA))
 })
 
+test_that(".join_by_group works with chunk-aware lookup from split texts", {
+  # After splitting, the by_column_lookup is remapped so that each chunk
+
+  # text is associated with the groups of its original source text.
+  df <- data.frame(
+    text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+    result = c("A", "B", "A"),
+    stringsAsFactors = FALSE
+  )
+  # Chunk-aware lookup: each chunk maps to the group(s) of its source text.
+  by_vals <- data.frame(
+    text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+    by_value = c("G1", "G1", "G2"),
+    stringsAsFactors = FALSE
+  )
+
+  out <- .join_by_group(df, by_vals)
+  expect_equal(nrow(out), 3)
+  expect_equal(out$.by_group, c("G1", "G1", "G2"))
+  # No NAs — every chunk is matched
+  expect_false(any(is.na(out$.by_group)))
+})
+
 test_that("generate_grouped_freq_table_single works with dedup data frame", {
   df <- data.frame(
     text = c("Text 1", "Text 2"),

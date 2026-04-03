@@ -53,11 +53,16 @@ text_split_server <- function(
     # Upon observing new raw texts, reset the split texts and message
     observeEvent(raw_texts(), {
       split_texts(NULL)
+      source_texts(NULL)
       semchunk_message("...")
     })
 
     # Reactive value which holds the split texts
     split_texts <- reactiveVal(NULL)
+
+    # Maps each split chunk back to its original text (same length as
+    # split_texts); NULL when not splitting.
+    source_texts <- reactiveVal(NULL)
 
     # Reactive value which holds text message about the splitting progress
     #   (set from async process via 'ipc' package, queue object)
@@ -86,6 +91,7 @@ text_split_server <- function(
       splitting = splitting,
       split_in_progress = split_in_progress,
       split_texts = split_texts,
+      source_texts = source_texts,
       semchunk_message = semchunk_message,
       max_tokens_val = max_tokens_val,
       overlap_val = overlap_val
@@ -275,7 +281,8 @@ text_split_server <- function(
         {
           result <- .
           split_in_progress(FALSE)
-          split_texts(result)
+          split_texts(result$texts)
+          source_texts(result$source_text)
 
           if (identical(raw_texts(), split_texts())) {
             semchunk_message(lang()$t(
@@ -393,7 +400,11 @@ text_split_server <- function(
     )
 
     # Return -------------------------------------------------------
-    return(texts)
+    return(list(
+      texts = texts,
+      source_texts = source_texts,
+      split_in_progress = split_in_progress
+    ))
   })
 }
 
@@ -420,15 +431,20 @@ split_texts_with_semchunk <- function(
     )
   }
 
-  result <- chunker(
+  chunks_list <- chunker(
     texts,
     progress = FALSE,
     offsets = FALSE,
     overlap = overlap
-  ) |>
-    unlist()
+  )
 
-  return(result)
+  # Build a source-text vector that maps each chunk back to its original text.
+  source_text <- rep(texts, times = lengths(chunks_list))
+
+  list(
+    texts = unlist(chunks_list),
+    source_text = source_text
+  )
 }
 
 # 3 Example/development usage ----------------------------------------
