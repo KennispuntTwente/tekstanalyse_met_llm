@@ -933,6 +933,8 @@ processing_server <- function(
       # Handles the shared pieces after the mode-specific launchers.
       # This routes the process button, finalizes UI, and prepares result data.
 
+      ### 2.7.1 Process dispatch -----------------------------------------------
+
       # One observer handles the process button and routes to the correct
       # mode-specific launcher above.
 
@@ -964,6 +966,8 @@ processing_server <- function(
         }
       })
 
+      ### 2.7.2 Processing completion UI ---------------------------------------
+
       # Resets the progress and streaming UI when processing finishes
       # successfully. Used after worker results are accepted.
       finalize_processing_ui <- function() {
@@ -980,6 +984,8 @@ processing_server <- function(
         llm_stream$async$stop()
         llm_stream$hide()
       }
+
+      ### 2.7.3 Prompt snapshot ------------------------------------------------
 
       # Builds the prompt example stored in the result bundle.
       # Used during download preparation so the prompt-building logic stays out
@@ -1023,6 +1029,8 @@ processing_server <- function(
         NULL
       }
 
+      ### 2.7.4 Result list assembly -------------------------------------------
+
       # Collects the final result bundle used for Excel/report generation.
       # Called after optional IRR so the download step works from one structured
       # object.
@@ -1065,6 +1073,8 @@ processing_server <- function(
 
         result_list
       }
+
+      ### 2.7.5 Download bundle preparation ------------------------------------
 
       # Starts the async file-generation and zipping step.
       # Used once results are final so the observer does not have to carry the
