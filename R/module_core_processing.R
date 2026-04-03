@@ -2,7 +2,10 @@
 # Will also stop the app and return the results once done
 # See start of moduleServer for more details about the process
 
-# 1 UI ----------------------------------------------------------------------
+# 1 UI -------------------------------------------------------------------------
+
+# Shows the processing controls and status areas.
+# This is the visible UI for starting work, tracking progress, and downloading.
 
 processing_ui <- function(id) {
   ns <- NS(id)
@@ -26,7 +29,10 @@ processing_ui <- function(id) {
 }
 
 
-# 2 Server ----------------------------------------------------------------
+# 2 Server ---------------------------------------------------------------------
+
+# Runs the full processing flow behind the UI.
+# This section manages async work, results, downloads, and user actions.
 
 processing_server <- function(
   id,
@@ -53,7 +59,11 @@ processing_server <- function(
   moduleServer(
     id,
     function(input, output, session) {
-      # Processing state management ------------------------------------
+      ## 2.1 State management --------------------------------------------------
+
+      # Keeps the reactive state for one analysis run.
+      # These values track progress, results, download state, and completion.
+
       # Basic overview of the process:
       #   > Listen for start button click
       #   > Start processing based on mode (categorization/scoring/topic modelling)
@@ -88,8 +98,8 @@ processing_server <- function(
       #   topics: reactiveVal to store topics
       #   topics_definitive: reactiveVal to keep track of whether the topics are definitive
       #     Is false when the user is editing the topics, otherwise true
-      #   succes: reactiveVal to keep track of whether the processing
-      #     has been finished succesfully. Used for automated testing
+      #   success: reactiveVal to keep track of whether the processing
+      #     has finished successfully. Used for automated testing
       processing <- reactiveVal(FALSE)
       started <- reactiveVal(FALSE)
       results_df <- reactiveVal(NULL)
@@ -116,7 +126,11 @@ processing_server <- function(
       # UUID for the current processing task
       uuid <- uuid::UUIDgenerate()
 
-      # Launch processing --------------------------------------------
+      ## 2.2 Launch setup ------------------------------------------------------
+
+      # Prepares the shared launch rules used before any mode starts.
+      # This keeps common startup checks and helper wiring in one place.
+
       # Launch processing when button is clicked;
       #   set reactive values to keep track of processing state
       #   and store the UUID of the current processing task
@@ -143,27 +157,172 @@ processing_server <- function(
         return(TRUE)
       }
 
-      ## Categorisation & scoring ------------------------------------
-      # Listen for process button click when in categorization or scoring mode
-      # Launch processing
-      observeEvent(input$process, {
-        if (processing()) {
-          return()
-        }
+      ### 2.2.1 Shared launch helpers ------------------------------------------
 
+      # These helpers are used by all modes to keep process startup,
+      # promise wiring, and failure handling consistent.
+
+      n_preprocessed_texts <- function() {
+        length(texts$preprocessed %||% character(0))
+      }
+
+      # Logs one standard "process clicked" event for all modes.
+      # Used by the shared process observer so the mode runners do not repeat it.
+      log_processing_click <- function() {
         log_action(
           "analysis_process_clicked",
           details = sprintf(
             "mode=%s n_texts=%d",
             mode() %||% "unknown",
-            length(texts$preprocessed %||% character(0))
+            n_preprocessed_texts()
           )
         )
+      }
 
-        req(texts$preprocessed)
-        if (!mode() %in% c("Categorisatie", "Scoren")) {
-          return()
+      # Performs the shared setup before an async analysis starts.
+      # Used by the mode-specific start helpers so state, timing, progress, and
+      # async log context are initialized in one place.
+      start_processing_run <- function(set_initial_progress = TRUE) {
+        started(TRUE)
+        processing(TRUE)
+        analysis_started_at(Sys.time())
+        log_analysis_start(
+          mode = mode(),
+          n_texts = n_preprocessed_texts(),
+          model = models$main$parameters$model %||% "unknown"
+        )
+
+        if (isTRUE(set_initial_progress)) {
+          progress_primary$set_with_total(0, n_preprocessed_texts(), "...")
         }
+
+        shinyjs::disable("process")
+        shinyjs::addClass("process", "loading")
+
+        log_context_capture(
+          is_async = TRUE,
+          mode = getOption("app__mode", "unknown")
+        )
+      }
+
+      # Handles failures from async processing promises.
+      # Used by all async branches so stream cleanup, logging, and `app_error()`
+      # stay consistent.
+      handle_processing_failure <- function(
+        err,
+        when,
+        stop_stream = TRUE,
+        hide_stream = TRUE
+      ) {
+        if (isTRUE(stop_stream)) {
+          llm_stream$async$stop()
+        }
+        if (isTRUE(hide_stream)) {
+          llm_stream$hide()
+        }
+
+        err_msg <- tryCatch(conditionMessage(err), error = function(e) {
+          as.character(err)
+        })
+        err_msg <- substr(err_msg, 1, 200)
+        err_class <- paste(class(err), collapse = "|")
+        log_action(
+          "analysis_failed",
+          details = sprintf(
+            "mode=%s when=%s error_class=%s error=%s",
+            mode() %||% "unknown",
+            when,
+            err_class,
+            err_msg
+          )
+        )
+        app_error(
+          err,
+          when = when,
+          fatal = TRUE,
+          lang = lang()
+        )
+      }
+
+      # Connects a `mirai` promise to a reactive setter plus shared error
+      # handling. Used by the start helpers to keep promise wiring short.
+      bind_async_result <- function(
+        promise,
+        setter,
+        when,
+        debug_message = NULL,
+        stop_stream = TRUE,
+        hide_stream = TRUE
+      ) {
+        promise %...>%
+          (function(value) setter(value)) %...!%
+          {
+            handle_processing_failure(
+              err = .,
+              when = when,
+              stop_stream = stop_stream,
+              hide_stream = hide_stream
+            )
+          }
+
+        if (!is.null(debug_message)) {
+          log_debug(debug_message, component = "analysis")
+        }
+
+        invisible(NULL)
+      }
+
+      ## 2.3 Categorisatie & scoren --------------------------------------------
+
+      # Handles the categorization and scoring modes.
+      # This groups their validation rules and async launch logic together.
+
+      # Validation and async launch helpers for the categorization and scoring
+      # modes live together here.
+
+      # Helper function to check if categories are valid
+      categories_are_valid <- function() {
+        # User must be done editing categories
+        if (categories$editing()) {
+          shiny::showNotification(
+            lang()$t(
+              "Je moet eerst de categorieen opslaan voordat je verder kunt gaan."
+            ),
+            type = "error"
+          )
+          return(FALSE)
+        }
+
+        # User must have at least 2 non-empty categories
+        if (categories$unique_non_empty_count() < 2) {
+          shiny::showNotification(
+            lang()$t("Je moet minimaal 2 categorieen opgeven."),
+            type = "error"
+          )
+          return(FALSE)
+        }
+
+        return(TRUE)
+      }
+
+      # Helper function to check if scoring characteristic is valid
+      scoring_characteristic_is_valid <- function() {
+        # User must have at least 1 non-empty scoring characteristic
+        if (isTRUE(nchar(scoring_characteristic()) < 1)) {
+          shiny::showNotification(
+            lang()$t("Geef een karakteristiek op."),
+            type = "error"
+          )
+          return(FALSE)
+        }
+
+        return(TRUE)
+      }
+
+      # Starts the async worker for categorization or scoring.
+      # Kept separate so the shared process observer only dispatches by mode.
+      start_categorization_or_scoring <- function() {
+        req(texts$preprocessed)
         if (!number_of_texts_under_maximum()) {
           return()
         }
@@ -175,28 +334,9 @@ processing_server <- function(
         }
         req(isFALSE(context_window$any_fit_problem))
 
-        started(TRUE)
-        # Set processing state
-        processing(TRUE)
-        analysis_started_at(Sys.time())
-        log_analysis_start(
-          mode = mode(),
-          n_texts = length(texts$preprocessed),
-          model = models$main$parameters$model %||% "unknown"
-        )
-        # Set initial progress
-        progress_primary$set_with_total(0, length(texts$preprocessed), "...")
+        log_ctx <- start_processing_run()
 
-        # Disable button
-        shinyjs::disable("process")
-        shinyjs::addClass("process", "loading")
-
-        log_ctx <- log_context_capture(
-          is_async = TRUE,
-          mode = getOption("app__mode", "unknown")
-        )
-
-        mirai::mirai(
+        promise <- mirai::mirai(
           {
             log_context_apply(log_ctx)
             prepare_async_analysis_worker("categorization_scoring")
@@ -239,110 +379,34 @@ processing_server <- function(
               )
             }
 
-            # If multiple categories, convert from JSON array string to
-            #   multiple binary columns
             if (mode == "Categorisatie" && assign_multiple_categories) {
-              # Parse the JSON array strings into vector-column
-              results <- results |>
-                dplyr::mutate(
-                  result = purrr::map(result, jsonlite::fromJSON)
-                )
-
-              # Copy to avoid collision with the original df
-              results_new <- results |>
-                dplyr::select(-result)
-
-              # For each category, create a binary column
-              for (cat in categories) {
-                results_new[[cat]] <- purrr::map_lgl(
-                  results$result,
-                  ~ cat %in% .x
-                )
-              }
-
-              results <- results_new
+              results <- expand_multi_label_results(results, categories)
             }
 
             # If categorization, write paragraphs
             if (mode == "Categorisatie" && write_paragraphs) {
-              # Make list per category, with all texts assigned to that category
-              categories_texts <- list()
-              if (!assign_multiple_categories) {
-                # Can simply group by 'result'
-                for (cat in categories) {
-                  categories_texts[[cat]] <- results$text[
-                    results$result == cat
-                  ]
-                }
-              } else {
-                # If multiple categories, we have a binary column per category
-                # For each category, get the texts assigned to that category
-                for (cat in categories) {
-                  categories_texts[[cat]] <- results$text[
-                    results[[cat]]
-                  ]
-                }
-              }
-
-              # Exclude categories which don't have supporting texts
-              categories_texts <- categories_texts[
-                purrr::map_lgl(categories_texts, ~ isTRUE(length(.x) > 0))
-              ]
-
-              # Write paragraphs, per category
-              progress_secondary$show()
-              progress_secondary$set_with_total(
-                0,
-                length(categories_texts),
-                "..."
-              )
-
-              # Show streaming panel for paragraph writing (if enabled)
-              stream_callback <- NULL
-              if (streaming_enabled) {
-                llm_stream_async$show()
-                stream_callback <- function(token, meta) {
-                  llm_stream_async$set(meta$partial_response %||% "")
-                  invisible(TRUE)
-                }
-              }
-
               paragraphs <- tryCatch(
                 {
-                  purrr::map(
-                    seq_along(categories_texts),
-                    function(i) {
-                      # Get category name
-                      cat_name <- names(categories_texts)[[i]]
-                      cat_texts <- categories_texts[[i]]
+                  categories_texts <- collect_grouped_texts(
+                    results = results,
+                    labels = categories,
+                    assign_multiple_categories = assign_multiple_categories
+                  )
 
-                      progress_secondary$set_with_total(
-                        i,
-                        length(categories_texts),
-                        paste0(lang$t("Schrijven over '"), cat_name, "'...")
-                      )
-
-                      # Clear streaming panel before this paragraph
-                      if (streaming_enabled) {
-                        llm_stream_async$clear()
-                      }
-
-                      # Write paragraph about the category
-                      write_paragraph(
-                        texts = cat_texts,
-                        topic = cat_name,
-                        research_background = research_background,
-                        style_prompt = style_prompt,
-                        llm_provider = llm_provider,
-                        language = lang$get_translation_language(),
-                        stream_callback = stream_callback
-                      )
-                    }
+                  write_grouped_paragraphs(
+                    grouped_texts = categories_texts,
+                    research_background = research_background,
+                    style_prompt = style_prompt,
+                    llm_provider = llm_provider,
+                    lang = lang,
+                    progress_secondary = progress_secondary,
+                    interrupter = interrupter,
+                    llm_stream_async = llm_stream_async,
+                    streaming_enabled = streaming_enabled
                   )
                 },
                 error = handle_detailed_error("Category paragraph writing")
               )
-              progress_secondary$hide()
 
               # Add as attribute to the results
               attr(results, "paragraphs") <- paragraphs
@@ -372,133 +436,48 @@ processing_server <- function(
                 isTRUE(models$main$parameters$stream)
             ),
             analysis_async_categorization_globals(),
+            analysis_async_processing_globals(),
             analysis_async_tokenizer_globals(),
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals()
           )
-        ) %...>%
-          results_df() %...!%
-          {
-            # Clean up async controllers before error handling
-            llm_stream$async$stop()
-            llm_stream$hide()
-
-            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
-              as.character(.)
-            })
-            err_msg <- substr(err_msg, 1, 200)
-            err_class <- paste(class(.), collapse = "|")
-            log_action(
-              "analysis_failed",
-              details = sprintf(
-                "mode=%s when=%s error_class=%s error=%s",
-                mode() %||% "unknown",
-                "main processing of categorization/scoring",
-                err_class,
-                err_msg
-              )
-            )
-            app_error(
-              .,
-              when = "main processing of categorization/scoring",
-              fatal = TRUE,
-              lang = lang()
-            )
-          }
-        log_debug(
-          "Started async processing for categorization/scoring",
-          component = "analysis"
         )
-      })
-
-      # Helper function to check if categories are valid
-      categories_are_valid <- function() {
-        # User must be done editing categories
-        if (categories$editing()) {
-          shiny::showNotification(
-            lang()$t(
-              "Je moet eerst de categorieen opslaan voordat je verder kunt gaan."
-            ),
-            type = "error"
-          )
-          return(FALSE)
-        }
-
-        # User must have at least 2 non-empty categories
-        if (categories$unique_non_empty_count() < 2) {
-          shiny::showNotification(
-            lang()$t("Je moet minimaal 2 categorieen opgeven."),
-            type = "error"
-          )
-          return(FALSE)
-        }
-
-        return(TRUE)
+        bind_async_result(
+          promise = promise,
+          setter = results_df,
+          when = "main processing of categorization/scoring",
+          debug_message = "Started async processing for categorization/scoring"
+        )
       }
 
-      # Helper function to check if scoring characteristic is valid
-      scoring_characteristic_is_valid <- function() {
-        # User must have at least 1 non-empty scoring characteristic
-        if (isTRUE(nchar(scoring_characteristic()) < 1)) {
-          shiny::showNotification(
-            lang()$t("Geef een karakteristiek op."),
-            type = "error"
-          )
-          return(FALSE)
-        }
+      ## 2.4 Onderwerpextractie ------------------------------------------------
 
-        return(TRUE)
-      }
+      # Handles the topic-modelling flow from start to finish.
+      # This covers topic generation, optional editing, and final assignment.
 
-      ## Topic modelling (onderwerpextractie) ------------------------
-      ## >> Topic generation -------------------------------------------
-      # Listen for process button click when in topic modelling mode
-      # Launch processing
-      observeEvent(input$process, {
-        if (processing()) {
-          return()
-        }
+      # Topic-modelling flow: first generate/reduce topics, then optionally let
+      # the user edit them, then assign topics and write paragraphs.
 
-        log_action(
-          "analysis_process_clicked",
-          details = sprintf(
-            "mode=%s n_texts=%d",
-            mode() %||% "unknown",
-            length(texts$preprocessed %||% character(0))
-          )
-        )
+      ### 2.4.1 Topic generation -----------------------------------------------
 
+      # Generates candidate topics and reduces them to a usable list.
+      # This is the first async step before any human review happens.
+
+      # Starts the first topic-modelling phase.
+      # This worker generates candidate topics and reduces them before any human
+      # editing or topic assignment happens.
+      start_topic_generation <- function() {
         req(texts$preprocessed)
         req(context_window$text_chunks)
-        if (!mode() %in% c("Onderwerpextractie")) {
-          return()
-        }
         if (!number_of_texts_under_maximum()) {
           return()
         }
         req(isFALSE(context_window$any_fit_problem))
         req(isFALSE(context_window$too_many_chunks))
 
-        started(TRUE)
-        # Set processing state
-        processing(TRUE)
-        analysis_started_at(Sys.time())
-        log_analysis_start(
-          mode = mode(),
-          n_texts = length(texts$preprocessed),
-          model = models$main$parameters$model %||% "unknown"
-        )
+        log_ctx <- start_processing_run(set_initial_progress = FALSE)
 
-        # Disable button
-        shinyjs::disable("process")
-        shinyjs::addClass("process", "loading")
-
-        log_ctx <- log_context_capture(
-          is_async = TRUE,
-          mode = getOption("app__mode", "unknown")
-        )
-
-        mirai::mirai(
+        promise <- mirai::mirai(
           {
             log_context_apply(log_ctx)
 
@@ -589,44 +568,24 @@ processing_server <- function(
             analysis_async_topic_modelling_globals(),
             analysis_async_tokenizer_globals()
           )
-        ) %...>%
-          topics() %...!%
-          {
-            llm_stream$hide()
-
-            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
-              as.character(.)
-            })
-            err_msg <- substr(err_msg, 1, 200)
-            err_class <- paste(class(.), collapse = "|")
-            log_action(
-              "analysis_failed",
-              details = sprintf(
-                "mode=%s when=%s error_class=%s error=%s",
-                mode() %||% "unknown",
-                "main processing (step 1-2) of topic modelling",
-                err_class,
-                err_msg
-              )
-            )
-            app_error(
-              .,
-              when = "main processing (step 1-2) of topic modelling",
-              fatal = TRUE,
-              lang = lang()
-            )
-          }
-
-        log_debug(
-          "Started async processing for topic modelling (step 1-2)",
-          component = "analysis"
         )
-      })
+        bind_async_result(
+          promise = promise,
+          setter = topics,
+          when = "main processing (step 1-2) of topic modelling",
+          debug_message = "Started async processing for topic modelling (step 1-2)",
+          stop_stream = FALSE,
+          hide_stream = TRUE
+        )
+      }
 
-      ## >> Topics generated; editing --------------------------------
-      # Listen for topics completion
-      # Present modal dialog to edit/confirm topics
-      ## Updated observeEvent for topics() with Add/Remove buttons in the modal
+      ### 2.4.2 Topic editing --------------------------------------------------
+
+      # Reacts when generated topics are ready.
+      # This either auto-confirms them or opens the editing step for the user.
+
+      # Listens for topics becoming available.
+      # Opens editing when human review is enabled, otherwise auto-confirms.
       observeEvent(topics(), {
         req(topics())
         req(!topics_definitive())
@@ -638,7 +597,7 @@ processing_server <- function(
             lang()$t("Onbekend/niet van toepassing")
           ))
         }
-        # Remove any exclusive topics which may ont be present in the topics
+        # Remove any exclusive topics which may not be present in the topics
         exclusive_topics(
           exclusive_topics()[exclusive_topics() %in% topics()]
         )
@@ -681,15 +640,16 @@ processing_server <- function(
         )
       })
 
-      ## >> Topics definitive; assigning -----------------------------
-      # Listen for definitive topics
-      # Launch processing for assigning topics to paragraphs
-      observeEvent(topics_definitive(), {
-        if (!isTRUE(topics_definitive())) {
-          return()
-        }
-        req(topics())
+      ### 2.4.3 Topic assignment -----------------------------------------------
 
+      # Starts the final topic step after topics are confirmed.
+      # This assigns topics to texts and optionally writes report paragraphs.
+
+      # Starts the second topic-modelling phase after topics are definitive.
+      # This worker assigns topics to texts and optionally writes topic
+      # paragraphs.
+      start_topic_assignment <- function() {
+        req(topics())
         if (!assign_multiple_categories()) {
           # If not assigning multiple categories, set each topic is exclusive
           exclusive_topics(topics())
@@ -723,7 +683,7 @@ processing_server <- function(
           mode = getOption("app__mode", "unknown")
         )
 
-        mirai::mirai(
+        promise <- mirai::mirai(
           {
             log_context_apply(log_ctx)
             prepare_async_analysis_worker("topic_assignment")
@@ -747,28 +707,8 @@ processing_server <- function(
                 )
                 progress_secondary$hide()
 
-                # If multiple categories, convert from JSON array string to
-                #   multiple binary columns
                 if (assign_multiple_categories) {
-                  # Parse the JSON array strings into vector-column
-                  results <- results |>
-                    dplyr::mutate(
-                      result = purrr::map(result, jsonlite::fromJSON)
-                    )
-
-                  # Copy to avoid collision with the original df
-                  results_new <- results |>
-                    dplyr::select(-result)
-
-                  # For each category, create a binary column
-                  for (cat in topics) {
-                    results_new[[cat]] <- purrr::map_lgl(
-                      results$result,
-                      ~ cat %in% .x
-                    )
-                  }
-
-                  results <- results_new
+                  results <- expand_multi_label_results(results, topics)
                 }
 
                 results
@@ -787,90 +727,26 @@ processing_server <- function(
             if (write_paragraphs) {
               paragraphs <- tryCatch(
                 {
-                  # Make list per topic, with all texts assigned to that topic
-                  topics_texts_list <- list()
-                  if (!assign_multiple_categories) {
-                    # Can simply group by 'result'
-                    for (topic in texts_with_topics$result) {
-                      topics_texts_list[[topic]] <- texts_with_topics$text[
-                        texts_with_topics$result == topic
-                      ]
-                    }
-                  } else {
-                    # If multiple categories, we have a binary column per category
-                    # For each category, get the texts assigned to that category
-                    for (cat in topics) {
-                      topics_texts_list[[cat]] <- texts_with_topics$text[
-                        texts_with_topics[[cat]]
-                      ]
-                    }
-                  }
-
-                  # Exclude topics which don't have supporting texts
-                  topics_texts_list <- topics_texts_list[
-                    purrr::map_lgl(topics_texts_list, ~ isTRUE(length(.x) > 0))
-                  ]
-
-                  # Write paragraphs, per topic
-                  progress_secondary$show()
-                  progress_secondary$set_with_total(
-                    0,
-                    length(topics_texts_list),
-                    "..."
+                  topics_texts_list <- collect_grouped_texts(
+                    results = texts_with_topics,
+                    labels = topics,
+                    assign_multiple_categories = assign_multiple_categories
                   )
 
-                  # Show streaming panel for paragraph writing (if enabled)
-                  stream_callback <- NULL
-                  if (streaming_enabled) {
-                    llm_stream_async$show()
-                    stream_callback <- function(token, meta) {
-                      llm_stream_async$set(meta$partial_response %||% "")
-                      invisible(TRUE)
-                    }
-                  }
-
-                  paragraphs <- purrr::map(
-                    seq_along(topics_texts_list),
-                    function(i) {
-                      interrupter$execInterrupts()
-                      topic_name <- names(topics_texts_list)[[i]]
-                      topic_texts <- topics_texts_list[[i]]
-
-                      progress_secondary$set_with_total(
-                        i,
-                        length(topics_texts_list),
-                        paste0(
-                          lang$t("Schrijven over '"),
-                          topic_name,
-                          "'..."
-                        )
-                      )
-
-                      # Clear streaming panel before this paragraph
-                      if (streaming_enabled) {
-                        llm_stream_async$clear()
-                      }
-
-                      paragraph <- write_paragraph(
-                        texts = topic_texts,
-                        topic = topic_name,
-                        research_background = research_background,
-                        style_prompt = style_prompt,
-                        llm_provider = llm_provider,
-                        language = lang$get_translation_language(),
-                        stream_callback = stream_callback
-                      )
-
-                      paragraph
-                    }
+                  write_grouped_paragraphs(
+                    grouped_texts = topics_texts_list,
+                    research_background = research_background,
+                    style_prompt = style_prompt,
+                    llm_provider = llm_provider,
+                    lang = lang,
+                    progress_secondary = progress_secondary,
+                    interrupter = interrupter,
+                    llm_stream_async = llm_stream_async,
+                    streaming_enabled = streaming_enabled
                   )
-
-                  paragraphs
                 },
                 error = handle_detailed_error("Topic report generation")
               )
-
-              progress_secondary$hide()
 
               # Add as attribute to the result
               attr(texts_with_topics, "paragraphs") <- paragraphs
@@ -901,45 +777,36 @@ processing_server <- function(
             ),
             analysis_async_topic_modelling_globals(),
             analysis_async_paragraph_globals(),
+            analysis_async_processing_globals(),
             analysis_async_tokenizer_globals(),
             log_async_globals(log_ctx)
           )
-        ) %...>%
-          results_df() %...!%
-          {
-            # Clean up async controllers before error handling
-            llm_stream$async$stop()
-            llm_stream$hide()
-
-            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
-              as.character(.)
-            })
-            err_msg <- substr(err_msg, 1, 200)
-            err_class <- paste(class(.), collapse = "|")
-            log_action(
-              "analysis_failed",
-              details = sprintf(
-                "mode=%s when=%s error_class=%s error=%s",
-                mode() %||% "unknown",
-                "main processing (step 3-4) of topic modelling",
-                err_class,
-                err_msg
-              )
-            )
-            app_error(
-              .,
-              when = "main processing (step 3-4) of topic modelling",
-              fatal = TRUE,
-              lang = lang()
-            )
-          }
-        log_debug(
-          "Started async processing for topic modelling (step 3-4)",
-          component = "analysis"
         )
+        bind_async_result(
+          promise = promise,
+          setter = results_df,
+          when = "main processing (step 3-4) of topic modelling",
+          debug_message = "Started async processing for topic modelling (step 3-4)"
+        )
+      }
+
+      # Listens for topics being confirmed.
+      # Starts assignment once the topic list is final.
+      observeEvent(topics_definitive(), {
+        if (!isTRUE(topics_definitive())) {
+          return()
+        }
+
+        start_topic_assignment()
       })
 
-      ## Markeren ----------------------------------------------------
+      ## 2.5 Markeren ----------------------------------------------------------
+
+      # Handles the marking mode.
+      # This groups the marking validation and async worker launch together.
+
+      # Validation and async launch helpers for marking mode live here.
+
       codes_are_valid <- function() {
         # User must be done editing codes
         if (codes$editing()) {
@@ -973,26 +840,11 @@ processing_server <- function(
         return(TRUE)
       }
 
-      # Listen for process button click when in marking mode
-      # Launch processing
-      observeEvent(input$process, {
-        if (processing()) {
-          return()
-        }
-
-        log_action(
-          "analysis_process_clicked",
-          details = sprintf(
-            "mode=%s n_texts=%d",
-            mode() %||% "unknown",
-            length(texts$preprocessed %||% character(0))
-          )
-        )
-
+      # Starts the async worker for marking mode.
+      # Kept separate so the marking validation and worker call do not clutter
+      # the shared process observer.
+      start_marking <- function() {
         req(texts$preprocessed)
-        if (!mode() %in% c("Markeren")) {
-          return()
-        }
         if (!number_of_texts_under_maximum()) {
           return()
         }
@@ -1003,28 +855,9 @@ processing_server <- function(
         req(context_window$max_tokens)
         req(context_window$overlap)
 
-        started(TRUE)
-        # Set processing state
-        processing(TRUE)
-        analysis_started_at(Sys.time())
-        log_analysis_start(
-          mode = mode(),
-          n_texts = length(texts$preprocessed),
-          model = models$main$parameters$model %||% "unknown"
-        )
-        # Set initial progress
-        progress_primary$set_with_total(0, length(texts$preprocessed), "...")
+        log_ctx <- start_processing_run()
 
-        # Disable button
-        shinyjs::disable("process")
-        shinyjs::addClass("process", "loading")
-
-        log_ctx <- log_context_capture(
-          is_async = TRUE,
-          mode = getOption("app__mode", "unknown")
-        )
-
-        mirai::mirai(
+        promise <- mirai::mirai(
           {
             log_context_apply(log_ctx)
             prepare_async_analysis_worker("marking")
@@ -1069,40 +902,204 @@ processing_server <- function(
             log_async_globals(log_ctx),
             send_prompt_with_retries_async_globals()
           )
-        ) %...>%
-          results_df() %...!%
-          {
-            # Clean up async controllers before error handling
-            llm_stream$async$stop()
-            llm_stream$hide()
+        )
 
-            err_msg <- tryCatch(conditionMessage(.), error = function(e) {
-              as.character(.)
-            })
-            err_msg <- substr(err_msg, 1, 200)
-            err_class <- paste(class(.), collapse = "|")
-            log_action(
-              "analysis_failed",
-              details = sprintf(
-                "mode=%s when=%s error_class=%s error=%s",
-                mode() %||% "unknown",
-                "main processing of marking",
-                err_class,
-                err_msg
-              )
-            )
-            app_error(
-              .,
-              when = "main processing of marking",
-              fatal = TRUE,
-              lang = lang()
-            )
-          }
+        bind_async_result(
+          promise = promise,
+          setter = results_df,
+          when = "main processing of marking",
+          stop_stream = TRUE
+        )
+      }
 
-        NULL # Avoid blocking the app with the promise
+      ## 2.6 Shared dispatch & result prep -------------------------------------
+
+      # Handles the shared pieces after the mode-specific launchers.
+      # This routes the process button, finalizes UI, and prepares result data.
+
+      # One observer handles the process button and routes to the correct
+      # mode-specific launcher above.
+
+      # Single process-button observer for all modes.
+      # It logs the click once and dispatches to the correct mode-specific start
+      # helper.
+      observeEvent(input$process, {
+        if (processing()) {
+          return()
+        }
+
+        log_processing_click()
+
+        current_mode <- mode()
+        if (current_mode %in% c("Categorisatie", "Scoren")) {
+          start_categorization_or_scoring()
+          return()
+        }
+        if (current_mode == "Onderwerpextractie") {
+          start_topic_generation()
+          return()
+        }
+        if (current_mode == "Markeren") {
+          start_marking()
+        }
       })
 
-      # Post-processing: interrater-reliability, download files ------
+      # Resets the progress and streaming UI when processing finishes
+      # successfully. Used after worker results are accepted.
+      finalize_processing_ui <- function() {
+        progress_primary$async$stop()
+        progress_primary$set(
+          100,
+          paste0(
+            bsicons::bs_icon("check2-circle"),
+            lang()$t(" Verwerking voltooid!")
+          )
+        )
+        progress_secondary$async$stop()
+        progress_secondary$hide()
+        llm_stream$async$stop()
+        llm_stream$hide()
+      }
+
+      # Builds the prompt example stored in the result bundle.
+      # Used during download preparation so the prompt-building logic stays out
+      # of the result-list assembly code.
+      current_result_prompt_text <- function() {
+        current_mode <- mode()
+
+        if (current_mode == "Categorisatie") {
+          return(
+            prompt_category(
+              text = lang()$t("<< TEKST >>"),
+              research_background = research_background(),
+              categories = categories$texts()
+            ) |>
+              tidyprompt::construct_prompt_text()
+          )
+        }
+
+        if (current_mode == "Scoren") {
+          return(
+            prompt_score(
+              text = lang()$t("<< TEKST >>"),
+              research_background = research_background(),
+              scoring_characteristic = scoring_characteristic()
+            ) |>
+              tidyprompt::construct_prompt_text()
+          )
+        }
+
+        if (current_mode == "Markeren") {
+          return(
+            mark_text_prompt(
+              text = lang()$t("<< TEKST >>"),
+              research_background = research_background(),
+              code = "<< CODE >>"
+            ) |>
+              tidyprompt::construct_prompt_text()
+          )
+        }
+
+        NULL
+      }
+
+      # Collects the final result bundle used for Excel/report generation.
+      # Called after optional IRR so the download step works from one structured
+      # object.
+      create_result_list <- function() {
+        result_list <- build_processing_result_list(
+          final_results_df = final_results_df(),
+          uuid = uuid,
+          mode = mode(),
+          research_background = research_background(),
+          style_prompt = style_prompt(),
+          irr_result = irr_result(),
+          language = lang()$get_translation_language(),
+          by_column_name = by_column_name(),
+          by_column_values = by_column_values(),
+          models = models,
+          categories = categories$texts(),
+          exclusive_categories = categories$exclusive_texts(),
+          scoring_characteristic = scoring_characteristic(),
+          topics = topics(),
+          exclusive_topics = exclusive_topics(),
+          codes = codes$texts(),
+          assign_multiple_categories = assign_multiple_categories(),
+          human_in_the_loop = human_in_the_loop(),
+          write_paragraphs = write_paragraphs(),
+          context_window = context_window,
+          prompt_text = current_result_prompt_text()
+        )
+
+        if (
+          isTRUE(write_paragraphs()) &&
+            is.null(result_list$paragraphs)
+        ) {
+          app_error(
+            "Paragraphs were requested to be written, but no paragraphs found",
+            when = "creating result list, checking paragraph presence",
+            fatal = TRUE,
+            lang = lang()
+          )
+        }
+
+        result_list
+      }
+
+      # Starts the async file-generation and zipping step.
+      # Used once results are final so the observer does not have to carry the
+      # export mechanics inline.
+      prepare_download_bundle <- function(result_list) {
+        preparing_download(TRUE)
+
+        log_action(
+          "results_download_preparing",
+          details = sprintf(
+            "mode=%s n_texts=%d uuid=%s",
+            mode() %||% "unknown",
+            nrow(result_list$df %||% data.frame()),
+            uuid
+          )
+        )
+
+        promise <- mirai::mirai(
+          {
+            create_processing_download_bundle(
+              result_list = result_list,
+              temp_dir = temp_dir
+            )
+          },
+          .args = list(
+            result_list = result_list,
+            temp_dir = tempdir(),
+            create_processing_download_bundle = create_processing_download_bundle,
+            write_processing_result_excel = write_processing_result_excel,
+            write_processing_result_rmarkdown = write_processing_result_rmarkdown,
+            processing_mode_supports_report = processing_mode_supports_report
+          )
+        )
+
+        bind_async_result(
+          promise = promise,
+          setter = zip_file,
+          when = "preparing download (excel, rmarkdown, zip)",
+          stop_stream = FALSE,
+          hide_stream = FALSE
+        )
+
+        shinyjs::hide("process")
+      }
+
+      ## 2.7 Post-processing & downloads ---------------------------------------
+
+      # Runs after worker results come back.
+      # This joins results, handles IRR, builds files, and exposes downloads.
+
+      ### 2.7.1 Worker results -------------------------------------------------
+
+      # Handles the first result coming back from a worker.
+      # This restores raw texts, finishes the UI, and starts IRR when needed.
+
       # Listen for processing completion
       # Join results with original texts
       # Launch interrater reliability module if required
@@ -1113,19 +1110,10 @@ processing_server <- function(
           component = "analysis"
         )
 
-        # Join results of preprocessed texts to raw texts
-        df <- texts$df
-        df <- df |>
-          dplyr::left_join(
-            results_df(),
-            by = dplyr::join_by("preprocessed" == "text")
-          ) |>
-          # Remove preprocessed column
-          dplyr::select(-preprocessed) |>
-          # Rename 'raw' to 'text'
-          dplyr::rename(text = raw)
-        # Transfer attribute containing paragraphs
-        attr(df, "paragraphs") <- attr(results_df(), "paragraphs")
+        df <- join_processing_results(
+          texts_df = texts$df,
+          worker_results_df = results_df()
+        )
 
         # Store final results df
         final_results_df(df)
@@ -1151,20 +1139,7 @@ processing_server <- function(
           )
         }
 
-        # Update UI to show finished processing
-        progress_primary$async$stop()
-
-        progress_primary$set(
-          100,
-          paste0(
-            bsicons::bs_icon("check2-circle"),
-            lang()$t(" Verwerking voltooid!")
-          )
-        )
-        progress_secondary$async$stop()
-        progress_secondary$hide()
-        llm_stream$async$stop()
-        llm_stream$hide()
+        finalize_processing_ui()
 
         if (interrater_reliability_toggle()) {
           all_categories <-
@@ -1217,6 +1192,11 @@ processing_server <- function(
         }
       })
 
+      ### 2.7.2 IRR completion -------------------------------------------------
+
+      # Continues once inter-rater reliability is done or skipped.
+      # This builds the result bundle and starts download preparation.
+
       # Listen for inter-rater reliability completion
       # Prepare files for download
       observeEvent(
@@ -1238,140 +1218,16 @@ processing_server <- function(
             )
           }
 
-          # Set preparing download state (to show loading animation)
-          preparing_download(TRUE)
-
-          log_action(
-            "results_download_preparing",
-            details = sprintf(
-              "mode=%s n_texts=%d uuid=%s",
-              mode() %||% "unknown",
-              nrow(result_list$df %||% data.frame()),
-              uuid
-            )
-          )
-
-          # Generate files async
-          mirai::mirai(
-            {
-              # Generate files
-              excel_file <- create_result_excel(result_list)
-
-              if (
-                mode %in%
-                  c(
-                    "Categorisatie",
-                    "Scoren",
-                    "Onderwerpextractie",
-                    "Markeren"
-                  )
-              ) {
-                rmarkdown <- create_result_rmarkdown(result_list)
-              }
-
-              # Check if all files exist, if not,
-              #   wait up to 10s
-              #   and then throw an error
-              for (i in 1:10) {
-                if (
-                  mode %in%
-                    c(
-                      "Categorisatie",
-                      "Scoren",
-                      "Onderwerpextractie",
-                      "Markeren"
-                    )
-                ) {
-                  if (file.exists(excel_file) && file.exists(rmarkdown)) {
-                    break
-                  }
-                } else {
-                  if (file.exists(excel_file)) {
-                    break
-                  }
-                }
-                Sys.sleep(1)
-              }
-
-              if (!file.exists(excel_file)) {
-                stop("Excel file not found, no error available")
-              }
-              if (grepl("\\.txt$", excel_file)) {
-                stop(paste0(
-                  "Excel file generation error: ",
-                  readLines(excel_file, warn = FALSE)
-                ))
-              }
-
-              if (
-                mode %in%
-                  c(
-                    "Categorisatie",
-                    "Scoren",
-                    "Onderwerpextractie",
-                    "Markeren"
-                  )
-              ) {
-                if (!file.exists(rmarkdown)) {
-                  stop("Rmarkdown file not found, no error available")
-                }
-                if (grepl("\\.txt$", rmarkdown)) {
-                  stop(paste0(
-                    "Rmarkdown file generation error: ",
-                    readLines(rmarkdown, warn = FALSE)
-                  ))
-                }
-              }
-
-              files <- c(excel_file)
-              if (
-                mode %in%
-                  c(
-                    "Categorisatie",
-                    "Scoren",
-                    "Onderwerpextractie",
-                    "Markeren"
-                  )
-              ) {
-                files <- c(files, rmarkdown)
-              }
-
-              # Zip them
-              zip_path <- file.path(
-                tempdir,
-                paste0(uuid::UUIDgenerate(), "_results.zip")
-              )
-              zip::zipr(
-                zipfile = zip_path,
-                files = files,
-                root = dirname(excel_file)
-              )
-              zip_path
-            },
-            .args = list(
-              mode = mode(),
-              create_result_excel = create_result_excel,
-              create_result_rmarkdown = create_result_rmarkdown,
-              result_list = result_list,
-              tempdir = tempdir(),
-              lang = lang()
-            )
-          ) %...>%
-            zip_file() %...!%
-            {
-              app_error(
-                .,
-                when = "preparing download (excel, rmarkdown, zip)",
-                fatal = TRUE,
-                lang = lang()
-              )
-            }
-
-          shinyjs::hide("process")
+          prepare_download_bundle(result_list)
         },
         suspended = FALSE,
         autoDestroy = TRUE
       )
+
+      ### 2.7.3 Download preparation UI ----------------------------------------
+
+      # Shows the loading state while files are being prepared.
+      # This switches to the download and restart controls once ready.
 
       # Loading animation during download preparation
       output$download_ui <- renderUI({
@@ -1396,6 +1252,11 @@ processing_server <- function(
           )
         }
       })
+
+      ### 2.7.4 Download ready UI ----------------------------------------------
+
+      # Runs when the zip file is ready for the user.
+      # This logs timing, exposes the download handler, and shows restart.
 
       # Listen for when download (zip file) is ready
       # Present download button
@@ -1544,6 +1405,11 @@ processing_server <- function(
         success(TRUE)
       })
 
+      ### 2.7.5 Restart flow ---------------------------------------------------
+
+      # Lets the user start over after a completed run.
+      # This shows a confirmation modal and reloads the session if confirmed.
+
       # Restart button listener
       # Launches modal dialog to confirm restart
       observeEvent(input$restart, {
@@ -1579,242 +1445,37 @@ processing_server <- function(
         session$reload()
       })
 
-      # Helper functions ---------------------------------------------
-      # Helper function to create a list with all the results, including metadata
-      create_result_list <- function(df) {
-        result_list <- list(
-          df = final_results_df(),
-          time = Sys.time(),
-          uuid = uuid,
-          mode = mode(),
-          research_background = research_background(),
-          style_prompt = style_prompt(),
-          irr = irr_result(),
-          language = lang()$get_translation_language(),
-          by_column_name = by_column_name(),
-          by_column_values = by_column_values()
-        )
+      ## 2.8 UI controls -------------------------------------------------------
 
-        if (mode() == "Categorisatie") {
-          result_list$model <- models$main$parameters$model
-          result_list$categories <- categories$texts()
-          result_list$exclusive_categories <- categories$exclusive_texts()
-          result_list$assign_multiple_categories <- assign_multiple_categories()
-          result_list$prompt <- prompt_category(
-            text = lang()$t("<< TEKST >>"),
-            research_background = research_background(),
-            categories = categories$texts()
-          ) |>
-            tidyprompt::construct_prompt_text()
-          result_list$human_in_the_loop <- human_in_the_loop()
-          result_list$write_paragraphs <- write_paragraphs()
-        }
+      # Sets up the UI controllers around the processing flow.
+      # These pieces drive progress, streaming, start/cancel, and restart.
 
-        if (mode() == "Scoren") {
-          result_list$model <- models$main$parameters$model
-          result_list$scoring_characteristic <- scoring_characteristic()
-          result_list$prompt <- prompt_score(
-            text = lang()$t("<< TEKST >>"),
-            research_background = research_background(),
-            scoring_characteristic = scoring_characteristic()
-          ) |>
-            tidyprompt::construct_prompt_text()
-        }
+      ### 2.8.1 Progress bars --------------------------------------------------
 
-        if (mode() == "Onderwerpextractie") {
-          result_list$model <- models$main$parameters$model
-          result_list$model_reductie <- models$large$parameters$model
-          result_list$topics <- topics()
-          result_list$exclusive_topics <- exclusive_topics()
-          result_list$assign_multiple_categories <- assign_multiple_categories()
-          result_list$write_paragraphs <- write_paragraphs()
+      # Shows primary and secondary progress during processing.
+      # These controllers are shared by the async workers and UI updates.
 
-          # Add chunking information
-          chunking_parameters <- tibble::tibble(
-            parameter = c(
-              "chunk_size",
-              "draws",
-              "n_tokens_context_window",
-              "n_chunks"
-            ),
-            value = c(
-              context_window$chunk_size,
-              context_window$draws,
-              context_window$n_tokens_context_window,
-              context_window$n_chunks
-            )
-          )
-          result_list$chunking_parameters <- chunking_parameters
-        }
-
-        if (mode() == "Markeren") {
-          result_list$model <- models$main$parameters$model
-          result_list$codes <- codes$texts()
-          result_list$write_paragraphs <- write_paragraphs()
-          result_list$prompt <- mark_text_prompt(
-            text = lang()$t("<< TEKST >>"),
-            research_background = research_background(),
-            code = "<< CODE >>"
-          ) |>
-            tidyprompt::construct_prompt_text()
-          result_list$text_size_tokens <- context_window$max_tokens
-          result_list$overlap_size_tokens <- context_window$overlap
-        }
-
-        # Transfer paragraphs if present as attribute
-        if (!is.null(attr(final_results_df(), "paragraphs"))) {
-          result_list$paragraphs <- attr(final_results_df(), "paragraphs")
-        }
-        # Verify that paragraphs are present if write_paragraphs is TRUE
-        if (isTRUE(write_paragraphs()) && is.null(result_list$paragraphs)) {
-          app_error(
-            "Paragraphs were requested to be written, but no paragraphs found",
-            when = "creating result list, checking paragraph presence",
-            fatal = TRUE,
-            lang = lang()
-          )
-        }
-
-        return(result_list)
-      }
-
-      # Helper function to turn result_list into Excel file
-      create_result_excel <- function(result_list) {
-        excel_file <- file.path(
-          tempdir(),
-          paste0("data_", result_list$uuid, ".xlsx")
-        )
-
-        error_file <- file.path(
-          tempdir(),
-          paste0("data_", result_list$uuid, "_error.txt")
-        )
-
-        safe_write_xlsx <- function(result_list, excel_file) {
-          sheets <- lapply(result_list, function(x) {
-            if (is.null(x)) {
-              return(NULL)
-            } else if (length(x) == 1 && is.atomic(x) && is.na(x)) {
-              return(data.frame(value = NA, stringsAsFactors = FALSE))
-            } else if (is.data.frame(x)) {
-              return(x)
-            } else if (is.atomic(x) || is.character(x)) {
-              return(data.frame(value = x, stringsAsFactors = FALSE))
-            } else if (is.list(x)) {
-              df <- tryCatch(as.data.frame(x), error = function(e) NULL)
-              if (is.null(df)) {
-                warning(
-                  "List could not be coerced to data.frame; capturing printed output instead."
-                )
-                captured <- capture.output(print(x))
-                return(data.frame(
-                  captured_output = captured,
-                  stringsAsFactors = FALSE
-                ))
-              } else {
-                return(df)
-              }
-            } else {
-              warning(
-                "Unsupported element type; capturing printed output instead."
-              )
-              captured <- capture.output(print(x))
-              return(data.frame(
-                captured_output = captured,
-                stringsAsFactors = FALSE
-              ))
-            }
-          })
-
-          names(sheets) <- names(result_list)
-          # Remove NULL elements
-          sheets <- Filter(Negate(is.null), sheets)
-
-          writexl::write_xlsx(x = sheets, path = excel_file)
-        }
-
-        result <- tryCatch(
-          {
-            safe_write_xlsx(result_list, excel_file)
-            excel_file # Success: return path to .xlsx
-          },
-          error = function(e) {
-            # Error: write message into .txt file
-            writeLines(
-              paste("Error during Excel creation:", conditionMessage(e)),
-              con = error_file
-            )
-            error_file # Return path to .txt
-          }
-        )
-
-        return(result)
-      }
-
-      # Helper function to turn result_list into HTML output via Rmarkdown
-      create_result_rmarkdown <- function(result_list) {
-        output_file_html <- file.path(
-          tempdir(),
-          paste0("report_", result_list$uuid, ".html")
-        )
-
-        output_file_txt <- file.path(
-          tempdir(),
-          paste0("report_", result_list$uuid, "_error.txt")
-        )
-
-        result <- tryCatch(
-          {
-            rmarkdown::render(
-              input = paste0(
-                "R/report_",
-                result_list$mode,
-                "_",
-                result_list$language,
-                ".Rmd"
-              ),
-              output_file = output_file_html,
-              params = list(result_list = result_list),
-              envir = new.env()
-            )
-
-            output_file_html
-          },
-          error = function(e) {
-            # Capture detailed stack trace and message
-            error_details <- paste(
-              "Error during rendering:",
-              conditionMessage(e),
-              "\n\n--- Traceback ---\n",
-              paste(capture.output(traceback()), collapse = "\n"),
-              "\n\n--- Full Error Object ---\n",
-              paste(capture.output(print(e)), collapse = "\n")
-            )
-
-            # Write error details to file
-            writeLines(error_details, con = output_file_txt)
-
-            output_file_txt
-          }
-        )
-
-        return(result)
-      }
-
-      # Progress bars ------------------------------------------------
       progress_primary <- progress_bar_server("progress_primary")
       progress_secondary <- progress_bar_server(
         "progress_secondary",
         initially_hidden = TRUE
       )
 
-      # LLM Streaming ------------------------------------------------
+      ### 2.8.2 LLM streaming --------------------------------------------------
+
+      # Shows live paragraph streaming when supported by the model.
+      # This gives the user feedback while report paragraphs are being written.
+
       llm_stream <- llm_streaming_server(
         "llm_stream",
         initially_hidden = TRUE
       )
 
-      # Processing button --------------------------------------------
+      ### 2.8.3 Processing button ----------------------------------------------
+
+      # Renders the main start button for the current mode.
+      # This keeps the label and disabled state in sync with the current inputs.
+
       output$process_button <- renderUI({
         req(mode(), lang())
 
@@ -1828,9 +1489,7 @@ processing_server <- function(
           return(NULL)
         }
 
-        # Count how many preprocessed texts we have
-        preproc <- texts$preprocessed
-        n_pre <- if (is.null(preproc)) 0 else length(preproc)
+        n_pre <- n_preprocessed_texts()
 
         # Build the label based on mode
         btn_label <- switch(
@@ -1843,6 +1502,7 @@ processing_server <- function(
             n_pre,
             ")"
           ),
+          "Markeren" = paste0(lang()$t("Markeer"), " (", n_pre, ")"),
           # fallback
           paste0(lang()$t("Verwerk"), " (", n_pre, ")")
         )
@@ -1860,47 +1520,11 @@ processing_server <- function(
         )
       })
 
-      # Process button update ----------------------------------------
-      # Upon selecting mode, change text in process button
-      observe({
-        req(mode())
-        if (mode() == "Categorisatie") {
-          updateActionButton(
-            session,
-            "process",
-            label = paste0(
-              lang()$t("Categoriseer"),
-              " (",
-              length(texts$preprocessed),
-              ")"
-            )
-          )
-        } else if (mode() == "Scoren") {
-          updateActionButton(
-            session,
-            "process",
-            label = paste0(
-              lang()$t("Scoreer"),
-              " (",
-              length(texts$preprocessed),
-              ")"
-            )
-          )
-        } else if (mode() == "Onderwerpextractie") {
-          updateActionButton(
-            session,
-            "process",
-            label = paste0(
-              lang()$t("Extraheer"),
-              " (",
-              length(texts$preprocessed),
-              ")"
-            )
-          )
-        }
-      })
+      ### 2.8.4 Interruption & cancel ------------------------------------------
 
-      # Interruption -------------------------------------------------
+      # Handles cancellation and session shutdown while processing runs.
+      # This makes sure async work can be stopped cleanly when needed.
+
       # Interrupter can stop async processing if user quits
       interrupter <- ipc::AsyncInterruptor$new()
 
@@ -1980,6 +1604,11 @@ processing_server <- function(
         session$reload()
       })
 
+      ## 2.9 Return value ------------------------------------------------------
+
+      # Returns a small processing interface to other modules.
+      # The function reports current state and exposes simple reactive flags.
+
       processing_fn <- function() {
         processing()
       }
@@ -2001,117 +1630,6 @@ processing_server <- function(
   )
 }
 
+# 3 Helpers --------------------------------------------------------------------
 
-# 3 Helpers ---------------------------------------------------------------
-
-# In other places this helper function can be called to efficiently
-# disable multiple inputs when processing is active
-
-#' Disable inputs when processing is active
-#'
-#' Creates an observer that disables/enables the specified input IDs
-#' based on the processing state. Uses shinyjs::toggleState internally.
-#'
-#' @param processing Reactive value indicating processing state (TRUE = processing)
-#' @param input_ids Character vector of input IDs to toggle
-#'
-#' @return An observer (invisible)
-#' @examples
-#' disable_when_processing(processing, c("toggle", "submit_btn", "text_input"))
-disable_when_processing <- function(processing, input_ids) {
-  observe({
-    for (id in input_ids) {
-      shinyjs::toggleState(id, condition = !processing())
-    }
-  })
-}
-
-
-# 4 Example/development usage ---------------------------------------------
-
-if (FALSE) {
-  library(shiny)
-  library(shinyjs)
-  library(tidyprompt)
-  library(bslib)
-  library(bsicons)
-
-  ui <- bslib::page_fluid(
-    shinyjs::useShinyjs(),
-    css_js_head(),
-    mode_ui("mode"),
-    human_in_the_loop_toggle_ui("hitl_toggle"),
-    interrater_toggle_ui("interrater_toggle"),
-    processing_ui("processing")
-  )
-
-  server <- function(input, output, session) {
-    mode <- mode_server(
-      "mode",
-      processing
-    )
-    human_in_the_loop <- human_in_the_loop_toggle_server(
-      "hitl_toggle",
-      processing,
-      mode
-    )
-    interrater_reliability_toggle <- interrater_toggle_server(
-      "interrater_toggle",
-      processing
-    )
-    llm_provider_rv <- llm_provider_server(
-      "llm_provider",
-      processing,
-      preconfigured_llm_provider = tidyprompt::llm_provider_openai(),
-      preconfigured_main_models = c("gpt-4o-mini", "gpt-3.5-turbo"),
-      preconfigured_large_models = c("gpt-4o", "o3")
-    )
-    models <- model_server(
-      "model",
-      llm_provider = llm_provider
-    )
-    processing <- processing_server(
-      "processing",
-      mode = mode,
-      interrater_reliability_toggle = reactiveVal(FALSE),
-      texts = reactiveValues(
-        preprocessed = c(
-          "i hate this product",
-          "i love this yellow product!!",
-          "no opinion. but it has a red colour"
-        ),
-        df = data.frame(
-          raw = c(
-            "i hate this product, call me: +31 6 12345678",
-            "i love this yellow product!!",
-            "no opinion. but it has a red colour"
-          ),
-          preprocessed = c(
-            "i hate this product",
-            "i love this yellow product!!",
-            "no opinion. but it has a red colour"
-          )
-        )
-      ),
-      llm_provider_rv = llm_provider_rv,
-      models = models,
-      categories = list(
-        texts = reactiveVal(c(
-          "positive review",
-          "negative review",
-          "neutral review",
-          "mentions colour"
-        )),
-        editing = reactiveVal(FALSE),
-        unique_non_empty_count = reactiveVal(3)
-      ),
-      scoring_characteristic = reactiveVal("positive sentiment"),
-      research_background = reactiveVal(
-        "We have collected consumer reviews of our product."
-      ),
-      human_in_the_loop = human_in_the_loop
-    )
-  }
-
-  shiny::shinyApp(ui, server)
-}
+# See R/utils_processing_helpers.R for helpers related to the processing logic

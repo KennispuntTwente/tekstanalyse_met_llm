@@ -167,6 +167,21 @@ analysis_async_paragraph_globals <- function() {
 }
 
 
+#' Globals shared by async worker helpers in processing flows
+#'
+#' Used by async workers in `module_core_processing` so they can call the small
+#' helper functions that keep the worker bodies readable.
+#'
+#' @return Named list for `mirai::mirai(..., .args = ...)`.
+analysis_async_processing_globals <- function() {
+  list(
+    expand_multi_label_results = expand_multi_label_results,
+    collect_grouped_texts = collect_grouped_texts,
+    write_grouped_paragraphs = write_grouped_paragraphs
+  )
+}
+
+
 #' Globals shared by async topic-modelling workers
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
