@@ -323,3 +323,105 @@ test_that("Scoren report renders with deduped by_column_values (no error text)",
     }
   })
 })
+
+
+# -- Integration: split texts + by-column grouped report -----------------------
+
+test_that("Categorisatie report renders correctly with split-chunk by_column_lookup", {
+  testthat::skip_if_not_installed("rmarkdown")
+  testthat::skip_if_not_installed("knitr")
+  testthat::skip_if_not_installed("here")
+  testthat::skip_if_not_installed("htmltools")
+  testthat::skip_if_not_installed("bslib")
+  testthat::skip_if_not_installed("DT")
+  testthat::skip_if_not_installed("dplyr")
+  testthat::skip_if_not_installed("tidyr")
+  testthat::skip_if_not_installed("stringr")
+  testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+
+  # Scenario: original upload had 2 texts ("Text 1" in G1, "Text 2" in G2).
+  # After splitting, "Text 1" became two chunks. The chunk-aware lookup maps
+  # each chunk back to its source text's group.
+  result_list <- list(
+    df = data.frame(
+      text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+      result = c("A", "B", "A"),
+      stringsAsFactors = FALSE
+    ),
+    categories = c("A", "B"),
+    model = "test-model",
+    assign_multiple_categories = FALSE,
+    research_background = "",
+    irr = NULL,
+    paragraphs = NULL,
+    by_column_name = "group",
+    by_column_values = data.frame(
+      text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+      by_value = c("G1", "G1", "G2"),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  out_dir <- withr::local_tempdir()
+
+  report_paths <- list.files(
+    here::here("R"),
+    pattern = "^report_Categorisatie_.*\\.Rmd$",
+    full.names = TRUE
+  )
+  expect_true(length(report_paths) > 0)
+
+  withr::with_dir(here::here(), {
+    for (report_path in report_paths) {
+      out_file <- file.path(
+        out_dir,
+        paste0(tools::file_path_sans_ext(basename(report_path)), "_split.html")
+      )
+
+      res <- try(
+        rmarkdown::render(
+          input = report_path,
+          output_file = out_file,
+          params = list(result_list = result_list),
+          quiet = TRUE,
+          envir = new.env(parent = globalenv())
+        ),
+        silent = TRUE
+      )
+
+      if (inherits(res, "try-error")) {
+        stop(paste0(
+          "Render with split-chunk by_column failed for ",
+          basename(report_path),
+          ": ",
+          as.character(res)
+        ))
+      }
+
+      expect_true(file.exists(out_file))
+      expect_true(file.info(out_file)$size > 0)
+
+      html_content <- readLines(out_file, warn = FALSE)
+      html_text <- paste(html_content, collapse = "\n")
+      # No grouped-frequency error text
+      expect_false(
+        grepl("must be size", html_text, fixed = TRUE),
+        info = paste0(
+          "Report ",
+          basename(report_path),
+          " contains error text from grouped frequency chunk (split scenario)"
+        )
+      )
+      # The grouped table should show two distinct groups
+      expect_true(
+        grepl("G1", html_text, fixed = TRUE) &&
+          grepl("G2", html_text, fixed = TRUE),
+        info = paste0(
+          "Report ",
+          basename(report_path),
+          " missing expected groups G1/G2 in split scenario"
+        )
+      )
+    }
+  })
+})
