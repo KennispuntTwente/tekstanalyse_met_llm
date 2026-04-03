@@ -7,7 +7,10 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
     width = 2400,
     load_timeout = 30000,
     seed = 123,
-    options = list(kwallm.test_async = TRUE)
+    options = list(
+      kwallm.test_async = TRUE,
+      kwallm.test_fake_llm = TRUE
+    )
   )
 
   # Switch to horizontal/sections mode
@@ -59,20 +62,13 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   # ---- Section 4: LLM & Context ----
   expect_equal(app$get_value(input = "kwallm_sections_step"), "4")
 
-  # Set model
-  app$set_inputs(
-    `llm_provider-select_openai` = 0.123,
-    allow_no_input_binding_ = TRUE
+  # Set deterministic fake models
+  app$wait_for_js(
+    "!!document.getElementById('model-main_model') && !!document.getElementById('model-large_model')",
+    timeout = 30000
   )
-  Sys.sleep(3)
-  app$click("llm_provider-get_models")
-  app$wait_for_value(
-    export = "llm_provider-available_models_openai",
-  )
-  models <- app$get_value(export = "llm_provider-available_models_openai")
-  expect_true("gpt-4.1-nano-2025-04-14" %in% models)
-  app$set_inputs(`model-main_model` = "gpt-4.1-nano-2025-04-14")
-  app$set_inputs(`model-large_model` = "gpt-4.1-nano-2025-04-14")
+  app$set_inputs(`model-main_model` = "kwallm-fake-main-1024")
+  app$set_inputs(`model-large_model` = "kwallm-fake-reducer-320")
 
   # Test back navigation - go back to section 3 and then forward again
   app$click("kwallm_sections_prev")

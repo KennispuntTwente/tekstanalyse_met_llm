@@ -101,14 +101,17 @@ test_that("text_management_server: fallback to 'none' when regex disabled and de
     anonymization__gliner_model = FALSE
   ))
 
-  # This is validated early and should error because default 'regex' is not enabled.
-  expect_error(
-    text_management_server(
-      id = "tm",
-      raw_texts = reactiveVal(c("x")),
-      gliner_model = NULL,
-      processing = reactiveVal(FALSE),
-      lang = make_test_lang("nl")
+  # The warning fires before moduleServer() which then errors on missing session.
+  expect_warning(
+    tryCatch(
+      text_management_server(
+        id = "tm",
+        raw_texts = reactiveVal(c("x")),
+        gliner_model = NULL,
+        processing = reactiveVal(FALSE),
+        lang = make_test_lang("nl")
+      ),
+      error = function(e) NULL
     ),
     "Default anonymization method 'regex'"
   )
