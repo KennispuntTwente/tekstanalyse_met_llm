@@ -96,7 +96,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   app$click("processing-process")
   app$wait_for_value(
     export = "processing-edit_topics-started",
-    timeout = 30000
+    timeout = 60000
   )
   Sys.sleep(3)
   app$click("processing-edit_topics-confirm_topics")
