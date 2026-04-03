@@ -987,6 +987,17 @@ processing_server <- function(
         current_mode <- mode()
 
         if (current_mode == "Categorisatie") {
+          if (isTRUE(assign_multiple_categories())) {
+            return(
+              prompt_multi_category(
+                text = lang()$t("<< TEKST >>"),
+                research_background = research_background(),
+                categories = categories$texts(),
+                exclusive_categories = categories$exclusive_texts()
+              ) |>
+                tidyprompt::construct_prompt_text()
+            )
+          }
           return(
             prompt_category(
               text = lang()$t("<< TEKST >>"),
