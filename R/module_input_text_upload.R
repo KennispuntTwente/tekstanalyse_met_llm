@@ -100,12 +100,17 @@ text_upload_server <- function(
       )
     }
 
+    clear_by_column_data <- function() {
+      by_column_values(NULL)
+      by_column_lookup(NULL)
+    }
+
     clear_upload_state <- function() {
       raw_texts(NULL)
       uploaded_data(NULL)
       sheet_names(NULL)
       filter_spec(NULL)
-      by_column_values(NULL)
+      clear_by_column_data()
       by_column(NULL)
       selected_sheet(NULL)
       selected_column(NULL)
@@ -201,6 +206,7 @@ text_upload_server <- function(
     sheet_names <- reactiveVal(NULL) # character vector of Excel sheet names
     by_column <- reactiveVal(NULL) # name of optional grouping column
     by_column_values <- reactiveVal(NULL) # values of by column aligned with texts
+    by_column_lookup <- reactiveVal(NULL) # duplicate-preserving lookup for reports
     filter_spec <- reactiveVal(NULL) # list(col = <chr>, vals = <chr>) | NULL
     file_type <- reactiveVal(NULL) # ◄ NEW: current file extension
     uploaded_file_info <- reactiveVal(NULL)
@@ -330,20 +336,27 @@ text_upload_server <- function(
           !nzchar(by_col) ||
           !by_col %in% names(df)
       ) {
-        by_column_values(NULL)
+        clear_by_column_data()
         return(invisible(NULL))
       }
 
       text_vals <- df[[text_col]]
       by_vals <- df[[by_col]]
       keep <- !is.na(text_vals) & stringr::str_trim(text_vals) != ""
-      # Keep all non-empty text-group pairs so that duplicate texts
-      # appearing in different groups are preserved for grouped reports.
-      by_column_values(data.frame(
-        text = text_vals[keep],
-        by_value = by_vals[keep],
+      text_keep <- text_vals[keep]
+      by_keep <- by_vals[keep]
+
+      # Keep all non-empty text-group pairs so grouped reports can fan out
+      # duplicate texts that belong to more than one group.
+      by_column_lookup(data.frame(
+        text = text_keep,
+        by_value = by_keep,
         stringsAsFactors = FALSE
       ))
+
+      # Align by-column values with discard_empty(), which keeps the first
+      # occurrence of each non-empty text.
+      by_column_values(by_keep[!duplicated(text_keep)])
       invisible(NULL)
     }
 
@@ -388,7 +401,7 @@ text_upload_server <- function(
       uploaded_data(NULL)
       sheet_names(NULL)
       filter_spec(NULL)
-      by_column_values(NULL)
+      clear_by_column_data()
       by_column(NULL)
       selected_column(NULL)
 
@@ -688,7 +701,7 @@ text_upload_server <- function(
       col <- input$by_column
       if (is.null(col) || !nzchar(col)) {
         by_column(NULL)
-        by_column_values(NULL)
+        clear_by_column_data()
         log_action("by_column_cleared")
       } else {
         by_column(col)
@@ -697,28 +710,28 @@ text_upload_server <- function(
       }
     })
 
-    # Update by_column_values when filtered_data, column, or by_column changes
+    # Update by-column metadata when filtered_data, column, or by_column changes
     observe({
       req(filtered_data())
       text_col <- current_column()
       by_col <- current_by_column()
 
       if (is.null(text_col) || !nzchar(text_col)) {
-        by_column_values(NULL)
+        clear_by_column_data()
         return()
       }
 
       if (is.null(by_col) || !nzchar(by_col)) {
-        by_column_values(NULL)
+        clear_by_column_data()
         return()
       }
 
       if (!by_col %in% names(filtered_data())) {
-        by_column_values(NULL)
+        clear_by_column_data()
         return()
       }
 
-      # Get the by column values aligned with the text column
+      # Keep both the dedup-aligned vector and the report lookup in sync.
       refresh_by_column_values()
     })
 
@@ -997,7 +1010,8 @@ text_upload_server <- function(
     return(list(
       texts = raw_texts,
       by_column_name = by_column,
-      by_column_values = by_column_values
+      by_column_values = by_column_values,
+      by_column_lookup = by_column_lookup
     ))
   })
 }

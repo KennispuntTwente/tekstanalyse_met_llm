@@ -385,11 +385,13 @@ test_that("text_upload_server: duplicate texts get by_column_values aligned afte
       raw_texts <- upload_result$texts
       by_col_name <- upload_result$by_column_name
       by_col_values <- upload_result$by_column_values
+      by_col_lookup <- upload_result$by_column_lookup
 
       list(
         raw_texts = raw_texts,
         by_col_name = by_col_name,
         by_col_values = by_col_values,
+        by_col_lookup = by_col_lookup,
         lang = lang
       )
     },
@@ -428,6 +430,15 @@ test_that("text_upload_server: duplicate texts get by_column_values aligned afte
       # by_column_values must be same length as raw_texts (first occurrence kept)
       expect_equal(length(by_col_values()), length(raw_texts()))
       expect_equal(by_col_values(), c("Group1", "Group2"))
+
+      expect_equal(
+        by_col_lookup(),
+        data.frame(
+          text = c("Text A", "Text A", "Text B"),
+          by_value = c("Group1", "Group2", "Group2"),
+          stringsAsFactors = FALSE
+        )
+      )
     }
   )
 })

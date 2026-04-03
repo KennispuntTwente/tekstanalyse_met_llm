@@ -263,7 +263,9 @@ processing_results_have_invalid_na <- function(results_df, mode) {
 #' @param irr_result Optional inter-rater-reliability result object.
 #' @param language Output language code for reports.
 #' @param by_column_name Optional column name used for grouped analyses.
-#' @param by_column_values Optional vector of selected values from that column.
+#' @param by_column_lookup Optional lookup of group values keyed by text.
+#'   Reports expect a data frame with `text` and `by_value` columns so grouped
+#'   tables can preserve duplicate text-to-group mappings.
 #' @param models List with configured model objects.
 #' @param categories Optional character vector of categories.
 #' @param exclusive_categories Optional character vector of exclusive
@@ -290,7 +292,7 @@ build_processing_result_list <- function(
   irr_result = NULL,
   language,
   by_column_name = NULL,
-  by_column_values = NULL,
+  by_column_lookup = NULL,
   models,
   categories = NULL,
   exclusive_categories = NULL,
@@ -315,7 +317,7 @@ build_processing_result_list <- function(
     irr = irr_result,
     language = language,
     by_column_name = by_column_name,
-    by_column_values = by_column_values
+    by_column_values = by_column_lookup
   )
 
   if (mode == "Categorisatie") {

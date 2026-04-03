@@ -50,7 +50,7 @@ processing_server <- function(
   write_paragraphs = reactiveVal(TRUE),
   context_window,
   by_column_name = reactiveVal(NULL),
-  by_column_values = reactiveVal(NULL),
+  by_column_lookup = reactiveVal(NULL),
   lang = default_lang()
 ) {
   ns <- NS(id)
@@ -1036,7 +1036,7 @@ processing_server <- function(
           irr_result = irr_result(),
           language = lang()$get_translation_language(),
           by_column_name = by_column_name(),
-          by_column_values = by_column_values(),
+          by_column_lookup = by_column_lookup(),
           models = models,
           categories = categories$texts(),
           exclusive_categories = categories$exclusive_texts(),

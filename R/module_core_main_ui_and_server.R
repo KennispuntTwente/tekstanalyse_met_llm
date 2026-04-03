@@ -571,7 +571,7 @@ main_server <- function(
     text_upload_result <- text_upload_server("text_upload", processing, lang)
     raw_texts <- text_upload_result$texts
     by_column_name <- text_upload_result$by_column_name
-    by_column_values <- text_upload_result$by_column_values
+    by_column_lookup <- text_upload_result$by_column_lookup
 
     # Split texts
     split_texts <- text_split_server(
@@ -724,7 +724,7 @@ main_server <- function(
       write_paragraphs = write_paragraphs_toggle,
       context_window = context_window,
       by_column_name = by_column_name,
-      by_column_values = by_column_values,
+      by_column_lookup = by_column_lookup,
       lang = lang
     )
 
