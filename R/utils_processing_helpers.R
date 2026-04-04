@@ -237,6 +237,33 @@ processing_results_have_invalid_na <- function(results_df, mode) {
 }
 
 
+#' Count how many paragraph subjects should exist for one AnalysisResult
+#'
+#' Used in `module_core_processing` to distinguish valid empty paragraph output
+#' (for example marking runs with no matches) from missing paragraphs when
+#' there were results to summarize.
+#'
+#' @param analysis_result AnalysisResult to inspect.
+#'
+#' @return Integer scalar with the number of labels or codes that have
+#'   supporting results and therefore could yield a paragraph.
+analysis_result_expected_paragraph_subject_count <- function(analysis_result) {
+  stopifnot(inherits(analysis_result, "AnalysisResult"))
+
+  result <- analysis_result@results
+
+  if (inherits(result, c("CategorizationResult", "TopicResult"))) {
+    return(as.integer(length(unique(result@assignments$label_id))))
+  }
+
+  if (inherits(result, "MarkingResult")) {
+    return(as.integer(length(unique(result@markings$code_id))))
+  }
+
+  0L
+}
+
+
 # 4 Export helpers -------------------------------------------------------------
 
 #' Write an AnalysisResult to Excel

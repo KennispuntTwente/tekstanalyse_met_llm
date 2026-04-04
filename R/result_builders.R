@@ -32,8 +32,9 @@
 #' @param language App language code.
 #' @param by_column_name Optional grouping column name.
 #' @param by_column_lookup Optional lookup table, usually `by_column_lookup()`.
-#'   Must contain `text` and `by_value`, where `text` matches the original
-#'   source text and `by_value` is the grouped-report value for that source row.
+#'   Must contain `text` and `by_value`. `text` may match either the original
+#'   source text or the current document text (for example split chunks), and
+#'   `by_value` is the grouped-report value for that row.
 #' @param models Named list with provider/model info per stage. Expected entries
 #'   are `main` and, for topic reduction, optional `large`.
 #' @param categories Optional categorization labels.
@@ -315,22 +316,47 @@ build_analysis_result <- function(
       nrow(by_column_lookup) &&
       all(c("text", "by_value") %in% names(by_column_lookup))
   ) {
-    source_lookup <- unique(texts_df[c("source_document_id", "source_text")])
-    merged <- merge(
-      source_lookup,
-      by_column_lookup,
-      by.x = "source_text",
-      by.y = "text",
-      all.x = FALSE,
-      all.y = FALSE
+    by_lookup <- data.frame(
+      text = as.character(by_column_lookup$text),
+      by_value = as.character(by_column_lookup$by_value),
+      stringsAsFactors = FALSE
     )
 
-    if (nrow(merged)) {
-      document_groups <- unique(data.frame(
+    build_group_rows <- function(lookup_text) {
+      merged <- merge(
+        unique(data.frame(
+          source_document_id = texts_df$source_document_id,
+          lookup_text = as.character(lookup_text),
+          stringsAsFactors = FALSE
+        )),
+        by_lookup,
+        by.x = "lookup_text",
+        by.y = "text",
+        all.x = FALSE,
+        all.y = FALSE
+      )
+
+      if (!nrow(merged)) {
+        return(NULL)
+      }
+
+      data.frame(
         source_document_id = merged$source_document_id,
         group_value = as.character(merged$by_value),
         stringsAsFactors = FALSE
-      ))
+      )
+    }
+
+    group_rows <- Filter(
+      Negate(is.null),
+      list(
+        build_group_rows(texts_df$source_text),
+        build_group_rows(texts_df$raw)
+      )
+    )
+
+    if (length(group_rows)) {
+      document_groups <- unique(do.call(rbind, group_rows))
     }
   }
 

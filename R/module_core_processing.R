@@ -1198,8 +1198,12 @@ processing_server <- function(
           irr_sample = irr_sample()
         )
 
+        expected_paragraph_subjects <-
+          analysis_result_expected_paragraph_subject_count(analysis_result)
+
         if (
           isTRUE(write_paragraphs()) &&
+            expected_paragraph_subjects > 0L &&
             nrow(analysis_result@paragraphs@paragraphs) == 0
         ) {
           app_error(

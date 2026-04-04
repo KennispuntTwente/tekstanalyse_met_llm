@@ -81,6 +81,54 @@ test_that("build_analysis_result preserves split lineage and group fan-out", {
   )
 })
 
+test_that("build_analysis_result preserves groups from chunk-keyed lookup", {
+  texts_df <- data.frame(
+    raw = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+    preprocessed = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+    stringsAsFactors = FALSE
+  )
+
+  results_table <- data.frame(
+    text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+    result = c("Theme 1", "Theme 2", "Theme 1"),
+    stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-1b",
+    mode = "Categorisatie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = "group",
+    by_column_lookup = data.frame(
+      text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+      by_value = c("G1", "G1", "G2"),
+      stringsAsFactors = FALSE
+    ),
+    models = .test_models(),
+    categories = c("Theme 1", "Theme 2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = TRUE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt"),
+    source_texts = c("Text 1", "Text 1", "Text 2")
+  )
+
+  group_lookup <- .kwallm_report_group_lookup(analysis_result)
+
+  expect_equal(
+    analysis_result@text_lineage@document_groups$group_value,
+    c("G1", "G2")
+  )
+  expect_equal(nrow(group_lookup), 3)
+  expect_equal(sort(group_lookup$by_value), c("G1", "G1", "G2"))
+})
+
 test_that("marking paragraphs retain supporting excerpts in report helpers", {
   texts_df <- data.frame(
     raw = "Text about dogs",
@@ -196,6 +244,72 @@ test_that("paragraph provenance uses preprocessed text when raw text differs", {
       analysis_result@paragraphs@paragraphs$paragraph_id[[1]]
     ),
     "[PERSON] called"
+  )
+})
+
+test_that("analysis_result_expected_paragraph_subject_count is result-aware", {
+  marking_result <- build_analysis_result(
+    texts_df = data.frame(
+      raw = "Text about cats",
+      preprocessed = "Text about cats",
+      stringsAsFactors = FALSE
+    ),
+    results_table = data.frame(
+      text = "Text about cats",
+      sub_text = NA_character_,
+      code = NA_character_,
+      marked_text = NA_character_,
+      stringsAsFactors = FALSE
+    ),
+    uuid = "run-empty-marking",
+    mode = "Markeren",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    codes = "Code 1",
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = TRUE
+  )
+
+  categorization_result <- build_analysis_result(
+    texts_df = data.frame(
+      raw = c("Text 1", "Text 2"),
+      preprocessed = c("Text 1", "Text 2"),
+      stringsAsFactors = FALSE
+    ),
+    results_table = data.frame(
+      text = c("Text 1", "Text 2"),
+      result = c("Theme 1", "Theme 2"),
+      stringsAsFactors = FALSE
+    ),
+    uuid = "run-categorization-count",
+    mode = "Categorisatie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = c("Theme 1", "Theme 2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = TRUE
+  )
+
+  expect_identical(
+    analysis_result_expected_paragraph_subject_count(marking_result),
+    0L
+  )
+  expect_identical(
+    analysis_result_expected_paragraph_subject_count(categorization_result),
+    2L
   )
 })
 
