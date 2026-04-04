@@ -51,7 +51,7 @@ test_that("processing_texts_under_maximum validates count and notifies", {
 })
 
 
-test_that("join_processing_results keeps paragraphs on the joined results table", {
+test_that("join_processing_results restores raw texts without paragraph side channel", {
   texts_df <- data.frame(
     raw = c("Raw 1", "Raw 2"),
     preprocessed = c("prep-1", "prep-2"),
@@ -62,20 +62,13 @@ test_that("join_processing_results keeps paragraphs on the joined results table"
     result = c("A", "B"),
     stringsAsFactors = FALSE
   )
-  attr(results_table_pre, "paragraphs") <- list(list(
-    topic = "Topic A",
-    paragraph = "paragraph",
-    texts = c("Raw 1"),
-    prompt_fits = TRUE
-  ))
-
   joined <- join_processing_results(texts_df, results_table_pre)
 
   expect_true(is.data.frame(joined))
   expect_identical(joined$text, c("Raw 1", "Raw 2"))
   expect_identical(joined$result, c("A", "B"))
   expect_false("preprocessed" %in% names(joined))
-  expect_identical(attr(joined, "paragraphs")[[1]]$paragraph, "paragraph")
+  expect_null(attr(joined, "paragraphs", exact = TRUE))
 })
 
 

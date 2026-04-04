@@ -102,7 +102,7 @@ test_that("marking paragraphs retain supporting excerpts in report helpers", {
     stringsAsFactors = FALSE
   )
 
-  attr(results_table, "paragraphs") <- list(list(
+  paragraph_entries <- list(list(
     topic = "Code 1",
     paragraph = "Summary paragraph.",
     texts = c("Text about **dogs**"),
@@ -112,6 +112,7 @@ test_that("marking paragraphs retain supporting excerpts in report helpers", {
   analysis_result <- build_analysis_result(
     texts_df = texts_df,
     results_table = results_table,
+    paragraph_entries = paragraph_entries,
     uuid = "run-2",
     mode = "Markeren",
     research_background = "background",
@@ -145,6 +146,57 @@ test_that("marking paragraphs retain supporting excerpts in report helpers", {
   expect_equal(metadata$results$markings[[1]]$source_marked_text, "dogs?")
   expect_equal(metadata$results$markings[[1]]$match_start, 12L)
   expect_equal(metadata$results$markings[[1]]$match_method, "fuzzy")
+})
+
+test_that("paragraph provenance uses preprocessed text when raw text differs", {
+  texts_df <- data.frame(
+    raw = "John Smith called",
+    preprocessed = "[PERSON] called",
+    stringsAsFactors = FALSE
+  )
+
+  results_table <- data.frame(
+    text = "John Smith called",
+    result = "Theme 1",
+    stringsAsFactors = FALSE
+  )
+
+  paragraph_entries <- list(list(
+    topic = "Theme 1",
+    paragraph = "Summary paragraph.",
+    texts = "[PERSON] called",
+    prompt_fits = TRUE
+  ))
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    paragraph_entries = paragraph_entries,
+    uuid = "run-2b",
+    mode = "Categorisatie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = "Theme 1",
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = TRUE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  expect_equal(nrow(analysis_result@paragraphs@paragraph_sources), 1)
+  expect_equal(
+    .kwallm_paragraph_supporting_texts(
+      analysis_result,
+      analysis_result@paragraphs@paragraphs$paragraph_id[[1]]
+    ),
+    "[PERSON] called"
+  )
 })
 
 test_that("topic metadata includes candidate and reduced topics", {
@@ -379,6 +431,57 @@ test_that("stage execution provenance is serialized", {
   expect_equal(sheets$stage_executions$completion_status[[1]], "success")
 })
 
+test_that("AnalysisResult rejects result rows that do not reference text lineage", {
+  text_lineage <- TextLineage(
+    source_documents = data.frame(
+      source_document_id = 1L,
+      source_text = "Text 1",
+      stringsAsFactors = FALSE
+    ),
+    documents = data.frame(
+      document_id = 1L,
+      source_document_id = 1L,
+      document_text = "Text 1",
+      stringsAsFactors = FALSE
+    ),
+    analysis_units = data.frame(
+      analysis_unit_id = 1L,
+      preprocessed_text = "Text 1",
+      stringsAsFactors = FALSE
+    ),
+    document_units = data.frame(
+      document_id = 1L,
+      analysis_unit_id = 1L,
+      stringsAsFactors = FALSE
+    )
+  )
+
+  expect_error(
+    AnalysisResult(
+      metadata = AnalysisMetadata(
+        run_id = "run-invalid",
+        mode_id = "scoring",
+        language = "en",
+        timestamp = Sys.time(),
+        research_background = ""
+      ),
+      text_lineage = text_lineage,
+      results = ScoringResult(
+        scores = data.frame(
+          analysis_unit_id = 2L,
+          score = 10,
+          stringsAsFactors = FALSE
+        ),
+        characteristic = "helpfulness"
+      ),
+      mode_config = ScoringConfig(
+        scoring_characteristic = "helpfulness"
+      )
+    ),
+    "results scores\\$analysis_unit_id must reference text_lineage@analysis_units"
+  )
+})
+
 test_that("app_version and api_url are serialized", {
   texts_df <- data.frame(
     raw = c("Text 1", "Text 2"),
@@ -493,4 +596,44 @@ test_that("download bundle contains metadata json, excel, and report", {
 
   expect_true(file.exists(bundle))
   expect_setequal(contents, c("metadata.json", "results.xlsx", "report.html"))
+})
+
+test_that("download bundle surfaces metadata errors with the correct label", {
+  skip_if_not_installed("rmarkdown")
+  skip_if_not_installed("zip")
+  skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+
+  temp_dir <- withr::local_tempdir()
+
+  analysis_result <- build_analysis_result(
+    texts_df = data.frame(
+      raw = "Text 1",
+      preprocessed = "Text 1",
+      stringsAsFactors = FALSE
+    ),
+    results_table = data.frame(
+      text = "Text 1",
+      result = 10,
+      stringsAsFactors = FALSE
+    ),
+    uuid = "run-metadata-error",
+    mode = "Scoren",
+    research_background = "background",
+    style_prompt = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    scoring_characteristic = "helpfulness",
+    write_paragraphs = FALSE,
+    irr_result = list(bad = new.env(parent = emptyenv()))
+  )
+
+  expect_error(
+    create_analysis_result_download_bundle(
+      analysis_result,
+      temp_dir = temp_dir
+    ),
+    "Metadata file generation error"
+  )
 })

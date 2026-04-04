@@ -73,8 +73,14 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     )
   )
 
+  app$wait_for_value(
+    export = "processing-paragraph_entries",
+    timeout = 10000
+  )
+
   # Read results
   results <- app$get_value(export = "processing-results_table")
+  paragraphs <- app$get_value(export = "processing-paragraph_entries")
 
   # Expect that all texts are present in column 'text'
   texts <- readLines(
@@ -94,9 +100,6 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   # Expect that all texts are categorized in at least one topic
   expect_true(all(rowSums(results[-1]) > 0))
 
-  # Expect that results have 'paragraphs' attribute
-  expect_true("paragraphs" %in% names(attributes(results)))
-  paragraphs <- attr(results, "paragraphs")
   # Expect correct paragraph structure
   expect_true(is.character(paragraphs[[1]]$paragraph))
   expect_true(is.logical(paragraphs[[1]]$prompt_fits))
