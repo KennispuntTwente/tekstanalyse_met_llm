@@ -361,22 +361,11 @@ create_analysis_result_download_bundle <- function(
     temp_dir = bundle_dir
   )
 
-  files <- c(metadata_file, excel_file)
-  if (
-    analysis_result@metadata@mode_id %in%
-      c(
-        "categorization",
-        "scoring",
-        "topic_extraction",
-        "marking"
-      )
-  ) {
-    rmarkdown_file <- write_analysis_result_report_html(
-      analysis_result,
-      temp_dir = bundle_dir
-    )
-    files <- c(files, rmarkdown_file)
-  }
+  rmarkdown_file <- write_analysis_result_report_html(
+    analysis_result,
+    temp_dir = bundle_dir
+  )
+  files <- c(metadata_file, excel_file, rmarkdown_file)
 
   for (file in files) {
     if (!file.exists(file)) {

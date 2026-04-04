@@ -399,107 +399,56 @@ build_analysis_result <- function(
     )
   }
 
-  main_provider <- provider_fields(models$main %||% NULL)
-  large_provider <- provider_fields(models$large %||% NULL)
+  main <- provider_fields(models$main %||% NULL)
+  large <- provider_fields(models$large %||% NULL)
 
-  rows <- switch(
+  # Build stage-provider pairs row by row per mode, then assemble once.
+  stages <- switch(
     mode_id,
-    categorization = data.frame(
-      stage_id = c(
-        "categorization",
-        if (isTRUE(write_paragraphs)) "paragraph_generation"
-      ),
-      provider_kind = c(
-        main_provider$kind,
-        if (isTRUE(write_paragraphs)) main_provider$kind
-      ),
-      api_url = c(
-        main_provider$api_url,
-        if (isTRUE(write_paragraphs)) main_provider$api_url
-      ),
-      model_id = c(
-        main_provider$model_id,
-        if (isTRUE(write_paragraphs)) main_provider$model_id
-      ),
-      stringsAsFactors = FALSE
-    ),
-    scoring = data.frame(
-      stage_id = "scoring",
-      provider_kind = main_provider$kind,
-      api_url = main_provider$api_url,
-      model_id = main_provider$model_id,
-      stringsAsFactors = FALSE
-    ),
-    topic_extraction = data.frame(
-      stage_id = c(
-        "topic_candidate_generation",
-        "topic_reduction",
-        if (
-          isTRUE(topic_reduction_info$not_applicable_check_performed %||% FALSE)
-        ) {
-          "topic_not_applicable_check"
-        },
-        "topic_assignment",
-        if (isTRUE(write_paragraphs)) "paragraph_generation"
-      ),
-      provider_kind = c(
-        main_provider$kind,
-        large_provider$kind,
-        if (
-          isTRUE(topic_reduction_info$not_applicable_check_performed %||% FALSE)
-        ) {
-          large_provider$kind
-        },
-        main_provider$kind,
-        if (isTRUE(write_paragraphs)) main_provider$kind
-      ),
-      api_url = c(
-        main_provider$api_url,
-        large_provider$api_url,
-        if (
-          isTRUE(topic_reduction_info$not_applicable_check_performed %||% FALSE)
-        ) {
-          large_provider$api_url
-        },
-        main_provider$api_url,
-        if (isTRUE(write_paragraphs)) main_provider$api_url
-      ),
-      model_id = c(
-        main_provider$model_id,
-        large_provider$model_id,
-        if (
-          isTRUE(topic_reduction_info$not_applicable_check_performed %||% FALSE)
-        ) {
-          large_provider$model_id
-        },
-        main_provider$model_id,
-        if (isTRUE(write_paragraphs)) main_provider$model_id
-      ),
-      stringsAsFactors = FALSE
-    ),
-    marking = data.frame(
-      stage_id = c(
-        "marking",
-        if (isTRUE(write_paragraphs)) "paragraph_generation"
-      ),
-      provider_kind = c(
-        main_provider$kind,
-        if (isTRUE(write_paragraphs)) main_provider$kind
-      ),
-      api_url = c(
-        main_provider$api_url,
-        if (isTRUE(write_paragraphs)) main_provider$api_url
-      ),
-      model_id = c(
-        main_provider$model_id,
-        if (isTRUE(write_paragraphs)) main_provider$model_id
-      ),
-      stringsAsFactors = FALSE
-    ),
-    .kwallm_empty_stage_models()
+    categorization = {
+      s <- list(list("categorization", main))
+      if (isTRUE(write_paragraphs)) {
+        s <- c(s, list(list("paragraph_generation", main)))
+      }
+      s
+    },
+    scoring = list(list("scoring", main)),
+    topic_extraction = {
+      s <- list(
+        list("topic_candidate_generation", main),
+        list("topic_reduction", large)
+      )
+      if (
+        isTRUE(topic_reduction_info$not_applicable_check_performed %||% FALSE)
+      ) {
+        s <- c(s, list(list("topic_not_applicable_check", large)))
+      }
+      s <- c(s, list(list("topic_assignment", main)))
+      if (isTRUE(write_paragraphs)) {
+        s <- c(s, list(list("paragraph_generation", main)))
+      }
+      s
+    },
+    marking = {
+      s <- list(list("marking", main))
+      if (isTRUE(write_paragraphs)) {
+        s <- c(s, list(list("paragraph_generation", main)))
+      }
+      s
+    }
   )
 
-  unique(rows)
+  if (is.null(stages) || !length(stages)) {
+    return(.kwallm_empty_stage_models())
+  }
+
+  unique(data.frame(
+    stage_id = vapply(stages, `[[`, character(1), 1L),
+    provider_kind = vapply(stages, function(s) s[[2]]$kind, character(1)),
+    api_url = vapply(stages, function(s) s[[2]]$api_url, character(1)),
+    model_id = vapply(stages, function(s) s[[2]]$model_id, character(1)),
+    stringsAsFactors = FALSE
+  ))
 }
 
 # Builds the stage-to-prompt mapping for the current mode.
@@ -553,11 +502,11 @@ build_analysis_result <- function(
 # Builds the per-call execution provenance table.
 # We use this to keep retry and duration metadata alongside stage models and prompts.
 .kwallm_build_stage_executions <- function(stage_execution_rows = NULL) {
-  if (is.null(stage_execution_rows) || !is.data.frame(stage_execution_rows)) {
-    return(.kwallm_empty_stage_executions())
-  }
-
-  if (!nrow(stage_execution_rows)) {
+  if (
+    is.null(stage_execution_rows) ||
+      !is.data.frame(stage_execution_rows) ||
+      !nrow(stage_execution_rows)
+  ) {
     return(.kwallm_empty_stage_executions())
   }
 

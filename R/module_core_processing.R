@@ -1321,16 +1321,13 @@ processing_server <- function(
 
         if (interrater_reliability_toggle()) {
           # Only categorization-style modes need a category set for IRR.
-          all_categories <-
-            if (exists("all_categories")) {
-              all_categories
-            } else if (mode() == "Categorisatie") {
-              categories$texts()
-            } else if (mode() == "Onderwerpextractie") {
-              topics()
-            } else {
-              NULL
-            }
+          all_categories <- if (mode() == "Categorisatie") {
+            categories$texts()
+          } else if (mode() == "Onderwerpextractie") {
+            topics()
+          } else {
+            NULL
+          }
 
           if (
             mode() %in%
@@ -1417,42 +1414,23 @@ processing_server <- function(
         # End-to-end duration: from process click to download-ready
         started_at <- analysis_started_at()
         if (!is.null(started_at)) {
-          duration_total_secs <- as.numeric(difftime(
+          duration_secs <- as.numeric(difftime(
             Sys.time(),
             started_at,
             units = "secs"
           ))
-
-          preprocessed_texts <- tryCatch(
-            {
-              txt <- texts$preprocessed %||% character(0)
-              as.character(txt)
-            },
-            error = function(e) character(0)
+          n_texts <- length(texts$preprocessed %||% character(0))
+          total_chars <- sum(
+            nchar(texts$preprocessed %||% character(0), allowNA = TRUE),
+            na.rm = TRUE
           )
-
-          n_texts_total <- length(preprocessed_texts)
-
-          total_chars <- tryCatch(
-            sum(
-              nchar(preprocessed_texts, type = "chars", allowNA = TRUE),
-              na.rm = TRUE
-            ),
-            error = function(e) NA_real_
-          )
-
-          secs_per_text <- if (
-            isTRUE(!is.na(n_texts_total)) && isTRUE(n_texts_total > 0)
-          ) {
-            duration_total_secs / n_texts_total
+          secs_per_text <- if (n_texts > 0) {
+            duration_secs / n_texts
           } else {
             NA_real_
           }
-
-          secs_per_1k_chars <- if (
-            isTRUE(!is.na(total_chars)) && isTRUE(total_chars > 0)
-          ) {
-            (duration_total_secs / total_chars) * 1000
+          secs_per_1k_chars <- if (total_chars > 0) {
+            (duration_secs / total_chars) * 1000
           } else {
             NA_real_
           }
@@ -1461,14 +1439,14 @@ processing_server <- function(
             sprintf(
               paste0(
                 "Analysis total duration (click->download-ready): ",
-                "mode=%s, n_texts_preprocessed=%s, total_chars_preprocessed=%s, uuid=%s, ",
+                "mode=%s, n_texts_preprocessed=%d, total_chars_preprocessed=%d, uuid=%s, ",
                 "duration=%.1fs, avg=%.3fs/text, avg=%.3fs/1k_chars"
               ),
               mode() %||% "unknown",
-              as.character(n_texts_total),
-              as.character(total_chars),
+              n_texts,
+              total_chars,
               uuid,
-              duration_total_secs,
+              duration_secs,
               secs_per_text,
               secs_per_1k_chars
             ),
