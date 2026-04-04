@@ -1218,6 +1218,40 @@ AnalysisResult <- S7::new_class(
       )
     }
 
+    valid_analysis_unit_ids <- self@text_lineage@analysis_units$analysis_unit_id
+    if (
+      inherits(self@results, c("CategorizationResult", "TopicResult")) &&
+        nrow(self@results@assignments) > 0 &&
+        !all(
+          self@results@assignments$analysis_unit_id %in% valid_analysis_unit_ids
+        )
+    ) {
+      problems <- c(
+        problems,
+        "results assignments$analysis_unit_id must reference text_lineage@analysis_units"
+      )
+    }
+    if (
+      inherits(self@results, "ScoringResult") &&
+        nrow(self@results@scores) > 0 &&
+        !all(self@results@scores$analysis_unit_id %in% valid_analysis_unit_ids)
+    ) {
+      problems <- c(
+        problems,
+        "results scores$analysis_unit_id must reference text_lineage@analysis_units"
+      )
+    }
+    if (
+      inherits(self@results, "MarkingResult") &&
+        nrow(self@results@chunks) > 0 &&
+        !all(self@results@chunks$analysis_unit_id %in% valid_analysis_unit_ids)
+    ) {
+      problems <- c(
+        problems,
+        "results chunks$analysis_unit_id must reference text_lineage@analysis_units"
+      )
+    }
+
     valid_document_ids <- self@text_lineage@documents$document_id
     if (
       nrow(self@paragraphs@paragraph_sources) > 0 &&

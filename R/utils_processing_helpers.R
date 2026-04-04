@@ -195,8 +195,6 @@ join_processing_results <- function(texts_df, results_table_pre) {
   stopifnot(is.data.frame(texts_df))
   stopifnot(is.data.frame(results_table_pre))
 
-  paragraphs <- attr(results_table_pre, "paragraphs", exact = TRUE)
-
   # Join by the preprocessed text the worker actually saw, then restore the raw
   # uploaded text as the main `text` column.
   results_table <- texts_df |>
@@ -206,8 +204,6 @@ join_processing_results <- function(texts_df, results_table_pre) {
     ) |>
     dplyr::select(-preprocessed) |>
     dplyr::rename(text = raw)
-
-  attr(results_table, "paragraphs") <- paragraphs
   results_table
 }
 
@@ -410,11 +406,13 @@ create_analysis_result_download_bundle <- function(
     if (grepl("\\.txt$", file)) {
       # Export helpers write `.txt` files on failure, so surface those as real
       # errors before zipping.
-      label <- if (grepl("^data_", basename(file))) {
-        "Excel file"
-      } else {
-        "Rmarkdown file"
-      }
+      label <- switch(
+        basename(file),
+        metadata_error.txt = "Metadata file",
+        results_error.txt = "Excel file",
+        report_error.txt = "Rmarkdown file",
+        "Output file"
+      )
       stop(paste0(
         label,
         " generation error: ",

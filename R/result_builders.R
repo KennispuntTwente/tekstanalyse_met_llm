@@ -22,7 +22,8 @@
 #'   `result`, and marking uses `text`, `sub_text`, `code`, and `marked_text`,
 #'   with optional matching diagnostics in `source_marked_text`, `match_start`,
 #'   `match_end`, `match_distance`, `match_method`, and `response_status`.
-#'   Generated paragraphs, if any, live in `attr(results_table, "paragraphs")`.
+#' @param paragraph_entries Optional explicit paragraph output list from the
+#'   processing flow.
 #' @param uuid Character run identifier.
 #' @param mode Display mode name or canonical mode id.
 #' @param research_background Character prompt context entered by the user.
@@ -79,6 +80,7 @@
 build_analysis_result <- function(
   texts_df,
   results_table,
+  paragraph_entries = NULL,
   uuid,
   mode,
   research_background,
@@ -127,8 +129,6 @@ build_analysis_result <- function(
 
     value
   }
-
-  paragraph_entries <- attr(results_table, "paragraphs", exact = TRUE)
 
   mode_id <- .kwallm_mode_id_from_display(mode)
   texts_df <- .kwallm_prepare_texts_df(texts_df)
@@ -855,8 +855,41 @@ build_analysis_result <- function(
     stats::setNames(labels_df$label_id, labels_df$label_text)
   }
 
-  documents <- unique(texts_df[c("document_id", "raw")])
+  documents <- unique(texts_df[c("document_id", "raw", "preprocessed")])
   names(documents)[names(documents) == "raw"] <- "document_text"
+  documents$document_text <- as.character(documents$document_text)
+  documents$preprocessed <- as.character(documents$preprocessed)
+
+  preprocessed_lookup <- split(
+    documents$document_id,
+    documents$preprocessed
+  )
+  raw_lookup <- split(
+    documents$document_id,
+    documents$document_text
+  )
+
+  lookup_document_ids <- function(value) {
+    if (is.null(value) || !length(value)) {
+      return(integer())
+    }
+
+    value <- as.character(value)[[1]]
+    if (is.na(value) || !nzchar(value)) {
+      return(integer())
+    }
+
+    matched_ids <- preprocessed_lookup[[value]]
+    if (is.null(matched_ids)) {
+      matched_ids <- raw_lookup[[value]]
+    }
+
+    if (is.null(matched_ids)) {
+      return(integer())
+    }
+
+    as.integer(unname(matched_ids))
+  }
 
   paragraph_rows <- vector("list", length(paragraphs))
   source_rows <- vector("list", length(paragraphs))
@@ -882,16 +915,28 @@ build_analysis_result <- function(
       source_texts <- gsub("\\*\\*", "", source_texts)
     }
 
-    matched_idx <- match(source_texts, documents$document_text)
-    keep <- !is.na(matched_idx)
+    source_rows_for_paragraph <- list()
+    for (j in seq_along(excerpt_texts)) {
+      matched_document_ids <- lookup_document_ids(source_texts[[j]])
+      if (!length(matched_document_ids)) {
+        next
+      }
 
-    if (any(keep)) {
-      source_rows[[i]] <- data.frame(
-        paragraph_id = rep.int(i, sum(keep)),
-        document_id = documents$document_id[matched_idx[keep]],
-        excerpt_text = excerpt_texts[keep],
+      source_rows_for_paragraph[[
+        length(source_rows_for_paragraph) + 1L
+      ]] <- data.frame(
+        paragraph_id = rep.int(i, length(matched_document_ids)),
+        document_id = matched_document_ids,
+        excerpt_text = rep.int(
+          excerpt_texts[[j]],
+          length(matched_document_ids)
+        ),
         stringsAsFactors = FALSE
       )
+    }
+
+    if (length(source_rows_for_paragraph)) {
+      source_rows[[i]] <- unique(do.call(rbind, source_rows_for_paragraph))
     } else {
       source_rows[[i]] <- .kwallm_empty_paragraph_sources()
     }

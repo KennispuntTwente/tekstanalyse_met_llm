@@ -81,6 +81,7 @@ processing_server <- function(
       #   processing: TRUE while an analysis is actively running
       #   started: TRUE once a run has been launched, even after processing ends
       #   results_table_pre: raw processing output based on preprocessed texts
+      #   paragraph_entries_generated: paragraph output kept alongside results
       #   results_table: joined row-level results shown in the app and tests
       #   irr_result: stored interrater reliability summary, if collected
       #   irr_sample: sampled rows rated during interrater reliability
@@ -98,6 +99,7 @@ processing_server <- function(
       processing <- reactiveVal(FALSE)
       started <- reactiveVal(FALSE)
       results_table_pre <- reactiveVal(NULL)
+      paragraph_entries_generated <- reactiveVal(NULL)
       results_table <- reactiveVal(NULL)
       irr_result <- reactiveVal(NULL)
       irr_sample <- reactiveVal(NULL)
@@ -125,6 +127,7 @@ processing_server <- function(
         processing = processing(),
         started = started(),
         success = success(),
+        paragraph_entries = paragraph_entries_generated(),
         results_table = results_table()
       )
 
@@ -145,6 +148,7 @@ processing_server <- function(
         started(TRUE)
         processing(TRUE)
         results_table_pre(NULL)
+        paragraph_entries_generated(NULL)
         results_table(NULL)
         candidate_topics_generated(NULL)
         reduced_topics_generated(NULL)
@@ -337,7 +341,8 @@ processing_server <- function(
             }
 
             list(
-              results = structure(results, paragraphs = paragraphs),
+              results = results,
+              paragraphs = paragraphs,
               stage_execution_rows = .kwallm__prompt_execution_get()
             )
           },
@@ -373,6 +378,7 @@ processing_server <- function(
           promise = promise,
           setter = function(value) {
             append_stage_execution_rows(value$stage_execution_rows)
+            paragraph_entries_generated(value$paragraphs %||% NULL)
             results_table_pre(value$results)
           },
           when = "main processing of categorization",
@@ -772,10 +778,8 @@ processing_server <- function(
             }
 
             list(
-              results = structure(
-                topic_assignment_results,
-                paragraphs = paragraphs
-              ),
+              results = topic_assignment_results,
+              paragraphs = paragraphs,
               stage_execution_rows = .kwallm__prompt_execution_get()
             )
           },
@@ -811,6 +815,7 @@ processing_server <- function(
           promise = promise,
           setter = function(value) {
             append_stage_execution_rows(value$stage_execution_rows)
+            paragraph_entries_generated(value$paragraphs %||% NULL)
             results_table_pre(value$results)
           },
           when = "main processing (step 3-4) of topic modelling",
@@ -903,8 +908,12 @@ processing_server <- function(
               streaming_enabled = streaming_enabled
             )
 
+            paragraphs <- attr(marking_output, "paragraphs", exact = TRUE)
+            attr(marking_output, "paragraphs") <- NULL
+
             list(
               results = marking_output,
+              paragraphs = paragraphs,
               stage_execution_rows = .kwallm__prompt_execution_get()
             )
           },
@@ -938,6 +947,7 @@ processing_server <- function(
           promise = promise,
           setter = function(value) {
             append_stage_execution_rows(value$stage_execution_rows)
+            paragraph_entries_generated(value$paragraphs %||% NULL)
             results_table_pre(value$results)
           },
           when = "main processing of marking",
@@ -1157,6 +1167,7 @@ processing_server <- function(
         analysis_result <- build_analysis_result(
           texts_df = texts$df,
           results_table = results_table(),
+          paragraph_entries = paragraph_entries_generated(),
           uuid = uuid,
           mode = mode(),
           research_background = research_background(),
