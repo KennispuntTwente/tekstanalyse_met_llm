@@ -143,6 +143,11 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   expect_true(is.vector(paragraphs[[1]]$texts))
   expect_true(is.character(paragraphs[[1]]$texts))
   expect_true(length(paragraphs[[1]]$texts) > 0)
+  expect_true(is.numeric(paragraphs[[1]]$analysis_unit_ids))
+  expect_identical(
+    length(paragraphs[[1]]$analysis_unit_ids),
+    length(paragraphs[[1]]$texts)
+  )
 
   app$stop()
 })

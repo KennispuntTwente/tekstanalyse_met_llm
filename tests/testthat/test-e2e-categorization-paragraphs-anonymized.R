@@ -45,12 +45,14 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
   app$set_inputs(`model-main_model` = "kwallm-fake-main-1024")
   app$set_inputs(`write_paragraphs_toggle-toggle` = "Yes")
 
-  raw_texts <- app$get_value(export = "text_management-texts__raw")
+  document_texts <- app$get_value(
+    export = "text_management-texts__document_text"
+  )
   preprocessed_texts <- app$get_value(
     export = "text_management-texts__preprocessed"
   )
 
-  expect_true(any(grepl("kennispunttwente.nl", raw_texts, fixed = TRUE)))
+  expect_true(any(grepl("kennispunttwente.nl", document_texts, fixed = TRUE)))
   expect_false(any(grepl(
     "kennispunttwente.nl",
     preprocessed_texts,
@@ -83,6 +85,12 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
   expect_true(is.logical(paragraphs[[1]]$prompt_fits))
   expect_true(is.character(paragraphs[[1]]$texts))
   expect_true(length(paragraphs[[1]]$texts) > 0)
+  expect_true(is.numeric(paragraphs[[1]]$analysis_unit_ids))
+  expect_true(length(paragraphs[[1]]$analysis_unit_ids) > 0)
+  expect_identical(
+    length(paragraphs[[1]]$analysis_unit_ids),
+    length(paragraphs[[1]]$texts)
+  )
 
   app$stop()
 })

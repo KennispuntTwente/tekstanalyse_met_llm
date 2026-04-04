@@ -30,8 +30,7 @@ source(here::here("R", "utils_quotes.R"), local = TRUE)
 
 ## Method
 
-There were `r length(unique(report_df$text))` texts analyzed with a large language model (LLM) (model: `r htmltools::htmlEscape(main_model)`),
-where the LLM was asked to mark texts that belonged to one of the following codes:
+`r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to mark texts that belonged to one of the following codes:
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 cat("<blockquote>")
@@ -82,7 +81,7 @@ report_df |>
   dplyr::filter(!is.na(marked_text) & marked_text != "") |>
   dplyr::rename(
     `Text` = text,
-    `Subtext` = sub_text,
+    `Chunk` = chunk_text,
     `Code` = code,
     `Marked text` = marked_text
   ) |>

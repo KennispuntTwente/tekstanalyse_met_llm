@@ -6,6 +6,7 @@
 
 mark_texts <- function(
   texts,
+  analysis_unit_ids,
   codes,
   text_size_tokens = 128,
   overlap_size_tokens = 64,
@@ -28,6 +29,8 @@ mark_texts <- function(
     is.character(texts),
     is.vector(texts),
     length(texts) > 0,
+    is.numeric(analysis_unit_ids),
+    length(analysis_unit_ids) == length(texts),
     is.character(codes),
     is.vector(codes),
     length(codes) > 0
@@ -104,17 +107,24 @@ mark_texts <- function(
     semchunker <- get(chunker_name, envir = .GlobalEnv)
   }
 
-  # Create dataframe with original texts
-  df <- tibble::tibble(text = texts)
-  # Split texts into semantic chunks, creating additional rows where needed
+  # `texts` here are already unique analysis-unit texts, not source/document rows.
+  # `analysis_unit_id` identifies that LLM input, and `chunk_id` identifies the
+  # chunk rows created from it.
+  df <- tibble::tibble(
+    analysis_unit_id = as.integer(analysis_unit_ids),
+    analysis_unit_text = texts
+  )
+
+  # Split analysis units into semantic chunks, keeping chunk lineage explicit.
   df <- df |>
     dplyr::mutate(
-      sub_text = purrr::map(text, function(x) {
-        # Split text into semantic chunks
+      chunk_text = purrr::map(analysis_unit_text, function(x) {
         semchunker(x, overlap = overlap_size_tokens)
-      })
+      }),
+      chunk_index = purrr::map(chunk_text, seq_along)
     ) |>
-    tidyr::unnest(sub_text)
+    tidyr::unnest(c(chunk_text, chunk_index)) |>
+    dplyr::mutate(chunk_id = dplyr::row_number())
 
   # Verify that longest text does not exceed token limit
   model <- llm_provider$parameters$model
@@ -123,7 +133,7 @@ mark_texts <- function(
     n_tokens_context_window <- 2048
   }
   longest_prompt_tokens <- mark_text_prompt(
-    text = df$sub_text[which.max(count_tokens(df$sub_text))],
+    text = df$chunk_text[which.max(count_tokens(df$chunk_text))],
     code = codes[which.max(count_tokens(codes))]
   ) |>
     tidyprompt::construct_prompt_text() |>
@@ -138,8 +148,7 @@ mark_texts <- function(
     ))
   }
 
-  # For each code & sub_text, ask LLM to mark relevant sections in the text
-  # Create own row for each text, sub_text, code, and marked_text
+  # For each code and chunk, ask the LLM to mark relevant sections.
   total_combinations <- nrow(df) * length(codes)
 
   # Guard against runaway cost: the cross-product of split chunks x codes
@@ -184,7 +193,7 @@ mark_texts <- function(
   df_result <- df |>
     tidyr::crossing(code = codes) |>
     dplyr::mutate(
-      marking_match = purrr::map2(sub_text, code, function(txt, cd) {
+      marking_match = purrr::map2(chunk_text, code, function(txt, cd) {
         current_count <<- current_count + 1
         if (current_count == 1 || current_count %% 10 == 0) {
           log_info(
@@ -244,10 +253,10 @@ mark_texts <- function(
 
   # Clean up the result: remove NA marked_text, normalize, and check for substrings
   # (substring is when overlapped text parts are present in other marked sections;
-  # i.e., same text, same code)
+  # i.e., same analysis unit, same code)
   df_result_clean <- df_result |>
     dplyr::filter(!is.na(marked_text)) |>
-    dplyr::group_by(text, code) |>
+    dplyr::group_by(analysis_unit_id, analysis_unit_text, code) |>
     dplyr::mutate(
       # Normalize for comparison: lowercase, remove punctuation and spaces
       norm_text = stringr::str_remove_all(
@@ -285,16 +294,16 @@ mark_texts <- function(
     )
 
     # Collect the marked snippets for each text-code combo;
-    #  this will be used to highlight the marked texts for each original text & code
+    # this is used to highlight supporting snippets in the full analysis unit.
     df_highlight <- df_result_clean |>
-      dplyr::group_by(text, code) |>
+      dplyr::group_by(analysis_unit_id, analysis_unit_text, code) |>
       dplyr::summarise(
         marked_texts = list(unique(na.omit(marked_text))),
         .groups = "drop"
       ) |>
       dplyr::mutate(
         highlighted_text = purrr::pmap_chr(
-          list(text, marked_texts),
+          list(analysis_unit_text, marked_texts),
           function(orig, mlist) {
             highlighted <- orig
             for (m in mlist) {
@@ -310,13 +319,23 @@ mark_texts <- function(
       )
 
     # Create list of code + all relevant original texts with highlighted marked texts
-    text_list <- df_highlight |>
+    paragraph_input_df <- df_highlight |>
       dplyr::group_by(code) |>
       dplyr::summarise(
-        paragraphs = list(highlighted_text),
+        texts = list(highlighted_text),
+        analysis_unit_ids = list(as.integer(analysis_unit_id)),
         .groups = "drop"
-      ) |>
-      tibble::deframe()
+      )
+
+    text_list <- stats::setNames(
+      lapply(seq_len(nrow(paragraph_input_df)), function(i) {
+        list(
+          texts = paragraph_input_df$texts[[i]],
+          analysis_unit_ids = paragraph_input_df$analysis_unit_ids[[i]]
+        )
+      }),
+      paragraph_input_df$code
+    )
 
     # Create paragraphs for each code
     try(
@@ -345,7 +364,7 @@ mark_texts <- function(
     i <- -1
     paragraphs <- purrr::imap(
       text_list,
-      function(texts, code) {
+      function(paragraph_input, code) {
         i <<- i + 1
         if (!is.null(interrupter)) {
           interrupter$execInterrupts()
@@ -373,7 +392,8 @@ mark_texts <- function(
         }
 
         paragraph <- write_paragraph(
-          texts = texts,
+          texts = paragraph_input$texts,
+          analysis_unit_ids = paragraph_input$analysis_unit_ids,
           topic = code,
           research_background = research_background,
           style_prompt = style_prompt,
@@ -402,7 +422,21 @@ mark_texts <- function(
     attr(df_result_clean, "paragraphs") <- paragraphs
   }
 
-  df_result_clean
+  df_result_clean |>
+    dplyr::select(
+      analysis_unit_id,
+      chunk_id,
+      chunk_index,
+      chunk_text,
+      code,
+      source_marked_text,
+      marked_text,
+      match_start,
+      match_end,
+      match_distance,
+      match_method,
+      response_status
+    )
 }
 
 # Helper: prompt to mark text

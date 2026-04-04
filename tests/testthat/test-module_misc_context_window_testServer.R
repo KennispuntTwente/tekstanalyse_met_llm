@@ -1,7 +1,7 @@
 library(testthat)
 library(shiny)
 
-source(here::here("R", "utils_create_text_chunks.R"), local = TRUE)
+source(here::here("R", "utils_create_text_batches.R"), local = TRUE)
 source(here::here("R", "module_misc_context_window.R"), local = TRUE)
 
 # Minimal stubs used by this module (UI helpers + validators).
@@ -93,7 +93,7 @@ test_that("context_window_server: fit flag flips based on context window size", 
 
       texts <- reactiveValues(
         preprocessed = c("123456789012345678"),
-        raw = character()
+        document_text = character()
       )
 
       rv <- context_window_server(
@@ -142,7 +142,7 @@ test_that("context_window_server: fit flag flips based on context window size", 
 })
 
 
-test_that("context_window_server: topic mode sets chunk flags and too-many-chunks", {
+test_that("context_window_server: topic mode sets batch flags and too-many-batches", {
   tidyprompt_ns <- asNamespace("tidyprompt")
   old_construct <- get("construct_prompt_text", envir = tidyprompt_ns)
   withr::defer({
@@ -190,7 +190,7 @@ test_that("context_window_server: topic mode sets chunk flags and too-many-chunk
 
       texts <- reactiveValues(
         preprocessed = c("t1", "t2", "t3"),
-        raw = character()
+        document_text = character()
       )
 
       rv <- context_window_server(
@@ -205,22 +205,22 @@ test_that("context_window_server: topic mode sets chunk flags and too-many-chunk
         texts = texts,
         processing = reactiveVal(FALSE),
         lang = lang,
-        number_of_chunks_limit = 2
+        number_of_batches_limit = 2
       )
 
       list(rv = rv)
     },
     {
-      # Force each text into its own chunk, deterministically.
-      session$setInputs(`cw-chunk_size` = 1)
+      # Force each text into its own batch, deterministically.
+      session$setInputs(`cw-batch_size` = 1)
 
       for (i in 1:10) {
         session$flushReact()
       }
 
-      expect_identical(rv$fit_context_window_chunks, TRUE)
-      expect_identical(rv$too_many_chunks, TRUE)
-      expect_equal(rv$n_chunks, 3)
+      expect_identical(rv$fit_context_window_batches, TRUE)
+      expect_identical(rv$too_many_batches, TRUE)
+      expect_equal(rv$n_batches, 3)
     }
   )
 })
@@ -296,7 +296,7 @@ test_that("context_window_server: multi-label uses actual exclusive_texts, not f
 
       texts <- reactiveValues(
         preprocessed = c("some text"),
-        raw = character()
+        document_text = character()
       )
 
       rv <- context_window_server(

@@ -2,12 +2,12 @@ library(testthat)
 
 # Shared helper ---------------------------------------------------------------
 # Source analysis_code_generation.R into an isolated env with stubs so the
-# function finds our fakes for create_text_chunks, count_tokens, etc.
+# function finds our fakes for create_text_batches, count_tokens, etc.
 make_codegen_env <- function(
   context_window = 20,
-  create_text_chunks_fn = function(
+  create_text_batches_fn = function(
     texts,
-    chunk_size,
+    batch_size,
     draws,
     n_tokens_context_window,
     base_prompt_text
@@ -23,13 +23,13 @@ make_codegen_env <- function(
   env$get_context_window_size_in_tokens <- function(model) context_window
   env$count_tokens <- function(x) nchar(x)
   env$prompt_candidate_topics <- function(
-    text_chunk,
+    text_batch,
     research_background,
     language
   ) {
     tidyprompt::tidyprompt("")
   }
-  env$create_text_chunks <- create_text_chunks_fn
+  env$create_text_batches <- create_text_batches_fn
 
   source(here::here("R", "analysis_code_generation.R"), local = env)
   env
@@ -37,12 +37,12 @@ make_codegen_env <- function(
 
 fake_provider <- list(parameters = list(model = "test-model"))
 
-# 1. create_text_chunks returns NULL -> error ----------------------------------
-test_that("generate_codes_by_reading_texts stops when chunks are NULL", {
+# 1. create_text_batches returns NULL -> error ---------------------------------
+test_that("generate_codes_by_reading_texts stops when batches are NULL", {
   env <- make_codegen_env(
-    create_text_chunks_fn = function(
+    create_text_batches_fn = function(
       texts,
-      chunk_size,
+      batch_size,
       draws,
       n_tokens_context_window,
       base_prompt_text
@@ -62,12 +62,12 @@ test_that("generate_codes_by_reading_texts stops when chunks are NULL", {
   )
 })
 
-# 2. create_text_chunks returns empty list -> error ----------------------------
-test_that("generate_codes_by_reading_texts stops when chunks are empty list", {
+# 2. create_text_batches returns empty list -> error ---------------------------
+test_that("generate_codes_by_reading_texts stops when batches are empty list", {
   env <- make_codegen_env(
-    create_text_chunks_fn = function(
+    create_text_batches_fn = function(
       texts,
-      chunk_size,
+      batch_size,
       draws,
       n_tokens_context_window,
       base_prompt_text
@@ -91,9 +91,9 @@ test_that("generate_codes_by_reading_texts stops when chunks are empty list", {
 test_that("generate_codes_by_reading_texts error includes token count", {
   env <- make_codegen_env(
     context_window = 20,
-    create_text_chunks_fn = function(
+    create_text_batches_fn = function(
       texts,
-      chunk_size,
+      batch_size,
       draws,
       n_tokens_context_window,
       base_prompt_text
@@ -185,9 +185,9 @@ test_that("generate_codes_by_reading_texts defaults to 2048 for unknown model", 
   received_window <- NULL
   env <- make_codegen_env(
     context_window = NULL,
-    create_text_chunks_fn = function(
+    create_text_batches_fn = function(
       texts,
-      chunk_size,
+      batch_size,
       draws,
       n_tokens_context_window,
       base_prompt_text

@@ -357,7 +357,7 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
   expect_true(all(results$code %in% codes))
   expect_identical(length(unique(results$text)), 3000L)
   expect_true(all(vapply(results$marked_text, is.character, logical(1))))
-  expect_true(all(results$marked_text == results$sub_text))
+  expect_true(all(results$marked_text == results$chunk_text))
   expect_true(all(nchar(results$marked_text) > 0))
 
   log_file <- file.path(

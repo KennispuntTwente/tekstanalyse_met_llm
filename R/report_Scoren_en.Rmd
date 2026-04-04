@@ -32,8 +32,7 @@ source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 
 ## Method
 
-`r nrow(report_df)` texts were analyzed with an LLM (model: `r htmltools::htmlEscape(main_model)`),
-where the LLM was asked to provide a score (0-100) indicating
+`r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to provide a score (0-100) indicating
 how well a text fits the characteristic '*`r htmltools::htmlEscape(result_payload@characteristic)`*'.
 
 Each text was presented separately to the LLM.

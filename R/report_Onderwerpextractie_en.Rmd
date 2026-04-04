@@ -46,7 +46,7 @@ source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 
 ## Method
 
-`r nrow(report_df)` texts have been analyzed with a language model,
+`r .kwallm_report_text_count_summary(analysis_result)` A language model was then used
 to discover which different topics are mentioned in the texts
 and how often.
 
@@ -153,7 +153,7 @@ if (!assign_multiple_categories) {
   )
 } else {
   report_df |>
-    dplyr::select(-text) |>
+    dplyr::select(-dplyr::any_of(c("document_id", "text"))) |>
     # For each binary category column, count the number of TRUE values
     dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(.x, na.rm = TRUE))) |>
     tidyr::pivot_longer(
@@ -197,8 +197,8 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
       language = "en"
     )
   } else {
-    # Get topic columns (all except 'text')
-    topic_cols <- setdiff(names(report_df), "text")
+    # Get topic columns (excluding report identity columns)
+    topic_cols <- setdiff(names(report_df), c("document_id", "text"))
     generate_grouped_topic_table_multi(
       df = report_df,
       by_values = group_lookup,

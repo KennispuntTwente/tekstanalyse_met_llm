@@ -63,7 +63,7 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     export = c(
       # Text upload & processing works
       "text_management-anonymization_mode",
-      "text_management-texts__raw",
+      "text_management-texts__document_text",
       "text_management-texts__preprocessed",
       "text_management-texts__df",
 
@@ -106,6 +106,11 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   expect_true(is.vector(paragraphs[[1]]$texts))
   expect_true(is.character(paragraphs[[1]]$texts))
   expect_true(length(paragraphs[[1]]$texts) > 0)
+  expect_true(is.numeric(paragraphs[[1]]$analysis_unit_ids))
+  expect_identical(
+    length(paragraphs[[1]]$analysis_unit_ids),
+    length(paragraphs[[1]]$texts)
+  )
 
   app$stop()
 })

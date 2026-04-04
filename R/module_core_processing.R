@@ -51,7 +51,6 @@ processing_server <- function(
   context_window,
   by_column_name = reactiveVal(NULL),
   by_column_lookup = reactiveVal(NULL),
-  split_source_texts = reactiveVal(NULL),
   split_settings = reactiveVal(list()),
   upload_info = reactiveVal(list()),
   split_in_progress = reactiveVal(FALSE),
@@ -119,6 +118,17 @@ processing_server <- function(
 
       # Timestamp for end-to-end duration (click -> download-ready)
       analysis_started_at <- reactiveVal(NULL)
+
+      current_analysis_unit_ids <- function() {
+        # These ids line up with texts$preprocessed: one id per unique analysis
+        # unit, not one id per document row in texts$df.
+        ids <- texts$analysis_units$analysis_unit_id %||% NULL
+        if (is.null(ids)) {
+          stop("texts$analysis_units$analysis_unit_id must be available")
+        }
+
+        as.integer(ids)
+      }
 
       ### 2.1.2 Test exports ---------------------------------------------------
 
@@ -304,6 +314,7 @@ processing_server <- function(
 
             results <- categorize_texts(
               texts = texts,
+              analysis_unit_ids = analysis_unit_ids,
               categories = categories,
               research_background = research_background,
               llm_provider = llm_provider,
@@ -318,7 +329,7 @@ processing_server <- function(
             if (write_paragraphs) {
               paragraphs <- tryCatch(
                 {
-                  categories_texts <- collect_grouped_texts(
+                  categories_texts <- collect_grouped_paragraph_inputs(
                     results = results,
                     labels = categories,
                     assign_multiple_categories = assign_multiple_categories
@@ -350,6 +361,7 @@ processing_server <- function(
             list(
               llm_provider = models$main,
               texts = texts$preprocessed,
+              analysis_unit_ids = current_analysis_unit_ids(),
               research_background = research_background(),
               style_prompt = style_prompt(),
               categories = categories$texts(),
@@ -433,6 +445,7 @@ processing_server <- function(
 
             results <- score_texts(
               texts = texts,
+              analysis_unit_ids = analysis_unit_ids,
               scoring_characteristic = scoring_characteristic,
               research_background = research_background,
               llm_provider = llm_provider,
@@ -449,6 +462,7 @@ processing_server <- function(
             list(
               llm_provider = models$main,
               texts = texts$preprocessed,
+              analysis_unit_ids = current_analysis_unit_ids(),
               research_background = research_background(),
               scoring_characteristic = scoring_characteristic(),
               progress_primary = progress_primary$async,
@@ -490,7 +504,8 @@ processing_server <- function(
       # editing or topic assignment happens.
       start_topic_generation <- function() {
         req(texts$preprocessed)
-        req(context_window$text_chunks)
+        # `text_batches` here are prompt batches over unique analysis-unit texts.
+        req(context_window$text_batches)
         if (
           !processing_texts_under_maximum(
             preprocessed_texts = texts$preprocessed,
@@ -500,7 +515,7 @@ processing_server <- function(
           return()
         }
         req(isFALSE(context_window$any_fit_problem))
-        req(isFALSE(context_window$too_many_chunks))
+        req(isFALSE(context_window$too_many_batches))
 
         log_context <- start_processing_run(set_initial_progress = FALSE)
 
@@ -522,13 +537,13 @@ processing_server <- function(
             progress_secondary$show()
             progress_secondary$set_with_total(
               0,
-              length(text_chunks),
+              length(text_batches),
               lang$t("...")
             )
 
             candidate_topics <- tryCatch(
               create_candidate_topics(
-                text_chunks = text_chunks,
+                text_batches = text_batches,
                 research_background = research_background,
                 llm_provider = llm_provider_main,
                 language = lang$get_translation_language(),
@@ -581,7 +596,7 @@ processing_server <- function(
               research_background = research_background(),
               mode = mode(),
               handle_detailed_error = handle_detailed_error,
-              text_chunks = context_window$text_chunks,
+              text_batches = context_window$text_batches,
               lang = lang(),
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
@@ -727,6 +742,7 @@ processing_server <- function(
               {
                 results <- assign_topics(
                   texts = texts,
+                  analysis_unit_ids = analysis_unit_ids,
                   topics = topics,
                   research_background = research_background,
                   llm_provider = llm_provider,
@@ -755,7 +771,7 @@ processing_server <- function(
             if (write_paragraphs) {
               paragraphs <- tryCatch(
                 {
-                  topics_texts_list <- collect_grouped_texts(
+                  topics_texts_list <- collect_grouped_paragraph_inputs(
                     results = topic_assignment_results,
                     labels = topics,
                     assign_multiple_categories = assign_multiple_categories
@@ -789,6 +805,7 @@ processing_server <- function(
               topics = topics(),
               llm_provider = models$main,
               texts = texts$preprocessed,
+              analysis_unit_ids = current_analysis_unit_ids(),
               research_background = research_background(),
               style_prompt = style_prompt(),
               mode = mode(),
@@ -893,6 +910,7 @@ processing_server <- function(
 
             marking_output <- mark_texts(
               texts = texts,
+              analysis_unit_ids = analysis_unit_ids,
               codes = codes,
               research_background = research_background,
               style_prompt = style_prompt,
@@ -921,6 +939,7 @@ processing_server <- function(
             list(
               llm_provider = models$main,
               texts = texts$preprocessed,
+              analysis_unit_ids = current_analysis_unit_ids(),
               research_background = research_background(),
               style_prompt = style_prompt(),
               codes = codes$texts(),
@@ -1062,7 +1081,7 @@ processing_server <- function(
             c("<< ONDERWERP 1 >>", "<< ONDERWERP 2 >>")
 
           stage_prompt_previews$topic_candidate_generation <- prompt_candidate_topics(
-            text_chunk = c(
+            text_batch = c(
               lang()$t("<< TEKST 1 >>"),
               lang()$t("<< TEKST 2 >>")
             ),
@@ -1191,7 +1210,6 @@ processing_server <- function(
           stage_execution_rows = stage_execution_rows_generated(),
           app_version = getOption("kwallm__app_version", NULL),
           input_info = merged_input_info,
-          source_texts = split_source_texts(),
           candidate_topics = candidate_topics_generated(),
           reduced_topics = reduced_topics_generated(),
           topics_were_edited = topics_were_edited(),
@@ -1639,7 +1657,7 @@ processing_server <- function(
         # Disable if no texts OR if there is a context-window fit problem
         disable_flag <- (n_pre == 0) ||
           isTRUE(context_window$any_fit_problem) ||
-          isTRUE(context_window$too_many_chunks) ||
+          isTRUE(context_window$too_many_batches) ||
           isTRUE(split_in_progress())
 
         actionButton(

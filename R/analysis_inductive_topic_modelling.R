@@ -10,24 +10,25 @@
 
 ## 1.1 Candidate topic creation --------------------------------------------
 
-# Presenting the texts to the LLM (in chunks);
+# Presenting the analysis-unit texts to the LLM in prompt batches;
 #   asking to return all potential topics
 # May be done with a smaller model to reduce costs/improve speed
 
-#' Retrieve candidate topics from text chunks
+#' Retrieve candidate topics from text batches
 #'
-#' @param text_chunks A list of text chunks, where each chunk is a vector of texts
+#' @param text_batches A list of prompt batches, where each batch is a vector of
+#'   analysis-unit texts.
 #' @param research_background Background information about the research (optional)
 #' @param llm_provider A tidyprompt LLM provider object
 #' @param on_progress Optional callback function called after each processed
-#'   chunk as \code{on_progress(i, n, chunk, result)}.
+#'   batch as \code{on_progress(i, n, batch, result)}.
 #' @param interrupter Optional object with \code{$execInterrupts()} method for
 #'   cancellation support.
 #'
 #' @return A character vector of candidate topics
 #' @export
 create_candidate_topics <- function(
-  text_chunks,
+  text_batches,
   research_background = "",
   llm_provider,
   language = c("nl", "en"),
@@ -36,9 +37,9 @@ create_candidate_topics <- function(
 ) {
   language <- match.arg(language)
   stopifnot(
-    is.list(text_chunks),
-    all(purrr::map_lgl(text_chunks, is.character)),
-    length(text_chunks) > 0,
+    is.list(text_batches),
+    all(purrr::map_lgl(text_batches, is.character)),
+    length(text_batches) > 0,
     is.character(research_background),
     length(research_background) == 1
   )
@@ -48,19 +49,19 @@ create_candidate_topics <- function(
   )
   on.exit(options(stage_options), add = TRUE)
 
-  candidate_topics <- vector("list", length(text_chunks))
+  candidate_topics <- vector("list", length(text_batches))
 
-  for (i in seq_along(text_chunks)) {
+  for (i in seq_along(text_batches)) {
     if (!is.null(interrupter)) {
       interrupter$execInterrupts()
     }
 
-    chunk <- text_chunks[[i]]
-    # (A chunk is a vector of texts)
-    # Create a prompt for the chunk; present texts to LLM,
+    batch <- text_batches[[i]]
+    # A topic batch is one prompt-sized group of analysis-unit texts.
+    # Create a prompt for the batch; present texts to LLM,
     # ask to return a list of potential topics
     prompt <- prompt_candidate_topics(
-      text_chunk = chunk,
+      text_batch = batch,
       research_background = research_background,
       language = language
     )
@@ -70,7 +71,7 @@ create_candidate_topics <- function(
     candidate_topics[[i]] <- result$topics
 
     if (!is.null(on_progress)) {
-      on_progress(i, length(text_chunks), chunk, result$topics)
+      on_progress(i, length(text_batches), batch, result$topics)
     }
   }
 
@@ -80,8 +81,8 @@ create_candidate_topics <- function(
   tryCatch(
     log_info(
       sprintf(
-        "Topic generation: n_chunks=%d, n_candidates=%d",
-        length(text_chunks),
+        "Topic generation: n_batches=%d, n_candidates=%d",
+        length(text_batches),
         length(candidate_topics)
       ),
       component = "topics"
@@ -93,14 +94,14 @@ create_candidate_topics <- function(
 }
 
 prompt_candidate_topics <- function(
-  text_chunk,
+  text_batch,
   research_background = "",
   language = c("nl", "en")
 ) {
   language <- match.arg(language)
 
-  chunk_formatted <- purrr::map_chr(seq_along(text_chunk), function(i) {
-    paste0("<text ", i, ">\n", text_chunk[[i]], "\n</text ", i, ">")
+  batch_formatted <- purrr::map_chr(seq_along(text_batch), function(i) {
+    paste0("<text ", i, ">\n", text_batch[[i]], "\n</text ", i, ">")
   })
 
   base <- "Your task is to distill a list of topics from the following texts: "
@@ -114,7 +115,7 @@ prompt_candidate_topics <- function(
   }
 
   prompt <- base |>
-    tidyprompt::add_text(paste(chunk_formatted, collapse = "\n\n")) |>
+    tidyprompt::add_text(paste(batch_formatted, collapse = "\n\n")) |>
     tidyprompt::add_text(
       "Topics should not be too specific, but also not too general."
     ) |>
@@ -308,7 +309,8 @@ prompt_topic_not_applicable_check <- function(
 #' This helper repeatedly sends smaller, context‑window‑friendly prompts to the
 #' LLM until the full list of topics can be distilled in a single pass. It
 #' avoids throwing an error when the candidate topic list is too large; instead
-#' it chunks, reduces, combines, and, if needed, repeats the process up to
+#' it groups topics into prompt batches, reduces each batch, combines them,
+#' and, if needed, repeats the process up to
 #' `max_iterations` times.  If the prompt still does not fit afterwards, an
 #' informative error is raised.
 #'
@@ -320,20 +322,21 @@ prompt_topic_not_applicable_check <- function(
 #' @param language Either "nl" or "en" — affects the returned topic language.
 #' @param always_add_not_applicable Logical; automatically append the generic
 #'   “Unknown/not applicable” topic when missing.
-#' @param max_iterations Maximum number of chunk‑reduce cycles (default = 4).
+#' @param max_iterations Maximum number of batch-reduce cycles (default = 4).
 #' @return A character vector of reduced topics.
 #' @export
 #' Reduce the number of topics
 #'
 #' `reduce_topics()` repeatedly sends context-window-friendly prompts to an LLM,
-#' chunking the input topics, reducing each chunk, combining the results, and
+#' grouping the input topics into prompt batches, reducing each batch,
+#' combining the results, and
 #' repeating until everything fits in a single prompt. Two safety caps are in
 #' place so you stay in control of token cost:
 #'
 #' 1. **`max_iterations`** – limits how many reduce-and-combine cycles are tried.
-#' 2. **`max_groups`** – puts a hard ceiling on how many prompt chunks may ever
+#' 2. **`max_groups`** – puts a hard ceiling on how many prompt batches may ever
 #'    exist *at any stage* of the algorithm.  If a split produces more than
-#'    `max_groups` chunks, the function aborts immediately with an informative
+#'    `max_groups` batches, the function aborts immediately with an informative
 #'    error.
 #'
 #' @param candidate_topics Character vector of candidate topics.
@@ -344,8 +347,8 @@ prompt_topic_not_applicable_check <- function(
 #' @param language "nl" or "en" – controls the language of the returned topics.
 #' @param always_add_not_applicable Append a generic "Unknown/not applicable"
 #'   topic when missing (default honours global option).
-#' @param max_iterations Maximum number of chunk-reduce cycles (default = 4).
-#' @param max_groups Maximum number of chunks allowed at *any* iteration
+#' @param max_iterations Maximum number of batch-reduce cycles (default = 4).
+#' @param max_groups Maximum number of prompt batches allowed at *any* iteration
 #'   (default = 16).
 #'
 #' @return Character vector of reduced topics.
@@ -431,8 +434,8 @@ reduce_topics <- function(
     n_tokens_context_window <- 2048
   }
 
-  split_into_chunks <- function(topics_vec) {
-    chunks <- list()
+  split_into_batches <- function(topics_vec) {
+    batches <- list()
     current <- character()
     cur_tokens <- 0
     for (i in seq_along(topics_vec)) {
@@ -442,7 +445,7 @@ reduce_topics <- function(
         (cur_tokens + add_tokens + base_token_cost) > n_tokens_context_window &&
           length(current) > 0
       ) {
-        chunks[[length(chunks) + 1]] <- current
+        batches[[length(batches) + 1]] <- current
         current <- character()
         cur_tokens <- 0
       }
@@ -450,18 +453,18 @@ reduce_topics <- function(
       cur_tokens <- cur_tokens + add_tokens
     }
     if (length(current) > 0) {
-      chunks[[length(chunks) + 1]] <- current
+      batches[[length(batches) + 1]] <- current
     }
-    chunks
+    batches
   }
 
   ### first split guard -----------------------------------------------------
-  chunks <- split_into_chunks(candidate_topics)
-  if (length(chunks) > max_groups) {
+  batches <- split_into_batches(candidate_topics)
+  if (length(batches) > max_groups) {
     stop(
       "reduce_topics(): Initial split produced ",
-      length(chunks),
-      " groups, which exceeds 'max_groups' (",
+      length(batches),
+      " prompt batches, which exceeds 'max_groups' (",
       max_groups,
       "). Either reduce 'candidate_topics', increase the model context window, or raise 'max_groups'."
     )
@@ -485,25 +488,25 @@ reduce_topics <- function(
       interrupter$execInterrupts()
     }
 
-    chunks <- split_into_chunks(current_topics)
+    batches <- split_into_batches(current_topics)
 
     #### guard at each iteration ------------------------------------------
-    if (length(chunks) > max_groups) {
+    if (length(batches) > max_groups) {
       stop(
         "reduce_topics(): Reduction step ",
         iteration,
         " produced ",
-        length(chunks),
-        " groups, exceeding 'max_groups' (",
+        length(batches),
+        " prompt batches, exceeding 'max_groups' (",
         max_groups,
         "). Reduce topic count or raise the cap."
       )
     }
 
-    reduced_chunks <- purrr::map(chunks, reduce_once)
-    combined <- unique(unlist(reduced_chunks))
+    reduced_batches <- purrr::map(batches, reduce_once)
+    combined <- unique(unlist(reduced_batches))
 
-    if (length(chunks) == 1) {
+    if (length(batches) == 1) {
       # everything fits now, we're done
       current_topics <- combined
       break
@@ -586,6 +589,7 @@ reduce_topics <- function(
 #' @export
 assign_topics <- function(
   texts,
+  analysis_unit_ids,
   topics,
   research_background = "",
   llm_provider,
@@ -599,6 +603,8 @@ assign_topics <- function(
   stopifnot(
     is.character(texts),
     length(texts) > 0,
+    is.numeric(analysis_unit_ids),
+    length(analysis_unit_ids) == length(texts),
     is.character(topics),
     length(topics) > 0,
     is.character(research_background),
@@ -651,6 +657,7 @@ assign_topics <- function(
 
   if (assign_multiple_categories) {
     results_df <- data.frame(
+      analysis_unit_id = as.integer(analysis_unit_ids),
       text = texts,
       stringsAsFactors = FALSE
     )
@@ -678,6 +685,7 @@ assign_topics <- function(
   }
 
   data.frame(
+    analysis_unit_id = as.integer(analysis_unit_ids),
     text = texts,
     result = results,
     stringsAsFactors = FALSE
@@ -767,7 +775,7 @@ if (FALSE) {
   )
 
   # See function arguments for the various options for the procedure,
-  #   e.g., which model to use, how to chunk texts, etc.
+  #   e.g., which model to use and how to batch texts for topic generation.
   # See 'tidyprompt' documentation specifically for selecting a LLM provider
   #   (https://tjarkvandemerwe.github.io/tidyprompt/)
 
@@ -775,16 +783,18 @@ if (FALSE) {
   texts <- sentences_df$sentence
   research_background <- ""
 
-  # Chunk texts
-  text_chunks <- create_text_chunks(
+  # Group analysis-unit texts into prompt batches
+  text_batches <- create_text_batches(
     texts,
-    max_chunk_size = 50,
-    max_redrawing = 1
+    batch_size = 50,
+    draws = 1,
+    n_tokens_context_window = 2048,
+    base_prompt_text = ""
   )
 
   # Use LLM to generate topics
   candidate_topics <- create_candidate_topics(
-    text_chunks,
+    text_batches,
     research_background,
     llm_provider = llm_provider_openai(
       parameters = list(model = "gpt-4.1-2025-04-14")
@@ -800,9 +810,10 @@ if (FALSE) {
 
   # Use LLM to assign topics
   topic_assignment_results <- assign_topics(
-    texts,
-    topics,
-    research_background,
+    texts = texts,
+    analysis_unit_ids = seq_along(texts),
+    topics = topics,
+    research_background = research_background,
     llm_provider = llm_provider_openai(
       parameters = list(model = "gpt-4.1-2025-04-14")
     )

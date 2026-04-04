@@ -11,19 +11,24 @@
 #' object that drives exports and reports.
 #'
 #' @param texts_df Data frame from the processing flow, usually `texts$df`.
-#'   Must contain `raw`; if present, `preprocessed`, `document_id`,
-#'   `source_document_id`, `source_text`, and `analysis_unit_id` are reused.
-#'   Missing lineage columns are filled in by this builder.
+#'   Must contain `source_document_id`, `document_id`,
+#'   `source_document_text`, `document_text`, `preprocessed`, and
+#'   `analysis_unit_id`. `source_document_*` is the uploaded row,
+#'   `document_*` is the current row after optional splitting, and
+#'   `analysis_unit_id` points to the unique preprocessed text sent to the LLM.
 #' @param results_table Joined processing output returned after mapping results
 #'   back to the original texts, usually `results_table()` from
 #'   `module_core_processing.R`. It should already be in
 #'   final UI/export shape: categorization/topic single-label uses `result`,
 #'   multi-label uses one logical column per label, scoring uses numeric
-#'   `result`, and marking uses `text`, `sub_text`, `code`, and `marked_text`,
-#'   with optional matching diagnostics in `source_marked_text`, `match_start`,
-#'   `match_end`, `match_distance`, `match_method`, and `response_status`.
+#'   `result`, and marking uses `text`, `chunk_id`, `chunk_index`,
+#'   `chunk_text`, `code`, and `marked_text`, with optional matching
+#'   diagnostics in `source_marked_text`, `match_start`, `match_end`,
+#'   `match_distance`, `match_method`, and `response_status`.
 #' @param paragraph_entries Optional explicit paragraph output list from the
-#'   processing flow.
+#'   processing flow. Each entry must contain `texts` plus aligned
+#'   `analysis_unit_ids` so paragraph provenance can be reconstructed without
+#'   text matching.
 #' @param uuid Character run identifier.
 #' @param mode Display mode name or canonical mode id.
 #' @param research_background Character prompt context entered by the user.
@@ -32,9 +37,9 @@
 #' @param language App language code.
 #' @param by_column_name Optional grouping column name.
 #' @param by_column_lookup Optional lookup table, usually `by_column_lookup()`.
-#'   Must contain `text` and `by_value`. `text` may match either the original
-#'   source text or the current document text (for example split chunks), and
-#'   `by_value` is the grouped-report value for that row.
+#'   Must contain either `source_document_id` and `by_value`, or
+#'   `document_id` and `by_value`. `by_value` is the grouped-report value for
+#'   that row.
 #' @param models Named list with provider/model info per stage. Expected entries
 #'   are `main` and, for topic reduction, optional `large`.
 #' @param categories Optional categorization labels.
@@ -65,9 +70,6 @@
 #'   `anonymization_requested_mode`, `anonymization_applied_mode`,
 #'   `anonymization_completed`, `split_enabled`, `split_chunk_size`, and
 #'   `split_overlap`.
-#' @param source_texts Optional character vector, usually `split_source_texts()`.
-#'   Must have length `nrow(texts_df)` and map each current row back to the
-#'   original source text before splitting.
 #' @param candidate_topics Character vector of raw generated topics.
 #' @param reduced_topics Character vector of reduced topics before final edits.
 #' @param topics_were_edited Logical; whether a human changed the final topics.
@@ -105,7 +107,6 @@ build_analysis_result <- function(
   stage_execution_rows = NULL,
   app_version = getOption("kwallm__app_version", NULL),
   input_info = list(),
-  source_texts = NULL,
   candidate_topics = character(),
   reduced_topics = character(),
   topics_were_edited = FALSE,
@@ -133,17 +134,6 @@ build_analysis_result <- function(
 
   mode_id <- .kwallm_mode_id_from_display(mode)
   texts_df <- .kwallm_prepare_texts_df(texts_df)
-  if (!is.null(source_texts)) {
-    if (length(source_texts) != nrow(texts_df)) {
-      stop("source_texts must match nrow(texts_df)")
-    }
-
-    texts_df$source_text <- as.character(source_texts)
-    texts_df$source_document_id <- match(
-      texts_df$source_text,
-      unique(texts_df$source_text)
-    )
-  }
 
   text_lineage <- .kwallm_build_text_lineage(
     texts_df = texts_df,
@@ -182,7 +172,7 @@ build_analysis_result <- function(
       input_info$anonymization_applied_mode %||% NULL
     ),
     anonymization_completed = input_info$anonymization_completed %||% NULL,
-    split_enabled = input_info$split_enabled %||% !is.null(source_texts),
+    split_enabled = input_info$split_enabled %||% NULL,
     split_chunk_size = input_info$split_chunk_size %||% NULL,
     split_overlap = input_info$split_overlap %||% NULL
   )
@@ -313,73 +303,66 @@ build_analysis_result <- function(
   if (
     !is.null(by_column_lookup) &&
       is.data.frame(by_column_lookup) &&
-      nrow(by_column_lookup) &&
-      all(c("text", "by_value") %in% names(by_column_lookup))
+      nrow(by_column_lookup)
   ) {
-    by_lookup <- data.frame(
-      text = as.character(by_column_lookup$text),
-      by_value = as.character(by_column_lookup$by_value),
-      stringsAsFactors = FALSE
-    )
-
-    build_group_rows <- function(lookup_text) {
+    if (all(c("source_document_id", "by_value") %in% names(by_column_lookup))) {
+      document_groups <- unique(data.frame(
+        source_document_id = as.integer(by_column_lookup$source_document_id),
+        group_value = as.character(by_column_lookup$by_value),
+        stringsAsFactors = FALSE
+      ))
+    } else if (all(c("document_id", "by_value") %in% names(by_column_lookup))) {
       merged <- merge(
+        unique(texts_df[c("document_id", "source_document_id")]),
         unique(data.frame(
-          source_document_id = texts_df$source_document_id,
-          lookup_text = as.character(lookup_text),
+          document_id = as.integer(by_column_lookup$document_id),
+          by_value = as.character(by_column_lookup$by_value),
           stringsAsFactors = FALSE
         )),
-        by_lookup,
-        by.x = "lookup_text",
-        by.y = "text",
+        by = "document_id",
         all.x = FALSE,
         all.y = FALSE
       )
 
-      if (!nrow(merged)) {
-        return(NULL)
-      }
-
-      data.frame(
+      document_groups <- unique(data.frame(
         source_document_id = merged$source_document_id,
-        group_value = as.character(merged$by_value),
+        group_value = merged$by_value,
         stringsAsFactors = FALSE
+      ))
+    } else {
+      stop(
+        paste(
+          "by_column_lookup must contain either source_document_id and by_value,",
+          "or document_id and by_value"
+        )
       )
-    }
-
-    group_rows <- Filter(
-      Negate(is.null),
-      list(
-        build_group_rows(texts_df$source_text),
-        build_group_rows(texts_df$raw)
-      )
-    )
-
-    if (length(group_rows)) {
-      document_groups <- unique(do.call(rbind, group_rows))
     }
   }
 
   source_documents <- unique(data.frame(
+    # Uploaded rows before any splitting or preprocessing.
     source_document_id = texts_df$source_document_id,
-    source_text = as.character(texts_df$source_text),
+    source_document_text = as.character(texts_df$source_document_text),
     stringsAsFactors = FALSE
   ))
 
   documents <- unique(data.frame(
+    # Current rows shown in the app/results after optional splitting.
     document_id = texts_df$document_id,
     source_document_id = texts_df$source_document_id,
-    document_text = as.character(texts_df$raw),
+    document_text = as.character(texts_df$document_text),
     stringsAsFactors = FALSE
   ))
 
   analysis_units <- unique(data.frame(
+    # Unique preprocessed texts actually sent to the LLM.
     analysis_unit_id = texts_df$analysis_unit_id,
     preprocessed_text = as.character(texts_df$preprocessed),
     stringsAsFactors = FALSE
   ))
 
   document_units <- unique(data.frame(
+    # Bridge from each current document row back to the analysis unit it reused.
     document_id = texts_df$document_id,
     analysis_unit_id = texts_df$analysis_unit_id,
     stringsAsFactors = FALSE
@@ -598,7 +581,7 @@ build_analysis_result <- function(
   assignments <- if (!isTRUE(multi_label)) {
     .kwallm_build_assignments_from_single(
       texts_df,
-      results_table$result,
+      results_table,
       labels_df
     )
   } else {
@@ -619,8 +602,10 @@ build_analysis_result <- function(
   results_table,
   scoring_characteristic
 ) {
+  analysis_unit_id <- .kwallm_result_analysis_unit_ids(texts_df, results_table)
+
   scores <- unique(data.frame(
-    analysis_unit_id = texts_df$analysis_unit_id,
+    analysis_unit_id = analysis_unit_id,
     score = as.numeric(results_table$result),
     stringsAsFactors = FALSE
   ))
@@ -661,7 +646,7 @@ build_analysis_result <- function(
   assignments <- if (!isTRUE(multi_label)) {
     .kwallm_build_assignments_from_single(
       texts_df,
-      results_table$result,
+      results_table,
       labels_df
     )
   } else {
@@ -693,9 +678,9 @@ build_analysis_result <- function(
       } else {
         as.integer(reduction_summary$reduction_iterations)
       },
-      chunk_size = context_window$chunk_size %||% NULL,
+      batch_size = context_window$batch_size %||% NULL,
       draws = context_window$draws %||% NULL,
-      n_chunks = context_window$n_chunks %||% NULL,
+      n_batches = context_window$n_batches %||% NULL,
       context_window_tokens = context_window$n_tokens_context_window %||% NULL
     )
   )
@@ -704,12 +689,28 @@ build_analysis_result <- function(
 # Builds the typed marking payload.
 # We use this to normalize marked spans into codes, chunks, and individual markings.
 .kwallm_build_marking_result <- function(texts_df, results_table, codes) {
+  required_cols <- c(
+    "analysis_unit_id",
+    "chunk_id",
+    "chunk_index",
+    "chunk_text"
+  )
+  missing_cols <- setdiff(required_cols, names(results_table))
+  if (length(missing_cols)) {
+    stop(
+      paste(
+        "results_table must contain marking chunk columns:",
+        paste(missing_cols, collapse = ", ")
+      )
+    )
+  }
+
   column_or <- function(column, default) {
     if (column %in% names(rows)) {
       return(rows[[column]])
     }
 
-    rep(default, nrow(rows))
+    rep_len(default, nrow(rows))
   }
 
   rows <- results_table[
@@ -717,6 +718,10 @@ build_analysis_result <- function(
     ,
     drop = FALSE
   ]
+
+  if (!"analysis_unit_id" %in% names(results_table)) {
+    stop("results_table must contain analysis_unit_id for marking results")
+  }
 
   code_values <- as.character(codes %||% rows$code %||% character())
   code_values <- trimws(code_values)
@@ -735,36 +740,27 @@ build_analysis_result <- function(
     ))
   }
 
-  mapping <- unique(texts_df[c("raw", "analysis_unit_id")])
-  rows$analysis_unit_id <- mapping$analysis_unit_id[match(
-    rows$text,
-    mapping$raw
-  )]
-
-  chunk_keys <- unique(rows[c("analysis_unit_id", "sub_text")])
-  chunk_keys$chunk_id <- seq_len(nrow(chunk_keys))
-  chunk_keys$chunk_index <- ave(
-    chunk_keys$analysis_unit_id,
-    chunk_keys$analysis_unit_id,
-    FUN = seq_along
-  )
-
-  chunks <- data.frame(
-    chunk_id = chunk_keys$chunk_id,
-    analysis_unit_id = chunk_keys$analysis_unit_id,
-    chunk_index = as.integer(chunk_keys$chunk_index),
-    chunk_text = as.character(chunk_keys$sub_text),
+  chunks <- unique(data.frame(
+    # Each chunk belongs to one analysis unit and keeps its own row id.
+    chunk_id = as.integer(rows$chunk_id),
+    analysis_unit_id = as.integer(rows$analysis_unit_id),
+    chunk_index = as.integer(rows$chunk_index),
+    chunk_text = as.character(rows$chunk_text),
     stringsAsFactors = FALSE
-  )
+  ))
+  chunks <- chunks[order(chunks$chunk_id), , drop = FALSE]
 
   code_id <- codes_df$code_id[match(rows$code, codes_df$code_text)]
-  chunk_id <- chunk_keys$chunk_id[match(
-    paste(rows$analysis_unit_id, rows$sub_text),
-    paste(chunk_keys$analysis_unit_id, chunk_keys$sub_text)
-  )]
+  chunk_id <- as.integer(rows$chunk_id)
 
-  markings <- data.frame(
-    mark_id = seq_len(nrow(rows)),
+  if (anyNA(chunk_id)) {
+    stop("marking rows must contain non-missing chunk_id values")
+  }
+  if (anyNA(code_id)) {
+    stop("marking rows must contain codes that are present in codes_df")
+  }
+
+  markings <- unique(data.frame(
     chunk_id = chunk_id,
     code_id = code_id,
     source_marked_text = as.character(
@@ -787,7 +783,23 @@ build_analysis_result <- function(
       column_or("response_status", "matched_all")
     ),
     stringsAsFactors = FALSE
-  )
+  ))
+
+  # `results_table` is already fanned back out to document rows, so collapse
+  # identical mark rows here before storing the analysis-unit-level payload.
+  markings$mark_id <- seq_len(nrow(markings))
+  markings <- markings[c(
+    "mark_id",
+    "chunk_id",
+    "code_id",
+    "source_marked_text",
+    "marked_text",
+    "match_start",
+    "match_end",
+    "match_distance",
+    "match_method",
+    "response_status"
+  )]
 
   MarkingResult(
     codes = codes_df,
@@ -836,11 +848,16 @@ build_analysis_result <- function(
         NULL
       },
       topic_generation_settings = data.frame(
-        setting = c("chunk_size", "draws", "n_chunks", "context_window_tokens"),
+        setting = c(
+          "batch_size",
+          "draws",
+          "n_batches",
+          "context_window_tokens"
+        ),
         value = as.character(c(
-          context_window$chunk_size %||% NA,
+          context_window$batch_size %||% NA,
           context_window$draws %||% NA,
-          context_window$n_chunks %||% NA,
+          context_window$n_batches %||% NA,
           context_window$n_tokens_context_window %||% NA
         )),
         stringsAsFactors = FALSE
@@ -881,35 +898,23 @@ build_analysis_result <- function(
     stats::setNames(labels_df$label_id, labels_df$label_text)
   }
 
-  documents <- unique(texts_df[c("document_id", "raw", "preprocessed")])
-  names(documents)[names(documents) == "raw"] <- "document_text"
-  documents$document_text <- as.character(documents$document_text)
-  documents$preprocessed <- as.character(documents$preprocessed)
-
-  preprocessed_lookup <- split(
-    documents$document_id,
-    documents$preprocessed
-  )
-  raw_lookup <- split(
-    documents$document_id,
-    documents$document_text
+  document_units <- unique(texts_df[c("document_id", "analysis_unit_id")])
+  document_ids_by_analysis_unit <- split(
+    document_units$document_id,
+    document_units$analysis_unit_id
   )
 
-  lookup_document_ids <- function(value) {
+  lookup_document_ids_from_analysis_unit <- function(value) {
     if (is.null(value) || !length(value)) {
       return(integer())
     }
 
-    value <- as.character(value)[[1]]
-    if (is.na(value) || !nzchar(value)) {
+    value <- as.integer(value[[1]])
+    if (is.na(value)) {
       return(integer())
     }
 
-    matched_ids <- preprocessed_lookup[[value]]
-    if (is.null(matched_ids)) {
-      matched_ids <- raw_lookup[[value]]
-    }
-
+    matched_ids <- document_ids_by_analysis_unit[[as.character(value)]]
     if (is.null(matched_ids)) {
       return(integer())
     }
@@ -936,16 +941,31 @@ build_analysis_result <- function(
     )
 
     excerpt_texts <- as.character(paragraph$texts %||% character())
-    source_texts <- excerpt_texts
-    if (mode_id == "marking") {
-      source_texts <- gsub("\\*\\*", "", source_texts)
+    analysis_unit_ids <- paragraph$analysis_unit_ids %||% NULL
+    if (is.null(analysis_unit_ids)) {
+      stop("paragraph entries must contain analysis_unit_ids")
+    }
+
+    analysis_unit_ids <- as.integer(analysis_unit_ids)
+    if (length(analysis_unit_ids) != length(excerpt_texts)) {
+      stop(
+        "paragraph analysis_unit_ids must align with paragraph texts"
+      )
     }
 
     source_rows_for_paragraph <- list()
     for (j in seq_along(excerpt_texts)) {
-      matched_document_ids <- lookup_document_ids(source_texts[[j]])
+      matched_document_ids <- lookup_document_ids_from_analysis_unit(
+        analysis_unit_ids[[j]]
+      )
       if (!length(matched_document_ids)) {
-        next
+        stop(
+          paste0(
+            "paragraph analysis_unit_id ",
+            analysis_unit_ids[[j]],
+            " does not reference any documents"
+          )
+        )
       }
 
       source_rows_for_paragraph[[
@@ -997,12 +1017,14 @@ build_analysis_result <- function(
 # We use this when each analysis unit can receive at most one label.
 .kwallm_build_assignments_from_single <- function(
   texts_df,
-  result_values,
+  result_df,
   labels_df
 ) {
+  analysis_unit_id <- .kwallm_result_analysis_unit_ids(texts_df, result_df)
+
   assignments <- unique(data.frame(
-    analysis_unit_id = texts_df$analysis_unit_id,
-    label_text = as.character(result_values),
+    analysis_unit_id = analysis_unit_id,
+    label_text = as.character(result_df$result),
     stringsAsFactors = FALSE
   ))
   assignments <- assignments[
@@ -1023,6 +1045,7 @@ build_analysis_result <- function(
   result_df,
   labels_df
 ) {
+  analysis_unit_id <- .kwallm_result_analysis_unit_ids(texts_df, result_df)
   rows <- vector("list", length = 0)
 
   for (i in seq_len(nrow(labels_df))) {
@@ -1037,7 +1060,7 @@ build_analysis_result <- function(
     }
 
     rows[[length(rows) + 1L]] <- data.frame(
-      analysis_unit_id = texts_df$analysis_unit_id[keep],
+      analysis_unit_id = analysis_unit_id[keep],
       label_id = labels_df$label_id[[i]],
       stringsAsFactors = FALSE
     )
@@ -1064,37 +1087,58 @@ build_analysis_result <- function(
   unique(x[!is.na(x) & nzchar(x)])
 }
 
+# Resolves the analysis-unit ids for one result table.
+# Prefer explicit ids carried through the runtime flow; only fall back to the
+# legacy row-aligned assumption for direct builder callers that still omit them.
+.kwallm_result_analysis_unit_ids <- function(texts_df, result_df) {
+  stopifnot(is.data.frame(texts_df), is.data.frame(result_df))
+
+  if ("analysis_unit_id" %in% names(result_df)) {
+    return(as.integer(result_df$analysis_unit_id))
+  }
+
+  if (nrow(result_df) != nrow(texts_df)) {
+    stop(
+      paste(
+        "results_table must contain analysis_unit_id when its row count",
+        "does not match texts_df"
+      )
+    )
+  }
+
+  as.integer(texts_df$analysis_unit_id)
+}
+
 # Ensures texts_df has the columns the result model expects.
-# We use this as the base normalization step before building lineage or results.
+# source_document_* = uploaded row, document_* = current row,
+# preprocessed/analysis_unit_id = unique LLM input layer.
 .kwallm_prepare_texts_df <- function(texts_df) {
   stopifnot(is.data.frame(texts_df))
 
-  if (!"raw" %in% names(texts_df)) {
-    stop("texts_df must contain a 'raw' column")
-  }
-
-  if (!"preprocessed" %in% names(texts_df)) {
-    texts_df$preprocessed <- texts_df$raw
-  }
-
-  if (!"document_id" %in% names(texts_df)) {
-    texts_df$document_id <- seq_len(nrow(texts_df))
-  }
-
-  if (!"source_document_id" %in% names(texts_df)) {
-    texts_df$source_document_id <- texts_df$document_id
-  }
-
-  if (!"source_text" %in% names(texts_df)) {
-    texts_df$source_text <- texts_df$raw
-  }
-
-  if (!"analysis_unit_id" %in% names(texts_df)) {
-    texts_df$analysis_unit_id <- match(
-      texts_df$preprocessed,
-      unique(texts_df$preprocessed)
+  required_cols <- c(
+    "source_document_id",
+    "document_id",
+    "source_document_text",
+    "document_text",
+    "preprocessed",
+    "analysis_unit_id"
+  )
+  missing_cols <- setdiff(required_cols, names(texts_df))
+  if (length(missing_cols)) {
+    stop(
+      paste(
+        "texts_df must contain:",
+        paste(missing_cols, collapse = ", ")
+      )
     )
   }
+
+  texts_df$source_document_id <- as.integer(texts_df$source_document_id)
+  texts_df$document_id <- as.integer(texts_df$document_id)
+  texts_df$source_document_text <- as.character(texts_df$source_document_text)
+  texts_df$document_text <- as.character(texts_df$document_text)
+  texts_df$preprocessed <- as.character(texts_df$preprocessed)
+  texts_df$analysis_unit_id <- as.integer(texts_df$analysis_unit_id)
 
   texts_df
 }

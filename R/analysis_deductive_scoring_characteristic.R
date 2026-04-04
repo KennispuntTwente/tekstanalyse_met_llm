@@ -73,6 +73,7 @@ prompt_score <- function(
 #' @export
 score_texts <- function(
   texts,
+  analysis_unit_ids,
   scoring_characteristic,
   research_background = "",
   llm_provider,
@@ -84,6 +85,8 @@ score_texts <- function(
   stopifnot(
     is.character(texts),
     length(texts) > 0,
+    is.numeric(analysis_unit_ids),
+    length(analysis_unit_ids) == length(texts),
     is.character(scoring_characteristic),
     length(scoring_characteristic) == 1,
     is.character(research_background),
@@ -130,6 +133,7 @@ score_texts <- function(
   }
 
   data.frame(
+    analysis_unit_id = as.integer(analysis_unit_ids),
     text = texts,
     result = results,
     stringsAsFactors = FALSE

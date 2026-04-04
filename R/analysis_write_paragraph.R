@@ -105,6 +105,7 @@ prompt_write_paragraph <- function(
 
 write_paragraph <- function(
   texts,
+  analysis_unit_ids,
   topic,
   research_background = "",
   style_prompt = "",
@@ -117,6 +118,8 @@ write_paragraph <- function(
   stopifnot(
     is.character(texts),
     length(texts) > 0,
+    is.numeric(analysis_unit_ids),
+    length(analysis_unit_ids) == length(texts),
     is.character(topic),
     length(topic) == 1,
     is.character(research_background),
@@ -174,6 +177,7 @@ write_paragraph <- function(
   return(list(
     paragraph = paragraph,
     texts = texts,
+    analysis_unit_ids = as.integer(analysis_unit_ids),
     topic = topic,
     prompt_fits = prompt_fits
   ))

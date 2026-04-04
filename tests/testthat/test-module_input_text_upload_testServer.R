@@ -13,8 +13,17 @@ make_fileinput_df <- function(path, filename, mime = "text/plain") {
   )
 }
 
+expected_lookup <- function(text, by_value) {
+  data.frame(
+    source_document_id = seq_along(text),
+    text = text,
+    by_value = by_value,
+    stringsAsFactors = FALSE
+  )
+}
 
-test_that("text_upload_server: txt split-lines mode returns unique non-empty lines", {
+
+test_that("text_upload_server: txt split-lines mode preserves non-empty lines", {
   shiny::testServer(
     function(input, output, session) {
       lang <- make_test_lang("nl")
@@ -51,7 +60,7 @@ test_that("text_upload_server: txt split-lines mode returns unique non-empty lin
       )
       session$flushReact()
 
-      expect_equal(sort(raw_texts()), sort(c("a", "b")))
+      expect_equal(raw_texts(), c("a", "b", "a"))
       # No by_column for txt files
       expect_null(by_col_name())
       expect_null(by_col_values())
@@ -172,10 +181,9 @@ test_that("text_upload_server: csv with by_column returns correct grouping value
       # Verify by_column_lookup is a data.frame with the full text-group mapping
       expect_equal(
         by_col_lookup(),
-        data.frame(
+        expected_lookup(
           text = c("Text A", "Text B", "Text C"),
-          by_value = c("Group1", "Group1", "Group2"),
-          stringsAsFactors = FALSE
+          by_value = c("Group1", "Group1", "Group2")
         )
       )
     }
@@ -372,11 +380,7 @@ test_that("text_upload_server: reuploading the same xlsx file refreshes sheet-ba
       expect_equal(by_col_values(), first_data$group)
       expect_equal(
         by_col_lookup(),
-        data.frame(
-          text = first_data$text,
-          by_value = first_data$group,
-          stringsAsFactors = FALSE
-        )
+        expected_lookup(first_data$text, first_data$group)
       )
 
       writexl::write_xlsx(list(Sheet1 = second_data), path)
@@ -395,18 +399,14 @@ test_that("text_upload_server: reuploading the same xlsx file refreshes sheet-ba
       expect_equal(by_col_values(), second_data$group)
       expect_equal(
         by_col_lookup(),
-        data.frame(
-          text = second_data$text,
-          by_value = second_data$group,
-          stringsAsFactors = FALSE
-        )
+        expected_lookup(second_data$text, second_data$group)
       )
     }
   )
 })
 
 
-test_that("text_upload_server: duplicate texts get by_column_values aligned after dedup", {
+test_that("text_upload_server: duplicate texts preserve row-aligned group values", {
   shiny::testServer(
     function(input, output, session) {
       lang <- make_test_lang("en")
@@ -459,20 +459,18 @@ test_that("text_upload_server: duplicate texts get by_column_values aligned afte
       session$setInputs(`text_upload-by_column` = "group")
       session$flushReact()
 
-      # discard_empty() applies unique() -> 2 unique texts
-      expect_equal(length(raw_texts()), 2)
-      expect_equal(sort(raw_texts()), sort(c("Text A", "Text B")))
+      expect_equal(length(raw_texts()), 3)
+      expect_equal(raw_texts(), c("Text A", "Text A", "Text B"))
 
-      # by_column_values must be same length as raw_texts (first occurrence kept)
+      # by_column_values stay aligned to source rows, including duplicates.
       expect_equal(length(by_col_values()), length(raw_texts()))
-      expect_equal(by_col_values(), c("Group1", "Group2"))
+      expect_equal(by_col_values(), c("Group1", "Group2", "Group2"))
 
       expect_equal(
         by_col_lookup(),
-        data.frame(
+        expected_lookup(
           text = c("Text A", "Text A", "Text B"),
-          by_value = c("Group1", "Group2", "Group2"),
-          stringsAsFactors = FALSE
+          by_value = c("Group1", "Group2", "Group2")
         )
       )
     }

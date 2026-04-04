@@ -22,7 +22,7 @@ test_that("{shinytest2} upload card keeps consistent state across navigation and
   app$upload_file(`text_upload-text_file` = temp_csv)
   app$set_inputs(`text_upload-column` = "text")
   app$wait_for_value(
-    export = "text_management-texts__raw",
+    export = "text_management-texts__document_text",
     timeout = 10000,
     ignore = c(NULL)
   )

@@ -21,7 +21,10 @@ test_that("marking_codes_server: save/edit cycle returns trimmed unique codes", 
       processing <- reactiveVal(FALSE)
 
       # Minimal texts/context_window objects required by the module.
-      texts <- reactiveValues(preprocessed = c("t1"), raw = character())
+      texts <- reactiveValues(
+        preprocessed = c("t1"),
+        document_text = character()
+      )
       research_background <- reactiveVal("background")
       context_window <- reactiveValues(any_fit_problem = FALSE)
 
@@ -93,7 +96,10 @@ test_that("marking_codes_server: mode other than Markeren does not error", {
         id = "codes",
         mode = mode,
         processing = reactiveVal(FALSE),
-        texts = reactiveValues(preprocessed = character(), raw = character()),
+        texts = reactiveValues(
+          preprocessed = character(),
+          document_text = character()
+        ),
         research_background = reactiveVal(""),
         context_window = reactiveValues(any_fit_problem = FALSE),
         llm_provider_rv = NULL,

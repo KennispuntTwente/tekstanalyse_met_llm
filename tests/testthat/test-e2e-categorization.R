@@ -54,7 +54,7 @@ test_that("{shinytest2} recording: standard process - categorization", {
     export = c(
       # Text upload & processing works
       "text_management-anonymization_mode",
-      "text_management-texts__raw",
+      "text_management-texts__document_text",
       "text_management-texts__preprocessed",
       "text_management-texts__df",
 

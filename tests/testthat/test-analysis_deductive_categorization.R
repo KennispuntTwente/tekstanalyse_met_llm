@@ -139,6 +139,8 @@ test_that("categorize_texts returns binary columns for multi-label output", {
   source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
 
+  analysis_unit_ids <- c(11L, 22L)
+
   send_prompt_with_retries <- function(prompt, llm_provider) {
     force(prompt)
     force(llm_provider)
@@ -154,12 +156,14 @@ test_that("categorize_texts returns binary columns for multi-label output", {
 
   result <- categorize_texts(
     texts = c("text a", "text b"),
+    analysis_unit_ids = analysis_unit_ids,
     categories = c("cat1", "cat2"),
     llm_provider = create_test_provider(),
     assign_multiple_categories = TRUE
   )
 
   expect_false("result" %in% names(result))
+  expect_identical(result$analysis_unit_id, analysis_unit_ids)
   expect_identical(result$text, c("text a", "text b"))
   expect_identical(result$cat1, c(TRUE, TRUE))
   expect_identical(result$cat2, c(FALSE, TRUE))
@@ -202,6 +206,7 @@ test_that("categorize_texts supports progress, interruption, and early NA", {
     interrupter = interrupter
   )
 
+  expect_identical(result$analysis_unit_id, c(1L, 2L, 3L))
   expect_equal(result$text, c("text a", "text b", "text c"))
   expect_true(all(is.na(result$result)))
   expect_equal(call_count, 2)

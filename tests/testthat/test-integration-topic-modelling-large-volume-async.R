@@ -54,7 +54,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
 
   source(here::here("R", "utils_context_window.R"), local = TRUE)
   source(here::here("R", "utils_tokenizer.R"), local = TRUE)
-  source(here::here("R", "utils_create_text_chunks.R"), local = TRUE)
+  source(here::here("R", "utils_create_text_batches.R"), local = TRUE)
   source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
   source(here::here("R", "utils_async_analysis_workers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
@@ -75,22 +75,22 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
 
   texts <- build_large_volume_topic_texts(3000)
   base_prompt_text <- prompt_candidate_topics(
-    text_chunk = c(""),
+    text_batch = c(""),
     research_background = "",
     language = "en"
   ) |>
     tidyprompt::construct_prompt_text()
 
-  text_chunks <- create_text_chunks(
+  text_batches <- create_text_batches(
     texts = texts,
-    chunk_size = 25,
+    batch_size = 25,
     draws = 1,
     n_tokens_context_window = 1024,
     base_prompt_text = base_prompt_text
   )
 
-  expect_false(is.null(text_chunks))
-  expect_true(length(text_chunks) >= 100)
+  expect_false(is.null(text_batches))
+  expect_true(length(text_batches) >= 100)
 
   main_provider <- kwallm_test_llm_provider("kwallm-fake-main-1024")
   large_provider <- kwallm_test_llm_provider("kwallm-fake-reducer-320")
@@ -106,7 +106,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
       log_context_apply(log_ctx)
 
       candidate_topics <- create_candidate_topics(
-        text_chunks = text_chunks,
+        text_batches = text_batches,
         research_background = research_background,
         llm_provider = llm_provider_main,
         language = "en"
@@ -120,14 +120,14 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
       )
 
       list(
-        n_chunks = length(text_chunks),
+        n_batches = length(text_batches),
         n_candidates = length(candidate_topics),
         reduced_topics = reduced_topics
       )
     },
     .args = c(
       list(
-        text_chunks = text_chunks,
+        text_batches = text_batches,
         research_background = "",
         llm_provider_main = main_provider,
         llm_provider_large = large_provider
@@ -147,7 +147,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
     ))
   }
 
-  expect_true(generation_result$n_chunks >= 100)
+  expect_true(generation_result$n_batches >= 100)
   expect_true(generation_result$n_candidates >= 200)
   expect_true(length(generation_result$reduced_topics) <= 7)
   expect_true("Unknown/not applicable" %in% generation_result$reduced_topics)
@@ -159,6 +159,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
 
       assign_topics(
         texts = texts,
+        analysis_unit_ids = seq_along(texts),
         topics = topics,
         research_background = research_background,
         llm_provider = llm_provider,
@@ -186,10 +187,12 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
   }
 
   expect_identical(nrow(results), 3000L)
+  expect_identical(results$analysis_unit_id, seq_along(texts))
   expect_identical(sort(results$text), sort(texts))
   expect_true(ncol(results) >= 5)
-  expect_true(all(vapply(results[-1], is.logical, logical(1))))
-  expect_true(all(rowSums(results[-1]) > 0))
+  topic_columns <- setdiff(names(results), c("analysis_unit_id", "text"))
+  expect_true(all(vapply(results[topic_columns], is.logical, logical(1))))
+  expect_true(all(rowSums(results[topic_columns]) > 0))
 
   log_file <- file.path(
     getOption("logger__dir"),
@@ -199,7 +202,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
   log_lines <- readLines(log_file, warn = FALSE)
 
   topic_generation_log <- log_lines[
-    grepl("Topic generation: n_chunks=", log_lines, fixed = TRUE)
+    grepl("Topic generation: n_batches=", log_lines, fixed = TRUE)
   ]
   topic_reduction_log <- log_lines[
     grepl("Topic reduction complete: n_input=", log_lines, fixed = TRUE)
@@ -210,7 +213,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
 
   generation_match <- stringr::str_match(
     utils::tail(topic_generation_log, 1),
-    "n_chunks=(\\d+), n_candidates=(\\d+)"
+    "n_batches=(\\d+), n_candidates=(\\d+)"
   )
   reduction_match <- stringr::str_match(
     utils::tail(topic_reduction_log, 1),

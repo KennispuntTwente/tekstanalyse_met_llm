@@ -36,11 +36,28 @@ source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   "nl"
 }
 
+.make_smoke_texts_df <- function(
+  document_text,
+  preprocessed = document_text,
+  source_document_id = seq_along(document_text),
+  source_document_text = document_text,
+  analysis_unit_id = match(preprocessed, unique(preprocessed))
+) {
+  data.frame(
+    source_document_id = as.integer(source_document_id),
+    document_id = seq_along(document_text),
+    source_document_text = as.character(source_document_text),
+    document_text = as.character(document_text),
+    preprocessed = as.character(preprocessed),
+    analysis_unit_id = as.integer(analysis_unit_id),
+    stringsAsFactors = FALSE
+  )
+}
+
 .build_smoke_analysis_result <- function(
   report_path,
   by_column_name = NULL,
-  by_column_lookup = NULL,
-  source_texts = NULL
+  by_column_lookup = NULL
 ) {
   nm <- basename(report_path)
   language <- .report_language_from_path(report_path)
@@ -73,14 +90,13 @@ source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   )
 
   if (grepl("Markeren", nm, fixed = TRUE)) {
-    texts_df <- data.frame(
-      raw = "A long text",
-      preprocessed = "A long text",
-      stringsAsFactors = FALSE
-    )
+    texts_df <- .make_smoke_texts_df(document_text = "A long text")
     results_table <- data.frame(
+      analysis_unit_id = texts_df$analysis_unit_id,
+      chunk_id = 1L,
+      chunk_index = 1L,
       text = "A long text",
-      sub_text = "A long text",
+      chunk_text = "A long text",
       code = "Code 1",
       marked_text = "long",
       stringsAsFactors = FALSE
@@ -102,17 +118,12 @@ source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
       assign_multiple_categories = FALSE,
       human_in_the_loop = FALSE,
       write_paragraphs = FALSE,
-      stage_prompt_previews = list(marking = "prompt"),
-      source_texts = source_texts
+      stage_prompt_previews = list(marking = "prompt")
     ))
   }
 
   if (grepl("Scoren", nm, fixed = TRUE)) {
-    texts_df <- data.frame(
-      raw = c("Text 1", "Text 2"),
-      preprocessed = c("Text 1", "Text 2"),
-      stringsAsFactors = FALSE
-    )
+    texts_df <- .make_smoke_texts_df(document_text = c("Text 1", "Text 2"))
     results_table <- data.frame(
       text = c("Text 1", "Text 2"),
       result = c(10, 20),
@@ -133,17 +144,12 @@ source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
       models = .render_test_models(),
       scoring_characteristic = "test characteristic",
       write_paragraphs = FALSE,
-      stage_prompt_previews = list(scoring = "prompt"),
-      source_texts = source_texts
+      stage_prompt_previews = list(scoring = "prompt")
     ))
   }
 
   if (grepl("Onderwerpextractie", nm, fixed = TRUE)) {
-    texts_df <- data.frame(
-      raw = c("Text 1", "Text 2"),
-      preprocessed = c("Text 1", "Text 2"),
-      stringsAsFactors = FALSE
-    )
+    texts_df <- .make_smoke_texts_df(document_text = c("Text 1", "Text 2"))
     results_table <- data.frame(
       text = c("Text 1", "Text 2"),
       result = c("Topic A", "Topic B"),
@@ -168,9 +174,9 @@ source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
       human_in_the_loop = FALSE,
       write_paragraphs = FALSE,
       context_window = list(
-        chunk_size = 5,
+        batch_size = 5,
         draws = 2,
-        n_chunks = 2,
+        n_batches = 2,
         n_tokens_context_window = 1000
       ),
       stage_prompt_previews = list(
@@ -180,16 +186,11 @@ source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
       ),
       candidate_topics = c("Topic A", "Topic B"),
       reduced_topics = c("Topic A", "Topic B"),
-      topics_were_edited = FALSE,
-      source_texts = source_texts
+      topics_were_edited = FALSE
     ))
   }
 
-  texts_df <- data.frame(
-    raw = c("Text 1", "Text 2"),
-    preprocessed = c("Text 1", "Text 2"),
-    stringsAsFactors = FALSE
-  )
+  texts_df <- .make_smoke_texts_df(document_text = c("Text 1", "Text 2"))
   results_table <- data.frame(
     text = c("Text 1", "Text 2"),
     result = c("A", "B"),
@@ -213,8 +214,7 @@ source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
     assign_multiple_categories = FALSE,
     human_in_the_loop = FALSE,
     write_paragraphs = FALSE,
-    stage_prompt_previews = list(categorization = "prompt"),
-    source_texts = source_texts
+    stage_prompt_previews = list(categorization = "prompt")
   )
 }
 
@@ -324,8 +324,8 @@ test_that("Categorisatie report renders with by_column_* set", {
               report_path,
               by_column_name = "group",
               by_column_lookup = data.frame(
-                text = c("Text 1", "Text 2", "Text 3"),
-                by_value = c("G1", "G1", "G2"),
+                source_document_id = c(1L, 2L),
+                by_value = c("G1", "G2"),
                 stringsAsFactors = FALSE
               )
             )

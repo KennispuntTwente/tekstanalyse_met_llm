@@ -227,6 +227,7 @@ prompt_multi_category <- function(
 #' @export
 categorize_texts <- function(
   texts,
+  analysis_unit_ids,
   categories,
   research_background = "",
   llm_provider,
@@ -240,6 +241,8 @@ categorize_texts <- function(
   stopifnot(
     is.character(texts),
     length(texts) > 0,
+    is.numeric(analysis_unit_ids),
+    length(analysis_unit_ids) == length(texts),
     is.character(categories),
     length(categories) > 0,
     is.character(research_background),
@@ -294,6 +297,7 @@ categorize_texts <- function(
 
   if (assign_multiple_categories) {
     results_df <- data.frame(
+      analysis_unit_id = as.integer(analysis_unit_ids),
       text = texts,
       stringsAsFactors = FALSE
     )
@@ -321,6 +325,7 @@ categorize_texts <- function(
   }
 
   data.frame(
+    analysis_unit_id = as.integer(analysis_unit_ids),
     text = texts,
     result = results,
     stringsAsFactors = FALSE

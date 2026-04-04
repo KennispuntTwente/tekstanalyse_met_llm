@@ -196,12 +196,12 @@ options(
   #   this may be useful to avoid LLM failure in the topic assignment process;
   #     see R/topic_modelling.R
   topic_modelling__always_add_not_applicable = TRUE,
-  # - Parameters for text chunking;
+  # - Parameters for topic batching;
   #     see R/module_misc_context_window.R
-  topic_modelling__chunk_size_default = 25,
-  topic_modelling__chunk_size_limit = 100,
-  topic_modelling__number_of_chunks_limit = getOption(
-    "topic_modelling__number_of_chunks_limit",
+  topic_modelling__batch_size_default = 25,
+  topic_modelling__batch_size_limit = 100,
+  topic_modelling__number_of_batches_limit = getOption(
+    "topic_modelling__number_of_batches_limit",
     50
   ),
   topic_modelling__draws_default = 1,

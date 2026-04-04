@@ -113,6 +113,7 @@ test_that("score_texts supports progress, interruption, and early NA", {
     local = TRUE
   )
 
+  analysis_unit_ids <- c(10L, 20L, 30L)
   call_count <- 0
   interrupt_count <- 0
   progress_events <- list()
@@ -134,6 +135,7 @@ test_that("score_texts supports progress, interruption, and early NA", {
 
   result <- score_texts(
     texts = c("text a", "text b", "text c"),
+    analysis_unit_ids = analysis_unit_ids,
     scoring_characteristic = "clarity",
     llm_provider = create_test_provider(),
     on_progress = function(i, n, text) {
@@ -146,6 +148,7 @@ test_that("score_texts supports progress, interruption, and early NA", {
     interrupter = interrupter
   )
 
+  expect_identical(result$analysis_unit_id, analysis_unit_ids)
   expect_equal(result$text, c("text a", "text b", "text c"))
   expect_true(all(is.na(result$result)))
   expect_equal(call_count, 2)

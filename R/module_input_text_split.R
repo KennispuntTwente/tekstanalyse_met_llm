@@ -8,7 +8,8 @@ text_split_ui <- function(id) {
 
 text_split_server <- function(
   id,
-  raw_texts, # reactive vector with raw texts (provided by text_upload module)
+  document_texts, # reactive vector with current document texts
+  document_rows = NULL,
   processing = reactiveVal(FALSE),
   lang = default_lang(),
   enabled = getOption("text_split__enabled", TRUE)
@@ -17,25 +18,69 @@ text_split_server <- function(
     ns <- session$ns
 
     # -- State ----------------------------------------------------
+    # source_document_* stays tied to the uploaded row.
+    # document_* is this module's current row view and can fan out into chunks.
 
-    # Reactive value which will return the texts; split or original
-    texts <- reactive({
-      # If not splitting, return raw texts
-      if (!isTRUE(splitting())) {
-        return(raw_texts())
+    build_identity_rows <- function(values) {
+      if (!length(values)) {
+        return(data.frame(
+          source_document_id = integer(),
+          document_id = integer(),
+          source_document_text = character(),
+          document_text = character(),
+          stringsAsFactors = FALSE
+        ))
       }
 
-      # If splitting is in progress, return NULL
+      # Before splitting, the current row is still the uploaded source row.
+      data.frame(
+        source_document_id = seq_along(values),
+        document_id = seq_along(values),
+        source_document_text = as.character(values),
+        document_text = as.character(values),
+        stringsAsFactors = FALSE
+      )
+    }
+
+    input_rows <- reactive({
+      if (!is.null(document_rows)) {
+        return(document_rows())
+      }
+
+      values <- document_texts()
+      if (is.null(values)) {
+        return(NULL)
+      }
+
+      build_identity_rows(values)
+    })
+
+    rows <- reactive({
+      # Output rows stay unchanged when splitting is off, and become chunk rows
+      # when splitting is on.
+      if (!isTRUE(splitting())) {
+        return(input_rows())
+      }
+
       if (isTRUE(split_in_progress())) {
         return(NULL)
       }
 
-      # If split not in progress and no split texts, return raw texts
-      if (is.null(split_texts())) {
-        return(raw_texts())
+      if (is.null(split_rows())) {
+        return(input_rows())
       }
 
-      return(split_texts())
+      split_rows()
+    })
+
+    # Convenience view of the current document texts after optional splitting.
+    texts <- reactive({
+      current_rows <- rows()
+      if (is.null(current_rows)) {
+        return(NULL)
+      }
+
+      current_rows$document_text
     })
 
     # If text splitting is activated
@@ -50,19 +95,20 @@ text_split_server <- function(
     # If right now we are running the splitting process
     split_in_progress <- reactiveVal(FALSE)
 
-    # Upon observing new raw texts, reset the split texts and message
-    observeEvent(raw_texts(), {
-      split_texts(NULL)
-      source_texts(NULL)
+    # Upon observing new document texts, reset the split texts and message.
+    observeEvent(input_rows(), {
+      split_document_texts(NULL)
+      split_rows(NULL)
+      source_document_texts(NULL)
       semchunk_message("...")
     })
 
-    # Reactive value which holds the split texts
-    split_texts <- reactiveVal(NULL)
+    # Chunked current-document texts created by this module.
+    split_document_texts <- reactiveVal(NULL)
+    split_rows <- reactiveVal(NULL)
 
-    # Maps each split chunk back to its original text (same length as
-    # split_texts); NULL when not splitting.
-    source_texts <- reactiveVal(NULL)
+    # One source-document text per chunk row, used for lineage and grouping.
+    source_document_texts <- reactiveVal(NULL)
 
     # Reactive value which holds text message about the splitting progress
     #   (set from async process via 'ipc' package, queue object)
@@ -90,8 +136,9 @@ text_split_server <- function(
     shiny::exportTestValues(
       splitting = splitting,
       split_in_progress = split_in_progress,
-      split_texts = split_texts,
-      source_texts = source_texts,
+      split_document_texts = split_document_texts,
+      split_rows = split_rows,
+      source_document_texts = source_document_texts,
       semchunk_message = semchunk_message,
       max_tokens_val = max_tokens_val,
       overlap_val = overlap_val
@@ -222,7 +269,7 @@ text_split_server <- function(
     # Listen for user inputs ---------------------------------------
 
     observeEvent(input$split_texts, {
-      req(raw_texts())
+      req(input_rows())
       req(isTRUE(splitting()))
       req(input$max_tokens)
       req(isFALSE(processing()))
@@ -231,7 +278,7 @@ text_split_server <- function(
       # Set processing state
       split_in_progress(TRUE)
       # Reset previous split texts
-      split_texts(NULL)
+      split_document_texts(NULL)
       # Disable the button while splitting
       shinyjs::disable("split_texts")
       # Set message
@@ -243,7 +290,7 @@ text_split_server <- function(
           "Text split started: max_tokens=%d, overlap=%d, n_texts=%d",
           input$max_tokens,
           input$overlap %||% 0,
-          length(raw_texts())
+          nrow(input_rows())
         ),
         component = "split"
       )
@@ -259,7 +306,9 @@ text_split_server <- function(
           log_context_apply(log_ctx)
 
           split_texts_with_semchunk(
-            texts = raw_texts,
+            texts = input_rows$document_text,
+            source_document_ids = input_rows$source_document_id,
+            source_document_texts = input_rows$source_document_text,
             chunk_size = chunk_size,
             overlap = overlap,
             queue = queue
@@ -268,7 +317,7 @@ text_split_server <- function(
         .args = c(
           log_async_globals(log_ctx),
           list(
-            raw_texts = raw_texts(),
+            input_rows = input_rows(),
             chunk_size = max_tokens_val(),
             overlap = overlap_val(),
             queue = queue,
@@ -281,17 +330,18 @@ text_split_server <- function(
         {
           result <- .
           split_in_progress(FALSE)
-          split_texts(result$texts)
-          source_texts(result$source_text)
+          split_rows(result$rows)
+          split_document_texts(result$rows$document_text)
+          source_document_texts(result$rows$source_document_text)
 
-          if (identical(raw_texts(), split_texts())) {
+          if (identical(input_rows()$document_text, split_document_texts())) {
             semchunk_message(lang()$t(
               "Splitsing resulteerde niet in meer teksten"
             ))
             log_info("Text split: no change", component = "split")
           } else {
-            n <- length(raw_texts())
-            m <- length(split_texts())
+            n <- nrow(input_rows())
+            m <- length(split_document_texts())
 
             semchunk_message(paste0(
               lang()$t("Originele "),
@@ -317,7 +367,8 @@ text_split_server <- function(
           )
 
           split_in_progress(FALSE)
-          split_texts(NULL)
+          split_document_texts(NULL)
+          split_rows(NULL)
           semchunk_message("...")
 
           # Handle errors
@@ -410,7 +461,8 @@ text_split_server <- function(
     # Return -------------------------------------------------------
     return(list(
       texts = texts,
-      source_texts = source_texts,
+      rows = rows,
+      source_document_texts = source_document_texts,
       split_in_progress = split_in_progress,
       split_settings = split_settings
     ))
@@ -421,10 +473,19 @@ text_split_server <- function(
 # 2 Helpers --------------------------------------------------------
 split_texts_with_semchunk <- function(
   texts,
+  source_document_ids = NULL,
+  source_document_texts = NULL,
   chunk_size = 128,
   overlap = 0,
   queue = NULL
 ) {
+  if (is.null(source_document_ids)) {
+    source_document_ids <- seq_along(texts)
+  }
+  if (is.null(source_document_texts)) {
+    source_document_texts <- texts
+  }
+
   chunker <- semchunk_load_chunker(
     chunk_size = chunk_size,
     queue = queue
@@ -447,12 +508,27 @@ split_texts_with_semchunk <- function(
     overlap = overlap
   )
 
-  # Build a source-text vector that maps each chunk back to its original text.
-  source_text <- rep(texts, times = lengths(chunks_list))
+  # source_document_* still points to the uploaded row.
+  # document_* identifies each chunk row created by the split.
+  source_document_text <- rep(
+    source_document_texts,
+    times = lengths(chunks_list)
+  )
+  source_document_id <- rep(source_document_ids, times = lengths(chunks_list))
+  chunk_texts <- as.character(unlist(chunks_list))
+
+  rows <- data.frame(
+    source_document_id = as.integer(source_document_id),
+    document_id = seq_along(chunk_texts),
+    source_document_text = as.character(source_document_text),
+    document_text = chunk_texts,
+    stringsAsFactors = FALSE
+  )
 
   list(
-    texts = unlist(chunks_list),
-    source_text = source_text
+    texts = chunk_texts,
+    source_document_text = source_document_text,
+    rows = rows
   )
 }
 
@@ -476,8 +552,8 @@ if (FALSE) {
   server <- function(input, output, session) {
     processing <- reactiveVal(FALSE)
 
-    # Example raw texts
-    raw_texts <- reactiveVal(c(
+    # Example current document texts
+    document_texts <- reactiveVal(c(
       "Dit is een voorbeeldtekst die we gaan splitsen.",
       "Hier is nog een andere tekst die ook gesplitst moet worden."
     ))
@@ -488,7 +564,12 @@ if (FALSE) {
       )
     })
 
-    text_split_server("text_split", raw_texts, processing, lang)
+    text_split_server(
+      "text_split",
+      document_texts = document_texts,
+      processing = processing,
+      lang = lang
+    )
   }
 
   shinyApp(ui, server)

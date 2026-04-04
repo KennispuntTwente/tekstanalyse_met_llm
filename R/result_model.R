@@ -183,7 +183,7 @@
 .kwallm_empty_source_documents <- function() {
   data.frame(
     source_document_id = integer(),
-    source_text = character(),
+    source_document_text = character(),
     stringsAsFactors = FALSE
   )
 }
@@ -510,7 +510,7 @@ TextLineage <- S7::new_class(
       default = quote(.kwallm_empty_source_documents()),
       validator = .kwallm_validate_df_columns(c(
         "source_document_id",
-        "source_text"
+        "source_document_text"
       ))
     ),
     documents = S7::new_property(
@@ -714,7 +714,7 @@ TopicProvenance <- S7::new_class(
       default = NULL,
       validator = .kwallm_validate_optional_scalar_integer(min = 0L)
     ),
-    chunk_size = S7::new_property(
+    batch_size = S7::new_property(
       NULL | S7::class_numeric,
       default = NULL,
       validator = .kwallm_validate_optional_scalar_numeric(min = 0)
@@ -724,7 +724,7 @@ TopicProvenance <- S7::new_class(
       default = NULL,
       validator = .kwallm_validate_optional_scalar_numeric(min = 0)
     ),
-    n_chunks = S7::new_property(
+    n_batches = S7::new_property(
       NULL | S7::class_numeric,
       default = NULL,
       validator = .kwallm_validate_optional_scalar_numeric(min = 0)

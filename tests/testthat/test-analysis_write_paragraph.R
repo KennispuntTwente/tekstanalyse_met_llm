@@ -13,6 +13,7 @@ test_that("write_paragraph re-raises send_prompt_with_retries errors", {
   expect_error(
     write_paragraph(
       texts = c("some text"),
+      analysis_unit_ids = 1L,
       topic = "weather",
       llm_provider = list(parameters = list(model = "test")),
       language = "en"

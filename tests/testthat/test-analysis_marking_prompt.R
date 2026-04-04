@@ -125,6 +125,8 @@ test_that("normalize_for_dist is consistent with normalize_with_map", {
 test_that("mark_texts works with lang = NULL", {
   source(here::here("R", "analysis_marking.R"), local = TRUE)
 
+  analysis_unit_ids <- 91L
+
   withr::defer({
     rm(
       list = grep("^semchunker_", ls(envir = .GlobalEnv), value = TRUE),
@@ -155,7 +157,7 @@ test_that("mark_texts works with lang = NULL", {
     force(prompt)
     force(llm_provider)
     force(max_interactions)
-    character(0)
+    "short text"
   }
 
   progress_messages <- character()
@@ -172,6 +174,7 @@ test_that("mark_texts works with lang = NULL", {
 
   result <- mark_texts(
     texts = "A short text",
+    analysis_unit_ids = analysis_unit_ids,
     codes = "Code A",
     llm_provider = list(parameters = list(model = "unit-test-model")),
     progress_primary = progress_stub,
@@ -182,8 +185,17 @@ test_that("mark_texts works with lang = NULL", {
 
   expect_s3_class(result, "tbl_df")
   expect_true(all(
-    c("text", "sub_text", "code", "marked_text") %in% names(result)
+    c(
+      "analysis_unit_id",
+      "chunk_id",
+      "chunk_index",
+      "chunk_text",
+      "code",
+      "marked_text"
+    ) %in%
+      names(result)
   ))
+  expect_identical(unique(result$analysis_unit_id), analysis_unit_ids)
   expect_true(length(progress_messages) >= 3)
 })
 

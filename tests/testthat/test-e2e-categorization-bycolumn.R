@@ -47,7 +47,7 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
 
   # Wait for texts to be populated after column selection
   app$wait_for_value(
-    export = "text_management-texts__raw",
+    export = "text_management-texts__document_text",
     timeout = 10000,
     ignore = c(NULL)
   )

@@ -39,8 +39,7 @@ source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 
 ## Method
 
-`r nrow(report_df)` texts were analyzed with a LLM (model: `r htmltools::htmlEscape(main_model)`),
-during which the LLM was asked to assign one of the following `r length(categories)` categories to each text:
+`r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to assign one of the following `r length(categories)` categories to each text:
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 cat("<blockquote>")
@@ -133,7 +132,7 @@ if (!assign_multiple_categories) {
     )
 } else {
   report_df |>
-    dplyr::select(-text) |>
+    dplyr::select(-dplyr::any_of(c("document_id", "text"))) |>
     # For each binary category column, count the number of TRUE values
     dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(.x, na.rm = TRUE))) |>
     tidyr::pivot_longer(
@@ -177,8 +176,8 @@ if (!assign_multiple_categories) {
       language = "en"
     )
   } else {
-    # Get category columns (all except 'text')
-    cat_cols <- setdiff(names(report_df), "text")
+    # Get category columns (excluding report identity columns)
+    cat_cols <- setdiff(names(report_df), c("document_id", "text"))
     generate_grouped_freq_table_multi(
       df = report_df,
       by_values = group_lookup,

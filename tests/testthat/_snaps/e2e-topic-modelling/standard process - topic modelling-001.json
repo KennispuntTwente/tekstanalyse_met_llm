@@ -4,7 +4,28 @@
     "processing-success": true,
     "text_management-anonymization_mode": "simple",
     "text_management-texts__df": {
-      "raw": [
+      "source_document_id": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "document_id": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "source_document_text": [
+        "lovely product!",
+        "bad product!",
+        "no opinion!",
+        "my email address is l.koning@kennispunttwente.nl",
+        "oke!"
+      ],
+      "document_text": [
         "lovely product!",
         "bad product!",
         "no opinion!",
@@ -17,6 +38,13 @@
         "no opinion!",
         "my email address is << removed e-mail address >>",
         "oke!"
+      ],
+      "analysis_unit_id": [
+        1,
+        2,
+        3,
+        4,
+        5
       ]
     },
     "text_management-texts__preprocessed": [
@@ -26,7 +54,7 @@
       "my email address is << removed e-mail address >>",
       "oke!"
     ],
-    "text_management-texts__raw": [
+    "text_management-texts__document_text": [
       "lovely product!",
       "bad product!",
       "no opinion!",

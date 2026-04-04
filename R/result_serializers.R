@@ -23,6 +23,7 @@ analysis_result_to_metadata_list <- function(analysis_result) {
     timestamp = .kwallm_timestamp_string(analysis_result@metadata@timestamp),
     research_background = analysis_result@metadata@research_background,
     app_version = analysis_result@metadata@app_version,
+    text_counts = .kwallm_analysis_result_text_counts(analysis_result),
     input = list(
       file_type = analysis_result@input@file_type,
       selected_sheet = analysis_result@input@selected_sheet,
@@ -122,9 +123,9 @@ analysis_result_to_metadata_list <- function(analysis_result) {
           auto_added_not_applicable = analysis_result@results@topic_provenance@auto_added_not_applicable,
           not_applicable_check_performed = analysis_result@results@topic_provenance@not_applicable_check_performed,
           reduction_iterations = analysis_result@results@topic_provenance@reduction_iterations,
-          chunk_size = analysis_result@results@topic_provenance@chunk_size,
+          batch_size = analysis_result@results@topic_provenance@batch_size,
           draws = analysis_result@results@topic_provenance@draws,
-          n_chunks = analysis_result@results@topic_provenance@n_chunks,
+          n_batches = analysis_result@results@topic_provenance@n_batches,
           context_window_tokens = analysis_result@results@topic_provenance@context_window_tokens
         )
       ),
@@ -162,6 +163,8 @@ analysis_result_to_metadata_list <- function(analysis_result) {
 analysis_result_to_export_sheets <- function(analysis_result) {
   stopifnot(inherits(analysis_result, "AnalysisResult"))
 
+  text_counts <- .kwallm_analysis_result_text_counts(analysis_result)
+
   sheets <- list(
     metadata = data.frame(
       field = c(
@@ -171,7 +174,11 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         "language",
         "timestamp",
         "research_background",
-        "app_version"
+        "app_version",
+        "source_documents",
+        "documents",
+        "analysis_units",
+        "reused_analyses"
       ),
       value = c(
         as.character(analysis_result@metadata@schema_version),
@@ -180,7 +187,11 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         analysis_result@metadata@language,
         .kwallm_timestamp_string(analysis_result@metadata@timestamp),
         analysis_result@metadata@research_background,
-        .kwallm_excel_scalar(analysis_result@metadata@app_version)
+        .kwallm_excel_scalar(analysis_result@metadata@app_version),
+        .kwallm_excel_scalar(text_counts$source_documents),
+        .kwallm_excel_scalar(text_counts$documents),
+        .kwallm_excel_scalar(text_counts$analysis_units),
+        .kwallm_excel_scalar(text_counts$reused_analyses)
       ),
       stringsAsFactors = FALSE
     ),
@@ -254,9 +265,9 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         "auto_added_not_applicable",
         "not_applicable_check_performed",
         "reduction_iterations",
-        "chunk_size",
+        "batch_size",
         "draws",
-        "n_chunks",
+        "n_batches",
         "context_window_tokens"
       ),
       value = as.character(c(
@@ -265,9 +276,9 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         analysis_result@results@topic_provenance@auto_added_not_applicable,
         analysis_result@results@topic_provenance@not_applicable_check_performed,
         analysis_result@results@topic_provenance@reduction_iterations,
-        analysis_result@results@topic_provenance@chunk_size,
+        analysis_result@results@topic_provenance@batch_size,
         analysis_result@results@topic_provenance@draws,
-        analysis_result@results@topic_provenance@n_chunks,
+        analysis_result@results@topic_provenance@n_batches,
         analysis_result@results@topic_provenance@context_window_tokens
       )),
       stringsAsFactors = FALSE
@@ -355,12 +366,16 @@ write_analysis_result_metadata_json <- function(
       all.x = TRUE,
       all.y = FALSE
     )
-    out <- merged[c("document_text", "result")]
-    names(out) <- c("text", "result")
+    out <- merged[c("document_id", "document_text", "result")]
+    names(out) <- c("document_id", "text", "result")
     return(out)
   }
 
-  out <- data.frame(text = base$document_text, stringsAsFactors = FALSE)
+  out <- data.frame(
+    document_id = base$document_id,
+    text = base$document_text,
+    stringsAsFactors = FALSE
+  )
   for (label in result@labels$label_text) {
     out[[label]] <- FALSE
   }
@@ -393,8 +408,8 @@ write_analysis_result_metadata_json <- function(
     all.y = FALSE
   )
 
-  out <- merged[c("document_text", "score")]
-  names(out) <- c("text", "result")
+  out <- merged[c("document_id", "document_text", "score")]
+  names(out) <- c("document_id", "text", "result")
   out
 }
 
@@ -407,8 +422,9 @@ write_analysis_result_metadata_json <- function(
 
   if (!nrow(result@chunks)) {
     return(data.frame(
+      document_id = integer(),
       text = character(),
-      sub_text = character(),
+      chunk_text = character(),
       code = character(),
       marked_text = character(),
       stringsAsFactors = FALSE
@@ -417,17 +433,17 @@ write_analysis_result_metadata_json <- function(
 
   chunk_docs <- merge(
     result@chunks,
-    base[c("analysis_unit_id", "document_text")],
+    base[c("analysis_unit_id", "document_id", "document_text")],
     by = "analysis_unit_id",
     all.x = TRUE,
     all.y = FALSE
   )
 
   if (!nrow(result@codes)) {
-    out <- chunk_docs[c("document_text", "chunk_text")]
+    out <- chunk_docs[c("document_id", "document_text", "chunk_text")]
     out$code <- character(nrow(out))
     out$marked_text <- NA_character_
-    names(out)[1:2] <- c("text", "sub_text")
+    names(out)[1:3] <- c("document_id", "text", "chunk_text")
     return(out)
   }
 
@@ -451,8 +467,14 @@ write_analysis_result_metadata_json <- function(
   )
   merged$code <- codes_lookup[as.character(merged$code_id)]
 
-  out <- merged[c("document_text", "chunk_text", "code", "marked_text")]
-  names(out) <- c("text", "sub_text", "code", "marked_text")
+  out <- merged[c(
+    "document_id",
+    "document_text",
+    "chunk_text",
+    "code",
+    "marked_text"
+  )]
+  names(out) <- c("document_id", "text", "chunk_text", "code", "marked_text")
   out
 }
 
@@ -545,6 +567,97 @@ write_analysis_result_metadata_json <- function(
   rows
 }
 
+# Computes the main text-count layers used across metadata and reports.
+# We keep these counts together so every output surface describes the run the same way.
+.kwallm_analysis_result_text_counts <- function(analysis_result) {
+  lineage <- analysis_result@text_lineage
+
+  list(
+    source_documents = nrow(lineage@source_documents),
+    documents = nrow(lineage@documents),
+    analysis_units = nrow(lineage@analysis_units),
+    reused_analyses = max(
+      0L,
+      nrow(lineage@documents) - nrow(lineage@analysis_units)
+    )
+  )
+}
+
+# Builds the short count summary shown near the top of each HTML report.
+# This keeps the wording consistent with the exported metadata fields.
+.kwallm_report_text_count_summary <- function(analysis_result) {
+  counts <- .kwallm_analysis_result_text_counts(analysis_result)
+
+  if (identical(analysis_result@metadata@language, "nl")) {
+    parts <- c(
+      paste0(counts$source_documents, " bronteksten/rijen zijn meegenomen")
+    )
+
+    if (counts$documents != counts$source_documents) {
+      parts <- c(
+        parts,
+        paste0(
+          "na splitsen leverde dat ",
+          counts$documents,
+          " analyseerbare teksten/chunks op"
+        )
+      )
+    }
+
+    parts <- c(
+      parts,
+      paste0(
+        counts$analysis_units,
+        " unieke teksten zijn naar het LLM gestuurd"
+      )
+    )
+
+    if (counts$reused_analyses > 0L) {
+      parts <- c(
+        parts,
+        paste0(
+          counts$reused_analyses,
+          " teksten hergebruikten een bestaande analyse omdat ze na preprocessing gelijk waren"
+        )
+      )
+    }
+
+    return(paste0(paste(parts, collapse = "; "), "."))
+  }
+
+  parts <- c(
+    paste0(counts$source_documents, " source texts/rows were included")
+  )
+
+  if (counts$documents != counts$source_documents) {
+    parts <- c(
+      parts,
+      paste0(
+        "after splitting, this became ",
+        counts$documents,
+        " texts/chunks in the results"
+      )
+    )
+  }
+
+  parts <- c(
+    parts,
+    paste0(counts$analysis_units, " unique texts were sent to the LLM")
+  )
+
+  if (counts$reused_analyses > 0L) {
+    parts <- c(
+      parts,
+      paste0(
+        counts$reused_analyses,
+        " texts reused an existing analysis because they were identical after preprocessing"
+      )
+    )
+  }
+
+  paste0(paste(parts, collapse = "; "), ".")
+}
+
 # Gets the first matching model id for one or more stage ids.
 # We use this for report templates that refer to stage-specific model ids.
 .kwallm_get_stage_model_id <- function(analysis_result, stage_id) {
@@ -566,7 +679,8 @@ write_analysis_result_metadata_json <- function(
 }
 
 # Rebuilds the grouped-report lookup from the lineage tables.
-# We use this so grouped reports keep working after source documents are split.
+# We keep document ids here so grouped reports can join rows by stable identity
+# instead of text value alone when duplicate texts appear in the same group.
 .kwallm_report_group_lookup <- function(analysis_result) {
   groups <- analysis_result@text_lineage@document_groups
   if (!nrow(groups)) {
@@ -574,7 +688,7 @@ write_analysis_result_metadata_json <- function(
   }
 
   docs <- analysis_result@text_lineage@documents[,
-    c("document_text", "source_document_id"),
+    c("document_id", "document_text", "source_document_id"),
     drop = FALSE
   ]
   merged <- merge(
@@ -586,6 +700,7 @@ write_analysis_result_metadata_json <- function(
   )
 
   data.frame(
+    document_id = merged$document_id,
     text = merged$document_text,
     by_value = merged$group_value,
     stringsAsFactors = FALSE

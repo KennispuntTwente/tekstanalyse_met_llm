@@ -11,10 +11,10 @@ create_test_provider <- function(model = "test-model") {
 test_that("prompt_candidate_topics returns a usable prompt object", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
-  text_chunk <- c("The weather is nice", "I like coding")
+  text_batch <- c("The weather is nice", "I like coding")
 
   prompt <- prompt_candidate_topics(
-    text_chunk = text_chunk,
+    text_batch = text_batch,
     research_background = "",
     language = "en"
   )
@@ -29,7 +29,7 @@ test_that("prompt_candidate_topics includes research background", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
   prompt <- prompt_candidate_topics(
-    text_chunk = c("test"),
+    text_batch = c("test"),
     research_background = "Customer satisfaction survey",
     language = "en"
   )
@@ -42,7 +42,7 @@ test_that("prompt_candidate_topics respects language parameter", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
   prompt_nl <- prompt_candidate_topics(
-    text_chunk = c("test"),
+    text_batch = c("test"),
     research_background = "",
     language = "nl"
   )
@@ -55,14 +55,14 @@ test_that("create_candidate_topics supports progress and interruption", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
   prompt_candidate_topics <- function(
-    text_chunk,
+    text_batch,
     research_background = "",
     language = c("nl", "en")
   ) {
-    force(text_chunk)
+    force(text_batch)
     force(research_background)
     match.arg(language)
-    list(text_chunk = text_chunk)
+    list(text_batch = text_batch)
   }
 
   interrupt_count <- 0
@@ -70,7 +70,7 @@ test_that("create_candidate_topics supports progress and interruption", {
 
   send_prompt_with_retries <- function(prompt, llm_provider) {
     force(llm_provider)
-    list(topics = paste0("topic:", prompt$text_chunk))
+    list(topics = paste0("topic:", prompt$text_batch))
   }
 
   interrupter <- list(
@@ -80,15 +80,15 @@ test_that("create_candidate_topics supports progress and interruption", {
   )
 
   result <- create_candidate_topics(
-    text_chunks = list(c("alpha"), c("beta", "gamma")),
+    text_batches = list(c("alpha"), c("beta", "gamma")),
     research_background = "background",
     llm_provider = create_test_provider(),
-    on_progress = function(i, n, chunk, chunk_result) {
+    on_progress = function(i, n, batch, batch_result) {
       progress_events[[length(progress_events) + 1]] <<- list(
         i = i,
         n = n,
-        chunk = chunk,
-        result = chunk_result
+        batch = batch,
+        result = batch_result
       )
     },
     interrupter = interrupter
@@ -102,7 +102,7 @@ test_that("create_candidate_topics supports progress and interruption", {
     list(
       i = 1,
       n = 2,
-      chunk = c("alpha"),
+      batch = c("alpha"),
       result = c("topic:alpha")
     )
   )
@@ -111,7 +111,7 @@ test_that("create_candidate_topics supports progress and interruption", {
     list(
       i = 2,
       n = 2,
-      chunk = c("beta", "gamma"),
+      batch = c("beta", "gamma"),
       result = c("topic:beta", "topic:gamma")
     )
   )
@@ -121,6 +121,8 @@ test_that("assign_topics returns binary columns for multi-label output", {
   source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  analysis_unit_ids <- c(31L, 32L)
 
   send_prompt_with_retries <- function(prompt, llm_provider) {
     force(llm_provider)
@@ -136,12 +138,14 @@ test_that("assign_topics returns binary columns for multi-label output", {
 
   result <- assign_topics(
     texts = c("text a", "text b"),
+    analysis_unit_ids = analysis_unit_ids,
     topics = c("Topic A", "Topic B"),
     llm_provider = create_test_provider(),
     assign_multiple_categories = TRUE
   )
 
   expect_false("result" %in% names(result))
+  expect_identical(result$analysis_unit_id, analysis_unit_ids)
   expect_identical(result$text, c("text a", "text b"))
   expect_identical(result[["Topic A"]], c(TRUE, TRUE))
   expect_identical(result[["Topic B"]], c(FALSE, TRUE))
@@ -173,6 +177,7 @@ test_that("assign_topics supports progress, interruption, and early NA", {
 
   result <- assign_topics(
     texts = c("text a", "text b", "text c"),
+    analysis_unit_ids = c(1L, 2L, 3L),
     topics = c("Topic A", "Topic B"),
     llm_provider = create_test_provider(),
     on_progress = function(i, n, text) {
@@ -185,6 +190,7 @@ test_that("assign_topics supports progress, interruption, and early NA", {
     interrupter = interrupter
   )
 
+  expect_identical(result$analysis_unit_id, c(1L, 2L, 3L))
   expect_equal(result$text, c("text a", "text b", "text c"))
   expect_true(all(is.na(result$result)))
   expect_equal(call_count, 2)
@@ -210,6 +216,7 @@ test_that("assign_topics multi-label: early NA produces NA topic columns", {
 
   result <- assign_topics(
     texts = c("text a", "text b", "text c"),
+    analysis_unit_ids = c(1L, 2L, 3L),
     topics = c("Topic A", "Topic B"),
     llm_provider = create_test_provider(),
     assign_multiple_categories = TRUE

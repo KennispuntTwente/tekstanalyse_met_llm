@@ -77,14 +77,66 @@ collect_grouped_texts <- function(results, labels, assign_multiple_categories) {
 }
 
 
+#' Collect paragraph-writing inputs per label from processing results
+#'
+#' Used before paragraph writing in `module_core_processing`.
+#' It preserves the `analysis_unit_id` values alongside the texts so paragraph
+#' provenance can be reconstructed without text matching.
+#'
+#' @param results Data frame returned by a processing step.
+#' @param labels Character vector with labels to collect texts for.
+#' @param assign_multiple_categories Logical; `TRUE` when `results` stores one
+#'   logical column per label, `FALSE` when it stores a single `result` column.
+#'
+#' @return A named list where each element is a list with `texts` and
+#'   `analysis_unit_ids` entries for one label. Empty groups are removed.
+collect_grouped_paragraph_inputs <- function(
+  results,
+  labels,
+  assign_multiple_categories
+) {
+  stopifnot(
+    is.data.frame(results),
+    is.character(labels),
+    "text" %in% names(results),
+    "analysis_unit_id" %in% names(results)
+  )
+
+  grouped_inputs <- vector("list", length(labels))
+  names(grouped_inputs) <- labels
+
+  build_group_entry <- function(keep) {
+    keep <- keep %in% TRUE
+    list(
+      texts = as.character(results$text[keep]),
+      analysis_unit_ids = as.integer(results$analysis_unit_id[keep])
+    )
+  }
+
+  if (!isTRUE(assign_multiple_categories)) {
+    for (label in labels) {
+      grouped_inputs[[label]] <- build_group_entry(results$result == label)
+    }
+  } else {
+    for (label in labels) {
+      grouped_inputs[[label]] <- build_group_entry(results[[label]])
+    }
+  }
+
+  grouped_inputs[
+    purrr::map_lgl(grouped_inputs, ~ isTRUE(length(.x$texts) > 0))
+  ]
+}
+
+
 #' Write one paragraph per grouped set of texts
 #'
 #' Used inside async workers in `module_core_processing` for categorization and
 #' topic assignment. This keeps the progress, streaming, and interruption logic
 #' out of the main worker bodies.
 #'
-#' @param grouped_texts Named list where each element is a character vector of
-#'   texts for one category/topic.
+#' @param grouped_texts Named list where each element is a list with `texts`
+#'   and aligned `analysis_unit_ids` entries for one category/topic.
 #' @param research_background Single background string passed to
 #'   `write_paragraph()`.
 #' @param style_prompt Single style instruction string passed to
@@ -112,6 +164,31 @@ write_grouped_paragraphs <- function(
   streaming_enabled = FALSE
 ) {
   stopifnot(is.list(grouped_texts), !is.null(names(grouped_texts)))
+
+  normalize_group_entry <- function(entry) {
+    if (!is.list(entry) || is.null(entry$texts)) {
+      stop(
+        paste(
+          "grouped_texts entries must be lists with texts and analysis_unit_ids"
+        )
+      )
+    }
+
+    texts <- as.character(entry$texts)
+    analysis_unit_ids <- entry$analysis_unit_ids %||% NULL
+
+    if (is.null(analysis_unit_ids)) {
+      stop("grouped_texts entries must contain analysis_unit_ids")
+    }
+
+    analysis_unit_ids <- as.integer(analysis_unit_ids)
+    stopifnot(length(analysis_unit_ids) == length(texts))
+
+    list(
+      texts = texts,
+      analysis_unit_ids = analysis_unit_ids
+    )
+  }
 
   # No groups means there is nothing to summarize.
   if (!length(grouped_texts)) {
@@ -141,7 +218,9 @@ write_grouped_paragraphs <- function(
 
   purrr::imap(
     grouped_texts,
-    function(topic_texts, topic_name) {
+    function(topic_entry, topic_name) {
+      normalized_entry <- normalize_group_entry(topic_entry)
+
       if (!is.null(interrupter)) {
         interrupter$execInterrupts()
       }
@@ -164,7 +243,8 @@ write_grouped_paragraphs <- function(
 
       # Write one paragraph for one category/topic.
       write_paragraph(
-        texts = topic_texts,
+        texts = normalized_entry$texts,
+        analysis_unit_ids = normalized_entry$analysis_unit_ids,
         topic = topic_name,
         research_background = research_background,
         style_prompt = style_prompt,
@@ -182,28 +262,41 @@ write_grouped_paragraphs <- function(
 #' Join worker results back to the original uploaded texts
 #'
 #' Used after async processing completes in `module_core_processing`.
-#' Workers operate on preprocessed texts, while the UI and downloads should use
-#' the original raw texts again.
+#' Workers operate on deduplicated analysis units, while the UI and downloads
+#' should use the current document text again.
 #'
-#' @param texts_df Data frame with at least `raw` and `preprocessed` columns.
+#' @param texts_df Data frame with at least `document_text`, `preprocessed`, and
+#'   `analysis_unit_id` columns.
 #' @param results_table_pre Data frame returned by processing.
-#'   Its `text` column must match `texts_df$preprocessed`.
-#'   `texts_df$preprocessed`.
+#'   It must contain `analysis_unit_id` for the worker outputs. Multiple
+#'   document rows may share one `analysis_unit_id`.
 #'
-#' @return A data frame with the raw text restored as `text`.
+#' @return A data frame with the current document text restored as `text`.
 join_processing_results <- function(texts_df, results_table_pre) {
   stopifnot(is.data.frame(texts_df))
   stopifnot(is.data.frame(results_table_pre))
 
-  # Join by the preprocessed text the worker actually saw, then restore the raw
-  # uploaded text as the main `text` column.
+  stopifnot(
+    "analysis_unit_id" %in% names(texts_df),
+    "analysis_unit_id" %in% names(results_table_pre)
+  )
+
+  worker_results <- results_table_pre
+  if ("text" %in% names(worker_results)) {
+    worker_results$text <- NULL
+  }
+
+  # One analysis unit can map back to many document rows, so this join
+  # intentionally fans worker output back out to the current row layer.
   results_table <- texts_df |>
     dplyr::left_join(
-      results_table_pre,
-      by = dplyr::join_by("preprocessed" == "text")
+      worker_results,
+      by = "analysis_unit_id",
+      relationship = "many-to-many"
     ) |>
     dplyr::select(-preprocessed) |>
-    dplyr::rename(text = raw)
+    dplyr::rename(text = document_text)
+
   results_table
 }
 
@@ -308,6 +401,8 @@ analysis_result_report_globals <- function() {
   list(
     .kwallm_report_results_df = .kwallm_report_results_df,
     .kwallm_report_group_lookup = .kwallm_report_group_lookup,
+    .kwallm_analysis_result_text_counts = .kwallm_analysis_result_text_counts,
+    .kwallm_report_text_count_summary = .kwallm_report_text_count_summary,
     .kwallm_get_stage_model_id = .kwallm_get_stage_model_id,
     .kwallm_paragraph_subject_lookup = .kwallm_paragraph_subject_lookup,
     .kwallm_paragraph_supporting_texts = .kwallm_paragraph_supporting_texts

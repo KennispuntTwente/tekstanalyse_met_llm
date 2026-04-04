@@ -24,11 +24,29 @@ source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   )
 }
 
-test_that("build_analysis_result preserves split lineage and group fan-out", {
-  texts_df <- data.frame(
-    raw = c("Chunk A", "Chunk B"),
-    preprocessed = c("Chunk A", "Chunk B"),
+.make_result_texts_df <- function(
+  document_text,
+  preprocessed = document_text,
+  source_document_id = seq_along(document_text),
+  source_document_text = document_text,
+  analysis_unit_id = match(preprocessed, unique(preprocessed))
+) {
+  data.frame(
+    source_document_id = as.integer(source_document_id),
+    document_id = seq_along(document_text),
+    source_document_text = as.character(source_document_text),
+    document_text = as.character(document_text),
+    preprocessed = as.character(preprocessed),
+    analysis_unit_id = as.integer(analysis_unit_id),
     stringsAsFactors = FALSE
+  )
+}
+
+test_that("build_analysis_result preserves split lineage and group fan-out", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Chunk A", "Chunk B"),
+    source_document_id = c(1L, 1L),
+    source_document_text = c("Original text", "Original text")
   )
 
   results_table <- data.frame(
@@ -48,7 +66,7 @@ test_that("build_analysis_result preserves split lineage and group fan-out", {
     language = "en",
     by_column_name = "group",
     by_column_lookup = data.frame(
-      text = "Original text",
+      source_document_id = 1L,
       by_value = "G1",
       stringsAsFactors = FALSE
     ),
@@ -59,7 +77,6 @@ test_that("build_analysis_result preserves split lineage and group fan-out", {
     human_in_the_loop = TRUE,
     write_paragraphs = FALSE,
     stage_prompt_previews = list(categorization = "prompt"),
-    source_texts = c("Original text", "Original text"),
     input_info = list(file_type = "csv", text_column = "text")
   )
 
@@ -67,10 +84,12 @@ test_that("build_analysis_result preserves split lineage and group fan-out", {
   group_lookup <- .kwallm_report_group_lookup(analysis_result)
 
   expect_s3_class(report_df, "data.frame")
+  expect_true("document_id" %in% names(report_df))
   expect_equal(nrow(analysis_result@text_lineage@source_documents), 1)
   expect_equal(nrow(analysis_result@text_lineage@documents), 2)
   expect_equal(analysis_result@text_lineage@document_groups$group_value, "G1")
   expect_equal(nrow(group_lookup), 2)
+  expect_equal(group_lookup$document_id, c(1L, 2L))
   expect_equal(report_df$result, c("Theme 1", "Theme 2"))
 
   # stage_models captures api_url
@@ -82,10 +101,10 @@ test_that("build_analysis_result preserves split lineage and group fan-out", {
 })
 
 test_that("build_analysis_result preserves groups from chunk-keyed lookup", {
-  texts_df <- data.frame(
-    raw = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
-    preprocessed = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
-    stringsAsFactors = FALSE
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+    source_document_id = c(1L, 1L, 2L),
+    source_document_text = c("Text 1", "Text 1", "Text 2")
   )
 
   results_table <- data.frame(
@@ -105,7 +124,7 @@ test_that("build_analysis_result preserves groups from chunk-keyed lookup", {
     language = "en",
     by_column_name = "group",
     by_column_lookup = data.frame(
-      text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+      document_id = c(1L, 2L, 3L),
       by_value = c("G1", "G1", "G2"),
       stringsAsFactors = FALSE
     ),
@@ -115,8 +134,7 @@ test_that("build_analysis_result preserves groups from chunk-keyed lookup", {
     assign_multiple_categories = FALSE,
     human_in_the_loop = TRUE,
     write_paragraphs = FALSE,
-    stage_prompt_previews = list(categorization = "prompt"),
-    source_texts = c("Text 1", "Text 1", "Text 2")
+    stage_prompt_previews = list(categorization = "prompt")
   )
 
   group_lookup <- .kwallm_report_group_lookup(analysis_result)
@@ -126,19 +144,79 @@ test_that("build_analysis_result preserves groups from chunk-keyed lookup", {
     c("G1", "G2")
   )
   expect_equal(nrow(group_lookup), 3)
+  expect_true("document_id" %in% names(group_lookup))
+  expect_equal(group_lookup$document_id, c(1L, 2L, 3L))
   expect_equal(sort(group_lookup$by_value), c("G1", "G1", "G2"))
 })
 
-test_that("marking paragraphs retain supporting excerpts in report helpers", {
-  texts_df <- data.frame(
-    raw = "Text about dogs",
-    preprocessed = "Text about dogs",
-    stringsAsFactors = FALSE
+test_that("metadata and export sheets include text counts", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Doc 1 chunk A", "Doc 1 chunk B", "Doc 2"),
+    preprocessed = c("shared prep", "shared prep", "Doc 2"),
+    source_document_id = c(1L, 1L, 2L),
+    source_document_text = c("Doc 1", "Doc 1", "Doc 2"),
+    analysis_unit_id = c(1L, 1L, 2L)
   )
 
   results_table <- data.frame(
+    text = c("Doc 1 chunk A", "Doc 1 chunk B", "Doc 2"),
+    result = c("Theme 1", "Theme 1", "Theme 2"),
+    stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-counts",
+    mode = "Categorisatie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = c("Theme 1", "Theme 2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  metadata <- analysis_result_to_metadata_list(analysis_result)
+  sheets <- analysis_result_to_export_sheets(analysis_result)
+  metadata_values <- stats::setNames(
+    sheets$metadata$value,
+    sheets$metadata$field
+  )
+
+  expect_equal(
+    metadata$text_counts,
+    list(
+      source_documents = 2L,
+      documents = 3L,
+      analysis_units = 2L,
+      reused_analyses = 1L
+    )
+  )
+  expect_equal(metadata_values[["source_documents"]], "2")
+  expect_equal(metadata_values[["documents"]], "3")
+  expect_equal(metadata_values[["analysis_units"]], "2")
+  expect_equal(metadata_values[["reused_analyses"]], "1")
+})
+
+test_that("marking paragraphs retain supporting excerpts in report helpers", {
+  texts_df <- .make_result_texts_df(
+    document_text = "Text about dogs"
+  )
+
+  results_table <- data.frame(
+    analysis_unit_id = 1L,
+    chunk_id = 1L,
+    chunk_index = 1L,
     text = "Text about dogs",
-    sub_text = "Text about dogs",
+    chunk_text = "Text about dogs",
     code = "Code 1",
     marked_text = "dogs",
     source_marked_text = "dogs?",
@@ -154,6 +232,7 @@ test_that("marking paragraphs retain supporting excerpts in report helpers", {
     topic = "Code 1",
     paragraph = "Summary paragraph.",
     texts = c("Text about **dogs**"),
+    analysis_unit_ids = 1L,
     prompt_fits = TRUE
   ))
 
@@ -196,11 +275,235 @@ test_that("marking paragraphs retain supporting excerpts in report helpers", {
   expect_equal(metadata$results$markings[[1]]$match_method, "fuzzy")
 })
 
-test_that("paragraph provenance uses preprocessed text when raw text differs", {
-  texts_df <- data.frame(
-    raw = "John Smith called",
-    preprocessed = "[PERSON] called",
+test_that("marking results deduplicate shared analysis-unit rows before report fan-out", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Shared text", "Shared text"),
+    preprocessed = c("shared prep", "shared prep"),
+    analysis_unit_id = c(1L, 1L)
+  )
+
+  results_table <- data.frame(
+    analysis_unit_id = c(1L, 1L),
+    chunk_id = c(1L, 1L),
+    chunk_index = c(1L, 1L),
+    text = c("Shared text", "Shared text"),
+    chunk_text = c("Shared text", "Shared text"),
+    code = c("Code 1", "Code 1"),
+    source_marked_text = c("Shared", "Shared"),
+    marked_text = c("Shared", "Shared"),
+    match_start = c(1L, 1L),
+    match_end = c(6L, 6L),
+    match_distance = c(0L, 0L),
+    match_method = c("exact", "exact"),
+    response_status = c("matched_all", "matched_all"),
     stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-marking-dedup",
+    mode = "Markeren",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    codes = "Code 1",
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(marking = "prompt")
+  )
+
+  report_df <- .kwallm_report_results_df(analysis_result)
+  sheets <- analysis_result_to_export_sheets(analysis_result)
+
+  expect_equal(nrow(analysis_result@results@chunks), 1)
+  expect_equal(nrow(analysis_result@results@markings), 1)
+  expect_equal(nrow(report_df), 2)
+  expect_true("document_id" %in% names(report_df))
+  expect_identical(report_df$document_id, c(1L, 2L))
+  expect_true(all(report_df$marked_text == "Shared"))
+  expect_true("document_id" %in% names(sheets$results))
+  expect_identical(sheets$results$document_id, c(1L, 2L))
+})
+
+test_that("marking results default source_marked_text per row when omitted", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text about cats", "Text about dogs")
+  )
+
+  results_table <- data.frame(
+    analysis_unit_id = c(1L, 2L),
+    chunk_id = c(1L, 2L),
+    chunk_index = c(1L, 1L),
+    text = c("Text about cats", "Text about dogs"),
+    chunk_text = c("Text about cats", "Text about dogs"),
+    code = c("Code 1", "Code 1"),
+    marked_text = c("cats", "dogs"),
+    stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-marking-default-source-text",
+    mode = "Markeren",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    codes = "Code 1",
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(marking = "prompt")
+  )
+
+  markings <- analysis_result@results@markings
+
+  expect_equal(nrow(markings), 2)
+  expect_identical(markings$source_marked_text, markings$marked_text)
+  expect_true(all(markings$response_status == "matched_all"))
+})
+
+test_that("single-label assignments use explicit analysis unit ids when shuffled", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Doc 1", "Doc 2"),
+    preprocessed = c("prep 1", "prep 2"),
+    analysis_unit_id = c(10L, 20L)
+  )
+
+  results_table <- data.frame(
+    analysis_unit_id = c(20L, 10L),
+    text = c("Doc 2", "Doc 1"),
+    result = c("Theme 2", "Theme 1"),
+    stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-shuffled-single-label",
+    mode = "Categorisatie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = c("Theme 1", "Theme 2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  labels_lookup <- .kwallm_labels_lookup(analysis_result@results@labels)
+  assignments <- analysis_result@results@assignments
+  assigned_labels <- labels_lookup[as.character(assignments$label_id)]
+
+  expect_identical(
+    unname(assigned_labels[match(c(10L, 20L), assignments$analysis_unit_id)]),
+    c("Theme 1", "Theme 2")
+  )
+})
+
+test_that("multi-label assignments use explicit analysis unit ids when shuffled", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Doc 1", "Doc 2"),
+    preprocessed = c("prep 1", "prep 2"),
+    analysis_unit_id = c(10L, 20L)
+  )
+
+  results_table <- data.frame(
+    analysis_unit_id = c(20L, 10L),
+    text = c("Doc 2", "Doc 1"),
+    Positive = c(FALSE, TRUE),
+    Negative = c(TRUE, FALSE),
+    stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-shuffled-multi-label",
+    mode = "Categorisatie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = c("Positive", "Negative"),
+    exclusive_categories = character(),
+    assign_multiple_categories = TRUE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  labels_lookup <- .kwallm_labels_lookup(analysis_result@results@labels)
+  assignments <- analysis_result@results@assignments
+  assigned_labels <- split(
+    labels_lookup[as.character(assignments$label_id)],
+    assignments$analysis_unit_id
+  )
+
+  expect_identical(unname(assigned_labels[["10"]]), "Positive")
+  expect_identical(unname(assigned_labels[["20"]]), "Negative")
+})
+
+test_that("scoring results use explicit analysis unit ids when shuffled", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Doc 1", "Doc 2"),
+    preprocessed = c("prep 1", "prep 2"),
+    analysis_unit_id = c(10L, 20L)
+  )
+
+  results_table <- data.frame(
+    analysis_unit_id = c(20L, 10L),
+    text = c("Doc 2", "Doc 1"),
+    result = c(90, 10),
+    stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-shuffled-scores",
+    mode = "Scoren",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    scoring_characteristic = "helpfulness",
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(scoring = "prompt")
+  )
+
+  scores <- analysis_result@results@scores
+  expect_identical(
+    scores$score[match(c(10L, 20L), scores$analysis_unit_id)],
+    c(10, 90)
+  )
+})
+
+test_that("paragraph provenance uses analysis unit ids when raw text differs", {
+  texts_df <- .make_result_texts_df(
+    document_text = "John Smith called",
+    preprocessed = "[PERSON] called"
   )
 
   results_table <- data.frame(
@@ -213,6 +516,7 @@ test_that("paragraph provenance uses preprocessed text when raw text differs", {
     topic = "Theme 1",
     paragraph = "Summary paragraph.",
     texts = "[PERSON] called",
+    analysis_unit_ids = 1L,
     prompt_fits = TRUE
   ))
 
@@ -247,16 +551,113 @@ test_that("paragraph provenance uses preprocessed text when raw text differs", {
   )
 })
 
+
+test_that("build_analysis_result rejects paragraph entries without analysis unit ids", {
+  texts_df <- .make_result_texts_df(document_text = "Text 1")
+
+  results_table <- data.frame(
+    text = "Text 1",
+    result = "Theme 1",
+    stringsAsFactors = FALSE
+  )
+
+  paragraph_entries <- list(list(
+    topic = "Theme 1",
+    paragraph = "Summary paragraph.",
+    texts = "Text 1",
+    prompt_fits = TRUE
+  ))
+
+  expect_error(
+    build_analysis_result(
+      texts_df = texts_df,
+      results_table = results_table,
+      paragraph_entries = paragraph_entries,
+      uuid = "run-missing-paragraph-ids",
+      mode = "Categorisatie",
+      research_background = "background",
+      style_prompt = NULL,
+      irr_result = NULL,
+      language = "en",
+      by_column_name = NULL,
+      by_column_lookup = NULL,
+      models = .test_models(),
+      categories = "Theme 1",
+      exclusive_categories = character(),
+      assign_multiple_categories = FALSE,
+      human_in_the_loop = FALSE,
+      write_paragraphs = TRUE,
+      stage_prompt_previews = list(categorization = "prompt")
+    ),
+    "paragraph entries must contain analysis_unit_ids"
+  )
+})
+
+
+test_that("paragraph provenance uses explicit analysis unit ids when available", {
+  texts_df <- .make_result_texts_df(
+    document_text = "John Smith called",
+    preprocessed = "[PERSON] called"
+  )
+
+  results_table <- data.frame(
+    text = "John Smith called",
+    result = "Theme 1",
+    stringsAsFactors = FALSE
+  )
+
+  paragraph_entries <- list(list(
+    topic = "Theme 1",
+    paragraph = "Summary paragraph.",
+    texts = "excerpt carried through paragraph generation",
+    analysis_unit_ids = 1L,
+    prompt_fits = TRUE
+  ))
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    paragraph_entries = paragraph_entries,
+    uuid = "run-2c",
+    mode = "Categorisatie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = "Theme 1",
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = TRUE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  expect_equal(nrow(analysis_result@paragraphs@paragraph_sources), 1)
+  expect_identical(
+    analysis_result@paragraphs@paragraph_sources$document_id,
+    1L
+  )
+  expect_equal(
+    .kwallm_paragraph_supporting_texts(
+      analysis_result,
+      analysis_result@paragraphs@paragraphs$paragraph_id[[1]]
+    ),
+    "excerpt carried through paragraph generation"
+  )
+})
+
 test_that("analysis_result_expected_paragraph_subject_count is result-aware", {
   marking_result <- build_analysis_result(
-    texts_df = data.frame(
-      raw = "Text about cats",
-      preprocessed = "Text about cats",
-      stringsAsFactors = FALSE
-    ),
+    texts_df = .make_result_texts_df(document_text = "Text about cats"),
     results_table = data.frame(
+      analysis_unit_id = 1L,
+      chunk_id = NA_integer_,
+      chunk_index = NA_integer_,
       text = "Text about cats",
-      sub_text = NA_character_,
+      chunk_text = NA_character_,
       code = NA_character_,
       marked_text = NA_character_,
       stringsAsFactors = FALSE
@@ -277,10 +678,9 @@ test_that("analysis_result_expected_paragraph_subject_count is result-aware", {
   )
 
   categorization_result <- build_analysis_result(
-    texts_df = data.frame(
-      raw = c("Text 1", "Text 2"),
-      preprocessed = c("Text 1", "Text 2"),
-      stringsAsFactors = FALSE
+    texts_df = .make_result_texts_df(
+      document_text = c("Text 1", "Text 2"),
+      preprocessed = c("Text 1", "Text 2")
     ),
     results_table = data.frame(
       text = c("Text 1", "Text 2"),
@@ -314,10 +714,9 @@ test_that("analysis_result_expected_paragraph_subject_count is result-aware", {
 })
 
 test_that("topic metadata includes candidate and reduced topics", {
-  texts_df <- data.frame(
-    raw = c("Text 1", "Text 2"),
-    preprocessed = c("Text 1", "Text 2"),
-    stringsAsFactors = FALSE
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text 1", "Text 2"),
+    preprocessed = c("Text 1", "Text 2")
   )
 
   results_table <- data.frame(
@@ -351,9 +750,9 @@ test_that("topic metadata includes candidate and reduced topics", {
     human_in_the_loop = TRUE,
     write_paragraphs = FALSE,
     context_window = list(
-      chunk_size = 5,
+      batch_size = 5,
       draws = 2,
-      n_chunks = 3,
+      n_batches = 3,
       n_tokens_context_window = 1000
     ),
     stage_prompt_previews = list(
@@ -401,10 +800,9 @@ test_that("topic metadata includes candidate and reduced topics", {
 })
 
 test_that("input provenance and irr sample are serialized", {
-  texts_df <- data.frame(
-    raw = c("Text 1", "Text 2"),
-    preprocessed = c("Text 1", "Text 2"),
-    stringsAsFactors = FALSE
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text 1", "Text 2"),
+    preprocessed = c("Text 1", "Text 2")
   )
 
   results_table <- data.frame(
@@ -484,10 +882,9 @@ test_that("input provenance and irr sample are serialized", {
 })
 
 test_that("stage execution provenance is serialized", {
-  texts_df <- data.frame(
-    raw = c("Text 1", "Text 2"),
-    preprocessed = c("Text 1", "Text 2"),
-    stringsAsFactors = FALSE
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text 1", "Text 2"),
+    preprocessed = c("Text 1", "Text 2")
   )
 
   results_table <- data.frame(
@@ -549,7 +946,7 @@ test_that("AnalysisResult rejects result rows that do not reference text lineage
   text_lineage <- TextLineage(
     source_documents = data.frame(
       source_document_id = 1L,
-      source_text = "Text 1",
+      source_document_text = "Text 1",
       stringsAsFactors = FALSE
     ),
     documents = data.frame(
@@ -597,10 +994,9 @@ test_that("AnalysisResult rejects result rows that do not reference text lineage
 })
 
 test_that("app_version and api_url are serialized", {
-  texts_df <- data.frame(
-    raw = c("Text 1", "Text 2"),
-    preprocessed = c("Text 1", "Text 2"),
-    stringsAsFactors = FALSE
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text 1", "Text 2"),
+    preprocessed = c("Text 1", "Text 2")
   )
 
   results_table <- data.frame(
@@ -670,10 +1066,9 @@ test_that("download bundle contains metadata json, excel, and report", {
   skip_if_not_installed("zip")
   skip_if_not(isTRUE(rmarkdown::pandoc_available()))
 
-  texts_df <- data.frame(
-    raw = c("Text 1", "Text 2"),
-    preprocessed = c("Text 1", "Text 2"),
-    stringsAsFactors = FALSE
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text 1", "Text 2"),
+    preprocessed = c("Text 1", "Text 2")
   )
 
   results_table <- data.frame(
@@ -720,10 +1115,9 @@ test_that("download bundle surfaces metadata errors with the correct label", {
   temp_dir <- withr::local_tempdir()
 
   analysis_result <- build_analysis_result(
-    texts_df = data.frame(
-      raw = "Text 1",
-      preprocessed = "Text 1",
-      stringsAsFactors = FALSE
+    texts_df = .make_result_texts_df(
+      document_text = "Text 1",
+      preprocessed = "Text 1"
     ),
     results_table = data.frame(
       text = "Text 1",
