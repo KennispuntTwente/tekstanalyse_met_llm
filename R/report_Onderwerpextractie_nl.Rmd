@@ -6,12 +6,12 @@ output:
       version: 5
       bootswatch: lux
 params:
-  result_list: !r list(df = data.frame(result = c("A"), text = c("A")), paragraphs = list(A = list(paragraph = "Paragraaf over onderwerp 'A', we quoten de tekst \"A\"... En quoten een tekst die niet bestaat, \"B\"... En nogmaals \"A\"...", texts = c("A"))), model = "gpt-4o", model_reductie = "o1", irr = list(subjects = 20, raters = 2, irr.name = "Kappa", stat.name = "z", statistic = 1.163762, p.value = 0.243845, value = 0.119469))
+  report_context: !r list(df = data.frame(result = c("A"), text = c("A")), paragraphs = list(A = list(paragraph = "Paragraaf over onderwerp 'A', we quoten de tekst \"A\"... En quoten een tekst die niet bestaat, \"B\"... En nogmaals \"A\"...", texts = c("A"))), model = "gpt-4o", model_reductie = "o1", irr = list(subjects = 20, raters = 2, irr.name = "Kappa", stat.name = "z", statistic = 1.163762, p.value = 0.243845, value = 0.119469))
 ---
 
 ```{r include=FALSE, error=TRUE}
 library(stringr)
-rl <- params$result_list
+rl <- params$report_context
 source(here::here("R", "style_datatable_config.R"), local = TRUE)
 source(here::here("R", "utils_quotes.R"), local = TRUE)
 source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)

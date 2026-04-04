@@ -399,11 +399,20 @@ text_split_server <- function(
       c("toggle", "max_tokens", "overlap", "split_texts")
     )
 
+    split_settings <- reactive({
+      list(
+        enabled = isTRUE(splitting()),
+        chunk_size = max_tokens_val(),
+        overlap = overlap_val()
+      )
+    })
+
     # Return -------------------------------------------------------
     return(list(
       texts = texts,
       source_texts = source_texts,
-      split_in_progress = split_in_progress
+      split_in_progress = split_in_progress,
+      split_settings = split_settings
     ))
   })
 }

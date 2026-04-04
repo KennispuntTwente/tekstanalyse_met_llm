@@ -235,6 +235,16 @@ if (!getOption("shiny.testmode", FALSE)) {
 }
 
 
+## 2.5 App version -------------------------------------------------------------
+
+options(
+  kwallm__app_version = tryCatch(
+    jsonlite::fromJSON("package.json")$version,
+    error = function(e) NULL
+  )
+)
+
+
 # 3 Run app -----------------------------------------------------------------
 
 # Make images in 'www/' folder available to the app

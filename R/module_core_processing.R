@@ -51,6 +51,9 @@ processing_server <- function(
   context_window,
   by_column_name = reactiveVal(NULL),
   by_column_lookup = reactiveVal(NULL),
+  split_source_texts = reactiveVal(NULL),
+  split_settings = reactiveVal(list()),
+  upload_info = reactiveVal(list()),
   split_in_progress = reactiveVal(FALSE),
   lang = default_lang()
 ) {
@@ -94,11 +97,16 @@ processing_server <- function(
       final_results_df <- reactiveVal(NULL)
       irr_done <- reactiveVal(FALSE)
       irr_result <- reactiveVal(NULL)
+      irr_sample <- reactiveVal(NULL)
+      stage_execution_rows_generated <- reactiveVal(NULL)
       preparing_download <- reactiveVal(NULL)
       zip_file <- reactiveVal(NULL)
       topics <- reactiveVal(NULL)
       exclusive_topics <- reactiveVal(NULL)
       topics_definitive <- reactiveVal(FALSE)
+      candidate_topics_generated <- reactiveVal(NULL)
+      reduced_topics_generated <- reactiveVal(NULL)
+      topics_were_edited <- reactiveVal(FALSE)
       success <- reactiveVal(NULL)
 
       # Timestamp for end-to-end duration (click -> download-ready)
@@ -164,6 +172,11 @@ processing_server <- function(
       start_processing_run <- function(set_initial_progress = TRUE) {
         started(TRUE)
         processing(TRUE)
+        candidate_topics_generated(NULL)
+        reduced_topics_generated(NULL)
+        topics_were_edited(FALSE)
+        irr_sample(NULL)
+        stage_execution_rows_generated(NULL)
         analysis_started_at(Sys.time())
         log_analysis_start(
           mode = mode(),
@@ -251,6 +264,27 @@ processing_server <- function(
         invisible(NULL)
       }
 
+      # Appends new stage execution rows for the current run.
+      # Topic modelling uses multiple workers, so execution provenance is accumulated.
+      append_stage_execution_rows <- function(rows) {
+        if (is.null(rows) || !is.data.frame(rows) || !nrow(rows)) {
+          return(invisible(NULL))
+        }
+
+        current_rows <- stage_execution_rows_generated()
+        if (
+          is.null(current_rows) ||
+            !is.data.frame(current_rows) ||
+            !nrow(current_rows)
+        ) {
+          stage_execution_rows_generated(rows)
+        } else {
+          stage_execution_rows_generated(unique(rbind(current_rows, rows)))
+        }
+
+        invisible(NULL)
+      }
+
       ## 2.3 Categorisatie -----------------------------------------------------
 
       # Handles the categorization mode.
@@ -299,6 +333,7 @@ processing_server <- function(
           {
             log_context_apply(log_ctx)
             prepare_async_analysis_worker("categorization")
+            .kwallm__prompt_execution_reset()
 
             on_progress <- function(i, n, text) {
               progress_primary$set_with_total(i, n, text)
@@ -348,7 +383,10 @@ processing_server <- function(
               attr(results, "paragraphs") <- paragraphs
             }
 
-            results
+            list(
+              results = results,
+              stage_execution_rows = .kwallm__prompt_execution_get()
+            )
           },
           .args = c(
             list(
@@ -380,7 +418,10 @@ processing_server <- function(
 
         bind_async_result(
           promise = promise,
-          setter = results_df,
+          setter = function(value) {
+            append_stage_execution_rows(value$stage_execution_rows)
+            results_df(value$results)
+          },
           when = "main processing of categorization",
           debug_message = "Started async processing for categorization"
         )
@@ -424,6 +465,7 @@ processing_server <- function(
           {
             log_context_apply(log_ctx)
             prepare_async_analysis_worker("scoring")
+            .kwallm__prompt_execution_reset()
 
             on_progress <- function(i, n, text) {
               progress_primary$set_with_total(i, n, text)
@@ -435,13 +477,18 @@ processing_server <- function(
               }
             }
 
-            score_texts(
+            results <- score_texts(
               texts = texts,
               scoring_characteristic = scoring_characteristic,
               research_background = research_background,
               llm_provider = llm_provider,
               on_progress = on_progress,
               interrupter = interrupter
+            )
+
+            list(
+              results = results,
+              stage_execution_rows = .kwallm__prompt_execution_get()
             )
           },
           .args = c(
@@ -462,7 +509,10 @@ processing_server <- function(
 
         bind_async_result(
           promise = promise,
-          setter = results_df,
+          setter = function(value) {
+            append_stage_execution_rows(value$stage_execution_rows)
+            results_df(value$results)
+          },
           when = "main processing of scoring",
           debug_message = "Started async processing for scoring"
         )
@@ -498,6 +548,7 @@ processing_server <- function(
         promise <- mirai::mirai(
           {
             log_context_apply(log_ctx)
+            .kwallm__prompt_execution_reset()
 
             # Step 1: Generate candidate topics
             log_info(
@@ -555,7 +606,11 @@ processing_server <- function(
             )
 
             # Make intermediate results available
-            topics
+            list(
+              candidate_topics = candidate_topics,
+              topics = topics,
+              stage_execution_rows = .kwallm__prompt_execution_get()
+            )
           },
           .args = c(
             log_async_globals(log_ctx),
@@ -579,7 +634,13 @@ processing_server <- function(
         )
         bind_async_result(
           promise = promise,
-          setter = topics,
+          setter = function(value) {
+            append_stage_execution_rows(value$stage_execution_rows)
+            candidate_topics_generated(value$candidate_topics)
+            reduced_topics_generated(value$topics)
+            topics_were_edited(FALSE)
+            topics(value$topics)
+          },
           when = "main processing (step 1-2) of topic modelling",
           debug_message = "Started async processing for topic modelling (step 1-2)",
           stop_stream = FALSE,
@@ -614,6 +675,9 @@ processing_server <- function(
         edited_topics_observer <- observe(
           {
             req(edited_topics())
+            topics_were_edited(
+              !identical(edited_topics(), reduced_topics_generated())
+            )
             topics(edited_topics())
             topics_definitive(TRUE)
             edited_topics_observer$suspend()
@@ -644,6 +708,7 @@ processing_server <- function(
 
         # If no human in the loop, auto-confirm
         if (!isTRUE(human_in_the_loop())) {
+          topics_were_edited(FALSE)
           topics_definitive(TRUE)
           return()
         }
@@ -698,6 +763,7 @@ processing_server <- function(
           {
             log_context_apply(log_ctx)
             prepare_async_analysis_worker("topic_assignment")
+            .kwallm__prompt_execution_reset()
 
             # Step 4: Assign topics via standalone batch function
             on_progress <- function(i, n, text) {
@@ -759,7 +825,10 @@ processing_server <- function(
               attr(texts_with_topics, "paragraphs") <- paragraphs
             }
 
-            texts_with_topics
+            list(
+              results = texts_with_topics,
+              stage_execution_rows = .kwallm__prompt_execution_get()
+            )
           },
           .args = c(
             send_prompt_with_retries_async_globals(),
@@ -791,7 +860,10 @@ processing_server <- function(
         )
         bind_async_result(
           promise = promise,
-          setter = results_df,
+          setter = function(value) {
+            append_stage_execution_rows(value$stage_execution_rows)
+            results_df(value$results)
+          },
           when = "main processing (step 3-4) of topic modelling",
           debug_message = "Started async processing for topic modelling (step 3-4)"
         )
@@ -873,8 +945,9 @@ processing_server <- function(
           {
             log_context_apply(log_ctx)
             prepare_async_analysis_worker("marking")
+            .kwallm__prompt_execution_reset()
 
-            mark_texts(
+            results <- mark_texts(
               texts = texts,
               codes = codes,
               research_background = research_background,
@@ -889,6 +962,11 @@ processing_server <- function(
               overlap_size_tokens = overlap_size_tokens,
               llm_stream_async = llm_stream_async,
               streaming_enabled = streaming_enabled
+            )
+
+            list(
+              results = results,
+              stage_execution_rows = .kwallm__prompt_execution_get()
             )
           },
           .args = c(
@@ -919,7 +997,10 @@ processing_server <- function(
 
         bind_async_result(
           promise = promise,
-          setter = results_df,
+          setter = function(value) {
+            append_stage_execution_rows(value$stage_execution_rows)
+            results_df(value$results)
+          },
           when = "main processing of marking",
           stop_stream = TRUE
         )
@@ -983,54 +1064,146 @@ processing_server <- function(
       # Builds the prompt example stored in the result bundle.
       # Used during download preparation so the prompt-building logic stays out
       # of the result-list assembly code.
-      current_result_prompt_text <- function() {
+      current_result_prompt_texts <- function() {
         current_mode <- mode()
+        prompt_texts <- list()
+        placeholder_text <- lang()$t("<< TEKST >>")
 
         if (current_mode == "Categorisatie") {
           if (isTRUE(assign_multiple_categories())) {
-            return(
-              prompt_multi_category(
-                text = lang()$t("<< TEKST >>"),
-                research_background = research_background(),
-                categories = categories$texts(),
-                exclusive_categories = categories$exclusive_texts()
-              ) |>
-                tidyprompt::construct_prompt_text()
-            )
-          }
-          return(
-            prompt_category(
-              text = lang()$t("<< TEKST >>"),
+            prompt_texts$categorization <- prompt_multi_category(
+              text = placeholder_text,
+              research_background = research_background(),
+              categories = categories$texts(),
+              exclusive_categories = categories$exclusive_texts()
+            ) |>
+              tidyprompt::construct_prompt_text()
+          } else {
+            prompt_texts$categorization <- prompt_category(
+              text = placeholder_text,
               research_background = research_background(),
               categories = categories$texts()
             ) |>
               tidyprompt::construct_prompt_text()
-          )
+          }
+
+          if (isTRUE(write_paragraphs())) {
+            prompt_texts$paragraph_generation <- prompt_write_paragraph(
+              texts = placeholder_text,
+              topic = "<< CATEGORIE >>",
+              research_background = research_background(),
+              style_prompt = style_prompt(),
+              language = lang()$get_translation_language()
+            ) |>
+              tidyprompt::construct_prompt_text()
+          }
+
+          return(prompt_texts)
         }
 
         if (current_mode == "Scoren") {
-          return(
-            prompt_score(
-              text = lang()$t("<< TEKST >>"),
-              research_background = research_background(),
-              scoring_characteristic = scoring_characteristic()
+          prompt_texts$scoring <- prompt_score(
+            text = placeholder_text,
+            research_background = research_background(),
+            scoring_characteristic = scoring_characteristic()
+          ) |>
+            tidyprompt::construct_prompt_text()
+
+          return(prompt_texts)
+        }
+
+        if (current_mode == "Onderwerpextractie") {
+          reduction_summary <- attr(
+            reduced_topics_generated(),
+            "reduction_summary",
+            exact = TRUE
+          ) %||%
+            list()
+          assignment_topics <- topics() %||%
+            c("<< ONDERWERP 1 >>", "<< ONDERWERP 2 >>")
+
+          prompt_texts$topic_candidate_generation <- prompt_candidate_topics(
+            text_chunk = c(
+              lang()$t("<< TEKST 1 >>"),
+              lang()$t("<< TEKST 2 >>")
+            ),
+            research_background = research_background(),
+            language = lang()$get_translation_language()
+          ) |>
+            tidyprompt::construct_prompt_text()
+
+          prompt_texts$topic_reduction <- prompt_reduce_topics(
+            candidate_topics = c("<< ONDERWERP 1 >>", "<< ONDERWERP 2 >>"),
+            research_background = research_background(),
+            language = lang()$get_translation_language()
+          ) |>
+            tidyprompt::construct_prompt_text()
+
+          if (
+            isTRUE(reduction_summary$not_applicable_check_performed %||% FALSE)
+          ) {
+            prompt_texts$topic_not_applicable_check <- prompt_topic_not_applicable_check(
+              topics = c("<< ONDERWERP 1 >>", "<< ONDERWERP 2 >>"),
+              language = lang()$get_translation_language()
             ) |>
               tidyprompt::construct_prompt_text()
-          )
+          }
+
+          if (isTRUE(assign_multiple_categories())) {
+            prompt_texts$topic_assignment <- prompt_multi_category(
+              text = placeholder_text,
+              research_background = research_background(),
+              categories = assignment_topics,
+              exclusive_categories = exclusive_topics()
+            ) |>
+              tidyprompt::construct_prompt_text()
+          } else {
+            prompt_texts$topic_assignment <- prompt_category(
+              text = placeholder_text,
+              research_background = research_background(),
+              categories = assignment_topics
+            ) |>
+              tidyprompt::construct_prompt_text()
+          }
+
+          if (isTRUE(write_paragraphs())) {
+            prompt_texts$paragraph_generation <- prompt_write_paragraph(
+              texts = placeholder_text,
+              topic = "<< ONDERWERP >>",
+              research_background = research_background(),
+              style_prompt = style_prompt(),
+              language = lang()$get_translation_language()
+            ) |>
+              tidyprompt::construct_prompt_text()
+          }
+
+          return(prompt_texts)
         }
 
         if (current_mode == "Markeren") {
-          return(
-            mark_text_prompt(
-              text = lang()$t("<< TEKST >>"),
+          prompt_texts$marking <- mark_text_prompt(
+            text = placeholder_text,
+            research_background = research_background(),
+            code = "<< CODE >>"
+          ) |>
+            tidyprompt::construct_prompt_text()
+
+          if (isTRUE(write_paragraphs())) {
+            prompt_texts$paragraph_generation <- prompt_write_paragraph(
+              texts = "**<< GEMARKEERDE TEKST >>**",
+              topic = "<< CODE >>",
               research_background = research_background(),
-              code = "<< CODE >>"
+              style_prompt = style_prompt(),
+              language = lang()$get_translation_language(),
+              focus_on_highlighted_text = TRUE
             ) |>
               tidyprompt::construct_prompt_text()
-          )
+          }
+
+          return(prompt_texts)
         }
 
-        NULL
+        prompt_texts
       }
 
       ### 2.7.4 Result list assembly -------------------------------------------
@@ -1039,7 +1212,22 @@ processing_server <- function(
       # Called after optional IRR so the download step works from one structured
       # object.
       create_result_list <- function() {
+        merged_input_info <- utils::modifyList(
+          upload_info() %||% list(),
+          list(
+            anonymization_requested_mode = texts$anonymization_requested_mode %||%
+              NULL,
+            anonymization_applied_mode = texts$anonymization_applied_mode %||%
+              NULL,
+            anonymization_completed = texts$anonymization_completed %||% NULL,
+            split_enabled = split_settings()$enabled %||% NULL,
+            split_chunk_size = split_settings()$chunk_size %||% NULL,
+            split_overlap = split_settings()$overlap %||% NULL
+          )
+        )
+
         result_list <- build_processing_result_list(
+          texts_df = texts$df,
           final_results_df = final_results_df(),
           uuid = uuid,
           mode = mode(),
@@ -1060,12 +1248,20 @@ processing_server <- function(
           human_in_the_loop = human_in_the_loop(),
           write_paragraphs = write_paragraphs(),
           context_window = context_window,
-          prompt_text = current_result_prompt_text()
+          stage_prompt_texts = current_result_prompt_texts(),
+          stage_execution_rows = stage_execution_rows_generated(),
+          app_version = getOption("kwallm__app_version", NULL),
+          input_info = merged_input_info,
+          source_texts = split_source_texts(),
+          candidate_topics = candidate_topics_generated(),
+          reduced_topics = reduced_topics_generated(),
+          topics_were_edited = topics_were_edited(),
+          irr_sample = irr_sample()
         )
 
         if (
           isTRUE(write_paragraphs()) &&
-            is.null(result_list$paragraphs)
+            nrow(result_list@paragraphs@paragraphs) == 0
         ) {
           app_error(
             "Paragraphs were requested to be written, but no paragraphs found",
@@ -1091,7 +1287,7 @@ processing_server <- function(
           details = sprintf(
             "mode=%s n_texts=%d uuid=%s",
             mode() %||% "unknown",
-            nrow(result_list$df %||% data.frame()),
+            nrow(result_list@text_lineage@documents),
             uuid
           )
         )
@@ -1107,8 +1303,13 @@ processing_server <- function(
             result_list = result_list,
             temp_dir = tempdir(),
             create_processing_download_bundle = create_processing_download_bundle,
+            write_processing_result_metadata_json = write_processing_result_metadata_json,
             write_processing_result_excel = write_processing_result_excel,
             write_processing_result_rmarkdown = write_processing_result_rmarkdown,
+            analysis_result_to_metadata_list = analysis_result_to_metadata_list,
+            analysis_result_to_export_sheets = analysis_result_to_export_sheets,
+            analysis_result_to_report_context = analysis_result_to_report_context,
+            .kwallm_mode_display_from_id = .kwallm_mode_display_from_id,
             processing_mode_supports_report = processing_mode_supports_report
           )
         )
@@ -1214,6 +1415,7 @@ processing_server <- function(
               if (irr$done) {
                 irr_done(TRUE)
                 irr_result(irr$result)
+                irr_sample(irr$sample)
               }
             },
             suspended = FALSE,
@@ -1238,7 +1440,10 @@ processing_server <- function(
           result_list <- create_result_list()
 
           # Abort if invalid results still made it this far.
-          error <- processing_results_have_invalid_na(result_list$df, mode())
+          error <- processing_results_have_invalid_na(
+            analysis_result_to_report_context(result_list)$df,
+            mode()
+          )
           if (error) {
             app_error(
               "Results contain NA values; processing failed",

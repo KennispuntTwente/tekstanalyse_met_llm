@@ -88,7 +88,8 @@ interrater_server <- function(
       return <- reactiveValues(
         start = start,
         done = FALSE,
-        result = NULL
+        result = NULL,
+        sample = NULL
       )
 
       # State can be: "configure_sample", "rating", "finished"
@@ -394,6 +395,7 @@ interrater_server <- function(
 
         # Store sampled data and switch to rating mode
         sampled_data_rv(data_subset)
+        return$sample <- data_subset
         user_ratings_store(list())
         current_item_index(1)
         return$result <- NULL
@@ -435,6 +437,7 @@ interrater_server <- function(
         # Reset relevant states
         module_state("configure_sample")
         sampled_data_rv(NULL)
+        return$sample <- NULL
         user_ratings_store(list())
         current_item_index(1)
         return$result <- NULL

@@ -6,12 +6,12 @@ output:
       version: 5
       bootswatch: lux
 params:
-  result_list: !r list(df = data.frame(result = c(1), text = c("Tekst A")), irr = list(estimate = setNames(27.58, "mean difference"), statistic = setNames(8.975326, "t"), p.value = 6.416833e-12, parameter = setNames(49, "df"), conf.low = 21.40484, conf.high = 33.75516, method = "Paired t-test", alternative = "two.sided", llm_mean = 23.33, llm_sd = 5.72, user_mean = 36.7824, user_sd = 7.23), sensitivity_sentence = "Met een steekproefgrootte van (...).")
+  report_context: !r list(df = data.frame(result = c(1), text = c("Tekst A")), irr = list(estimate = setNames(27.58, "mean difference"), statistic = setNames(8.975326, "t"), p.value = 6.416833e-12, parameter = setNames(49, "df"), conf.low = 21.40484, conf.high = 33.75516, method = "Paired t-test", alternative = "two.sided", llm_mean = 23.33, llm_sd = 5.72, user_mean = 36.7824, user_sd = 7.23), sensitivity_sentence = "Met een steekproefgrootte van (...).")
 
 ---
 
 ```{r include=FALSE, error=TRUE}
-rl <- params$result_list
+rl <- params$report_context
 source(here::here("R", "style_datatable_config.R"), local = TRUE)
 source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ```

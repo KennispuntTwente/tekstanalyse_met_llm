@@ -168,7 +168,7 @@ test_that("Categorisatie report renders with deduped by_column_values (no error 
   # Scenario: original upload had 3 rows with "Text 1" appearing in two
   # groups (G1 and G2). After discard_empty() dedup, result df has 2 rows,
   # but the by_column_values lookup preserves both group memberships.
-  result_list <- list(
+  report_context <- list(
     df = data.frame(
       text = c("Text 1", "Text 2"),
       result = c("A", "B"),
@@ -208,7 +208,7 @@ test_that("Categorisatie report renders with deduped by_column_values (no error 
         rmarkdown::render(
           input = report_path,
           output_file = out_file,
-          params = list(result_list = result_list),
+          params = list(report_context = report_context),
           quiet = TRUE,
           envir = new.env(parent = globalenv())
         ),
@@ -255,7 +255,7 @@ test_that("Scoren report renders with deduped by_column_values (no error text)",
   testthat::skip_if_not_installed("stringr")
   testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
 
-  result_list <- list(
+  report_context <- list(
     df = data.frame(
       text = c("Text 1", "Text 2"),
       result = c(10, 20),
@@ -293,7 +293,7 @@ test_that("Scoren report renders with deduped by_column_values (no error text)",
         rmarkdown::render(
           input = report_path,
           output_file = out_file,
-          params = list(result_list = result_list),
+          params = list(report_context = report_context),
           quiet = TRUE,
           envir = new.env(parent = globalenv())
         ),
@@ -342,7 +342,7 @@ test_that("Categorisatie report renders correctly with split-chunk by_column_loo
   # Scenario: original upload had 2 texts ("Text 1" in G1, "Text 2" in G2).
   # After splitting, "Text 1" became two chunks. The chunk-aware lookup maps
   # each chunk back to its source text's group.
-  result_list <- list(
+  report_context <- list(
     df = data.frame(
       text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
       result = c("A", "B", "A"),
@@ -382,7 +382,7 @@ test_that("Categorisatie report renders correctly with split-chunk by_column_loo
         rmarkdown::render(
           input = report_path,
           output_file = out_file,
-          params = list(result_list = result_list),
+          params = list(report_context = report_context),
           quiet = TRUE,
           envir = new.env(parent = globalenv())
         ),

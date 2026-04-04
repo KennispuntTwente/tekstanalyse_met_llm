@@ -121,10 +121,21 @@ text_management_server <- function(
     # -- 2  State ----------------------------------------------------
     anonymization_mode <- reactiveVal(initial_mode)
 
-    texts <- reactiveValues(raw = NULL, preprocessed = NULL, df = NULL)
+    texts <- reactiveValues(
+      raw = NULL,
+      preprocessed = NULL,
+      df = NULL,
+      anonymization_mode = NULL,
+      anonymization_requested_mode = NULL,
+      anonymization_applied_mode = NULL,
+      anonymization_completed = NULL
+    )
 
     shiny::exportTestValues(
       anonymization_mode = anonymization_mode(),
+      anonymization_requested_mode = texts$anonymization_requested_mode,
+      anonymization_applied_mode = texts$anonymization_applied_mode,
+      anonymization_completed = texts$anonymization_completed,
       texts__raw = texts$raw,
       texts__preprocessed = texts$preprocessed,
       texts__df = texts$df
@@ -324,9 +335,18 @@ text_management_server <- function(
     # Track previous state to avoid duplicate logs
     prev_text_state <- reactiveVal(list(raw = 0, unique = 0, mode = ""))
 
+    export_anonymization_mode <- function(value) {
+      if (identical(value, "simple")) {
+        return("regex")
+      }
+      value
+    }
+
     observe({
       req(raw_texts())
       mode <- anonymization_mode()
+      requested_mode <- export_anonymization_mode(mode)
+      anonymization_completed <- TRUE
 
       out <- switch(
         mode,
@@ -336,9 +356,16 @@ text_management_server <- function(
           if (isTRUE(gliner$done)) {
             unname(gliner$anonymized_texts)
           } else {
+            anonymization_completed <- FALSE
             raw_texts()
           }
         }
+      )
+      applied_mode <- switch(
+        mode,
+        simple = "regex",
+        gliner = if (isTRUE(gliner$done)) "gliner" else "none",
+        "none"
       )
 
       texts$raw <- raw_texts()
@@ -348,6 +375,10 @@ text_management_server <- function(
         preprocessed = out,
         stringsAsFactors = FALSE
       )
+      texts$anonymization_mode <- mode
+      texts$anonymization_requested_mode <- requested_mode
+      texts$anonymization_applied_mode <- applied_mode
+      texts$anonymization_completed <- anonymization_completed
 
       # Only log when there's an actual change in counts
       new_state <- list(

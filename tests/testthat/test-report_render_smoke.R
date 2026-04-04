@@ -126,7 +126,7 @@ test_that("report templates render (smoke)", {
         rmarkdown::render(
           input = report_path,
           output_file = out_file,
-          params = list(result_list = make_result_list(report_path)),
+          params = list(report_context = make_result_list(report_path)),
           quiet = TRUE,
           envir = new.env(parent = globalenv())
         ),
@@ -171,7 +171,7 @@ test_that("Categorisatie report renders with by_column_* set", {
     value = 0.4
   )
 
-  result_list <- list(
+  report_context <- list(
     df = data.frame(
       text = c("Text 1", "Text 2", "Text 3"),
       result = c("A", "B", "A"),
@@ -211,7 +211,7 @@ test_that("Categorisatie report renders with by_column_* set", {
         rmarkdown::render(
           input = report_path,
           output_file = out_file,
-          params = list(result_list = result_list),
+          params = list(report_context = report_context),
           quiet = TRUE,
           envir = new.env(parent = globalenv())
         ),

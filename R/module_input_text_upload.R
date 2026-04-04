@@ -1005,13 +1005,39 @@ text_upload_server <- function(
     # ---- Reset fileInput on new session ------------------------------------
     shinyjs::reset("text_file")
 
+    upload_info <- reactive({
+      spec <- filter_spec()
+      filter_df <- if (is.null(spec)) {
+        NULL
+      } else {
+        data.frame(
+          column = rep(
+            spec$col %||% NA_character_,
+            length(spec$vals %||% character())
+          ),
+          value = as.character(spec$vals %||% character()),
+          stringsAsFactors = FALSE
+        )
+      }
+
+      list(
+        file_type = file_type(),
+        selected_sheet = current_sheet(),
+        text_column = current_column(),
+        grouping_column = current_by_column(),
+        filter_spec = filter_df,
+        txt_split_lines = txt_split_lines_choice()
+      )
+    })
+
     # ---- Return raw texts and by_column info -------------------------------
     # Return a list with raw_texts and by_column information
     return(list(
       texts = raw_texts,
       by_column_name = by_column,
       by_column_values = by_column_values,
-      by_column_lookup = by_column_lookup
+      by_column_lookup = by_column_lookup,
+      upload_info = upload_info
     ))
   })
 }

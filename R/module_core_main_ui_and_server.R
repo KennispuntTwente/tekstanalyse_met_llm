@@ -572,6 +572,7 @@ main_server <- function(
     raw_texts <- text_upload_result$texts
     by_column_name <- text_upload_result$by_column_name
     by_column_lookup <- text_upload_result$by_column_lookup
+    upload_info <- text_upload_result$upload_info
 
     # Split texts
     split_result <- text_split_server(
@@ -583,6 +584,7 @@ main_server <- function(
     split_texts <- split_result$texts
     split_source_texts <- split_result$source_texts
     split_in_progress <- split_result$split_in_progress
+    split_settings <- split_result$split_settings
 
     # When splitting is active, remap the by_column_lookup so that each
     # chunk is associated with the groups of its original (source) text.
@@ -761,6 +763,9 @@ main_server <- function(
       context_window = context_window,
       by_column_name = by_column_name,
       by_column_lookup = split_by_column_lookup,
+      split_source_texts = split_source_texts,
+      split_settings = split_settings,
+      upload_info = upload_info,
       split_in_progress = split_in_progress,
       lang = lang
     )

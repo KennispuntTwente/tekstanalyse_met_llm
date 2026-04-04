@@ -71,6 +71,10 @@ send_prompt_with_retries <- function(
   .trace_enabled <- resolve_helper(".kwallm__prompt_trace_enabled_to_file")
   .trace_append <- resolve_helper(".kwallm__prompt_trace_append")
   .trace_session_id <- resolve_helper(".kwallm__prompt_trace_session_id")
+  .exec_current_stage <- resolve_helper(
+    ".kwallm__prompt_execution_current_stage"
+  )
+  .exec_record <- resolve_helper(".kwallm__prompt_execution_record")
 
   # Bundle trace context for passing to log functions
   .trace_ctx <- list(
@@ -81,6 +85,50 @@ send_prompt_with_retries <- function(
 
   prompt_id <- .trace_new_id()
   prompt_text <- NULL
+  error_messages <- character()
+
+  record_execution <- function(completion_status, final_error_message = NULL) {
+    duration_ms <- as.numeric(difftime(
+      Sys.time(),
+      call_start_time,
+      units = "secs"
+    )) *
+      1000
+
+    .exec_record(data.frame(
+      prompt_id = prompt_id,
+      stage_id = .exec_current_stage(),
+      model_id = as.character(model_name),
+      started_at = format(
+        call_start_time,
+        "%Y-%m-%dT%H:%M:%OS3Z",
+        tz = "UTC"
+      ),
+      completed_at = format(
+        Sys.time(),
+        "%Y-%m-%dT%H:%M:%OS3Z",
+        tz = "UTC"
+      ),
+      duration_ms = duration_ms,
+      attempt_count = as.integer(tries),
+      retry_count = as.integer(max(tries - 1, 0)),
+      max_tries = as.integer(max_tries),
+      retry_delay_seconds = as.numeric(retry_delay_seconds),
+      max_interactions = as.integer(max_interactions),
+      completion_status = as.character(completion_status),
+      error_messages = if (length(error_messages)) {
+        paste(unique(error_messages), collapse = " || ")
+      } else {
+        NA_character_
+      },
+      final_error_message = if (is.null(final_error_message)) {
+        NA_character_
+      } else {
+        as.character(final_error_message)
+      },
+      stringsAsFactors = FALSE
+    ))
+  }
 
   # Log LLM call start
   tryCatch(
@@ -146,6 +194,7 @@ send_prompt_with_retries <- function(
         result
       },
       error = function(e) {
+        error_messages <<- c(error_messages, conditionMessage(e))
         .trace_log_error(
           prompt_id = prompt_id,
           model_name = model_name,
@@ -171,6 +220,10 @@ send_prompt_with_retries <- function(
         )
 
         if (tries == max_tries) {
+          record_execution(
+            completion_status = "error",
+            final_error_message = conditionMessage(e)
+          )
           stop(sprintf(
             "Error in LLM call after %d attempts: %s\nFinal error:\n%s",
             max_tries,
@@ -189,6 +242,14 @@ send_prompt_with_retries <- function(
   }
 
   if (is.null(result)) {
+    record_execution(
+      completion_status = "error",
+      final_error_message = paste0(
+        "Failed to get a response from the LLM after ",
+        max_tries,
+        " attempts."
+      )
+    )
     # Log final failure
     tryCatch(
       log_error(
@@ -210,6 +271,10 @@ send_prompt_with_retries <- function(
   }
 
   if (is.null(result$response)) {
+    record_execution(
+      completion_status = "invalid_response",
+      final_error_message = "Reached the LLM, but failed to get a valid reply"
+    )
     # Log invalid response
     tryCatch(
       log_error(
@@ -232,6 +297,10 @@ send_prompt_with_retries <- function(
       }
     ))
   }
+
+  # Record execution provenance before logging so duration_ms and completed_at
+  # reflect the actual LLM call time rather than including logging overhead.
+  record_execution(completion_status = "success")
 
   # Log successful LLM call
   duration_ms <- as.numeric(difftime(
@@ -265,6 +334,60 @@ send_prompt_with_retries <- function(
   )
 
   return(result$response)
+}
+
+
+# Helpers (execution provenance) ---------------------------------------------
+
+.kwallm__prompt_execution_current_stage <- function() {
+  stage_id <- getOption("kwallm__prompt_execution_stage", "unknown")
+  stage_id <- as.character(stage_id %||% "unknown")
+  if (!length(stage_id) || is.na(stage_id[[1]]) || !nzchar(stage_id[[1]])) {
+    return("unknown")
+  }
+
+  stage_id[[1]]
+}
+
+.kwallm__prompt_execution_reset <- function() {
+  options(kwallm__prompt_execution_records = list())
+  invisible(NULL)
+}
+
+.kwallm__prompt_execution_record <- function(record) {
+  if (!is.data.frame(record) || !nrow(record)) {
+    return(invisible(NULL))
+  }
+
+  records <- getOption("kwallm__prompt_execution_records", list())
+  options(kwallm__prompt_execution_records = c(records, list(record)))
+  invisible(NULL)
+}
+
+.kwallm__prompt_execution_get <- function() {
+  records <- getOption("kwallm__prompt_execution_records", list())
+
+  if (!length(records)) {
+    return(data.frame(
+      prompt_id = character(),
+      stage_id = character(),
+      model_id = character(),
+      started_at = character(),
+      completed_at = character(),
+      duration_ms = numeric(),
+      attempt_count = integer(),
+      retry_count = integer(),
+      max_tries = integer(),
+      retry_delay_seconds = numeric(),
+      max_interactions = integer(),
+      completion_status = character(),
+      error_messages = character(),
+      final_error_message = character(),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  unique(do.call(rbind, records))
 }
 
 
@@ -605,6 +728,10 @@ send_prompt_with_retries_async_globals <- function() {
     .kwallm__prompt_trace_extract_prompt_text = .kwallm__prompt_trace_extract_prompt_text,
     .kwallm__prompt_trace_log_send = .kwallm__prompt_trace_log_send,
     .kwallm__prompt_trace_log_reply = .kwallm__prompt_trace_log_reply,
-    .kwallm__prompt_trace_log_error = .kwallm__prompt_trace_log_error
+    .kwallm__prompt_trace_log_error = .kwallm__prompt_trace_log_error,
+    .kwallm__prompt_execution_current_stage = .kwallm__prompt_execution_current_stage,
+    .kwallm__prompt_execution_reset = .kwallm__prompt_execution_reset,
+    .kwallm__prompt_execution_record = .kwallm__prompt_execution_record,
+    .kwallm__prompt_execution_get = .kwallm__prompt_execution_get
   )
 }

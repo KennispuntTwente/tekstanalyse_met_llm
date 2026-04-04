@@ -32,6 +32,10 @@ mark_texts <- function(
     is.vector(codes),
     length(codes) > 0
   )
+
+  stage_options <- options(kwallm__prompt_execution_stage = "marking")
+  on.exit(options(stage_options), add = TRUE)
+
   total_steps <- 3
   if (write_paragraphs) {
     total_steps <- total_steps + 1
@@ -180,7 +184,7 @@ mark_texts <- function(
   df_result <- df |>
     tidyr::crossing(code = codes) |>
     dplyr::mutate(
-      marked_text = purrr::map2(sub_text, code, function(txt, cd) {
+      marking_match = purrr::map2(sub_text, code, function(txt, cd) {
         current_count <<- current_count + 1
         if (current_count == 1 || current_count %% 10 == 0) {
           log_info(
@@ -219,15 +223,10 @@ mark_texts <- function(
           max_interactions = max_interactions
         )
 
-        # Ensure result is always a character vector for unnesting
-        if (length(result) == 0 || is.null(result)) {
-          return(NA_character_)
-        }
-
-        return(result)
+        .kwallm_normalize_marking_matches(txt, result)
       })
     ) |>
-    tidyr::unnest(marked_text) # This creates one row per marked section
+    tidyr::unnest(marking_match) # This creates one row per marked section
   try(
     {
       progress_hide(progress_secondary)
@@ -463,10 +462,10 @@ mark_text_prompt <- function(
 
         # Empty handling
         if (length(text_parts) == 0) {
-          return(character(0))
+          return(.kwallm_empty_marking_matches())
         }
         if (length(text_parts) == 1 && identical(text_parts[1], "")) {
-          return(character(0))
+          return(.kwallm_empty_marking_matches())
         }
 
         # Find matches
@@ -482,8 +481,11 @@ mark_text_prompt <- function(
         if (length(missing_idx)) {
           # If we've hit max interactions, drop unmatched parts and return what *did* match
           if (interaction_count >= max_interactions) {
-            matched <- unname(res$match[!is.na(res$match)])
-            return(matched)
+            matched <- res[!is.na(res$match), , drop = FALSE]
+            return(.kwallm_marking_matches_from_find_matches(
+              matched,
+              response_status = "partial_after_max_interactions"
+            ))
           }
 
           # Otherwise, ask the model to correct by quoting literally
@@ -494,12 +496,107 @@ mark_text_prompt <- function(
           )))
         }
 
-        # Return the *literal* substrings from the original text
-        unname(res$match)
+        .kwallm_marking_matches_from_find_matches(res)
       }
     )
 
   return(prompt)
+}
+
+# Helper: create an empty marking-match table.
+.kwallm_empty_marking_matches <- function() {
+  tibble::tibble(
+    source_marked_text = character(),
+    marked_text = character(),
+    match_start = integer(),
+    match_end = integer(),
+    match_distance = integer(),
+    match_method = character(),
+    response_status = character()
+  )
+}
+
+# Helper: convert raw fuzzy-match output into the stored marking schema.
+.kwallm_marking_matches_from_find_matches <- function(
+  matches,
+  response_status = "matched_all"
+) {
+  if (!nrow(matches)) {
+    return(.kwallm_empty_marking_matches())
+  }
+
+  tibble::tibble(
+    source_marked_text = as.character(matches$needle),
+    marked_text = as.character(matches$match),
+    match_start = as.integer(matches$start),
+    match_end = as.integer(matches$end),
+    match_distance = as.integer(matches$distance),
+    match_method = ifelse(
+      is.na(matches$distance),
+      NA_character_,
+      ifelse(matches$distance == 0, "exact", "fuzzy")
+    ),
+    response_status = rep(response_status, nrow(matches))
+  )
+}
+
+# Helper: normalize different send_prompt_with_retries return shapes.
+.kwallm_normalize_marking_matches <- function(text, result) {
+  required_cols <- c(
+    "source_marked_text",
+    "marked_text",
+    "match_start",
+    "match_end",
+    "match_distance",
+    "match_method",
+    "response_status"
+  )
+
+  if (is.null(result)) {
+    return(.kwallm_empty_marking_matches())
+  }
+
+  if (is.data.frame(result)) {
+    if (!nrow(result)) {
+      return(.kwallm_empty_marking_matches())
+    }
+
+    if (all(required_cols %in% names(result))) {
+      return(tibble::as_tibble(result[required_cols]))
+    }
+
+    if (
+      all(c("needle", "match", "distance", "start", "end") %in% names(result))
+    ) {
+      response_status <- if ("response_status" %in% names(result)) {
+        as.character(result$response_status[[1]])
+      } else {
+        "matched_all"
+      }
+      return(.kwallm_marking_matches_from_find_matches(
+        result,
+        response_status = response_status
+      ))
+    }
+  }
+
+  if (is.character(result)) {
+    if (!length(result)) {
+      return(.kwallm_empty_marking_matches())
+    }
+
+    matches <- find_matches(
+      haystack = text,
+      needles = result,
+      rel = 0.12,
+      abs = 2,
+      step_div = 5L
+    )
+    matches <- matches[!is.na(matches$match), , drop = FALSE]
+    return(.kwallm_marking_matches_from_find_matches(matches))
+  }
+
+  stop("Unexpected marking match result type")
 }
 
 #' Fuzzy literal matching of candidate snippets against a haystack

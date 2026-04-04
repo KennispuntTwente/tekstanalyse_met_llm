@@ -3,15 +3,14 @@
 # Used in categorization and topic modelling modes, to write
 #   a paragraph about each category/topic
 
-write_paragraph <- function(
+# Helper: build the paragraph-writing prompt without sending it.
+prompt_write_paragraph <- function(
   texts,
   topic,
   research_background = "",
   style_prompt = "",
-  llm_provider,
   language = c("nl", "en"),
-  focus_on_highlighted_text = FALSE,
-  stream_callback = NULL
+  focus_on_highlighted_text = FALSE
 ) {
   language <- match.arg(language)
   stopifnot(
@@ -71,7 +70,7 @@ write_paragraph <- function(
     )
   }
 
-  prompt <- tidyprompt::tidyprompt(prompt) |>
+  tidyprompt::tidyprompt(prompt) |>
     tidyprompt::prompt_wrap(
       extraction_fn = function(paragraph) {
         # Ensure length of 1
@@ -102,6 +101,43 @@ write_paragraph <- function(
         return(paragraph)
       }
     )
+}
+
+write_paragraph <- function(
+  texts,
+  topic,
+  research_background = "",
+  style_prompt = "",
+  llm_provider,
+  language = c("nl", "en"),
+  focus_on_highlighted_text = FALSE,
+  stream_callback = NULL
+) {
+  language <- match.arg(language)
+  stopifnot(
+    is.character(texts),
+    length(texts) > 0,
+    is.character(topic),
+    length(topic) == 1,
+    is.character(research_background),
+    length(research_background) == 1,
+    (is.character(style_prompt) & length(style_prompt) == 1) |
+      is.null(style_prompt)
+  )
+
+  stage_options <- options(
+    kwallm__prompt_execution_stage = "paragraph_generation"
+  )
+  on.exit(options(stage_options), add = TRUE)
+
+  prompt <- prompt_write_paragraph(
+    texts = texts,
+    topic = topic,
+    research_background = research_background,
+    style_prompt = style_prompt,
+    language = language,
+    focus_on_highlighted_text = focus_on_highlighted_text
+  )
 
   paragraph <- tryCatch(
     {

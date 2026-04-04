@@ -90,6 +90,9 @@ score_texts <- function(
     length(research_background) == 1
   )
 
+  stage_options <- options(kwallm__prompt_execution_stage = "scoring")
+  on.exit(options(stage_options), add = TRUE)
+
   llm_provider <- llm_provider$clone()
   llm_provider$verbose <- verbose
   n <- length(texts)

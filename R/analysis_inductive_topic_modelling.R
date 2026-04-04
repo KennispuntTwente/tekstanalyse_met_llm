@@ -43,6 +43,11 @@ create_candidate_topics <- function(
     length(research_background) == 1
   )
 
+  stage_options <- options(
+    kwallm__prompt_execution_stage = "topic_candidate_generation"
+  )
+  on.exit(options(stage_options), add = TRUE)
+
   candidate_topics <- vector("list", length(text_chunks))
 
   for (i in seq_along(text_chunks)) {
@@ -158,6 +163,146 @@ prompt_candidate_topics <- function(
 
 ## 1.2 Topic reduction ------------------------------------------------------
 
+prompt_reduce_topics <- function(
+  candidate_topics,
+  research_background = "",
+  desired_number = NULL,
+  desired_number_type = c("max", "goal"),
+  language = c("nl", "en")
+) {
+  language <- match.arg(language)
+  desired_number_type <- match.arg(desired_number_type)
+
+  base <- "Your task will be to distill a list of core topics from the following topics: "
+  if (nzchar(research_background)) {
+    base <- paste0(
+      "We have distilled topics from texts obtained during a research.\n\n",
+      "Background information about the research:\n",
+      research_background,
+      "\n\n",
+      base
+    )
+  }
+
+  candidate_topics_formatted <- purrr::map_chr(
+    seq_along(candidate_topics),
+    ~ paste0(.x - 1, ": ", candidate_topics[[.x]])
+  )
+
+  prompt <- base |>
+    tidyprompt::add_text(paste(
+      candidate_topics_formatted,
+      collapse = "\n"
+    )) |>
+    tidyprompt::add_text("Merge duplicate topics.", sep = "\n\n") |>
+    tidyprompt::add_text(
+      "Also merge topics that are too specific.",
+      sep = "\n"
+    ) |>
+    tidyprompt::add_text(
+      "Do not merge topics which are about the same but have a different sentiment.",
+      sep = "\n"
+    )
+
+  if (!is.null(desired_number)) {
+    if (desired_number_type == "max") {
+      prompt <- tidyprompt::add_text(
+        prompt,
+        paste0(
+          "Please reduce the number of topics to a maximum of ",
+          desired_number,
+          "."
+        ),
+        sep = "\n"
+      )
+    } else {
+      prompt <- tidyprompt::add_text(
+        prompt,
+        paste0(
+          "Please reduce the number of topics to about ",
+          desired_number,
+          "."
+        ),
+        sep = "\n"
+      )
+    }
+  } else {
+    prompt <- tidyprompt::add_text(
+      prompt,
+      "Please reduce the number of topics to a reasonable number.",
+      sep = "\n"
+    )
+  }
+
+  if (language == "nl") {
+    prompt <- tidyprompt::add_text(
+      prompt,
+      "Please list the topics in Dutch.",
+      sep = "\n"
+    )
+  }
+
+  tidyprompt::answer_as_json(
+    prompt,
+    schema = list(
+      type = "object",
+      properties = list(
+        topics = list(type = "array", items = list(type = "string"))
+      ),
+      required = list("topics"),
+      additionalProperties = FALSE
+    ),
+    type = "auto"
+  ) |>
+    tidyprompt::prompt_wrap(
+      extraction_fn = function(result) {
+        if (!is.character(result$topics)) {
+          result$topics <- as.character(result$topics)
+        }
+        result$topics <- unique(trimws(result$topics[!is.na(result$topics)]))
+        if (length(result$topics) < 2) {
+          return(tidyprompt::llm_feedback(
+            "Provide an array of at least two valid topics."
+          ))
+        }
+        result
+      }
+    )
+}
+
+prompt_topic_not_applicable_check <- function(
+  topics,
+  language = c("nl", "en")
+) {
+  language <- match.arg(language)
+  not_applicable_topic <- ifelse(
+    language == "nl",
+    "Onbekend/niet van toepassing",
+    "Unknown/not applicable"
+  )
+
+  paste0(
+    "Is a topic like '",
+    not_applicable_topic,
+    "' present in the following topics?\n\n",
+    "<topics>\n",
+    paste(topics, collapse = "\n"),
+    "\n</topics>"
+  ) |>
+    tidyprompt::answer_as_boolean(
+      true_definition = paste0(
+        "Yes, a topic like '",
+        not_applicable_topic,
+        "' is present"
+      ),
+      false_definition = paste0(
+        "No, a topic like '",
+        not_applicable_topic,
+        "' is not present"
+      )
+    )
+}
+
 #' Reduce the number of topics
 #'
 #' This helper repeatedly sends smaller, context‑window‑friendly prompts to the
@@ -235,117 +380,38 @@ reduce_topics <- function(
     max_groups >= 1
   )
 
-  ### helper: create a reduce prompt with tidyprompt ------------------------
-  create_prompt <- function(
-    topics_vec
-  ) {
-    base <- "Your task will be to distill a list of core topics from the following topics: "
-    if (nzchar(research_background)) {
-      base <- paste0(
-        "We have distilled topics from texts obtained during a research.\n\n",
-        "Background information about the research:\n",
-        research_background,
-        "\n\n",
-        base
-      )
-    }
-
-    candidate_topics_formatted <- purrr::map_chr(
-      seq_along(topics_vec),
-      ~ paste0(.x - 1, ": ", topics_vec[[.x]])
-    )
-
-    prompt <- base |>
-      tidyprompt::add_text(paste(
-        candidate_topics_formatted,
-        collapse = "\n"
-      )) |>
-      tidyprompt::add_text("Merge duplicate topics.", sep = "\n\n") |>
-      tidyprompt::add_text(
-        "Also merge topics that are too specific.",
-        sep = "\n"
-      ) |>
-      tidyprompt::add_text(
-        "Do not merge topics which are about the same but have a different sentiment.",
-        sep = "\n"
-      )
-
-    if (!is.null(desired_number)) {
-      if (desired_number_type == "max") {
-        prompt <- tidyprompt::add_text(
-          prompt,
-          paste0(
-            "Please reduce the number of topics to a maximum of ",
-            desired_number,
-            "."
-          ),
-          sep = "\n"
-        )
-      } else {
-        prompt <- tidyprompt::add_text(
-          prompt,
-          paste0(
-            "Please reduce the number of topics to about ",
-            desired_number,
-            "."
-          ),
-          sep = "\n"
-        )
-      }
-    } else {
-      prompt <- tidyprompt::add_text(
-        prompt,
-        "Please reduce the number of topics to a reasonable number.",
-        sep = "\n"
-      )
-    }
-
-    if (language == "nl") {
-      prompt <- tidyprompt::add_text(
-        prompt,
-        "Please list the topics in Dutch.",
-        sep = "\n"
-      )
-    }
-
-    prompt <- tidyprompt::answer_as_json(
-      prompt,
-      schema = list(
-        type = "object",
-        properties = list(
-          topics = list(type = "array", items = list(type = "string"))
-        ),
-        required = list("topics"),
-        additionalProperties = FALSE
-      ),
-      type = "auto"
-    ) |>
-      tidyprompt::prompt_wrap(
-        extraction_fn = function(result) {
-          if (!is.character(result$topics)) {
-            result$topics <- as.character(result$topics)
-          }
-          result$topics <- unique(trimws(result$topics[!is.na(result$topics)]))
-          if (length(result$topics) < 2) {
-            return(tidyprompt::llm_feedback(
-              "Provide an array of at least two valid topics."
-            ))
-          }
-          result
-        }
-      )
-
-    return(prompt)
+  with_execution_stage <- function(stage_id, expr) {
+    stage_options <- options(kwallm__prompt_execution_stage = stage_id)
+    on.exit(options(stage_options), add = TRUE)
+    force(expr)
   }
 
-  base_token_cost <- create_prompt(c("")) |>
+  stage_options <- options(kwallm__prompt_execution_stage = "topic_reduction")
+  on.exit(options(stage_options), add = TRUE)
+
+  base_token_cost <- prompt_reduce_topics(
+    candidate_topics = c(""),
+    research_background = research_background,
+    desired_number = desired_number,
+    desired_number_type = desired_number_type,
+    language = language
+  ) |>
     tidyprompt::construct_prompt_text() |>
     count_tokens()
 
   ### helper: run a single reduce prompt ------------------------------------
   reduce_once <- function(topics_vec) {
-    prompt <- create_prompt(topics_vec)
-    result <- send_prompt_with_retries(prompt, llm_provider)
+    prompt <- prompt_reduce_topics(
+      candidate_topics = topics_vec,
+      research_background = research_background,
+      desired_number = desired_number,
+      desired_number_type = desired_number_type,
+      language = language
+    )
+    result <- with_execution_stage(
+      "topic_reduction",
+      send_prompt_with_retries(prompt, llm_provider)
+    )
 
     stopifnot(
       is.list(result),
@@ -451,6 +517,9 @@ reduce_topics <- function(
   # Set to sentence case
   current_topics <- stringr::str_to_sentence(current_topics)
 
+  auto_added_not_applicable <- FALSE
+  not_applicable_check_performed <- FALSE
+
   if (always_add_not_applicable) {
     not_applicable_topic <- ifelse(
       language == "nl",
@@ -459,35 +528,21 @@ reduce_topics <- function(
     )
 
     # Check if we have literal match already in one of the topics
-    if (not_applicable_topic %in% current_topics) {
-      return(current_topics) # return early
-    }
+    if (!(not_applicable_topic %in% current_topics)) {
+      not_applicable_check_performed <- TRUE
+      is_present <- with_execution_stage(
+        "topic_not_applicable_check",
+        prompt_topic_not_applicable_check(
+          topics = current_topics,
+          language = language
+        ) |>
+          send_prompt_with_retries(llm_provider)
+      )
 
-    # Check if the not-applicable topic is already present via a prompt to LLM
-    is_present <- paste0(
-      "Is a topic like '",
-      not_applicable_topic,
-      "' present in the following topics?\n\n",
-      "<topics>\n",
-      paste(current_topics, collapse = "\n"),
-      "\n</topics>"
-    ) |>
-      tidyprompt::answer_as_boolean(
-        true_definition = paste0(
-          "Yes, a topic like '",
-          not_applicable_topic,
-          "' is present"
-        ),
-        false_definition = paste0(
-          "No, a topic like '",
-          not_applicable_topic,
-          "' is not present"
-        )
-      ) |>
-      send_prompt_with_retries(llm_provider)
-
-    if (!is_present) {
-      current_topics <- c(current_topics, not_applicable_topic)
+      if (!is_present) {
+        current_topics <- c(current_topics, not_applicable_topic)
+        auto_added_not_applicable <- TRUE
+      }
     }
   }
 
@@ -503,6 +558,13 @@ reduce_topics <- function(
       component = "topics"
     ),
     error = function(e) NULL
+  )
+
+  attr(current_topics, "reduction_summary") <- list(
+    not_applicable_requested = isTRUE(always_add_not_applicable),
+    auto_added_not_applicable = auto_added_not_applicable,
+    not_applicable_check_performed = not_applicable_check_performed,
+    reduction_iterations = as.integer(iteration)
   )
 
   return(current_topics)
@@ -543,6 +605,9 @@ assign_topics <- function(
     length(research_background) == 1,
     all(exclusive_topics %in% topics)
   )
+
+  stage_options <- options(kwallm__prompt_execution_stage = "topic_assignment")
+  on.exit(options(stage_options), add = TRUE)
 
   llm_provider <- llm_provider$clone()
   llm_provider$verbose <- verbose
