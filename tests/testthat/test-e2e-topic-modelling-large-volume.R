@@ -112,7 +112,7 @@ test_that("{shinytest2} large-volume topic modelling launches app and uses async
 
   expect_true(isTRUE(app$get_value(export = "processing-success")))
 
-  results <- app$get_value(export = "processing-final_results_df")
+  results <- app$get_value(export = "processing-results_table")
   expect_identical(nrow(results), 3000L)
   expect_identical(sort(results$text), sort(texts))
   expect_true(ncol(results) >= 3)

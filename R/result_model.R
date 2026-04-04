@@ -613,100 +613,6 @@ TextLineage <- S7::new_class(
   }
 )
 
-# Stores the model used for each analysis stage.
-StageModelTable <- S7::new_class(
-  "StageModelTable",
-  properties = list(
-    rows = S7::new_property(
-      S7::class_data.frame,
-      default = quote(.kwallm_empty_stage_models()),
-      validator = .kwallm_validate_df_columns(c(
-        "stage_id",
-        "provider_kind",
-        "api_url",
-        "model_id"
-      ))
-    )
-  ),
-  validator = function(self) {
-    problems <- character()
-    if (anyDuplicated(self@rows$stage_id)) {
-      problems <- c(problems, "rows$stage_id must be unique")
-    }
-    .kwallm_problems_or_null(problems)
-  }
-)
-
-# Stores the prompt preview used for each analysis stage.
-StagePromptTable <- S7::new_class(
-  "StagePromptTable",
-  properties = list(
-    rows = S7::new_property(
-      S7::class_data.frame,
-      default = quote(.kwallm_empty_stage_prompts()),
-      validator = .kwallm_validate_df_columns(c("stage_id", "prompt_preview"))
-    )
-  ),
-  validator = function(self) {
-    problems <- character()
-    if (anyDuplicated(self@rows$stage_id)) {
-      problems <- c(problems, "rows$stage_id must be unique")
-    }
-    .kwallm_problems_or_null(problems)
-  }
-)
-
-# Stores one execution record per LLM call made during a run.
-StageExecutionTable <- S7::new_class(
-  "StageExecutionTable",
-  properties = list(
-    rows = S7::new_property(
-      S7::class_data.frame,
-      default = quote(.kwallm_empty_stage_executions()),
-      validator = .kwallm_validate_df_columns(c(
-        "prompt_id",
-        "stage_id",
-        "model_id",
-        "started_at",
-        "completed_at",
-        "duration_ms",
-        "attempt_count",
-        "retry_count",
-        "max_tries",
-        "retry_delay_seconds",
-        "max_interactions",
-        "completion_status",
-        "error_messages",
-        "final_error_message"
-      ))
-    )
-  ),
-  validator = function(self) {
-    problems <- character()
-    if (anyDuplicated(self@rows$prompt_id)) {
-      problems <- c(problems, "rows$prompt_id must be unique")
-    }
-    .kwallm_problems_or_null(problems)
-  }
-)
-
-# Stores non-fatal issues found while building the final result object.
-IssueTable <- S7::new_class(
-  "IssueTable",
-  properties = list(
-    issues = S7::new_property(
-      S7::class_data.frame,
-      default = quote(.kwallm_empty_issues()),
-      validator = .kwallm_validate_df_columns(c(
-        "stage_id",
-        "level",
-        "issue_code",
-        "message"
-      ))
-    )
-  )
-)
-
 # Stores generated paragraphs and the document rows that support them.
 ParagraphSet <- S7::new_class(
   "ParagraphSet",
@@ -1203,16 +1109,39 @@ AnalysisResult <- S7::new_class(
     ),
     text_lineage = S7::new_property(TextLineage),
     stage_models = S7::new_property(
-      StageModelTable,
-      default = quote(StageModelTable())
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_stage_models()),
+      validator = .kwallm_validate_df_columns(c(
+        "stage_id",
+        "provider_kind",
+        "api_url",
+        "model_id"
+      ))
     ),
     stage_prompts = S7::new_property(
-      StagePromptTable,
-      default = quote(StagePromptTable())
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_stage_prompts()),
+      validator = .kwallm_validate_df_columns(c("stage_id", "prompt_preview"))
     ),
     stage_executions = S7::new_property(
-      StageExecutionTable,
-      default = quote(StageExecutionTable())
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_stage_executions()),
+      validator = .kwallm_validate_df_columns(c(
+        "prompt_id",
+        "stage_id",
+        "model_id",
+        "started_at",
+        "completed_at",
+        "duration_ms",
+        "attempt_count",
+        "retry_count",
+        "max_tries",
+        "retry_delay_seconds",
+        "max_interactions",
+        "completion_status",
+        "error_messages",
+        "final_error_message"
+      ))
     ),
     results = S7::new_property(ResultPayload),
     paragraphs = S7::new_property(
@@ -1224,8 +1153,14 @@ AnalysisResult <- S7::new_class(
       default = NULL
     ),
     issues = S7::new_property(
-      IssueTable,
-      default = quote(IssueTable())
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_issues()),
+      validator = .kwallm_validate_df_columns(c(
+        "stage_id",
+        "level",
+        "issue_code",
+        "message"
+      ))
     ),
     mode_config = S7::new_property(ModeConfig)
   ),
@@ -1260,11 +1195,21 @@ AnalysisResult <- S7::new_class(
       )
     }
 
+    if (anyDuplicated(self@stage_models$stage_id)) {
+      problems <- c(problems, "stage_models$stage_id must be unique")
+    }
+    if (anyDuplicated(self@stage_prompts$stage_id)) {
+      problems <- c(problems, "stage_prompts$stage_id must be unique")
+    }
+    if (anyDuplicated(self@stage_executions$prompt_id)) {
+      problems <- c(problems, "stage_executions$prompt_id must be unique")
+    }
+
     if (
-      nrow(self@stage_executions@rows) > 0 &&
+      nrow(self@stage_executions) > 0 &&
         !all(
-          self@stage_executions@rows$stage_id %in%
-            self@stage_models@rows$stage_id
+          self@stage_executions$stage_id %in%
+            self@stage_models$stage_id
         )
     ) {
       problems <- c(

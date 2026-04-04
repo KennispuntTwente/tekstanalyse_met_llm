@@ -31,15 +31,15 @@ test_that("build_analysis_result preserves split lineage and group fan-out", {
     stringsAsFactors = FALSE
   )
 
-  final_results_df <- data.frame(
+  results_table <- data.frame(
     text = c("Chunk A", "Chunk B"),
     result = c("Theme 1", "Theme 2"),
     stringsAsFactors = FALSE
   )
 
-  analysis_result <- build_processing_result_list(
+  analysis_result <- build_analysis_result(
     texts_df = texts_df,
-    final_results_df = final_results_df,
+    results_table = results_table,
     uuid = "run-1",
     mode = "Categorisatie",
     research_background = "background",
@@ -58,7 +58,7 @@ test_that("build_analysis_result preserves split lineage and group fan-out", {
     assign_multiple_categories = FALSE,
     human_in_the_loop = TRUE,
     write_paragraphs = FALSE,
-    stage_prompt_texts = list(categorization = "prompt"),
+    stage_prompt_previews = list(categorization = "prompt"),
     source_texts = c("Original text", "Original text"),
     input_info = list(file_type = "csv", text_column = "text")
   )
@@ -73,9 +73,9 @@ test_that("build_analysis_result preserves split lineage and group fan-out", {
   expect_equal(report_context$df$result, c("Theme 1", "Theme 2"))
 
   # stage_models captures api_url
-  expect_true("api_url" %in% names(analysis_result@stage_models@rows))
+  expect_true("api_url" %in% names(analysis_result@stage_models))
   expect_equal(
-    analysis_result@stage_models@rows$api_url[[1]],
+    analysis_result@stage_models$api_url[[1]],
     "https://api.example.com/v1/chat/completions"
   )
 })
@@ -87,7 +87,7 @@ test_that("marking paragraphs retain supporting excerpts in report context", {
     stringsAsFactors = FALSE
   )
 
-  final_results_df <- data.frame(
+  results_table <- data.frame(
     text = "Text about dogs",
     sub_text = "Text about dogs",
     code = "Code 1",
@@ -101,16 +101,16 @@ test_that("marking paragraphs retain supporting excerpts in report context", {
     stringsAsFactors = FALSE
   )
 
-  attr(final_results_df, "paragraphs") <- list(list(
+  attr(results_table, "paragraphs") <- list(list(
     topic = "Code 1",
     paragraph = "Summary paragraph.",
     texts = c("Text about **dogs**"),
     prompt_fits = TRUE
   ))
 
-  analysis_result <- build_processing_result_list(
+  analysis_result <- build_analysis_result(
     texts_df = texts_df,
-    final_results_df = final_results_df,
+    results_table = results_table,
     uuid = "run-2",
     mode = "Markeren",
     research_background = "background",
@@ -124,7 +124,7 @@ test_that("marking paragraphs retain supporting excerpts in report context", {
     assign_multiple_categories = FALSE,
     human_in_the_loop = FALSE,
     write_paragraphs = TRUE,
-    stage_prompt_texts = list(marking = "prompt")
+    stage_prompt_previews = list(marking = "prompt")
   )
 
   metadata <- analysis_result_to_metadata_list(analysis_result)
@@ -145,7 +145,7 @@ test_that("topic metadata includes candidate and reduced topics", {
     stringsAsFactors = FALSE
   )
 
-  final_results_df <- data.frame(
+  results_table <- data.frame(
     text = c("Text 1", "Text 2"),
     result = c("Topic A", "Topic B"),
     stringsAsFactors = FALSE
@@ -158,9 +158,9 @@ test_that("topic metadata includes candidate and reduced topics", {
     reduction_iterations = 2L
   )
 
-  analysis_result <- build_processing_result_list(
+  analysis_result <- build_analysis_result(
     texts_df = texts_df,
-    final_results_df = final_results_df,
+    results_table = results_table,
     uuid = "run-3",
     mode = "Onderwerpextractie",
     research_background = "background",
@@ -181,7 +181,7 @@ test_that("topic metadata includes candidate and reduced topics", {
       n_chunks = 3,
       n_tokens_context_window = 1000
     ),
-    stage_prompt_texts = list(
+    stage_prompt_previews = list(
       topic_candidate_generation = "candidate prompt",
       topic_reduction = "reduction prompt",
       topic_not_applicable_check = "not applicable prompt",
@@ -229,7 +229,7 @@ test_that("input provenance and irr sample are serialized", {
     stringsAsFactors = FALSE
   )
 
-  final_results_df <- data.frame(
+  results_table <- data.frame(
     text = c("Text 1", "Text 2"),
     result = c(10, 20),
     stringsAsFactors = FALSE
@@ -256,9 +256,9 @@ test_that("input provenance and irr sample are serialized", {
     stringsAsFactors = FALSE
   )
 
-  analysis_result <- build_processing_result_list(
+  analysis_result <- build_analysis_result(
     texts_df = texts_df,
-    final_results_df = final_results_df,
+    results_table = results_table,
     uuid = "run-4",
     mode = "Scoren",
     research_background = "background",
@@ -270,7 +270,7 @@ test_that("input provenance and irr sample are serialized", {
     models = .test_models(),
     scoring_characteristic = "helpfulness",
     write_paragraphs = FALSE,
-    stage_prompt_texts = list(scoring = "prompt"),
+    stage_prompt_previews = list(scoring = "prompt"),
     input_info = list(
       file_type = "xlsx",
       selected_sheet = "Sheet1",
@@ -312,7 +312,7 @@ test_that("stage execution provenance is serialized", {
     stringsAsFactors = FALSE
   )
 
-  final_results_df <- data.frame(
+  results_table <- data.frame(
     text = c("Text 1", "Text 2"),
     result = c(10, 20),
     stringsAsFactors = FALSE
@@ -336,9 +336,9 @@ test_that("stage execution provenance is serialized", {
     stringsAsFactors = FALSE
   )
 
-  analysis_result <- build_processing_result_list(
+  analysis_result <- build_analysis_result(
     texts_df = texts_df,
-    final_results_df = final_results_df,
+    results_table = results_table,
     uuid = "run-4b",
     mode = "Scoren",
     research_background = "background",
@@ -350,7 +350,7 @@ test_that("stage execution provenance is serialized", {
     models = .test_models(),
     scoring_characteristic = "helpfulness",
     write_paragraphs = FALSE,
-    stage_prompt_texts = list(scoring = "prompt"),
+    stage_prompt_previews = list(scoring = "prompt"),
     stage_execution_rows = stage_execution_rows
   )
 
@@ -374,15 +374,15 @@ test_that("app_version and api_url are serialized", {
     stringsAsFactors = FALSE
   )
 
-  final_results_df <- data.frame(
+  results_table <- data.frame(
     text = c("Text 1", "Text 2"),
     result = c(10, 20),
     stringsAsFactors = FALSE
   )
 
-  analysis_result <- build_processing_result_list(
+  analysis_result <- build_analysis_result(
     texts_df = texts_df,
-    final_results_df = final_results_df,
+    results_table = results_table,
     uuid = "run-version",
     mode = "Scoren",
     research_background = "bg",
@@ -416,9 +416,9 @@ test_that("app_version and api_url are serialized", {
   expect_true("api_url" %in% names(sheets$stage_models))
 
   # NULL app_version is handled
-  result_no_version <- build_processing_result_list(
+  analysis_result_no_version <- build_analysis_result(
     texts_df = texts_df,
-    final_results_df = final_results_df,
+    results_table = results_table,
     uuid = "run-no-version",
     mode = "Scoren",
     research_background = "bg",
@@ -432,7 +432,7 @@ test_that("app_version and api_url are serialized", {
     write_paragraphs = FALSE,
     app_version = NULL
   )
-  md_no_version <- analysis_result_to_metadata_list(result_no_version)
+  md_no_version <- analysis_result_to_metadata_list(analysis_result_no_version)
   expect_null(md_no_version$app_version)
 })
 
@@ -447,15 +447,15 @@ test_that("download bundle contains metadata json, excel, and report", {
     stringsAsFactors = FALSE
   )
 
-  final_results_df <- data.frame(
+  results_table <- data.frame(
     text = c("Text 1", "Text 2"),
     result = c("A", "B"),
     stringsAsFactors = FALSE
   )
 
-  analysis_result <- build_processing_result_list(
+  analysis_result <- build_analysis_result(
     texts_df = texts_df,
-    final_results_df = final_results_df,
+    results_table = results_table,
     uuid = "run-5",
     mode = "Categorisatie",
     research_background = "background",
@@ -470,10 +470,10 @@ test_that("download bundle contains metadata json, excel, and report", {
     assign_multiple_categories = FALSE,
     human_in_the_loop = FALSE,
     write_paragraphs = FALSE,
-    stage_prompt_texts = list(categorization = "prompt")
+    stage_prompt_previews = list(categorization = "prompt")
   )
 
-  bundle <- create_processing_download_bundle(
+  bundle <- create_analysis_result_download_bundle(
     analysis_result,
     temp_dir = withr::local_tempdir()
   )

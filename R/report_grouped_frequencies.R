@@ -6,17 +6,11 @@
 # When the same text appears in multiple groups the join fans out,
 # so each group occurrence is counted.
 .join_by_group <- function(df, by_values) {
-  if (is.data.frame(by_values)) {
-    lookup <- by_values
-  } else {
-    # Legacy fallback: positional vector (must match nrow)
-    stopifnot(length(by_values) == nrow(df))
-    lookup <- data.frame(
-      text = df$text,
-      by_value = by_values,
-      stringsAsFactors = FALSE
-    )
+  if (!is.data.frame(by_values)) {
+    stop("by_values must be a data frame with 'text' and 'by_value' columns")
   }
+
+  lookup <- by_values
   # Use left_join so every result row gets at least one group.
   # relationship = "many-to-many" avoids warnings when a text maps to
   # multiple groups or the result df has duplicate texts.
@@ -31,8 +25,7 @@
 
 #' Generate grouped frequency table for single-category results
 #' @param df data frame with 'result' column containing category assignments
-#' @param by_values data frame with 'text' and 'by_value' columns (or legacy
-#'   positional vector aligned with df rows)
+#' @param by_values data frame with 'text' and 'by_value' columns
 #' @param by_column_name name of the grouping column for display
 #' @param categories vector of all possible categories
 #' @param language "en" or "nl"
@@ -112,8 +105,7 @@ generate_grouped_freq_table_single <- function(
 
 #' Generate grouped frequency table for multi-category results
 #' @param df data frame with binary category columns
-#' @param by_values data frame with 'text' and 'by_value' columns (or legacy
-#'   positional vector aligned with df rows)
+#' @param by_values data frame with 'text' and 'by_value' columns
 #' @param by_column_name name of the grouping column for display
 #' @param categories vector of category column names
 #' @param language "en" or "nl"
@@ -197,8 +189,7 @@ generate_grouped_freq_table_multi <- function(
 
 #' Generate grouped frequency table for scoring results
 #' @param df data frame with 'result' column containing numeric scores
-#' @param by_values data frame with 'text' and 'by_value' columns (or legacy
-#'   positional vector aligned with df rows)
+#' @param by_values data frame with 'text' and 'by_value' columns
 #' @param by_column_name name of the grouping column for display
 #' @param language "en" or "nl"
 #' @return DT::datatable with score statistics per group

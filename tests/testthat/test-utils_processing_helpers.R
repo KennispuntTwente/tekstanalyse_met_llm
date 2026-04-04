@@ -1,3 +1,5 @@
+source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+
 test_that("collect_grouped_texts groups by result or binary columns", {
   single_results <- data.frame(
     text = c("a", "b", "c"),
@@ -49,25 +51,31 @@ test_that("processing_texts_under_maximum validates count and notifies", {
 })
 
 
-test_that("join_processing_results restores raw texts and paragraph attribute", {
+test_that("join_processing_results keeps paragraphs on the joined results table", {
   texts_df <- data.frame(
     raw = c("Raw 1", "Raw 2"),
     preprocessed = c("prep-1", "prep-2"),
     stringsAsFactors = FALSE
   )
-  worker_results <- data.frame(
+  results_table_pre <- data.frame(
     text = c("prep-1", "prep-2"),
     result = c("A", "B"),
     stringsAsFactors = FALSE
   )
-  attr(worker_results, "paragraphs") <- list(p1 = "paragraph")
+  attr(results_table_pre, "paragraphs") <- list(list(
+    topic = "Topic A",
+    paragraph = "paragraph",
+    texts = c("Raw 1"),
+    prompt_fits = TRUE
+  ))
 
-  joined <- join_processing_results(texts_df, worker_results)
+  joined <- join_processing_results(texts_df, results_table_pre)
 
+  expect_true(is.data.frame(joined))
   expect_identical(joined$text, c("Raw 1", "Raw 2"))
   expect_identical(joined$result, c("A", "B"))
   expect_false("preprocessed" %in% names(joined))
-  expect_identical(attr(joined, "paragraphs"), list(p1 = "paragraph"))
+  expect_identical(attr(joined, "paragraphs")[[1]]$paragraph, "paragraph")
 })
 
 
@@ -99,11 +107,4 @@ test_that("processing_results_have_invalid_na is mode-aware", {
     )
   )
   expect_false(processing_results_have_invalid_na(marking_results, "Markeren"))
-})
-
-
-test_that("processing_mode_supports_report matches supported modes", {
-  expect_true(processing_mode_supports_report("Categorisatie"))
-  expect_true(processing_mode_supports_report("Markeren"))
-  expect_false(processing_mode_supports_report("Unknown"))
 })

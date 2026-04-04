@@ -264,6 +264,8 @@ mark_texts <- function(
     dplyr::ungroup() |>
     dplyr::distinct()
 
+  paragraphs <- NULL
+
   # Write paragraphs if requested
   if (write_paragraphs) {
     try(
@@ -397,11 +399,10 @@ mark_texts <- function(
       silent = TRUE
     )
 
-    # Set paragraphs as an attribute of the result
     attr(df_result_clean, "paragraphs") <- paragraphs
   }
 
-  return(df_result_clean)
+  df_result_clean
 }
 
 # Helper: prompt to mark text

@@ -13,7 +13,7 @@ test_that("report templates render (smoke)", {
 
   testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
 
-  make_result_list <- function(report_path) {
+  make_report_context <- function(report_path) {
     nm <- basename(report_path)
 
     irr_kappa <- list(
@@ -126,7 +126,7 @@ test_that("report templates render (smoke)", {
         rmarkdown::render(
           input = report_path,
           output_file = out_file,
-          params = list(report_context = make_result_list(report_path)),
+          params = list(report_context = make_report_context(report_path)),
           quiet = TRUE,
           envir = new.env(parent = globalenv())
         ),

@@ -14,15 +14,15 @@
 #'   Must contain `raw`; if present, `preprocessed`, `document_id`,
 #'   `source_document_id`, `source_text`, and `analysis_unit_id` are reused.
 #'   Missing lineage columns are filled in by this builder.
-#' @param final_results_df Data frame returned after joining the worker output
-#'   back to the texts, usually `final_results_df()` from
-#'   `module_core_processing.R`. Expected shape depends on the mode:
-#'   categorization/topic single-label uses `result`, multi-label uses one
-#'   logical column per label, scoring uses numeric `result`, and marking uses
-#'   `text`, `sub_text`, `code`, and `marked_text`, with optional matching
-#'   diagnostics in `source_marked_text`, `match_start`, `match_end`,
-#'   `match_distance`, `match_method`, and `response_status`. Generated
-#'   paragraphs, if any, are read from `attr(final_results_df, "paragraphs")`.
+#' @param results_table Joined processing output returned after mapping results
+#'   back to the original texts, usually `results_table()` from
+#'   `module_core_processing.R`. It should already be in
+#'   final UI/export shape: categorization/topic single-label uses `result`,
+#'   multi-label uses one logical column per label, scoring uses numeric
+#'   `result`, and marking uses `text`, `sub_text`, `code`, and `marked_text`,
+#'   with optional matching diagnostics in `source_marked_text`, `match_start`,
+#'   `match_end`, `match_distance`, `match_method`, and `response_status`.
+#'   Generated paragraphs, if any, live in `attr(results_table, "paragraphs")`.
 #' @param uuid Character run identifier.
 #' @param mode Display mode name or canonical mode id.
 #' @param research_background Character prompt context entered by the user.
@@ -45,7 +45,7 @@
 #' @param human_in_the_loop Logical; whether a human review step was used.
 #' @param write_paragraphs Logical; whether paragraph output was generated.
 #' @param context_window List with chunking or topic-generation settings.
-#' @param stage_prompt_texts Optional named list of prompt previews keyed by
+#' @param stage_prompt_previews Optional named list of prompt previews keyed by
 #'   stage id, usually built in `module_core_processing.R`. Common keys are
 #'   `categorization`, `scoring`, `topic_candidate_generation`,
 #'   `topic_reduction`, `topic_not_applicable_check`, `topic_assignment`,
@@ -78,7 +78,7 @@
 #'   optional paragraphs and reliability output, and derived issues.
 build_analysis_result <- function(
   texts_df,
-  final_results_df,
+  results_table,
   uuid,
   mode,
   research_background,
@@ -98,7 +98,7 @@ build_analysis_result <- function(
   human_in_the_loop = FALSE,
   write_paragraphs = FALSE,
   context_window = list(),
-  stage_prompt_texts = list(),
+  stage_prompt_previews = list(),
   stage_execution_rows = NULL,
   app_version = getOption("kwallm__app_version", NULL),
   input_info = list(),
@@ -108,11 +108,41 @@ build_analysis_result <- function(
   topics_were_edited = FALSE,
   irr_sample = NULL
 ) {
-  stopifnot(is.data.frame(texts_df), is.data.frame(final_results_df))
+  stopifnot(is.data.frame(texts_df))
+  stopifnot(is.data.frame(results_table))
+
+  normalize_anonymization_mode <- function(value) {
+    if (is.null(value) || !length(value) || is.na(value)) {
+      return(NULL)
+    }
+
+    value <- as.character(value)[1]
+    if (!nzchar(trimws(value))) {
+      return(NULL)
+    }
+
+    if (identical(value, "simple")) {
+      return("regex")
+    }
+
+    value
+  }
+
+  paragraph_entries <- attr(results_table, "paragraphs", exact = TRUE)
 
   mode_id <- .kwallm_mode_id_from_display(mode)
   texts_df <- .kwallm_prepare_texts_df(texts_df)
-  texts_df <- .kwallm_apply_source_texts(texts_df, source_texts = source_texts)
+  if (!is.null(source_texts)) {
+    if (length(source_texts) != nrow(texts_df)) {
+      stop("source_texts must match nrow(texts_df)")
+    }
+
+    texts_df$source_text <- as.character(source_texts)
+    texts_df$source_document_id <- match(
+      texts_df$source_text,
+      unique(texts_df$source_text)
+    )
+  }
 
   text_lineage <- .kwallm_build_text_lineage(
     texts_df = texts_df,
@@ -144,10 +174,10 @@ build_analysis_result <- function(
     grouping_column = by_column_name %||% input_info$grouping_column %||% NULL,
     filter_spec = input_info$filter_spec %||% NULL,
     txt_split_lines = input_info$txt_split_lines %||% NULL,
-    anonymization_requested_mode = .kwallm_normalize_anonymization_mode(
+    anonymization_requested_mode = normalize_anonymization_mode(
       input_info$anonymization_requested_mode %||% NULL
     ),
-    anonymization_applied_mode = .kwallm_normalize_anonymization_mode(
+    anonymization_applied_mode = normalize_anonymization_mode(
       input_info$anonymization_applied_mode %||% NULL
     ),
     anonymization_completed = input_info$anonymization_completed %||% NULL,
@@ -162,29 +192,26 @@ build_analysis_result <- function(
     write_paragraphs = write_paragraphs,
     topic_reduction_info = topic_reduction_info
   )
-  stage_prompts <- .kwallm_build_stage_prompts(
-    mode_id = mode_id,
-    stage_prompt_texts = stage_prompt_texts
-  )
+  stage_prompts <- .kwallm_build_stage_prompts(stage_prompt_previews)
   stage_executions <- .kwallm_build_stage_executions(stage_execution_rows)
 
   result_payload <- switch(
     mode_id,
     categorization = .kwallm_build_categorization_result(
       texts_df = texts_df,
-      final_results_df = final_results_df,
+      results_table = results_table,
       labels = categories,
       exclusive_labels = exclusive_categories,
       multi_label = assign_multiple_categories
     ),
     scoring = .kwallm_build_scoring_result(
       texts_df = texts_df,
-      final_results_df = final_results_df,
+      results_table = results_table,
       scoring_characteristic = scoring_characteristic
     ),
     topic_extraction = .kwallm_build_topic_result(
       texts_df = texts_df,
-      final_results_df = final_results_df,
+      results_table = results_table,
       topics = topics,
       exclusive_topics = exclusive_topics,
       multi_label = assign_multiple_categories,
@@ -195,7 +222,7 @@ build_analysis_result <- function(
     ),
     marking = .kwallm_build_marking_result(
       texts_df = texts_df,
-      final_results_df = final_results_df,
+      results_table = results_table,
       codes = codes
     )
   )
@@ -211,7 +238,7 @@ build_analysis_result <- function(
   )
 
   paragraphs <- .kwallm_build_paragraph_set(
-    paragraphs = attr(final_results_df, "paragraphs"),
+    paragraphs = paragraph_entries,
     mode_id = mode_id,
     texts_df = texts_df,
     labels_df = if (
@@ -228,6 +255,26 @@ build_analysis_result <- function(
     }
   )
 
+  bad_paragraphs <- paragraphs@paragraphs[
+    paragraphs@paragraphs$prompt_fits %in% FALSE,
+    ,
+    drop = FALSE
+  ]
+  issues <- if (!nrow(bad_paragraphs)) {
+    .kwallm_empty_issues()
+  } else {
+    data.frame(
+      stage_id = rep("paragraph_generation", nrow(bad_paragraphs)),
+      level = rep("warning", nrow(bad_paragraphs)),
+      issue_code = rep("paragraph_prompt_overflow", nrow(bad_paragraphs)),
+      message = rep(
+        "Paragraph prompt did not fit in the model context window.",
+        nrow(bad_paragraphs)
+      ),
+      stringsAsFactors = FALSE
+    )
+  }
+
   AnalysisResult(
     metadata = metadata,
     input = input,
@@ -237,11 +284,15 @@ build_analysis_result <- function(
     stage_executions = stage_executions,
     results = result_payload,
     paragraphs = paragraphs,
-    reliability = .kwallm_build_reliability_result(
-      irr_result = irr_result,
-      sample = irr_sample
-    ),
-    issues = .kwallm_build_issue_table(paragraphs),
+    reliability = if (is.null(irr_result)) {
+      NULL
+    } else {
+      ReliabilityResult(
+        summary = irr_result,
+        sample = irr_sample
+      )
+    },
+    issues = issues,
     mode_config = mode_config
   )
 }
@@ -256,6 +307,32 @@ build_analysis_result <- function(
 # We use this to preserve source document history after preprocessing and splitting.
 .kwallm_build_text_lineage <- function(texts_df, by_column_lookup = NULL) {
   texts_df <- .kwallm_prepare_texts_df(texts_df)
+
+  document_groups <- .kwallm_empty_document_groups()
+  if (
+    !is.null(by_column_lookup) &&
+      is.data.frame(by_column_lookup) &&
+      nrow(by_column_lookup) &&
+      all(c("text", "by_value") %in% names(by_column_lookup))
+  ) {
+    source_lookup <- unique(texts_df[c("source_document_id", "source_text")])
+    merged <- merge(
+      source_lookup,
+      by_column_lookup,
+      by.x = "source_text",
+      by.y = "text",
+      all.x = FALSE,
+      all.y = FALSE
+    )
+
+    if (nrow(merged)) {
+      document_groups <- unique(data.frame(
+        source_document_id = merged$source_document_id,
+        group_value = as.character(merged$by_value),
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
 
   source_documents <- unique(data.frame(
     source_document_id = texts_df$source_document_id,
@@ -287,10 +364,7 @@ build_analysis_result <- function(
     documents = documents,
     analysis_units = analysis_units,
     document_units = document_units,
-    document_groups = .kwallm_build_document_groups(
-      texts_df = texts_df,
-      by_column_lookup = by_column_lookup
-    )
+    document_groups = document_groups
   )
 }
 
@@ -302,15 +376,31 @@ build_analysis_result <- function(
   write_paragraphs = FALSE,
   topic_reduction_info = NULL
 ) {
-  main_provider <- models$main %||% NULL
-  large_provider <- models$large %||% NULL
+  provider_fields <- function(provider) {
+    provider_class <- class(provider)
+    url <- if (is.null(provider)) {
+      NULL
+    } else {
+      tryCatch(provider$url, error = function(e) NULL)
+    }
 
-  main_kind <- .kwallm_provider_kind(main_provider)
-  large_kind <- .kwallm_provider_kind(large_provider)
-  main_model <- .kwallm_get_model_id(main_provider)
-  large_model <- .kwallm_get_model_id(large_provider)
-  main_url <- .kwallm_get_api_url(main_provider)
-  large_url <- .kwallm_get_api_url(large_provider)
+    list(
+      kind = if (length(provider_class)) provider_class[[1]] else NA_character_,
+      model_id = if (is.null(provider) || is.null(provider$parameters)) {
+        NA_character_
+      } else {
+        as.character(provider$parameters$model %||% NA_character_)
+      },
+      api_url = if (is.null(url) || !nzchar(url)) {
+        NA_character_
+      } else {
+        as.character(url)
+      }
+    )
+  }
+
+  main_provider <- provider_fields(models$main %||% NULL)
+  large_provider <- provider_fields(models$large %||% NULL)
 
   rows <- switch(
     mode_id,
@@ -319,16 +409,25 @@ build_analysis_result <- function(
         "categorization",
         if (isTRUE(write_paragraphs)) "paragraph_generation"
       ),
-      provider_kind = c(main_kind, if (isTRUE(write_paragraphs)) main_kind),
-      api_url = c(main_url, if (isTRUE(write_paragraphs)) main_url),
-      model_id = c(main_model, if (isTRUE(write_paragraphs)) main_model),
+      provider_kind = c(
+        main_provider$kind,
+        if (isTRUE(write_paragraphs)) main_provider$kind
+      ),
+      api_url = c(
+        main_provider$api_url,
+        if (isTRUE(write_paragraphs)) main_provider$api_url
+      ),
+      model_id = c(
+        main_provider$model_id,
+        if (isTRUE(write_paragraphs)) main_provider$model_id
+      ),
       stringsAsFactors = FALSE
     ),
     scoring = data.frame(
       stage_id = "scoring",
-      provider_kind = main_kind,
-      api_url = main_url,
-      model_id = main_model,
+      provider_kind = main_provider$kind,
+      api_url = main_provider$api_url,
+      model_id = main_provider$model_id,
       stringsAsFactors = FALSE
     ),
     topic_extraction = data.frame(
@@ -344,37 +443,37 @@ build_analysis_result <- function(
         if (isTRUE(write_paragraphs)) "paragraph_generation"
       ),
       provider_kind = c(
-        main_kind,
-        large_kind,
+        main_provider$kind,
+        large_provider$kind,
         if (
           isTRUE(topic_reduction_info$not_applicable_check_performed %||% FALSE)
         ) {
-          large_kind
+          large_provider$kind
         },
-        main_kind,
-        if (isTRUE(write_paragraphs)) main_kind
+        main_provider$kind,
+        if (isTRUE(write_paragraphs)) main_provider$kind
       ),
       api_url = c(
-        main_url,
-        large_url,
+        main_provider$api_url,
+        large_provider$api_url,
         if (
           isTRUE(topic_reduction_info$not_applicable_check_performed %||% FALSE)
         ) {
-          large_url
+          large_provider$api_url
         },
-        main_url,
-        if (isTRUE(write_paragraphs)) main_url
+        main_provider$api_url,
+        if (isTRUE(write_paragraphs)) main_provider$api_url
       ),
       model_id = c(
-        main_model,
-        large_model,
+        main_provider$model_id,
+        large_provider$model_id,
         if (
           isTRUE(topic_reduction_info$not_applicable_check_performed %||% FALSE)
         ) {
-          large_model
+          large_provider$model_id
         },
-        main_model,
-        if (isTRUE(write_paragraphs)) main_model
+        main_provider$model_id,
+        if (isTRUE(write_paragraphs)) main_provider$model_id
       ),
       stringsAsFactors = FALSE
     ),
@@ -383,57 +482,50 @@ build_analysis_result <- function(
         "marking",
         if (isTRUE(write_paragraphs)) "paragraph_generation"
       ),
-      provider_kind = c(main_kind, if (isTRUE(write_paragraphs)) main_kind),
-      api_url = c(main_url, if (isTRUE(write_paragraphs)) main_url),
-      model_id = c(main_model, if (isTRUE(write_paragraphs)) main_model),
+      provider_kind = c(
+        main_provider$kind,
+        if (isTRUE(write_paragraphs)) main_provider$kind
+      ),
+      api_url = c(
+        main_provider$api_url,
+        if (isTRUE(write_paragraphs)) main_provider$api_url
+      ),
+      model_id = c(
+        main_provider$model_id,
+        if (isTRUE(write_paragraphs)) main_provider$model_id
+      ),
       stringsAsFactors = FALSE
     ),
     .kwallm_empty_stage_models()
   )
 
-  StageModelTable(rows = unique(rows))
+  unique(rows)
 }
 
 # Builds the stage-to-prompt mapping for the current mode.
 # We use this to store short prompt previews in metadata and report context.
-.kwallm_build_stage_prompts <- function(
-  mode_id,
-  stage_prompt_texts = list()
-) {
+.kwallm_build_stage_prompts <- function(stage_prompt_previews = list()) {
   rows <- .kwallm_empty_stage_prompts()
 
-  if (is.null(stage_prompt_texts)) {
-    return(StagePromptTable(rows = rows))
+  if (is.null(stage_prompt_previews)) {
+    return(rows)
   }
 
-  if (
-    is.character(stage_prompt_texts) &&
-      length(stage_prompt_texts) == 1L &&
-      is.null(names(stage_prompt_texts))
-  ) {
-    default_stage_id <- switch(
-      mode_id,
-      categorization = "categorization",
-      scoring = "scoring",
-      topic_extraction = "topic_assignment",
-      marking = "marking",
-      "analysis"
-    )
-    stage_prompt_texts <- stats::setNames(
-      as.list(stage_prompt_texts),
-      default_stage_id
-    )
-  } else if (is.character(stage_prompt_texts)) {
-    stage_prompt_texts <- as.list(stage_prompt_texts)
+  if (!is.list(stage_prompt_previews)) {
+    stop("stage_prompt_previews must be a named list")
   }
 
-  stage_ids <- names(stage_prompt_texts)
+  if (!length(stage_prompt_previews)) {
+    return(rows)
+  }
+
+  stage_ids <- names(stage_prompt_previews)
   if (is.null(stage_ids)) {
-    return(StagePromptTable(rows = rows))
+    stop("stage_prompt_previews must be a named list")
   }
 
   prompt_values <- vapply(
-    stage_prompt_texts,
+    stage_prompt_previews,
     function(value) {
       if (is.null(value)) {
         return("")
@@ -455,18 +547,18 @@ build_analysis_result <- function(
     )
   }
 
-  StagePromptTable(rows = unique(rows))
+  unique(rows)
 }
 
 # Builds the per-call execution provenance table.
 # We use this to keep retry and duration metadata alongside stage models and prompts.
 .kwallm_build_stage_executions <- function(stage_execution_rows = NULL) {
   if (is.null(stage_execution_rows) || !is.data.frame(stage_execution_rows)) {
-    return(StageExecutionTable())
+    return(.kwallm_empty_stage_executions())
   }
 
   if (!nrow(stage_execution_rows)) {
-    return(StageExecutionTable())
+    return(.kwallm_empty_stage_executions())
   }
 
   required_cols <- c(
@@ -506,24 +598,24 @@ build_analysis_result <- function(
   rows$error_messages <- as.character(rows$error_messages)
   rows$final_error_message <- as.character(rows$final_error_message)
 
-  StageExecutionTable(rows = unique(rows))
+  unique(rows)
 }
 
 # Builds the typed categorization payload.
 # We use this to normalize both single-label and multi-label categorization output.
 .kwallm_build_categorization_result <- function(
   texts_df,
-  final_results_df,
+  results_table,
   labels,
   exclusive_labels,
   multi_label
 ) {
   labels_df <- .kwallm_build_labels(
     values = labels %||%
-      if ("result" %in% names(final_results_df)) {
-        final_results_df$result
+      if ("result" %in% names(results_table)) {
+        results_table$result
       } else {
-        names(final_results_df)[setdiff(names(final_results_df), "text")]
+        names(results_table)[setdiff(names(results_table), "text")]
       },
     exclusive_values = exclusive_labels
   )
@@ -531,11 +623,11 @@ build_analysis_result <- function(
   assignments <- if (!isTRUE(multi_label)) {
     .kwallm_build_assignments_from_single(
       texts_df,
-      final_results_df$result,
+      results_table$result,
       labels_df
     )
   } else {
-    .kwallm_build_assignments_from_multi(texts_df, final_results_df, labels_df)
+    .kwallm_build_assignments_from_multi(texts_df, results_table, labels_df)
   }
 
   CategorizationResult(
@@ -549,12 +641,12 @@ build_analysis_result <- function(
 # We use this to store numeric scores in one consistent table with the configured label.
 .kwallm_build_scoring_result <- function(
   texts_df,
-  final_results_df,
+  results_table,
   scoring_characteristic
 ) {
   scores <- unique(data.frame(
     analysis_unit_id = texts_df$analysis_unit_id,
-    score = as.numeric(final_results_df$result),
+    score = as.numeric(results_table$result),
     stringsAsFactors = FALSE
   ))
 
@@ -570,7 +662,7 @@ build_analysis_result <- function(
 # We use this to keep topic assignments together with the topic-generation history.
 .kwallm_build_topic_result <- function(
   texts_df,
-  final_results_df,
+  results_table,
   topics,
   exclusive_topics,
   multi_label,
@@ -594,11 +686,11 @@ build_analysis_result <- function(
   assignments <- if (!isTRUE(multi_label)) {
     .kwallm_build_assignments_from_single(
       texts_df,
-      final_results_df$result,
+      results_table$result,
       labels_df
     )
   } else {
-    .kwallm_build_assignments_from_multi(texts_df, final_results_df, labels_df)
+    .kwallm_build_assignments_from_multi(texts_df, results_table, labels_df)
   }
 
   TopicResult(
@@ -636,14 +728,29 @@ build_analysis_result <- function(
 
 # Builds the typed marking payload.
 # We use this to normalize marked spans into codes, chunks, and individual markings.
-.kwallm_build_marking_result <- function(texts_df, final_results_df, codes) {
-  rows <- final_results_df[
-    !is.na(final_results_df$marked_text) & nzchar(final_results_df$marked_text),
+.kwallm_build_marking_result <- function(texts_df, results_table, codes) {
+  column_or <- function(column, default) {
+    if (column %in% names(rows)) {
+      return(rows[[column]])
+    }
+
+    rep(default, nrow(rows))
+  }
+
+  rows <- results_table[
+    !is.na(results_table$marked_text) & nzchar(results_table$marked_text),
     ,
     drop = FALSE
   ]
 
-  codes_df <- .kwallm_build_codes(values = codes %||% rows$code)
+  code_values <- as.character(codes %||% rows$code %||% character())
+  code_values <- trimws(code_values)
+  code_values <- unique(code_values[!is.na(code_values) & nzchar(code_values)])
+  codes_df <- data.frame(
+    code_id = seq_along(code_values),
+    code_text = code_values,
+    stringsAsFactors = FALSE
+  )
 
   if (!nrow(rows)) {
     return(MarkingResult(
@@ -686,23 +793,23 @@ build_analysis_result <- function(
     chunk_id = chunk_id,
     code_id = code_id,
     source_marked_text = as.character(
-      .kwallm_marking_column(rows, "source_marked_text", rows$marked_text)
+      column_or("source_marked_text", rows$marked_text)
     ),
     marked_text = as.character(rows$marked_text),
     match_start = as.integer(
-      .kwallm_marking_column(rows, "match_start", NA_integer_)
+      column_or("match_start", NA_integer_)
     ),
     match_end = as.integer(
-      .kwallm_marking_column(rows, "match_end", NA_integer_)
+      column_or("match_end", NA_integer_)
     ),
     match_distance = as.integer(
-      .kwallm_marking_column(rows, "match_distance", NA_integer_)
+      column_or("match_distance", NA_integer_)
     ),
     match_method = as.character(
-      .kwallm_marking_column(rows, "match_method", NA_character_)
+      column_or("match_method", NA_character_)
     ),
     response_status = as.character(
-      .kwallm_marking_column(rows, "response_status", "matched_all")
+      column_or("response_status", "matched_all")
     ),
     stringsAsFactors = FALSE
   )
@@ -847,91 +954,10 @@ build_analysis_result <- function(
   )
 }
 
-# Builds warnings derived from the paragraph data.
-# We use this to surface non-fatal export issues without changing the result payload.
-.kwallm_build_issue_table <- function(paragraph_set) {
-  if (nrow(paragraph_set@paragraphs) == 0) {
-    return(IssueTable())
-  }
-
-  bad <- paragraph_set@paragraphs[
-    paragraph_set@paragraphs$prompt_fits %in% FALSE,
-    ,
-    drop = FALSE
-  ]
-  if (!nrow(bad)) {
-    return(IssueTable())
-  }
-
-  IssueTable(
-    issues = data.frame(
-      stage_id = rep("paragraph_generation", nrow(bad)),
-      level = rep("warning", nrow(bad)),
-      issue_code = rep("paragraph_prompt_overflow", nrow(bad)),
-      message = rep(
-        "Paragraph prompt did not fit in the model context window.",
-        nrow(bad)
-      ),
-      stringsAsFactors = FALSE
-    )
-  )
-}
-
-# Builds the optional reliability payload.
-# We use this so IRR data is present only when that workflow actually ran.
-.kwallm_build_reliability_result <- function(irr_result = NULL, sample = NULL) {
-  if (is.null(irr_result)) {
-    return(NULL)
-  }
-
-  ReliabilityResult(
-    summary = irr_result,
-    sample = sample
-  )
-}
-
-
 # 3 Shared table builders ------------------------------------------------------
 
 # Contains reusable helpers that build normalized lookup tables.
 # These are shared across the mode-specific payload builders above.
-
-# Builds source-document group mappings from the upload lookup table.
-# We use this so grouped exports keep the original grouping after text splitting.
-.kwallm_build_document_groups <- function(texts_df, by_column_lookup = NULL) {
-  if (
-    is.null(by_column_lookup) ||
-      !is.data.frame(by_column_lookup) ||
-      !nrow(by_column_lookup)
-  ) {
-    return(.kwallm_empty_document_groups())
-  }
-
-  required_cols <- c("text", "by_value")
-  if (!all(required_cols %in% names(by_column_lookup))) {
-    return(.kwallm_empty_document_groups())
-  }
-
-  source_lookup <- unique(texts_df[c("source_document_id", "source_text")])
-  merged <- merge(
-    source_lookup,
-    by_column_lookup,
-    by.x = "source_text",
-    by.y = "text",
-    all.x = FALSE,
-    all.y = FALSE
-  )
-
-  if (!nrow(merged)) {
-    return(.kwallm_empty_document_groups())
-  }
-
-  unique(data.frame(
-    source_document_id = merged$source_document_id,
-    group_value = as.character(merged$by_value),
-    stringsAsFactors = FALSE
-  ))
-}
 
 # Builds the normalized label table.
 # We use this to give every category or topic a stable numeric id in exports.
@@ -943,47 +969,6 @@ build_analysis_result <- function(
     label_id = seq_along(values),
     label_text = values,
     is_exclusive = values %in% exclusive_values,
-    stringsAsFactors = FALSE
-  )
-}
-
-# Normalizes anonymization mode ids before storing them in the export contract.
-# We use regex instead of the internal simple label because exports are public-facing.
-.kwallm_normalize_anonymization_mode <- function(value) {
-  if (is.null(value) || !length(value) || is.na(value)) {
-    return(NULL)
-  }
-
-  value <- as.character(value)[1]
-  if (!nzchar(trimws(value))) {
-    return(NULL)
-  }
-
-  if (identical(value, "simple")) {
-    return("regex")
-  }
-
-  value
-}
-
-# Reads one optional marking column while keeping vector length aligned.
-# We use this so synthetic tests without diagnostic columns still build cleanly.
-.kwallm_marking_column <- function(df, column, default) {
-  if (column %in% names(df)) {
-    return(df[[column]])
-  }
-
-  rep(default, nrow(df))
-}
-
-# Builds the normalized code table.
-# We use this to give every marking code a stable numeric id in exports.
-.kwallm_build_codes <- function(values) {
-  values <- .kwallm_safe_unique_strings(values)
-
-  data.frame(
-    code_id = seq_along(values),
-    code_text = values,
     stringsAsFactors = FALSE
   )
 }
@@ -1051,39 +1036,6 @@ build_analysis_result <- function(
 # Keeps the lowest-level helpers together at the bottom of the file.
 # These functions clean incoming values before the larger builders use them.
 
-# Extracts the provider class name used in stage metadata.
-# We use this to store a simple provider kind instead of the whole provider object.
-.kwallm_provider_kind <- function(provider) {
-  provider_class <- class(provider)
-  if (!length(provider_class)) {
-    return(NA_character_)
-  }
-  provider_class[[1]]
-}
-
-# Extracts the configured model id from a provider object.
-# We use this when filling the stage_models export table.
-.kwallm_get_model_id <- function(provider) {
-  if (is.null(provider) || is.null(provider$parameters)) {
-    return(NA_character_)
-  }
-
-  as.character(provider$parameters$model %||% NA_character_)
-}
-
-# Extracts the API endpoint URL from a provider object.
-# We use this to record which endpoint each stage called.
-.kwallm_get_api_url <- function(provider) {
-  if (is.null(provider)) {
-    return(NA_character_)
-  }
-  url <- tryCatch(provider$url, error = function(e) NULL)
-  if (is.null(url) || !nzchar(url)) {
-    return(NA_character_)
-  }
-  as.character(url)
-}
-
 # Cleans a character vector and drops empty values.
 # We use this before building label and code lookup tables.
 .kwallm_safe_unique_strings <- function(x) {
@@ -1124,24 +1076,5 @@ build_analysis_result <- function(
     )
   }
 
-  texts_df
-}
-
-# Replaces source-text lineage when split texts came from earlier source rows.
-# We use this so split chunks still point back to the original uploaded document.
-.kwallm_apply_source_texts <- function(texts_df, source_texts = NULL) {
-  if (is.null(source_texts)) {
-    return(texts_df)
-  }
-
-  if (length(source_texts) != nrow(texts_df)) {
-    stop("source_texts must match nrow(texts_df)")
-  }
-
-  texts_df$source_text <- as.character(source_texts)
-  texts_df$source_document_id <- match(
-    texts_df$source_text,
-    unique(texts_df$source_text)
-  )
   texts_df
 }

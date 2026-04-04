@@ -799,7 +799,7 @@ if (FALSE) {
   )
 
   # Use LLM to assign topics
-  texts_with_topics <- assign_topics(
+  topic_assignment_results <- assign_topics(
     texts,
     topics,
     research_background,
@@ -810,7 +810,10 @@ if (FALSE) {
 
   # Add topics back to original data
   sentences_df_with_topics <- sentences_df |>
-    dplyr::left_join(texts_with_topics, dplyr::join_by("sentence" == "text"))
+    dplyr::left_join(
+      topic_assignment_results,
+      dplyr::join_by("sentence" == "text")
+    )
 
   # Print the results
   print(sentences_df_with_topics)

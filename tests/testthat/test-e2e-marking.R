@@ -73,7 +73,7 @@ test_that("{shinytest2} recording: standard process - marking", {
   )
 
   # Read results
-  results <- app$get_value(export = "processing-final_results_df")
+  results <- app$get_value(export = "processing-results_table")
 
   # Expect that columns 'text', 'sub_text', 'code', & 'marked_text' are present
   expect_true(all(

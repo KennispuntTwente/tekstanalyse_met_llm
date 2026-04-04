@@ -658,7 +658,7 @@ interrater_server <- function(
                 )
 
                 # Combine everything into one list
-                result_list <- c(as.list(t_test_summary), summary_stats)
+                result_summary <- c(as.list(t_test_summary), summary_stats)
 
                 # Log IRR t-test results
                 log_info(
@@ -672,7 +672,7 @@ interrater_server <- function(
                   component = "irr"
                 )
 
-                result_list
+                result_summary
               } else {
                 # Kappa for categorical data
 

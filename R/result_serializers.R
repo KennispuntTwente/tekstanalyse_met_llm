@@ -53,7 +53,7 @@ analysis_result_to_report_context <- function(analysis_result) {
     by_column_name = analysis_result@input@grouping_column,
     by_column_values = .kwallm_group_lookup_from_lineage(analysis_result),
     paragraphs = .kwallm_report_paragraphs(analysis_result),
-    issues = analysis_result@issues@issues
+    issues = analysis_result@issues
   )
 
   utils::modifyList(
@@ -98,11 +98,9 @@ analysis_result_to_metadata_list <- function(analysis_result) {
       split_chunk_size = analysis_result@input@split_chunk_size,
       split_overlap = analysis_result@input@split_overlap
     ),
-    stage_models = .kwallm_df_to_records(analysis_result@stage_models@rows),
-    stage_prompts = .kwallm_df_to_records(analysis_result@stage_prompts@rows),
-    stage_executions = .kwallm_df_to_records(
-      analysis_result@stage_executions@rows
-    ),
+    stage_models = .kwallm_df_to_records(analysis_result@stage_models),
+    stage_prompts = .kwallm_df_to_records(analysis_result@stage_prompts),
+    stage_executions = .kwallm_df_to_records(analysis_result@stage_executions),
     text_lineage = list(
       source_documents = .kwallm_df_to_records(
         analysis_result@text_lineage@source_documents
@@ -207,7 +205,7 @@ analysis_result_to_metadata_list <- function(analysis_result) {
         sample = analysis_result@reliability@sample
       )
     },
-    issues = .kwallm_df_to_records(analysis_result@issues@issues)
+    issues = .kwallm_df_to_records(analysis_result@issues)
   )
 }
 
@@ -282,12 +280,12 @@ analysis_result_to_export_sheets <- function(analysis_result) {
     analysis_units = analysis_result@text_lineage@analysis_units,
     document_units = analysis_result@text_lineage@document_units,
     document_groups = analysis_result@text_lineage@document_groups,
-    stage_models = analysis_result@stage_models@rows,
-    stage_prompts = analysis_result@stage_prompts@rows,
-    stage_executions = analysis_result@stage_executions@rows,
+    stage_models = analysis_result@stage_models,
+    stage_prompts = analysis_result@stage_prompts,
+    stage_executions = analysis_result@stage_executions,
     paragraphs = analysis_result@paragraphs@paragraphs,
     paragraph_sources = analysis_result@paragraphs@paragraph_sources,
-    issues = analysis_result@issues@issues
+    issues = analysis_result@issues
   )
 
   if (
@@ -365,7 +363,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
 #' @param temp_dir Directory where the output file should be written.
 #'
 #' @return Path to metadata.json, or to a metadata error text file on failure.
-write_processing_result_metadata_json <- function(
+write_analysis_result_metadata_json <- function(
   analysis_result,
   temp_dir = tempdir()
 ) {
@@ -396,8 +394,8 @@ write_processing_result_metadata_json <- function(
 
 # 2 Report reconstruction helpers ----------------------------------------------
 
-# Rebuilds report-friendly tables and paragraph structures from typed results.
-# We keep these together because report_context is mostly a compatibility layer.
+# Rebuilds the report-context tables and paragraph structures from typed results.
+# The report templates still consume this specific shape.
 
 # Rebuilds the raw categorization or topic data frame expected by reports.
 # We use this for both categorization and topic extraction because they share the same shape.
@@ -544,8 +542,8 @@ write_processing_result_metadata_json <- function(
   stats::setNames(character(), integer())
 }
 
-# Rebuilds the legacy paragraph list structure from the typed paragraph tables.
-# We use this so report templates can stay simple while exports keep full lineage tables.
+# Rebuilds the paragraph list structure expected by the report templates.
+# Exports keep the full lineage tables; reports use this simpler nested list.
 .kwallm_report_paragraphs <- function(analysis_result) {
   paragraphs <- analysis_result@paragraphs@paragraphs
   paragraph_sources <- analysis_result@paragraphs@paragraph_sources
@@ -663,7 +661,7 @@ write_processing_result_metadata_json <- function(
 # Gets the first matching model id for one or more stage ids.
 # We use this to populate compact model fields in report_context.
 .kwallm_get_stage_model_id <- function(analysis_result, stage_id) {
-  rows <- analysis_result@stage_models@rows
+  rows <- analysis_result@stage_models
   value <- rows$model_id[rows$stage_id %in% stage_id][1]
   .kwallm_scalar_or_null(value)
 }
@@ -671,7 +669,7 @@ write_processing_result_metadata_json <- function(
 # Gets the first matching prompt preview for one or more stage ids.
 # We use this to populate compact prompt fields in report_context.
 .kwallm_get_stage_prompt <- function(analysis_result, stage_id) {
-  rows <- analysis_result@stage_prompts@rows
+  rows <- analysis_result@stage_prompts
   value <- rows$prompt_preview[rows$stage_id %in% stage_id][1]
   .kwallm_scalar_or_null(value)
 }

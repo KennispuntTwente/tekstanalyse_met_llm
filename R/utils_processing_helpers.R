@@ -38,28 +38,6 @@ processing_texts_under_maximum <- function(
 
 # 2 Report and paragraph helpers -----------------------------------------------
 
-#' Check whether a mode should generate a HTML report
-#'
-#' Used in `module_core_processing` when preparing download files.
-#' This keeps the "which modes get a report?" rule in one place.
-#'
-#' @param mode Single mode name such as `"Categorisatie"` or `"Markeren"`.
-#'
-#' @return `TRUE` when the mode should get a report file, otherwise `FALSE`.
-processing_mode_supports_report <- function(mode) {
-  mode %in%
-    c(
-      "Categorisatie",
-      "Scoren",
-      "Onderwerpextractie",
-      "Markeren",
-      "categorization",
-      "scoring",
-      "topic_extraction",
-      "marking"
-    )
-}
-
 #' Collect texts per label from processing results
 #'
 #' Used before paragraph writing in `module_core_processing`.
@@ -208,26 +186,29 @@ write_grouped_paragraphs <- function(
 #' the original raw texts again.
 #'
 #' @param texts_df Data frame with at least `raw` and `preprocessed` columns.
-#' @param worker_results_df Data frame returned by the worker, with a `text`
-#'   column that matches `preprocessed`.
+#' @param results_table_pre Data frame returned by processing.
+#'   Its `text` column must match `texts_df$preprocessed`.
+#'   `texts_df$preprocessed`.
 #'
-#' @return A data frame with the raw text restored as `text`, plus any
-#'   attributes such as `paragraphs` copied over from the worker result.
-join_processing_results <- function(texts_df, worker_results_df) {
-  stopifnot(is.data.frame(texts_df), is.data.frame(worker_results_df))
+#' @return A data frame with the raw text restored as `text`.
+join_processing_results <- function(texts_df, results_table_pre) {
+  stopifnot(is.data.frame(texts_df))
+  stopifnot(is.data.frame(results_table_pre))
+
+  paragraphs <- attr(results_table_pre, "paragraphs", exact = TRUE)
 
   # Join by the preprocessed text the worker actually saw, then restore the raw
   # uploaded text as the main `text` column.
-  final_df <- texts_df |>
+  results_table <- texts_df |>
     dplyr::left_join(
-      worker_results_df,
+      results_table_pre,
       by = dplyr::join_by("preprocessed" == "text")
     ) |>
     dplyr::select(-preprocessed) |>
     dplyr::rename(text = raw)
 
-  attr(final_df, "paragraphs") <- attr(worker_results_df, "paragraphs")
-  final_df
+  attr(results_table, "paragraphs") <- paragraphs
+  results_table
 }
 
 
@@ -244,7 +225,8 @@ join_processing_results <- function(texts_df, worker_results_df) {
 #' @return `TRUE` when the result shape indicates a failed analysis response,
 #'   otherwise `FALSE`.
 processing_results_have_invalid_na <- function(results_df, mode) {
-  stopifnot(is.data.frame(results_df), is.character(mode), length(mode) == 1)
+  stopifnot(is.data.frame(results_df))
+  stopifnot(is.character(mode), length(mode) == 1)
 
   if (mode == "Markeren") {
     return(FALSE)
@@ -259,130 +241,29 @@ processing_results_have_invalid_na <- function(results_df, mode) {
 }
 
 
-#' Build the result bundle used for downloads and reports
-#'
-#' Used in `module_core_processing` after processing and optional
-#' inter-rater-reliability have finished. This gathers the result data and the
-#' mode-specific metadata in one structured list.
-#'
-#' @param final_results_df Final result data frame shown to the user.
-#' @param uuid Unique analysis id used in filenames and logs.
-#' @param mode Single processing mode name.
-#' @param research_background Single background string used for the run.
-#' @param style_prompt Single style prompt string used for the run.
-#' @param irr_result Optional inter-rater-reliability result object.
-#' @param language Output language code for reports.
-#' @param by_column_name Optional column name used for grouped analyses.
-#' @param by_column_lookup Optional lookup of group values keyed by text.
-#'   Reports expect a data frame with `text` and `by_value` columns so grouped
-#'   tables can preserve duplicate text-to-group mappings.
-#' @param models List with configured model objects.
-#' @param categories Optional character vector of categories.
-#' @param exclusive_categories Optional character vector of exclusive
-#'   categories.
-#' @param scoring_characteristic Optional single scoring characteristic string.
-#' @param topics Optional character vector of topics.
-#' @param exclusive_topics Optional character vector of exclusive topics.
-#' @param codes Optional character vector of marking codes.
-#' @param assign_multiple_categories Logical; whether multiple labels per text
-#'   were allowed.
-#' @param human_in_the_loop Logical; whether topic editing was enabled.
-#' @param write_paragraphs Logical; whether paragraphs were requested.
-#' @param context_window List with context-window and chunking settings.
-#' @param stage_prompt_texts Optional named list of prompt previews keyed by
-#'   analysis stage.
-#' @param stage_execution_rows Optional data frame with one row per recorded
-#'   LLM call made during the run.
-#'
-#' @return An `AnalysisResult` object used by the Excel export and R Markdown
-#'   report.
-build_processing_result_list <- function(
-  texts_df,
-  final_results_df,
-  uuid,
-  mode,
-  research_background,
-  style_prompt,
-  irr_result = NULL,
-  language,
-  by_column_name = NULL,
-  by_column_lookup = NULL,
-  models,
-  categories = NULL,
-  exclusive_categories = NULL,
-  scoring_characteristic = NULL,
-  topics = NULL,
-  exclusive_topics = NULL,
-  codes = NULL,
-  assign_multiple_categories = FALSE,
-  human_in_the_loop = FALSE,
-  write_paragraphs = FALSE,
-  context_window = list(),
-  stage_prompt_texts = list(),
-  stage_execution_rows = NULL,
-  app_version = getOption("kwallm__app_version", NULL),
-  input_info = list(),
-  source_texts = NULL,
-  candidate_topics = character(),
-  reduced_topics = character(),
-  topics_were_edited = FALSE,
-  irr_sample = NULL
-) {
-  build_analysis_result(
-    texts_df = texts_df,
-    final_results_df = final_results_df,
-    uuid = uuid,
-    mode = mode,
-    research_background = research_background,
-    style_prompt = style_prompt,
-    irr_result = irr_result,
-    language = language,
-    by_column_name = by_column_name,
-    by_column_lookup = by_column_lookup,
-    models = models,
-    categories = categories,
-    exclusive_categories = exclusive_categories,
-    scoring_characteristic = scoring_characteristic,
-    topics = topics,
-    exclusive_topics = exclusive_topics,
-    codes = codes,
-    assign_multiple_categories = assign_multiple_categories,
-    human_in_the_loop = human_in_the_loop,
-    write_paragraphs = write_paragraphs,
-    context_window = context_window,
-    stage_prompt_texts = stage_prompt_texts,
-    stage_execution_rows = stage_execution_rows,
-    app_version = app_version,
-    input_info = input_info,
-    source_texts = source_texts,
-    candidate_topics = candidate_topics,
-    reduced_topics = reduced_topics,
-    topics_were_edited = topics_were_edited,
-    irr_sample = irr_sample
-  )
-}
-
-
 # 4 Export helpers -------------------------------------------------------------
 
-#' Write the result bundle to Excel
+#' Write an AnalysisResult to Excel
 #'
 #' Used by the download preparation flow in `module_core_processing`.
 #' The helper always returns a file path; on failure it writes a `.txt` file
 #' with the error so the caller can surface that message cleanly.
 #'
-#' @param result_list AnalysisResult created by `build_processing_result_list()`.
+#' @param analysis_result AnalysisResult to export.
 #' @param temp_dir Directory where the output file should be written.
 #'
 #' @return Path to the created `.xlsx` file, or to a `.txt` error file.
-write_processing_result_excel <- function(result_list, temp_dir = tempdir()) {
+write_analysis_result_excel <- function(
+  analysis_result,
+  temp_dir = tempdir()
+) {
   excel_file <- file.path(temp_dir, "results.xlsx")
   error_file <- file.path(temp_dir, "results_error.txt")
 
   tryCatch(
     {
       writexl::write_xlsx(
-        x = analysis_result_to_export_sheets(result_list),
+        x = analysis_result_to_export_sheets(analysis_result),
         path = excel_file
       )
       excel_file
@@ -398,18 +279,18 @@ write_processing_result_excel <- function(result_list, temp_dir = tempdir()) {
 }
 
 
-#' Render the result bundle to a HTML report
+#' Render an AnalysisResult to a HTML report
 #'
 #' Used by the download preparation flow in `module_core_processing` for modes
 #' that should include a report. Like the Excel helper, it returns a path to
 #' either the report or a text file with error details.
 #'
-#' @param result_list AnalysisResult created by `build_processing_result_list()`.
+#' @param analysis_result AnalysisResult to render.
 #' @param temp_dir Directory where the output file should be written.
 #'
 #' @return Path to the created `.html` report, or to a `.txt` error file.
-write_processing_result_rmarkdown <- function(
-  result_list,
+write_analysis_result_report_html <- function(
+  analysis_result,
   temp_dir = tempdir()
 ) {
   output_file_html <- file.path(temp_dir, "report.html")
@@ -422,15 +303,15 @@ write_processing_result_rmarkdown <- function(
           "R",
           paste0(
             "report_",
-            .kwallm_mode_display_from_id(result_list@metadata@mode_id),
+            .kwallm_mode_display_from_id(analysis_result@metadata@mode_id),
             "_",
-            result_list@metadata@language,
+            analysis_result@metadata@language,
             ".Rmd"
           )
         ),
         output_file = output_file_html,
         params = list(
-          report_context = analysis_result_to_report_context(result_list)
+          report_context = analysis_result_to_report_context(analysis_result)
         ),
         envir = new.env()
       )
@@ -460,30 +341,38 @@ write_processing_result_rmarkdown <- function(
 #' `module_core_processing`. It generates the required output files, checks for
 #' error files, and zips the final bundle into one archive.
 #'
-#' @param result_list AnalysisResult created by `build_processing_result_list()`.
+#' @param analysis_result AnalysisResult to bundle.
 #' @param temp_dir Directory used for intermediate files and the final zip.
 #'
 #' @return Path to the generated `.zip` archive.
-create_processing_download_bundle <- function(
-  result_list,
+create_analysis_result_download_bundle <- function(
+  analysis_result,
   temp_dir = tempdir()
 ) {
   bundle_dir <- file.path(temp_dir, paste0("kwallm_", uuid::UUIDgenerate()))
   dir.create(bundle_dir, recursive = TRUE, showWarnings = FALSE)
 
-  metadata_file <- write_processing_result_metadata_json(
-    result_list,
+  metadata_file <- write_analysis_result_metadata_json(
+    analysis_result,
     temp_dir = bundle_dir
   )
-  excel_file <- write_processing_result_excel(
-    result_list,
+  excel_file <- write_analysis_result_excel(
+    analysis_result,
     temp_dir = bundle_dir
   )
 
   files <- c(metadata_file, excel_file)
-  if (processing_mode_supports_report(result_list@metadata@mode_id)) {
-    rmarkdown_file <- write_processing_result_rmarkdown(
-      result_list,
+  if (
+    analysis_result@metadata@mode_id %in%
+      c(
+        "categorization",
+        "scoring",
+        "topic_extraction",
+        "marking"
+      )
+  ) {
+    rmarkdown_file <- write_analysis_result_report_html(
+      analysis_result,
       temp_dir = bundle_dir
     )
     files <- c(files, rmarkdown_file)

@@ -70,7 +70,7 @@ test_that("{shinytest2} recording: standard process - categorization", {
   )
 
   # Read results
-  results <- app$get_value(export = "processing-final_results_df")
+  results <- app$get_value(export = "processing-results_table")
 
   # Expect that all texts are present in column 'text'
   texts <- readLines(

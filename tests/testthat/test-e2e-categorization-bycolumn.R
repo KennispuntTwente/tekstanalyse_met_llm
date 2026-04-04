@@ -117,7 +117,7 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
   )
 
   # Read results
-  results <- app$get_value(export = "processing-final_results_df")
+  results <- app$get_value(export = "processing-results_table")
 
   # Expect that all texts are present
   expect_true(all(test_data$text %in% results$text))
