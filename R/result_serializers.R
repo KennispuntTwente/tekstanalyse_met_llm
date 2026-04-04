@@ -3,64 +3,7 @@
 # 1 Public serializers ---------------------------------------------------------
 
 # Contains the conversion functions used outside this file.
-# These functions expose the stable output shapes used by reports and exports.
-
-#' Convert AnalysisResult to report context
-#'
-#' Build the list shape expected by the report templates from a typed
-#' AnalysisResult object.
-#'
-#' @param analysis_result An AnalysisResult object.
-#'
-#' @return A named list matching the report template contract.
-analysis_result_to_report_context <- function(analysis_result) {
-  stopifnot(inherits(analysis_result, "AnalysisResult"))
-
-  mode_id <- analysis_result@metadata@mode_id
-  report_context <- list(
-    schema_version = analysis_result@metadata@schema_version,
-    run_id = analysis_result@metadata@run_id,
-    mode_id = mode_id,
-    mode = .kwallm_mode_display_from_id(mode_id),
-    language = analysis_result@metadata@language,
-    time = analysis_result@metadata@timestamp,
-    research_background = analysis_result@metadata@research_background,
-    df = .kwallm_results_raw_df(analysis_result),
-    model = .kwallm_get_stage_model_id(
-      analysis_result,
-      c(
-        "categorization",
-        "scoring",
-        "topic_candidate_generation",
-        "topic_assignment",
-        "marking"
-      )
-    ),
-    model_reductie = .kwallm_get_stage_model_id(
-      analysis_result,
-      c("topic_reduction", "topic_not_applicable_check")
-    ),
-    prompt = .kwallm_get_stage_prompt(
-      analysis_result,
-      c("categorization", "scoring", "topic_assignment", "marking")
-    ),
-    style_prompt = .kwallm_paragraph_style_prompt(analysis_result),
-    irr = if (is.null(analysis_result@reliability)) {
-      NULL
-    } else {
-      analysis_result@reliability@summary
-    },
-    by_column_name = analysis_result@input@grouping_column,
-    by_column_values = .kwallm_group_lookup_from_lineage(analysis_result),
-    paragraphs = .kwallm_report_paragraphs(analysis_result),
-    issues = analysis_result@issues
-  )
-
-  utils::modifyList(
-    report_context,
-    .kwallm_mode_specific_report_fields(analysis_result)
-  )
-}
+# These functions expose the stable output shapes used by exports.
 
 #' Convert AnalysisResult to metadata JSON content
 #'
@@ -219,8 +162,6 @@ analysis_result_to_metadata_list <- function(analysis_result) {
 analysis_result_to_export_sheets <- function(analysis_result) {
   stopifnot(inherits(analysis_result, "AnalysisResult"))
 
-  report_context <- analysis_result_to_report_context(analysis_result)
-
   sheets <- list(
     metadata = data.frame(
       field = c(
@@ -274,7 +215,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
       ),
       stringsAsFactors = FALSE
     ),
-    results = report_context$df,
+    results = .kwallm_report_results_df(analysis_result),
     source_documents = analysis_result@text_lineage@source_documents,
     documents = analysis_result@text_lineage@documents,
     analysis_units = analysis_result@text_lineage@analysis_units,
@@ -394,12 +335,12 @@ write_analysis_result_metadata_json <- function(
 
 # 2 Report reconstruction helpers ----------------------------------------------
 
-# Rebuilds the report-context tables and paragraph structures from typed results.
-# The report templates still consume this specific shape.
+# Rebuilds the report tables and lookup structures from typed results.
+# Reports and exports share these smaller helpers directly.
 
-# Rebuilds the raw categorization or topic data frame expected by reports.
+# Rebuilds the categorization/topic report table from typed results.
 # We use this for both categorization and topic extraction because they share the same shape.
-.kwallm_results_raw_df_categorization <- function(analysis_result) {
+.kwallm_report_results_df_categorization <- function(analysis_result) {
   result <- analysis_result@results
   base <- .kwallm_document_unit_map(analysis_result)
   labels_lookup <- .kwallm_labels_lookup(result@labels)
@@ -438,9 +379,9 @@ write_analysis_result_metadata_json <- function(
   out
 }
 
-# Rebuilds the raw scoring data frame expected by reports.
+# Rebuilds the scoring report table from typed results.
 # We use this so scoring templates can keep their existing input shape.
-.kwallm_results_raw_df_scoring <- function(analysis_result) {
+.kwallm_report_results_df_scoring <- function(analysis_result) {
   result <- analysis_result@results
   base <- .kwallm_document_unit_map(analysis_result)
 
@@ -457,9 +398,9 @@ write_analysis_result_metadata_json <- function(
   out
 }
 
-# Rebuilds the raw marking data frame expected by reports.
-# We use this to expand chunk/code combinations back into the old flat table format.
-.kwallm_results_raw_df_marking <- function(analysis_result) {
+# Rebuilds the marking report table from typed results.
+# We use this to expand chunk/code combinations back into the flat table format.
+.kwallm_report_results_df_marking <- function(analysis_result) {
   result <- analysis_result@results
   base <- .kwallm_document_unit_map(analysis_result)
   codes_lookup <- .kwallm_codes_lookup(result@codes)
@@ -515,20 +456,22 @@ write_analysis_result_metadata_json <- function(
   out
 }
 
-# Dispatches to the correct raw-data reconstruction helper for the active mode.
-# We use this so report_context and Excel exports share one reconstructed result table.
-.kwallm_results_raw_df <- function(analysis_result) {
+# Dispatches to the correct report-table reconstruction helper for the active mode.
+# We use this so reports and Excel exports share one reconstructed result table.
+.kwallm_report_results_df <- function(analysis_result) {
   switch(
     analysis_result@metadata@mode_id,
-    categorization = .kwallm_results_raw_df_categorization(analysis_result),
-    scoring = .kwallm_results_raw_df_scoring(analysis_result),
-    topic_extraction = .kwallm_results_raw_df_categorization(analysis_result),
-    marking = .kwallm_results_raw_df_marking(analysis_result)
+    categorization = .kwallm_report_results_df_categorization(analysis_result),
+    scoring = .kwallm_report_results_df_scoring(analysis_result),
+    topic_extraction = .kwallm_report_results_df_categorization(
+      analysis_result
+    ),
+    marking = .kwallm_report_results_df_marking(analysis_result)
   )
 }
 
 # Looks up the label or code text used by paragraph rows.
-# We use this when rebuilding the paragraph list consumed by report templates.
+# We use this when report templates need subject labels for paragraph rows.
 .kwallm_paragraph_subject_lookup <- function(analysis_result) {
   result <- analysis_result@results
 
@@ -542,17 +485,23 @@ write_analysis_result_metadata_json <- function(
   stats::setNames(character(), integer())
 }
 
-# Rebuilds the paragraph list structure expected by the report templates.
-# Exports keep the full lineage tables; reports use this simpler nested list.
-.kwallm_report_paragraphs <- function(analysis_result) {
-  paragraphs <- analysis_result@paragraphs@paragraphs
+# Resolves the supporting texts for one paragraph row.
+# We use excerpts when present and otherwise fall back to full document text.
+.kwallm_paragraph_supporting_texts <- function(analysis_result, paragraph_id) {
   paragraph_sources <- analysis_result@paragraphs@paragraph_sources
-
-  if (!nrow(paragraphs)) {
-    return(NULL)
+  if (!nrow(paragraph_sources)) {
+    return(character())
   }
 
-  subject_lookup <- .kwallm_paragraph_subject_lookup(analysis_result)
+  sources <- paragraph_sources[
+    paragraph_sources$paragraph_id %in% paragraph_id,
+    ,
+    drop = FALSE
+  ]
+  if (!nrow(sources)) {
+    return(character())
+  }
+
   documents <- analysis_result@text_lineage@documents[,
     c("document_id", "document_text"),
     drop = FALSE
@@ -562,78 +511,16 @@ write_analysis_result_metadata_json <- function(
     documents$document_id
   )
 
-  output <- vector("list", nrow(paragraphs))
-  for (i in seq_len(nrow(paragraphs))) {
-    paragraph_id <- paragraphs$paragraph_id[[i]]
-    sources <- paragraph_sources[
-      paragraph_sources$paragraph_id %in% paragraph_id,
-      ,
-      drop = FALSE
-    ]
-    supporting_texts <- if (nrow(sources)) {
-      fallback_text <- document_lookup[as.character(sources$document_id)]
-      ifelse(
-        nzchar(sources$excerpt_text),
-        sources$excerpt_text,
-        unname(fallback_text)
-      )
-    } else {
-      character()
-    }
+  excerpt_text <- as.character(sources$excerpt_text)
+  fallback_text <- unname(document_lookup[as.character(sources$document_id)])
 
-    output[[i]] <- list(
-      topic = unname(subject_lookup[[as.character(paragraphs$subject_id[[
-        i
-      ]])]]),
-      paragraph = paragraphs$paragraph_text[[i]],
-      texts = as.character(supporting_texts),
-      prompt_fits = isTRUE(paragraphs$prompt_fits[[i]])
-    )
-  }
-
-  output
-}
-
-# Adds the mode-specific fields expected by current report templates.
-# We use this to keep report_context small but still mode-aware.
-.kwallm_mode_specific_report_fields <- function(analysis_result) {
-  result <- analysis_result@results
-  mode_config <- analysis_result@mode_config
-
-  switch(
-    analysis_result@metadata@mode_id,
-    categorization = list(
-      categories = result@labels$label_text,
-      exclusive_categories = result@labels$label_text[
-        result@labels$is_exclusive %in% TRUE
-      ],
-      assign_multiple_categories = isTRUE(result@multi_label),
-      human_in_the_loop = isTRUE(mode_config@human_in_the_loop),
-      write_paragraphs = isTRUE(mode_config@write_paragraphs)
-    ),
-    scoring = list(
-      scoring_characteristic = result@characteristic
-    ),
-    topic_extraction = list(
-      topics = result@labels$label_text,
-      exclusive_topics = result@labels$label_text[
-        result@labels$is_exclusive %in% TRUE
-      ],
-      assign_multiple_categories = isTRUE(result@multi_label),
-      human_in_the_loop = isTRUE(mode_config@human_in_the_loop),
-      write_paragraphs = isTRUE(mode_config@write_paragraphs),
-      candidate_topics = result@topic_provenance@candidate_topics,
-      reduced_topics = result@topic_provenance@reduced_topics,
-      final_topics = result@topic_provenance@final_topics,
-      topic_generation_settings = result@topic_provenance
-    ),
-    marking = list(
-      codes = result@codes$code_text,
-      write_paragraphs = isTRUE(mode_config@write_paragraphs),
-      text_size_tokens = mode_config@text_size_tokens,
-      overlap_size_tokens = mode_config@overlap_size_tokens
-    )
+  supporting_texts <- ifelse(
+    !is.na(excerpt_text) & nzchar(excerpt_text),
+    excerpt_text,
+    fallback_text
   )
+
+  as.character(stats::na.omit(supporting_texts))
 }
 
 
@@ -659,40 +546,11 @@ write_analysis_result_metadata_json <- function(
 }
 
 # Gets the first matching model id for one or more stage ids.
-# We use this to populate compact model fields in report_context.
+# We use this for report templates that refer to stage-specific model ids.
 .kwallm_get_stage_model_id <- function(analysis_result, stage_id) {
   rows <- analysis_result@stage_models
   value <- rows$model_id[rows$stage_id %in% stage_id][1]
   .kwallm_scalar_or_null(value)
-}
-
-# Gets the first matching prompt preview for one or more stage ids.
-# We use this to populate compact prompt fields in report_context.
-.kwallm_get_stage_prompt <- function(analysis_result, stage_id) {
-  rows <- analysis_result@stage_prompts
-  value <- rows$prompt_preview[rows$stage_id %in% stage_id][1]
-  .kwallm_scalar_or_null(value)
-}
-
-# Gets the paragraph style instruction, which is distinct from the full prompt preview.
-# We use this in report_context so existing templates keep seeing the user-entered style text.
-.kwallm_paragraph_style_prompt <- function(analysis_result) {
-  mode_config <- analysis_result@mode_config
-
-  if (
-    !inherits(
-      mode_config,
-      c(
-        "CategorizationConfig",
-        "TopicConfig",
-        "MarkingConfig"
-      )
-    )
-  ) {
-    return(NULL)
-  }
-
-  .kwallm_scalar_or_null(mode_config@paragraph_style_prompt)
 }
 
 # Joins document rows to analysis-unit ids.
@@ -709,7 +567,7 @@ write_analysis_result_metadata_json <- function(
 
 # Rebuilds the grouped-report lookup from the lineage tables.
 # We use this so grouped reports keep working after source documents are split.
-.kwallm_group_lookup_from_lineage <- function(analysis_result) {
+.kwallm_report_group_lookup <- function(analysis_result) {
   groups <- analysis_result@text_lineage@document_groups
   if (!nrow(groups)) {
     return(NULL)
@@ -753,7 +611,7 @@ write_analysis_result_metadata_json <- function(
 # These helpers are intentionally simple and feed the larger serializers above.
 
 # Converts a canonical mode id back to the display label used in reports.
-# We use this so report_context keeps the same mode wording as the UI.
+# We use this so generated filenames keep the same mode wording as the UI.
 .kwallm_mode_display_from_id <- function(mode_id) {
   switch(
     mode_id,

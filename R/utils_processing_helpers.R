@@ -279,6 +279,38 @@ write_analysis_result_excel <- function(
 }
 
 
+# Bundles the helpers injected into report render environments.
+# We use this in both the app render path and the report smoke tests.
+analysis_result_report_globals <- function() {
+  list(
+    .kwallm_report_results_df = .kwallm_report_results_df,
+    .kwallm_report_group_lookup = .kwallm_report_group_lookup,
+    .kwallm_get_stage_model_id = .kwallm_get_stage_model_id,
+    .kwallm_paragraph_subject_lookup = .kwallm_paragraph_subject_lookup,
+    .kwallm_paragraph_supporting_texts = .kwallm_paragraph_supporting_texts
+  )
+}
+
+
+# Bundles the functions the async download worker needs.
+# We use the same flat `.args = c(list(...), *_globals())` shape as other async workers.
+analysis_result_async_globals <- function() {
+  c(
+    list(
+      create_analysis_result_download_bundle = create_analysis_result_download_bundle,
+      write_analysis_result_metadata_json = write_analysis_result_metadata_json,
+      write_analysis_result_excel = write_analysis_result_excel,
+      write_analysis_result_report_html = write_analysis_result_report_html,
+      analysis_result_to_metadata_list = analysis_result_to_metadata_list,
+      analysis_result_to_export_sheets = analysis_result_to_export_sheets,
+      analysis_result_report_globals = analysis_result_report_globals,
+      .kwallm_mode_display_from_id = .kwallm_mode_display_from_id
+    ),
+    analysis_result_report_globals()
+  )
+}
+
+
 #' Render an AnalysisResult to a HTML report
 #'
 #' Used by the download preparation flow in `module_core_processing` for modes
@@ -295,6 +327,10 @@ write_analysis_result_report_html <- function(
 ) {
   output_file_html <- file.path(temp_dir, "report.html")
   output_file_txt <- file.path(temp_dir, "report_error.txt")
+  report_env <- list2env(
+    analysis_result_report_globals(),
+    parent = parent.frame()
+  )
 
   tryCatch(
     {
@@ -311,9 +347,9 @@ write_analysis_result_report_html <- function(
         ),
         output_file = output_file_html,
         params = list(
-          report_context = analysis_result_to_report_context(analysis_result)
+          analysis_result = analysis_result
         ),
-        envir = new.env()
+        envir = report_env
       )
 
       output_file_html

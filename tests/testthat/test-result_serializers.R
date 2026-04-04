@@ -63,14 +63,15 @@ test_that("build_analysis_result preserves split lineage and group fan-out", {
     input_info = list(file_type = "csv", text_column = "text")
   )
 
-  report_context <- analysis_result_to_report_context(analysis_result)
+  report_df <- .kwallm_report_results_df(analysis_result)
+  group_lookup <- .kwallm_report_group_lookup(analysis_result)
 
-  expect_true(is.list(report_context))
+  expect_s3_class(report_df, "data.frame")
   expect_equal(nrow(analysis_result@text_lineage@source_documents), 1)
   expect_equal(nrow(analysis_result@text_lineage@documents), 2)
   expect_equal(analysis_result@text_lineage@document_groups$group_value, "G1")
-  expect_equal(nrow(report_context$by_column_values), 2)
-  expect_equal(report_context$df$result, c("Theme 1", "Theme 2"))
+  expect_equal(nrow(group_lookup), 2)
+  expect_equal(report_df$result, c("Theme 1", "Theme 2"))
 
   # stage_models captures api_url
   expect_true("api_url" %in% names(analysis_result@stage_models))
@@ -80,7 +81,7 @@ test_that("build_analysis_result preserves split lineage and group fan-out", {
   )
 })
 
-test_that("marking paragraphs retain supporting excerpts in report context", {
+test_that("marking paragraphs retain supporting excerpts in report helpers", {
   texts_df <- data.frame(
     raw = "Text about dogs",
     preprocessed = "Text about dogs",
@@ -128,11 +129,19 @@ test_that("marking paragraphs retain supporting excerpts in report context", {
   )
 
   metadata <- analysis_result_to_metadata_list(analysis_result)
-  report_context <- analysis_result_to_report_context(analysis_result)
+  paragraph_row <- analysis_result@paragraphs@paragraphs[1, , drop = FALSE]
+  subject_lookup <- .kwallm_paragraph_subject_lookup(analysis_result)
+  supporting_texts <- .kwallm_paragraph_supporting_texts(
+    analysis_result,
+    paragraph_row$paragraph_id[[1]]
+  )
 
-  expect_length(report_context$paragraphs, 1)
-  expect_equal(report_context$paragraphs[[1]]$topic, "Code 1")
-  expect_equal(report_context$paragraphs[[1]]$texts, c("Text about **dogs**"))
+  expect_equal(nrow(analysis_result@paragraphs@paragraphs), 1)
+  expect_equal(
+    unname(subject_lookup[[as.character(paragraph_row$subject_id[[1]])]]),
+    "Code 1"
+  )
+  expect_equal(supporting_texts, c("Text about **dogs**"))
   expect_equal(metadata$results$markings[[1]]$source_marked_text, "dogs?")
   expect_equal(metadata$results$markings[[1]]$match_start, 12L)
   expect_equal(metadata$results$markings[[1]]$match_method, "fuzzy")
@@ -193,7 +202,10 @@ test_that("topic metadata includes candidate and reduced topics", {
   )
 
   metadata <- analysis_result_to_metadata_list(analysis_result)
-  report_context <- analysis_result_to_report_context(analysis_result)
+  reduction_model <- .kwallm_get_stage_model_id(
+    analysis_result,
+    c("topic_reduction", "topic_not_applicable_check")
+  )
 
   expect_equal(
     metadata$results$topic_provenance$candidate_topics,
@@ -219,7 +231,7 @@ test_that("topic metadata includes candidate and reduced topics", {
     function(x) identical(x$stage_id, "topic_not_applicable_check"),
     logical(1)
   )))
-  expect_equal(report_context$model_reductie, "large-model")
+  expect_equal(reduction_model, "large-model")
 })
 
 test_that("input provenance and irr sample are serialized", {

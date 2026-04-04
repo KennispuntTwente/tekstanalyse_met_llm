@@ -6,11 +6,32 @@ output:
       version: 5
       bootswatch: lux
 params:
-  report_context: !r list(df = data.frame(text = c("a", "b", "c"), result = c("A", "B", "C")), categories = c("A", "B", "C"), scoring_characteristic = "onderwerp", model = "gpt-4o", irr = list(subjects = 20, raters = 2, irr.name = "Kappa", stat.name = "z", statistic = 1.163762, p.value = 0.243845, value = 0.119469), research_background = "my research background")
+  analysis_result: !r NULL
 ---
 
 ```{r include=FALSE, error=TRUE}
-rl <- params$report_context
+analysis_result <- params$analysis_result
+stopifnot(inherits(analysis_result, "AnalysisResult"))
+
+report_df <- .kwallm_report_results_df(analysis_result)
+group_lookup <- .kwallm_report_group_lookup(analysis_result)
+result_payload <- analysis_result@results
+categories <- result_payload@labels$label_text
+assign_multiple_categories <- isTRUE(result_payload@multi_label)
+reliability_summary <- if (is.null(analysis_result@reliability)) {
+  NULL
+} else {
+  analysis_result@reliability@summary
+}
+paragraphs_df <- analysis_result@paragraphs@paragraphs
+has_paragraphs <- nrow(paragraphs_df) > 0
+paragraph_subject_lookup <- .kwallm_paragraph_subject_lookup(
+  analysis_result
+)
+main_model <- .kwallm_get_stage_model_id(analysis_result, "categorization")
+research_background <- analysis_result@metadata@research_background
+by_column_name <- analysis_result@input@grouping_column
+
 source(here::here("R", "style_datatable_config.R"), local = TRUE)
 source(here::here("R", "utils_quotes.R"), local = TRUE)
 source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
@@ -18,19 +39,19 @@ source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 
 ## Methode
 
-Er zijn `r nrow(rl$df)` teksten geanalyseerd met een LLM (model: `r htmltools::htmlEscape(rl$model)`),
-waarbij het LLM gevraagd werd om het in te delen in één van de volgende `r length(rl$categories)` categorieën:
+Er zijn `r nrow(report_df)` teksten geanalyseerd met een LLM (model: `r htmltools::htmlEscape(main_model)`),
+waarbij het LLM gevraagd werd om het in te delen in één van de volgende `r length(categories)` categorieën:
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 cat("<blockquote>")
-safe_categories <- vapply(rl$categories, htmltools::htmlEscape, character(1))
+safe_categories <- vapply(categories, htmltools::htmlEscape, character(1))
 cat(paste0("* *", safe_categories, "*"), sep = "\n")
 cat("</blockquote>")
 ```
 
 ```{r echo=FALSE, results='asis', error=TRUE}  
 multiple_categories_text <- "Het LLM moest één categorie toewijzen per tekst"
-if (isTRUE(rl$assign_multiple_categories)) {
+if (assign_multiple_categories) {
   multiple_categories_text <- "Het LLM mocht meerdere categorieën toewijzen per tekst (minimaal één categorie per tekst)"
 }
 ```
@@ -38,19 +59,18 @@ if (isTRUE(rl$assign_multiple_categories)) {
 `r multiple_categories_text`. Elke tekst is afzonderlijk gepresenteerd aan het LLM.
 
 ```{r echo=FALSE, results='asis', error=TRUE}
-if (!is.null(rl$paragraphs)) {
+if (has_paragraphs) {
   cat(paste0(
     "Met de teksten waaraan onderwerpen zijn toegevoegd, heeft een taalmodel ",
-  "(", htmltools::htmlEscape(rl$model), ") tenslotte een rapport geschreven.", "\n",
+  "(", htmltools::htmlEscape(main_model), ") tenslotte een rapport geschreven.", "\n",
     "Per onderwerp is met quotes samengevat wat er is gezegd."
   ))
 }
 ```
 
 ```{r echo=FALSE, results='asis', error=TRUE}
-research_background <- rl$research_background
 if (
-  !is.null(rl$research_background)
+  !is.null(research_background)
   && research_background != ""
 ) {
   cat(paste0(
@@ -65,23 +85,23 @@ if (
 ```
 
 ```{r echo=FALSE, results='asis', error=TRUE}
-if (!is.null(rl$irr)) {
+if (!is.null(reliability_summary)) {
   cat(paste0(
     "### Betrouwbaarheid\n",
     "De interbeoordelaarsbetrouwbaarheid tussen het taalmodel en een menselijke beoordelaar berekend.",
     " Hiervoor is een willekeurige steekproef genomen van " , 
-    rl$irr$subjects, " teksten.",
+    reliability_summary$subjects, " teksten.",
     " De berekende interbeoordelaarsbetrouwbaarheid is ",
-    round(rl$irr$value, 3), " (", rl$irr$irr.name, "; ", rl$irr$stat.name, " = ", 
-    round(rl$irr$statistic, 3), ", p = ", round(rl$irr$p.value, 3), ").",
+    round(reliability_summary$value, 3), " (", reliability_summary$irr.name, "; ", reliability_summary$stat.name, " = ", 
+    round(reliability_summary$statistic, 3), ", p = ", round(reliability_summary$p.value, 3), ").",
     " Dit valt te interpreteren als een ",
     dplyr::case_when(
-      rl$irr$value < 0 ~ "slechte ('poor')",
-      rl$irr$value < 0.2 ~ "zwakke ('slight')",
-      rl$irr$value < 0.4 ~ "matige ('fair')",
-      rl$irr$value < 0.6 ~ "redelijke ('moderate')",
-      rl$irr$value < 0.8 ~ "goede ('substantial')",
-      rl$irr$value < 1 ~ "zeer goede ('almost perfect')",
+      reliability_summary$value < 0 ~ "slechte ('poor')",
+      reliability_summary$value < 0.2 ~ "zwakke ('slight')",
+      reliability_summary$value < 0.4 ~ "matige ('fair')",
+      reliability_summary$value < 0.6 ~ "redelijke ('moderate')",
+      reliability_summary$value < 0.8 ~ "goede ('substantial')",
+      reliability_summary$value < 1 ~ "zeer goede ('almost perfect')",
       TRUE ~ "perfecte"
     ),
     " overeenstemming tussen het taalmodel en de menselijke beoordelaar ([Landis & Koch, 1977](https://doi.org/10.2307/2529310))."
@@ -97,12 +117,12 @@ Onderstaande tabel toont hoe vaak elke categorie is toegewezen.
 
 ```{r, echo=FALSE, results='asis', error=TRUE}
 
-if (!isTRUE(rl$assign_multiple_categories)) {
-  rl$df |>
+if (!assign_multiple_categories) {
+  report_df |>
     dplyr::count(result, name = "Aantal") |>
-    tidyr::complete(result = rl$categories, fill = list(Aantal = 0)) |>
+    tidyr::complete(result = categories, fill = list(Aantal = 0)) |>
     dplyr::mutate(
-      Percentage = round(Aantal / nrow(rl$df) * 100, 2)
+      Percentage = round(Aantal / nrow(report_df) * 100, 2)
     ) |>
     dplyr::rename(Categorie = result) |>
     dplyr::arrange(Categorie) |>
@@ -112,7 +132,7 @@ if (!isTRUE(rl$assign_multiple_categories)) {
       options = get_datatable_options()
     )
 } else {
-  rl$df |>
+  report_df |>
     dplyr::select(-text) |>
     # For each binary category column, count the number of TRUE values
     dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(.x, na.rm = TRUE))) |>
@@ -122,7 +142,7 @@ if (!isTRUE(rl$assign_multiple_categories)) {
       values_to = "Aantal"
     ) |>
     dplyr::mutate(
-      Percentage = round(Aantal / nrow(rl$df) * 100, 2)
+      Percentage = round(Aantal / nrow(report_df) * 100, 2)
     ) |>
     dplyr::arrange(dplyr::desc(Aantal)) |>
     DT::datatable(
@@ -137,32 +157,32 @@ if (!isTRUE(rl$assign_multiple_categories)) {
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 # Show grouped frequencies if by_column is specified
-if (!is.null(rl$by_column_name) && !is.null(rl$by_column_values)) {
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
   cat("\n### Frequentie per groep\n\n")
   cat(paste0(
     "Onderstaande tabel toont hoe vaak elke categorie is toegewezen, ",
-    "uitgesplitst naar **", htmltools::htmlEscape(rl$by_column_name), "**.\n\n"
+    "uitgesplitst naar **", htmltools::htmlEscape(by_column_name), "**.\n\n"
   ))
 }
 ```
 
 ```{r echo=FALSE, results='asis', error=TRUE}
-if (!is.null(rl$by_column_name) && !is.null(rl$by_column_values)) {
-  if (!isTRUE(rl$assign_multiple_categories)) {
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
+  if (!assign_multiple_categories) {
     generate_grouped_freq_table_single(
-      df = rl$df,
-      by_values = rl$by_column_values,
-      by_column_name = rl$by_column_name,
-      categories = rl$categories,
+      df = report_df,
+      by_values = group_lookup,
+      by_column_name = by_column_name,
+      categories = categories,
       language = "nl"
     )
   } else {
     # Get category columns (all except 'text')
-    cat_cols <- setdiff(names(rl$df), "text")
+    cat_cols <- setdiff(names(report_df), "text")
     generate_grouped_freq_table_multi(
-      df = rl$df,
-      by_values = rl$by_column_values,
-      by_column_name = rl$by_column_name,
+      df = report_df,
+      by_values = group_lookup,
+      by_column_name = by_column_name,
       categories = cat_cols,
       language = "nl"
     )
@@ -175,8 +195,8 @@ if (!is.null(rl$by_column_name) && !is.null(rl$by_column_values)) {
 Onderstaande tabel de categorieën per tekst.
 
 ```{r echo=FALSE, results='asis', error=TRUE}
-if (!isTRUE(rl$assign_multiple_categories)) {
-  rl$df |>
+if (!assign_multiple_categories) {
+  report_df |>
   dplyr::select(result, text) |>
   dplyr::rename(Tekst = text, Categorie = result) |>
   dplyr::arrange(Categorie) |>
@@ -184,7 +204,7 @@ if (!isTRUE(rl$assign_multiple_categories)) {
     options = get_datatable_options()
   )
 } else {
-  rl$df |>
+  report_df |>
     dplyr::rename(Tekst = text) |>
     dplyr::arrange(dplyr::desc(Tekst)) |>
     DT::datatable(
@@ -194,7 +214,7 @@ if (!isTRUE(rl$assign_multiple_categories)) {
 ```
  
 ```{r echo=FALSE, results='asis', error=TRUE}
-if (is.null(rl$paragraphs)) return(invisible(NULL))
+if (!has_paragraphs) return(invisible(NULL))
 
 output <- list()
 
@@ -226,20 +246,33 @@ output <- append(output, list(
 
 ## quote utils loaded from report_quote_utils.R
 
-for (i in seq_along(rl$paragraphs)) {
-  paragraph <- rl$paragraphs[[i]]
-  topic <- htmltools::htmlEscape(paragraph$topic)
-  paragraph_text <- htmltools::htmlEscape(paragraph$paragraph)
+for (i in seq_len(nrow(paragraphs_df))) {
+  paragraph_row <- paragraphs_df[i, , drop = FALSE]
+  topic <- unname(paragraph_subject_lookup[[
+    as.character(paragraph_row$subject_id[[1]])
+  ]])
+  if (is.null(topic) || !length(topic)) {
+    topic <- ""
+  }
+  topic <- htmltools::htmlEscape(topic)
+  paragraph_text <- htmltools::htmlEscape(paragraph_row$paragraph_text[[1]])
   
-  supporting_texts <- paste(htmltools::htmlEscape(paragraph$texts), collapse = " ")
-  if (length(supporting_texts) == 0) {
+  supporting_texts <- .kwallm_paragraph_supporting_texts(
+    analysis_result,
+    paragraph_row$paragraph_id[[1]]
+  )
+  if (!length(supporting_texts)) {
     next
   }
+  supporting_texts_html <- paste(
+    htmltools::htmlEscape(supporting_texts),
+    collapse = " "
+  )
   
   #### 1 Verify quotes on presence in supporting texts ####
   paragraph_text <- verify_and_decorate_quotes(
     paragraph_text = paragraph_text,
-    supporting_texts = supporting_texts,
+    supporting_texts = supporting_texts_html,
     lang = "nl",
     escape_html = TRUE
   )
@@ -249,7 +282,7 @@ for (i in seq_along(rl$paragraphs)) {
   # If paragraph has attribute 'prompt_fits' and it is FALSE, add a warning
   #   to the output
   warning_context_window <- NULL
-  prompt_fits <- paragraph$prompt_fits
+  prompt_fits <- isTRUE(paragraph_row$prompt_fits[[1]])
   if (isFALSE(prompt_fits)) {
     warning_context_window <- htmltools::div(
       class = "d-flex justify-content-center",
@@ -281,7 +314,7 @@ for (i in seq_along(rl$paragraphs)) {
     htmltools::HTML(paste0("<p>", paragraph_text, "</p>"))
   ))
 
-  if (!is.null(paragraph$texts)) {
+  if (length(supporting_texts)) {
     acc <- bslib::accordion(
       bslib::accordion_panel(
         title = "Bekijk teksten",
@@ -289,7 +322,7 @@ for (i in seq_along(rl$paragraphs)) {
           "<ul>",
           paste0(
             "<li><i>",
-            vapply(paragraph$texts, htmltools::htmlEscape, character(1)),
+            vapply(supporting_texts, htmltools::htmlEscape, character(1)),
             "</i></li>",
             collapse = ""
           ),
@@ -305,7 +338,7 @@ for (i in seq_along(rl$paragraphs)) {
   output <- append(output, list(htmltools::HTML("<br>")))
 }
 
-if (length(rl$paragraphs) > 0) {
+if (nrow(paragraphs_df) > 0) {
   htmltools::tagList(output)
 }
 ``` 

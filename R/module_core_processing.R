@@ -1202,7 +1202,7 @@ processing_server <- function(
         # Abort if invalid results still made it this far.
         if (
           processing_results_have_invalid_na(
-            analysis_result_to_report_context(analysis_result)$df,
+            .kwallm_report_results_df(analysis_result),
             mode()
           )
         ) {
@@ -1233,17 +1233,12 @@ processing_server <- function(
               temp_dir = temp_dir
             )
           },
-          .args = list(
-            analysis_result = analysis_result,
-            temp_dir = tempdir(),
-            create_analysis_result_download_bundle = create_analysis_result_download_bundle,
-            write_analysis_result_metadata_json = write_analysis_result_metadata_json,
-            write_analysis_result_excel = write_analysis_result_excel,
-            write_analysis_result_report_html = write_analysis_result_report_html,
-            analysis_result_to_metadata_list = analysis_result_to_metadata_list,
-            analysis_result_to_export_sheets = analysis_result_to_export_sheets,
-            analysis_result_to_report_context = analysis_result_to_report_context,
-            .kwallm_mode_display_from_id = .kwallm_mode_display_from_id
+          .args = c(
+            list(
+              analysis_result = analysis_result,
+              temp_dir = tempdir()
+            ),
+            analysis_result_async_globals()
           )
         )
 
