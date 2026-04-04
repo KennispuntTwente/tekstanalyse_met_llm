@@ -511,10 +511,6 @@ write_analysis_result_metadata_json <- function(
 # We use excerpts when present and otherwise fall back to full document text.
 .kwallm_paragraph_supporting_texts <- function(analysis_result, paragraph_id) {
   paragraph_sources <- analysis_result@paragraphs@paragraph_sources
-  if (!nrow(paragraph_sources)) {
-    return(character())
-  }
-
   sources <- paragraph_sources[
     paragraph_sources$paragraph_id %in% paragraph_id,
     ,
@@ -558,13 +554,9 @@ write_analysis_result_metadata_json <- function(
     return(list())
   }
 
-  rows <- vector("list", nrow(df))
-  for (i in seq_len(nrow(df))) {
-    row <- as.list(df[i, , drop = FALSE])
-    row <- lapply(row, .kwallm_scalar_or_null)
-    rows[[i]] <- row
-  }
-  rows
+  lapply(seq_len(nrow(df)), function(i) {
+    lapply(as.list(df[i, , drop = FALSE]), .kwallm_scalar_or_null)
+  })
 }
 
 # Computes the main text-count layers used across metadata and reports.
@@ -738,20 +730,10 @@ write_analysis_result_metadata_json <- function(
   )
 }
 
-# Collapses vectors that are entirely missing to NULL.
-# We use this before writing JSON records so empty values do not become noisy arrays.
-.kwallm_null_if_all_missing <- function(x) {
-  if (is.null(x) || !length(x) || all(is.na(x))) {
-    return(NULL)
-  }
-  x
-}
-
 # Returns a scalar value when possible, otherwise a cleaned vector or NULL.
 # We use this to make JSON output stable for both single values and small vectors.
 .kwallm_scalar_or_null <- function(x) {
-  x <- .kwallm_null_if_all_missing(x)
-  if (is.null(x)) {
+  if (is.null(x) || !length(x) || all(is.na(x))) {
     return(NULL)
   }
   if (length(x) == 1L) {

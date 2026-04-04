@@ -997,22 +997,13 @@ processing_server <- function(
           )
         )
 
-        mode_display <- mode()
-        if (mode_display == "Categorisatie") {
-          start_categorization()
-          return()
-        }
-        if (mode_display == "Scoren") {
-          start_scoring()
-          return()
-        }
-        if (mode_display == "Onderwerpextractie") {
-          start_topic_generation()
-          return()
-        }
-        if (mode_display == "Markeren") {
-          start_marking()
-        }
+        switch(
+          mode(),
+          "Categorisatie" = start_categorization(),
+          "Scoren" = start_scoring(),
+          "Onderwerpextractie" = start_topic_generation(),
+          "Markeren" = start_marking()
+        )
       })
 
       ### 2.7.2 Processing completion UI ---------------------------------------
@@ -1348,14 +1339,12 @@ processing_server <- function(
         llm_stream$hide()
 
         if (interrater_reliability_toggle()) {
-          # Only categorization-style modes need a category set for IRR.
-          all_categories <- if (mode() == "Categorisatie") {
-            categories$texts()
-          } else if (mode() == "Onderwerpextractie") {
-            topics()
-          } else {
+          all_categories <- switch(
+            mode(),
+            "Categorisatie" = categories$texts(),
+            "Onderwerpextractie" = topics(),
             NULL
-          }
+          )
 
           if (
             mode() %in%

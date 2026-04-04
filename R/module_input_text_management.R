@@ -28,11 +28,15 @@ text_management_server <- function(
   processing = reactiveVal(FALSE),
   lang = default_lang()
 ) {
+  opt_none <- isTRUE(getOption("anonymization__none", TRUE))
+  opt_regex <- isTRUE(getOption("anonymization__regex", TRUE))
+  opt_gliner <- isTRUE(getOption("anonymization__gliner_model", FALSE))
+
   # Ensure at least one anonymization method is enabled
   if (
-    !isTRUE(getOption("anonymization__none", TRUE)) &&
-      !isTRUE(getOption("anonymization__regex", TRUE)) &&
-      !isTRUE(getOption("anonymization__gliner_model", FALSE))
+    !opt_none &&
+      !opt_regex &&
+      !opt_gliner
   ) {
     stop("At least one anonymization method must be enabled via options.")
   }
@@ -50,65 +54,46 @@ text_management_server <- function(
     opt_default <- NA_character_
   }
 
-  default_is_enabled <- switch(
-    as.character(opt_default),
-    none = isTRUE(getOption("anonymization__none", TRUE)),
-    regex = isTRUE(getOption("anonymization__regex", TRUE)),
-    gliner = isTRUE(getOption("anonymization__gliner_model", FALSE)),
-    FALSE
+  available_modes <- c(
+    none = if (opt_none) "none" else NA_character_,
+    simple = if (opt_regex) "simple" else NA_character_,
+    gliner = if (opt_gliner) "gliner" else NA_character_
+  ) |>
+    stats::na.omit() |>
+    unname()
+
+  configured_default_mode <- switch(
+    opt_default,
+    none = "none",
+    regex = "simple",
+    gliner = "gliner",
+    NULL
   )
 
-  if (!default_is_enabled) {
-    fallback_map <- list(
-      regex = isTRUE(getOption("anonymization__regex", TRUE)),
-      gliner = isTRUE(getOption("anonymization__gliner_model", FALSE)),
-      none = isTRUE(getOption("anonymization__none", TRUE))
-    )
-    resolved <- names(which(unlist(fallback_map)))[1]
-    warning(
-      "Default anonymization method '",
-      opt_default,
-      "' is not enabled; falling back to '",
-      resolved,
-      "'."
-    )
-    opt_default <- resolved
+  if (
+    !is.null(configured_default_mode) &&
+      configured_default_mode %in% available_modes
+  ) {
+    initial_mode <- configured_default_mode
+  } else {
+    initial_mode <- intersect(c("simple", "gliner", "none"), available_modes)[1]
+
+    if (!is.na(opt_default)) {
+      warning(
+        "Default anonymization method '",
+        opt_default,
+        "' is not enabled; falling back to '",
+        initial_mode,
+        "'."
+      )
+    }
   }
 
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # -- 0  Global options ------------------------------------------
-    opt_default <- getOption("anonymization__default", "regex")
-    opt_none <- isTRUE(getOption("anonymization__none", TRUE))
-    opt_regex <- isTRUE(getOption("anonymization__regex", TRUE))
-    opt_gliner <- isTRUE(getOption("anonymization__gliner_model", FALSE))
-
-    # Determine which methods are actually available ----------------
-    available_modes <- c(
-      none = if (opt_none) "none" else NA,
-      simple = if (opt_regex) "simple" else NA,
-      gliner = if (opt_gliner) "gliner" else NA
-    ) |>
-      stats::na.omit() |>
-      unname()
-
     if (length(available_modes) == 0) {
       stop("At least one anonymization method must be enabled via options.")
-    }
-
-    # Determine the initial mode ------------------------------------
-    initial_mode <- switch(
-      opt_default,
-      none = if ("none" %in% available_modes) "none" else NULL,
-      regex = if ("simple" %in% available_modes) "simple" else NULL,
-      gliner = if ("gliner" %in% available_modes) "gliner" else NULL,
-      NULL
-    )
-    if (is.null(initial_mode)) {
-      # fall‑back order: regex → gliner → none
-      fallback_order <- c("simple", "gliner", "none")
-      initial_mode <- intersect(fallback_order, available_modes)[1]
     }
 
     # -- 1  Child module: GLiNER ------------------------------------
@@ -137,27 +122,6 @@ text_management_server <- function(
       anonymization_completed = NULL
     )
 
-    build_identity_rows <- function(values) {
-      if (!length(values)) {
-        return(data.frame(
-          source_document_id = integer(),
-          document_id = integer(),
-          source_document_text = character(),
-          document_text = character(),
-          stringsAsFactors = FALSE
-        ))
-      }
-
-      # Without upstream split rows, the current row is still the source row.
-      data.frame(
-        source_document_id = seq_along(values),
-        document_id = seq_along(values),
-        source_document_text = as.character(values),
-        document_text = as.character(values),
-        stringsAsFactors = FALSE
-      )
-    }
-
     input_rows <- reactive({
       # Upstream modules may already have split one source row into many
       # document rows. Keep that lineage intact when it is provided.
@@ -170,7 +134,13 @@ text_management_server <- function(
         return(NULL)
       }
 
-      build_identity_rows(values)
+      data.frame(
+        source_document_id = seq_along(values),
+        document_id = seq_along(values),
+        source_document_text = as.character(values),
+        document_text = as.character(values),
+        stringsAsFactors = FALSE
+      )
     })
 
     shiny::exportTestValues(
@@ -367,7 +337,7 @@ text_management_server <- function(
           return()
         }
         if (isTRUE(processing())) {
-          glossy <- shinyjs::disable(id)
+          shinyjs::disable(id)
         } else {
           shinyjs::enable(id)
         }
@@ -383,17 +353,10 @@ text_management_server <- function(
       mode = ""
     ))
 
-    export_anonymization_mode <- function(value) {
-      if (identical(value, "simple")) {
-        return("regex")
-      }
-      value
-    }
-
     observe({
       req(input_rows())
       mode <- anonymization_mode()
-      requested_mode <- export_anonymization_mode(mode)
+      requested_mode <- if (identical(mode, "simple")) "regex" else mode
       anonymization_completed <- TRUE
       document_text_vals <- input_rows()$document_text
 

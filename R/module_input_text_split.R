@@ -17,31 +17,6 @@ text_split_server <- function(
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # -- State ----------------------------------------------------
-    # source_document_* stays tied to the uploaded row.
-    # document_* is this module's current row view and can fan out into chunks.
-
-    build_identity_rows <- function(values) {
-      if (!length(values)) {
-        return(data.frame(
-          source_document_id = integer(),
-          document_id = integer(),
-          source_document_text = character(),
-          document_text = character(),
-          stringsAsFactors = FALSE
-        ))
-      }
-
-      # Before splitting, the current row is still the uploaded source row.
-      data.frame(
-        source_document_id = seq_along(values),
-        document_id = seq_along(values),
-        source_document_text = as.character(values),
-        document_text = as.character(values),
-        stringsAsFactors = FALSE
-      )
-    }
-
     input_rows <- reactive({
       if (!is.null(document_rows)) {
         return(document_rows())
@@ -52,7 +27,13 @@ text_split_server <- function(
         return(NULL)
       }
 
-      build_identity_rows(values)
+      data.frame(
+        source_document_id = seq_along(values),
+        document_id = seq_along(values),
+        source_document_text = as.character(values),
+        document_text = as.character(values),
+        stringsAsFactors = FALSE
+      )
     })
 
     rows <- reactive({

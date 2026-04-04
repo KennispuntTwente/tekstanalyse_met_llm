@@ -819,19 +819,21 @@ build_analysis_result <- function(
   style_prompt = NULL,
   context_window = list()
 ) {
+  paragraph_style_prompt <- if (
+    !is.null(style_prompt) && nzchar(style_prompt)
+  ) {
+    style_prompt
+  } else {
+    NULL
+  }
+
   switch(
     mode_id,
     categorization = CategorizationConfig(
       assign_multiple_categories = isTRUE(assign_multiple_categories),
       human_in_the_loop = isTRUE(human_in_the_loop),
       write_paragraphs = isTRUE(write_paragraphs),
-      paragraph_style_prompt = if (
-        !is.null(style_prompt) && nzchar(style_prompt)
-      ) {
-        style_prompt
-      } else {
-        NULL
-      }
+      paragraph_style_prompt = paragraph_style_prompt
     ),
     scoring = ScoringConfig(
       scoring_characteristic = as.character(scoring_characteristic %||% "Score")
@@ -840,13 +842,7 @@ build_analysis_result <- function(
       assign_multiple_categories = isTRUE(assign_multiple_categories),
       human_in_the_loop = isTRUE(human_in_the_loop),
       write_paragraphs = isTRUE(write_paragraphs),
-      paragraph_style_prompt = if (
-        !is.null(style_prompt) && nzchar(style_prompt)
-      ) {
-        style_prompt
-      } else {
-        NULL
-      },
+      paragraph_style_prompt = paragraph_style_prompt,
       topic_generation_settings = data.frame(
         setting = c(
           "batch_size",
@@ -865,13 +861,7 @@ build_analysis_result <- function(
     ),
     marking = MarkingConfig(
       write_paragraphs = isTRUE(write_paragraphs),
-      paragraph_style_prompt = if (
-        !is.null(style_prompt) && nzchar(style_prompt)
-      ) {
-        style_prompt
-      } else {
-        NULL
-      },
+      paragraph_style_prompt = paragraph_style_prompt,
       text_size_tokens = as.numeric(context_window$max_tokens %||% 0),
       overlap_size_tokens = as.numeric(context_window$overlap %||% 0)
     )
@@ -1002,8 +992,15 @@ build_analysis_result <- function(
 # Builds the normalized label table.
 # We use this to give every category or topic a stable numeric id in exports.
 .kwallm_build_labels <- function(values, exclusive_values = character()) {
-  values <- .kwallm_safe_unique_strings(values)
-  exclusive_values <- .kwallm_safe_unique_strings(exclusive_values)
+  values <- unique(trimws(as.character(values %||% character())))
+  values <- values[!is.na(values) & nzchar(values)]
+
+  exclusive_values <- unique(trimws(as.character(
+    exclusive_values %||% character()
+  )))
+  exclusive_values <- exclusive_values[
+    !is.na(exclusive_values) & nzchar(exclusive_values)
+  ]
 
   data.frame(
     label_id = seq_along(values),
@@ -1078,14 +1075,6 @@ build_analysis_result <- function(
 
 # Keeps the lowest-level helpers together at the bottom of the file.
 # These functions clean incoming values before the larger builders use them.
-
-# Cleans a character vector and drops empty values.
-# We use this before building label and code lookup tables.
-.kwallm_safe_unique_strings <- function(x) {
-  x <- as.character(x %||% character())
-  x <- trimws(x)
-  unique(x[!is.na(x) & nzchar(x)])
-}
 
 # Resolves the analysis-unit ids for one result table.
 # Prefer explicit ids carried through the runtime flow; only fall back to the
