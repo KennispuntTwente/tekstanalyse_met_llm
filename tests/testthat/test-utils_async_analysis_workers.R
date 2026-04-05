@@ -73,6 +73,61 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
     "prompt_score",
     envir = environment(scoring_env$score_texts)
   ))
+
+  marking_env <- new.env(parent = emptyenv())
+  marking_env$async_message_printer <- function(...) NULL
+  marking_env$log_info <- function(...) NULL
+  marking_env$send_prompt_with_retries <- function(...) NULL
+  marking_env$get_context_window_size_in_tokens <- function(...) 1024
+  marking_env$count_tokens <- function(...) 1
+  marking_env$tiktoken_load_tokenizer <- function(...) NULL
+  marking_env$semchunk_load_chunker <- function(...) NULL
+  marking_env$mark_text_prompt <- function(...) NULL
+  marking_env$write_paragraph <- function(...) NULL
+  marking_env$.kwallm_empty_marking_matches <- function(...) NULL
+  marking_env$.kwallm_marking_status_row <- function(...) NULL
+  marking_env$.kwallm_marking_matches_from_find_matches <- function(...) NULL
+  marking_env$.kwallm_normalize_marking_matches <- function(...) NULL
+  marking_env$.kwallm_marking_find_absolute_span <- function(...) NULL
+  marking_env$.kwallm_marking_clean_results <- function(...) NULL
+  marking_env$.kwallm_marking_build_highlighted_excerpt <- function(...) NULL
+  marking_env$.kwallm_marking_collect_paragraph_inputs <- function(...) NULL
+  marking_env$find_matches <- function(...) NULL
+  marking_env$normalize_with_map <- function(...) NULL
+  marking_env$best_literal_substring <- function(...) NULL
+  marking_env$fuzzy_threshold <- function(...) NULL
+  marking_env$normalize_for_dist <- function(...) NULL
+  marking_env$mark_texts <- function(...) NULL
+
+  prepare_async_analysis_worker(
+    task = "marking",
+    env = marking_env
+  )
+
+  expect_true(exists(
+    "async_message_printer",
+    envir = environment(marking_env$semchunk_load_chunker)
+  ))
+  expect_true(exists(
+    "semchunk_load_chunker",
+    envir = environment(marking_env$mark_texts)
+  ))
+  expect_true(exists(
+    "log_info",
+    envir = environment(marking_env$mark_texts)
+  ))
+  expect_true(exists(
+    "find_matches",
+    envir = environment(marking_env$mark_text_prompt)
+  ))
+  expect_true(exists(
+    ".kwallm_marking_matches_from_find_matches",
+    envir = environment(marking_env$mark_text_prompt)
+  ))
+  expect_true(exists(
+    "best_literal_substring",
+    envir = environment(marking_env$find_matches)
+  ))
 })
 
 
@@ -95,6 +150,14 @@ test_that("analysis async globals helpers expose the expected names", {
     "mark_text_prompt",
     "semchunk_load_chunker",
     "write_paragraph",
+    ".kwallm_empty_marking_matches",
+    ".kwallm_marking_status_row",
+    ".kwallm_marking_matches_from_find_matches",
+    ".kwallm_normalize_marking_matches",
+    ".kwallm_marking_find_absolute_span",
+    ".kwallm_marking_clean_results",
+    ".kwallm_marking_build_highlighted_excerpt",
+    ".kwallm_marking_collect_paragraph_inputs",
     "find_matches",
     "normalize_with_map",
     "best_literal_substring",
@@ -168,6 +231,14 @@ test_that("analysis async globals helpers expose the expected names", {
       "mark_text_prompt",
       "semchunk_load_chunker",
       "write_paragraph",
+      ".kwallm_empty_marking_matches",
+      ".kwallm_marking_status_row",
+      ".kwallm_marking_matches_from_find_matches",
+      ".kwallm_normalize_marking_matches",
+      ".kwallm_marking_find_absolute_span",
+      ".kwallm_marking_clean_results",
+      ".kwallm_marking_build_highlighted_excerpt",
+      ".kwallm_marking_collect_paragraph_inputs",
       "find_matches",
       "normalize_with_map",
       "best_literal_substring",
@@ -175,4 +246,17 @@ test_that("analysis async globals helpers expose the expected names", {
       "normalize_for_dist"
     )
   )
+
+  worker_setup_globals <- analysis_async_worker_setup_globals()
+  expect_named(worker_setup_globals, "prepare_async_analysis_worker")
+  expect_true(exists(
+    "async_inject_dependencies",
+    envir = environment(worker_setup_globals$prepare_async_analysis_worker),
+    inherits = TRUE
+  ))
+  expect_true(exists(
+    ".analysis_async_dependency_map",
+    envir = environment(worker_setup_globals$prepare_async_analysis_worker),
+    inherits = TRUE
+  ))
 })

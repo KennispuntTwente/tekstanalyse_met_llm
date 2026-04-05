@@ -133,10 +133,20 @@ kwallm_test_llm_recognizes_prompt <- function(prompt_text) {
       fixed = TRUE
     ),
     grepl(
-      "Characteristic to score the text on:",
+      "Respond with a score (0-100)",
       prompt_text,
       fixed = TRUE
-    ),
+    ) &&
+      grepl(
+        "<scoring_characteristic>",
+        prompt_text,
+        fixed = TRUE
+      ) &&
+      grepl(
+        "<text>",
+        prompt_text,
+        fixed = TRUE
+      ),
     (grepl("<code>", prompt_text, fixed = TRUE) &&
       grepl("<text>", prompt_text, fixed = TRUE) &&
       grepl("\"text_parts\"", prompt_text, fixed = TRUE)),
@@ -225,10 +235,12 @@ kwallm_test_llm_reply <- function(prompt_text, chat_history = NULL) {
 
   if (
     grepl(
-      "Characteristic to score the text on:",
+      "Respond with a score (0-100)",
       prompt_text,
       fixed = TRUE
-    )
+    ) &&
+      grepl("<scoring_characteristic>", prompt_text, fixed = TRUE) &&
+      grepl("<text>", prompt_text, fixed = TRUE)
   ) {
     return(kwallm_test_llm_score_reply(prompt_text))
   }
@@ -401,7 +413,7 @@ kwallm_test_llm_paragraph_reply <- function(prompt_text) {
 kwallm_test_llm_score_reply <- function(prompt_text) {
   text_value <- stringr::str_match(
     prompt_text,
-    "(?s)Text:\\s*'(.+?)'\\s*\\n\\nCharacteristic to score the text on:"
+    "(?s)<text>\\s*(.*?)\\s*</text>"
   )[, 2]
   if (is.na(text_value)) {
     text_value <- ""

@@ -80,8 +80,12 @@ test_that("{shinytest2} recording: standard process - marking", {
   expect_true(all(
     c("text", "chunk_text", "code", "marked_text") %in% colnames(results)
   ))
-  # Expect that all columns are character
-  expect_true(all(sapply(results, is.character)))
+  # Marking results now include typed diagnostic/id columns; only the text-like
+  # fields this test exercises must remain character vectors.
+  expect_true(all(sapply(
+    results[c("text", "chunk_text", "code", "marked_text")],
+    is.character
+  )))
 
   # Expect that all texts are present in column 'text'
   texts <- readLines(

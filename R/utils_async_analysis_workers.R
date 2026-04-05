@@ -86,6 +86,7 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       )
     ),
     marking = list(
+      semchunk_load_chunker = "async_message_printer",
       tiktoken_load_tokenizer = "async_message_printer",
       count_tokens = "tiktoken_load_tokenizer",
       write_paragraph = c(
@@ -94,7 +95,27 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "count_tokens",
         "tiktoken_load_tokenizer"
       ),
+      normalize_for_dist = "normalize_with_map",
+      best_literal_substring = c(
+        "normalize_for_dist",
+        "normalize_with_map",
+        "fuzzy_threshold"
+      ),
+      find_matches = "best_literal_substring",
+      mark_text_prompt = c(
+        "find_matches",
+        ".kwallm_marking_status_row",
+        ".kwallm_marking_matches_from_find_matches"
+      ),
+      .kwallm_normalize_marking_matches = c(
+        "find_matches",
+        ".kwallm_empty_marking_matches",
+        ".kwallm_marking_matches_from_find_matches"
+      ),
+      .kwallm_marking_clean_results = ".kwallm_marking_find_absolute_span",
+      .kwallm_marking_collect_paragraph_inputs = ".kwallm_marking_build_highlighted_excerpt",
       mark_texts = c(
+        "log_info",
         "send_prompt_with_retries",
         "get_context_window_size_in_tokens",
         "count_tokens",
@@ -106,7 +127,10 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "normalize_with_map",
         "best_literal_substring",
         "fuzzy_threshold",
-        "normalize_for_dist"
+        "normalize_for_dist",
+        ".kwallm_normalize_marking_matches",
+        ".kwallm_marking_clean_results",
+        ".kwallm_marking_collect_paragraph_inputs"
       )
     ),
     stop("Unknown async analysis worker task: ", task, call. = FALSE)
@@ -150,12 +174,26 @@ analysis_async_tokenizer_globals <- function() {
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
 analysis_async_worker_setup_globals <- function(env = parent.frame()) {
+  prepare_async_analysis_worker_fn <- get(
+    "prepare_async_analysis_worker",
+    envir = env,
+    inherits = TRUE
+  )
+  fn_env <- new.env(parent = environment(prepare_async_analysis_worker_fn))
+  fn_env$async_inject_dependencies <- get(
+    "async_inject_dependencies",
+    envir = env,
+    inherits = TRUE
+  )
+  fn_env$.analysis_async_dependency_map <- get(
+    ".analysis_async_dependency_map",
+    envir = env,
+    inherits = TRUE
+  )
+  environment(prepare_async_analysis_worker_fn) <- fn_env
+
   list(
-    prepare_async_analysis_worker = get(
-      "prepare_async_analysis_worker",
-      envir = env,
-      inherits = TRUE
-    )
+    prepare_async_analysis_worker = prepare_async_analysis_worker_fn
   )
 }
 
@@ -270,6 +308,46 @@ analysis_async_marking_globals <- function(env = parent.frame()) {
       inherits = TRUE
     ),
     write_paragraph = get("write_paragraph", envir = env, inherits = TRUE),
+    .kwallm_empty_marking_matches = get(
+      ".kwallm_empty_marking_matches",
+      envir = env,
+      inherits = TRUE
+    ),
+    .kwallm_marking_status_row = get(
+      ".kwallm_marking_status_row",
+      envir = env,
+      inherits = TRUE
+    ),
+    .kwallm_marking_matches_from_find_matches = get(
+      ".kwallm_marking_matches_from_find_matches",
+      envir = env,
+      inherits = TRUE
+    ),
+    .kwallm_normalize_marking_matches = get(
+      ".kwallm_normalize_marking_matches",
+      envir = env,
+      inherits = TRUE
+    ),
+    .kwallm_marking_find_absolute_span = get(
+      ".kwallm_marking_find_absolute_span",
+      envir = env,
+      inherits = TRUE
+    ),
+    .kwallm_marking_clean_results = get(
+      ".kwallm_marking_clean_results",
+      envir = env,
+      inherits = TRUE
+    ),
+    .kwallm_marking_build_highlighted_excerpt = get(
+      ".kwallm_marking_build_highlighted_excerpt",
+      envir = env,
+      inherits = TRUE
+    ),
+    .kwallm_marking_collect_paragraph_inputs = get(
+      ".kwallm_marking_collect_paragraph_inputs",
+      envir = env,
+      inherits = TRUE
+    ),
     find_matches = get("find_matches", envir = env, inherits = TRUE),
     normalize_with_map = get(
       "normalize_with_map",

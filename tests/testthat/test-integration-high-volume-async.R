@@ -78,6 +78,7 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
   skip_if_not_installed("mirai")
   withr::local_dir(here::here())
 
+  source(here::here("R", "utils_async_message_printer.R"), local = TRUE)
   source(here::here("R", "utils_context_window.R"), local = TRUE)
   source(here::here("R", "utils_tokenizer.R"), local = TRUE)
   source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
@@ -126,6 +127,7 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
 
       categorize_texts(
         texts = texts,
+        analysis_unit_ids = analysis_unit_ids,
         categories = categories,
         research_background = research_background,
         llm_provider = llm_provider,
@@ -144,6 +146,7 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
     .args = c(
       list(
         texts = texts,
+        analysis_unit_ids = seq_along(texts),
         categories = categories,
         research_background = "",
         llm_provider = provider
@@ -162,9 +165,13 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
 
   expect_identical(nrow(results), 3000L)
   expect_identical(sort(results$text), sort(texts))
-  expect_identical(names(results), c("text", categories))
-  expect_true(all(vapply(results[-1], is.logical, logical(1))))
-  expect_true(all(rowSums(results[-1]) > 0))
+  expect_identical(
+    names(results),
+    c("analysis_unit_id", "text", categories)
+  )
+  expect_identical(results$analysis_unit_id, seq_along(texts))
+  expect_true(all(vapply(results[-c(1, 2)], is.logical, logical(1))))
+  expect_true(all(rowSums(results[-c(1, 2)]) > 0))
   expect_true(sum(results[["Billing and refunds"]]) > 500)
   expect_true(sum(results[["Customer support"]]) >= 500)
   expect_true(sum(results[["Unknown/not applicable"]]) == 0)
@@ -190,6 +197,7 @@ test_that("scoring async integration handles 3000 texts with fake LLM", {
   skip_if_not_installed("mirai")
   withr::local_dir(here::here())
 
+  source(here::here("R", "utils_async_message_printer.R"), local = TRUE)
   source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
   source(here::here("R", "utils_async_analysis_workers.R"), local = TRUE)
   source(
@@ -225,6 +233,7 @@ test_that("scoring async integration handles 3000 texts with fake LLM", {
 
       score_texts(
         texts = texts,
+        analysis_unit_ids = analysis_unit_ids,
         scoring_characteristic = scoring_characteristic,
         research_background = research_background,
         llm_provider = llm_provider,
@@ -241,6 +250,7 @@ test_that("scoring async integration handles 3000 texts with fake LLM", {
     .args = c(
       list(
         texts = texts,
+        analysis_unit_ids = seq_along(texts),
         scoring_characteristic = "Customer satisfaction",
         research_background = "",
         llm_provider = provider
@@ -259,6 +269,7 @@ test_that("scoring async integration handles 3000 texts with fake LLM", {
 
   expect_identical(nrow(results), 3000L)
   expect_identical(sort(results$text), sort(texts))
+  expect_identical(results$analysis_unit_id, seq_along(texts))
   expect_true(is.numeric(results$result))
   expect_true(all(results$result >= 0 & results$result <= 100))
   expect_true(length(unique(results$result)) >= 3)
@@ -285,6 +296,7 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
   skip_if_not_installed("mirai")
   withr::local_dir(here::here())
 
+  source(here::here("R", "utils_async_message_printer.R"), local = TRUE)
   source(here::here("R", "utils_context_window.R"), local = TRUE)
   source(here::here("R", "utils_tokenizer.R"), local = TRUE)
   source(here::here("R", "utils_semchunk.R"), local = TRUE)
@@ -359,8 +371,12 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
   expect_true(all(results$code %in% codes))
   expect_identical(length(unique(results$analysis_unit_id)), 3000L)
   expect_true(all(vapply(results$marked_text, is.character, logical(1))))
-  expect_true(all(results$marked_text == results$chunk_text))
-  expect_true(all(nchar(results$marked_text) > 0))
+  expect_true(!all(is.na(results$marked_text)))
+  expect_true(all(
+    results$marked_text[!is.na(results$marked_text)] ==
+      results$chunk_text[!is.na(results$marked_text)]
+  ))
+  expect_true(all(nchar(results$marked_text[!is.na(results$marked_text)]) > 0))
 
   log_file <- file.path(
     getOption("logger__dir"),

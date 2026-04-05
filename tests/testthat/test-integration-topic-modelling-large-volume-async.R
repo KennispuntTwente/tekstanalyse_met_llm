@@ -51,7 +51,9 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
   skip_on_cran()
   skip_if_not_installed("mirai")
   withr::local_dir(here::here())
+  set.seed(1)
 
+  source(here::here("R", "utils_async_message_printer.R"), local = TRUE)
   source(here::here("R", "utils_context_window.R"), local = TRUE)
   source(here::here("R", "utils_tokenizer.R"), local = TRUE)
   source(here::here("R", "utils_create_text_batches.R"), local = TRUE)

@@ -54,18 +54,18 @@
         5
       ]
     },
-    "text_management-texts__preprocessed": [
-      "lovely product!",
-      "bad product!",
-      "no opinion!",
-      "my email address is << removed e-mail address >>",
-      "oke!"
-    ],
     "text_management-texts__document_text": [
       "lovely product!",
       "bad product!",
       "no opinion!",
       "my email address is l.koning@kennispunttwente.nl",
+      "oke!"
+    ],
+    "text_management-texts__preprocessed": [
+      "lovely product!",
+      "bad product!",
+      "no opinion!",
+      "my email address is << removed e-mail address >>",
       "oke!"
     ]
   }
