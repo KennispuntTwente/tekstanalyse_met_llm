@@ -53,7 +53,11 @@ test_that("topic_assignment_prompt_context_window_check uses the real topic list
     assign("construct_prompt_text", old_construct, envir = tidyprompt_ns)
     lockBinding("construct_prompt_text", tidyprompt_ns)
     assign("prompt_category", old_prompt_category, envir = helper_env)
-    assign("prompt_multi_category", old_prompt_multi_category, envir = helper_env)
+    assign(
+      "prompt_multi_category",
+      old_prompt_multi_category,
+      envir = helper_env
+    )
   })
 
   unlockBinding("construct_prompt_text", tidyprompt_ns)

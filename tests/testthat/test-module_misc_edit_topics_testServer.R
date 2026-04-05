@@ -10,7 +10,11 @@ testthat::skip_if_not_installed("later")
 showModal <- function(...) invisible(NULL)
 removeModal <- function(...) invisible(NULL)
 last_notification <- NULL
-showNotification <- function(ui, type = c("default", "message", "warning", "error"), ...) {
+showNotification <- function(
+  ui,
+  type = c("default", "message", "warning", "error"),
+  ...
+) {
   last_notification <<- list(
     ui = as.character(ui),
     type = match.arg(type)
@@ -97,7 +101,9 @@ test_that("edit_topics_server: confirm sets edited topics and updates exclusive 
         assign_multiple_categories = reactiveVal(TRUE),
         llm_provider = list(parameters = list(model = "unit-test")),
         assignment_texts = reactive(c("short text")),
-        assignment_llm_provider = reactive(list(parameters = list(model = "unit-test"))),
+        assignment_llm_provider = reactive(list(
+          parameters = list(model = "unit-test")
+        )),
         lang = lang
       )
 
@@ -150,7 +156,9 @@ test_that("edit_topics_server: reduce_again applies re-reduced topics and keeps 
         assign_multiple_categories = reactiveVal(TRUE),
         llm_provider = list(parameters = list(model = "unit-test")),
         assignment_texts = reactive(c("short text")),
-        assignment_llm_provider = reactive(list(parameters = list(model = "unit-test"))),
+        assignment_llm_provider = reactive(list(
+          parameters = list(model = "unit-test")
+        )),
         lang = lang
       )
 
@@ -245,7 +253,9 @@ test_that("edit_topics_server: confirm blocks topics that exceed context window"
         assign_multiple_categories = reactiveVal(TRUE),
         llm_provider = list(parameters = list(model = "unit-test")),
         assignment_texts = reactive(c("short text")),
-        assignment_llm_provider = reactive(list(parameters = list(model = "unit-test"))),
+        assignment_llm_provider = reactive(list(
+          parameters = list(model = "unit-test")
+        )),
         lang = lang
       )
 
@@ -260,7 +270,10 @@ test_that("edit_topics_server: confirm blocks topics that exceed context window"
       expect_null(edited())
       expect_false(is.null(last_notification))
       expect_identical(last_notification$type, "error")
-      expect_match(last_notification$ui, "context-window van het toekenningsmodel")
+      expect_match(
+        last_notification$ui,
+        "context-window van het toekenningsmodel"
+      )
     }
   )
 })
