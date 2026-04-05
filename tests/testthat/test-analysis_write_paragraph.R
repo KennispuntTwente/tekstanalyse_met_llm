@@ -1,5 +1,33 @@
 library(testthat)
 
+test_that("write_paragraph returns a warning record when the prompt overflows", {
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  count_tokens <- function(x) {
+    nchar(x)
+  }
+  get_context_window_size_in_tokens <- function(model) {
+    force(model)
+    10
+  }
+  send_prompt_with_retries <- function(...) {
+    testthat::fail("send_prompt_with_retries should not be called on overflow")
+  }
+
+  result <- write_paragraph(
+    texts = c("This text is intentionally long enough to overflow."),
+    analysis_unit_ids = 1L,
+    topic = "Code A",
+    llm_provider = list(parameters = list(model = "unit-test-model")),
+    language = "en"
+  )
+
+  expect_identical(result$paragraph, "")
+  expect_false(result$prompt_fits)
+  expect_identical(result$analysis_unit_ids, 1L)
+  expect_identical(result$topic, "Code A")
+})
+
 test_that("prompt_write_paragraph builds structured tagged prompt", {
   source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
 
@@ -55,16 +83,15 @@ test_that("write_paragraph checks prompt fit before sending", {
 
   source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
 
-  expect_error(
-    write_paragraph(
-      texts = c("some text"),
-      analysis_unit_ids = 1L,
-      topic = "weather",
-      llm_provider = list(parameters = list(model = "test")),
-      language = "en"
-    ),
-    "exceeds the model context window"
+  result <- write_paragraph(
+    texts = c("some text"),
+    analysis_unit_ids = 1L,
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en"
   )
 
+  expect_identical(result$paragraph, "")
+  expect_false(result$prompt_fits)
   expect_identical(send_call_count, 0)
 })

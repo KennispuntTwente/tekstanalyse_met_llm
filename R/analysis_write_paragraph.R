@@ -199,14 +199,12 @@ write_paragraph <- function(
 
   prompt_context <- .kwallm_prompt_context_window_info(prompt, llm_provider)
   if (!isTRUE(prompt_context$fits)) {
-    stop(paste0(
-      "Paragraph prompt about topic '",
-      topic,
-      "' exceeds the model context window (",
-      prompt_context$n_tokens_prompt,
-      " > ",
-      prompt_context$n_tokens_context_window,
-      " tokens)."
+    return(list(
+      paragraph = "",
+      texts = texts,
+      analysis_unit_ids = as.integer(analysis_unit_ids),
+      topic = topic,
+      prompt_fits = FALSE
     ))
   }
 
