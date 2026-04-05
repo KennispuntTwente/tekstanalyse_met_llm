@@ -20,6 +20,7 @@ on:
 env:
   IMAGE_NAME: ghcr.io/kennispunttwente/tekstanalyse_met_llm
   BASE_IMAGE_NAME: ghcr.io/kennispunttwente/tekstanalyse_met_llm-base
+  IMAGE_PLATFORMS: linux/amd64,linux/arm64
 
 permissions:
   contents: read
@@ -101,10 +102,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          if docker buildx imagetools inspect "${{ steps.base.outputs.base_ref }}" > /dev/null 2>&1; then
+          if ! raw_manifest=$(docker buildx imagetools inspect --raw "${{ steps.base.outputs.base_ref }}" 2> /dev/null); then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          missing_platforms=()
+          IFS=',' read -ra required_platforms <<< "${{ env.IMAGE_PLATFORMS }}"
+          for platform in "${required_platforms[@]}"; do
+            os="${platform%/*}"
+            arch="${platform#*/}"
+
+            if ! jq -e --arg os "$os" --arg arch "$arch" '
+              if has("manifests") then
+                any(.manifests[]?; .platform.os == $os and .platform.architecture == $arch)
+              else
+                .os == $os and .architecture == $arch
+              end
+            ' <<< "$raw_manifest" > /dev/null; then
+              missing_platforms+=("$platform")
+            fi
+          done
+
+          if [ "${#missing_platforms[@]}" -eq 0 ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
+            printf 'missing_platforms=%s\n' "${missing_platforms[*]}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build & push base image (heavy deps)
@@ -117,7 +141,7 @@ jobs:
           tags: |
             ${{ steps.base.outputs.base_ref }}
             ${{ env.BASE_IMAGE_NAME }}:base-latest
-          platforms: linux/amd64
+          platforms: ${{ env.IMAGE_PLATFORMS }}
           cache-from: type=registry,ref=${{ env.BASE_IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.BASE_IMAGE_NAME }}:buildcache,mode=max
 
@@ -139,14 +163,13 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ steps.vars.outputs.tags }}
-          platforms: linux/amd64
+          platforms: ${{ env.IMAGE_PLATFORMS }}
           build-args: |
             BASE_IMAGE=${{ steps.base.outputs.base_ref }}
           cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
 
-      # Show resulting image config (inspect the primary tag)
-      - name: Check image config
+      # Show resulting multi-arch manifest in GHCR
+      - name: Check published image manifests
         run: |
-          docker pull ${{ steps.vars.outputs.primary_tag }}
-          docker inspect ${{ steps.vars.outputs.primary_tag }} | jq '.[0].Config'
+          docker buildx imagetools inspect "${{ steps.vars.outputs.primary_tag }}"
