@@ -207,8 +207,10 @@ prompt_multi_category <- function(
         ]
         if (length(valid_numbers) == 0) {
           return(tidyprompt::llm_feedback(
-            "You must select at least one valid category number.",
-            "Format your response as a comma-separated list of numbers (e.g., \"1, 3, 5\")."
+            paste(
+              "You must select at least one valid category number.",
+              "Format your response as a comma-separated list of numbers (e.g., \"1, 3, 5\")."
+            )
           ))
         }
         categories_selected <- categories[as.integer(valid_numbers)]

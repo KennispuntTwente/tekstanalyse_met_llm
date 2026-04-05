@@ -43,6 +43,8 @@ count_tokens <- function(x) {
 
 
 test_that("topic_assignment_prompt_context_window_check uses the real topic list", {
+  source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
+
   tidyprompt_ns <- asNamespace("tidyprompt")
   helper_env <- environment(topic_assignment_prompt_context_window_check)
   old_construct <- get("construct_prompt_text", envir = tidyprompt_ns)
@@ -109,7 +111,7 @@ test_that("topic_assignment_prompt_context_window_check uses the real topic list
     texts = c("short", "this is the longest text"),
     topics = c("Topic A", "Topic B", "Topic C"),
     research_background = "background",
-    llm_provider = list(parameters = list(model = "unit-test-model")),
+    llm_provider = kwallm_test_llm_provider("kwallm-fake-main-1024"),
     assign_multiple_categories = TRUE,
     exclusive_topics = "Topic C"
   )

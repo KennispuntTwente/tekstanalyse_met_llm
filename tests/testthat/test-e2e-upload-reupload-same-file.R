@@ -25,6 +25,7 @@ test_that("{shinytest2} reuploading the same file refreshes upload state", {
     options = list(kwallm.test_async = TRUE)
   )
 
+  wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
   app$set_inputs(`text_upload-column` = "text")
   app$wait_for_value(
@@ -42,6 +43,7 @@ test_that("{shinytest2} reuploading the same file refreshes upload state", {
   expect_equal(app$get_value(input = "text_upload-by_column"), "group")
 
   vroom::vroom_write(second_data, temp_csv, delim = ",")
+  wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
 
   refreshed <- FALSE

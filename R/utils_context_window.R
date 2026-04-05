@@ -102,6 +102,11 @@ topic_assignment_prompt_context_window_check <- function(
   assign_multiple_categories = FALSE,
   exclusive_topics = character()
 ) {
+  provider_model <- tryCatch(
+    llm_provider$parameters$model,
+    error = function(e) NULL
+  )
+
   stopifnot(
     is.character(texts),
     length(texts) > 0,
@@ -109,7 +114,9 @@ topic_assignment_prompt_context_window_check <- function(
     length(topics) > 0,
     is.character(research_background),
     length(research_background) == 1,
-    is.list(llm_provider),
+    !is.null(provider_model),
+    is.character(provider_model),
+    length(provider_model) == 1,
     all(exclusive_topics %in% topics)
   )
 
@@ -130,8 +137,7 @@ topic_assignment_prompt_context_window_check <- function(
     )
   }
 
-  model <- llm_provider$parameters$model
-  assignment_context_window <- get_context_window_size_in_tokens(model)
+  assignment_context_window <- get_context_window_size_in_tokens(provider_model)
   if (is.null(assignment_context_window)) {
     assignment_context_window <- 2048
   }

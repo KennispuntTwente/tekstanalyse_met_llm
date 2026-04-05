@@ -13,6 +13,7 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
     )
   )
 
+  wait_for_text_upload_input(app)
   app$upload_file(
     `text_upload-text_file` = here::here(
       "tests",

@@ -14,6 +14,7 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   )
 
   # Upload texts
+  wait_for_text_upload_input(app)
   app$upload_file(
     `text_upload-text_file` = here::here(
       "tests",
@@ -58,20 +59,8 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     timeout = 30000
   )
 
-  # Confirm results
-  app$expect_values(
-    export = c(
-      # Text upload & processing works
-      "text_management-anonymization_mode",
-      "text_management-texts__document_text",
-      "text_management-texts__preprocessed",
-      "text_management-texts__df",
-
-      # Processing was successful
-      "processing-processing",
-      "processing-success"
-    )
-  )
+  expect_true(isTRUE(app$get_value(export = "processing-processing")))
+  expect_true(isTRUE(app$get_value(export = "processing-success")))
 
   app$wait_for_value(
     export = "processing-paragraph_entries",
@@ -86,6 +75,21 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   texts <- readLines(
     here::here("tests", "testthat", "test_texts.txt")
   )
+  document_texts <- app$get_value(
+    export = "text_management-texts__document_text"
+  )
+  preprocessed_texts <- app$get_value(
+    export = "text_management-texts__preprocessed"
+  )
+
+  expect_identical(document_texts, texts)
+  expect_true(any(grepl("kennispunttwente.nl", document_texts, fixed = TRUE)))
+  expect_false(any(grepl(
+    "kennispunttwente.nl",
+    preprocessed_texts,
+    fixed = TRUE
+  )))
+
   expect_true(all(texts %in% results$text))
   expect_true(all.equal(
     table(texts),
@@ -93,12 +97,12 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     check.attributes = FALSE
   ))
 
-  # Expect that at least 1 other column is present (topic column)
-  expect_true(ncol(results) > 1)
-  # Expect that all columns besides 'text' are logical
-  expect_true(all(sapply(results[-1], is.logical)))
+  expect_true("analysis_unit_id" %in% names(results))
+  topic_columns <- names(results)[vapply(results, is.logical, logical(1))]
+
+  expect_true(length(topic_columns) > 0)
   # Expect that all texts are categorized in at least one topic
-  expect_true(all(rowSums(results[-1]) > 0))
+  expect_true(all(rowSums(results[topic_columns]) > 0))
 
   # Expect correct paragraph structure
   expect_true(is.character(paragraphs[[1]]$paragraph))

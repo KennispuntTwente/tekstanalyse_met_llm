@@ -39,6 +39,7 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
   )
 
   # Upload CSV file
+  wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
   Sys.sleep(2)
 

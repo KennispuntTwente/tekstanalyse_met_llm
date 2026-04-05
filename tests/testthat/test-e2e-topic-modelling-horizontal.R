@@ -22,6 +22,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   expect_equal(app$get_value(input = "kwallm_sections_step"), "1")
 
   # Upload texts
+  wait_for_text_upload_input(app)
   app$upload_file(
     `text_upload-text_file` = here::here(
       "tests",
@@ -101,14 +102,8 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
     timeout = 30000
   )
 
-  # Confirm results
-  app$expect_values(
-    export = c(
-      # Processing was successful
-      "processing-processing",
-      "processing-success"
-    )
-  )
+  expect_true(isTRUE(app$get_value(export = "processing-processing")))
+  expect_true(isTRUE(app$get_value(export = "processing-success")))
 
   app$wait_for_value(
     export = "processing-paragraph_entries",
@@ -130,12 +125,12 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
     check.attributes = FALSE
   ))
 
-  # Expect that at least 1 other column is present (topic column)
-  expect_true(ncol(results) > 1)
-  # Expect that all columns besides 'text' are logical
-  expect_true(all(sapply(results[-1], is.logical)))
+  expect_true("analysis_unit_id" %in% names(results))
+  topic_columns <- names(results)[vapply(results, is.logical, logical(1))]
+
+  expect_true(length(topic_columns) > 0)
   # Expect that all texts are categorized in at least one topic
-  expect_true(all(rowSums(results[-1]) > 0))
+  expect_true(all(rowSums(results[topic_columns]) > 0))
 
   # Expect correct paragraph structure
   expect_true(is.character(paragraphs[[1]]$paragraph))

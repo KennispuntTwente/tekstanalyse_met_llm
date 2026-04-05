@@ -74,6 +74,7 @@ test_that("{shinytest2} large-volume topic modelling launches app and uses async
   )
   on.exit(app$stop(), add = TRUE)
 
+  wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_txt)
   app$wait_for_value(
     export = "text_management-texts__document_text",
@@ -117,9 +118,10 @@ test_that("{shinytest2} large-volume topic modelling launches app and uses async
   results <- app$get_value(export = "processing-results_table")
   expect_identical(nrow(results), 3000L)
   expect_identical(sort(results$text), sort(texts))
-  expect_true(ncol(results) >= 3)
-  expect_true(all(vapply(results[-1], is.logical, logical(1))))
-  expect_true(all(rowSums(results[-1]) > 0))
+  expect_true("analysis_unit_id" %in% names(results))
+  topic_columns <- names(results)[vapply(results, is.logical, logical(1))]
+  expect_true(length(topic_columns) >= 1)
+  expect_true(all(rowSums(results[topic_columns]) > 0))
 
   deadline <- Sys.time() + 15
   new_log_lines <- character()

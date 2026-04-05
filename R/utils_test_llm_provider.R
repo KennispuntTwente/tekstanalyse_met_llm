@@ -37,6 +37,11 @@ kwallm_test_llm_provider <- function(
 
     stopifnot(is.data.frame(chat_history), nrow(chat_history) > 0)
 
+    if (!"tool_result" %in% names(chat_history)) {
+      chat_history$tool_result <- FALSE
+    }
+    chat_history$tool_result[is.na(chat_history$tool_result)] <- FALSE
+
     if (!exists("kwallm_test_llm_reply", mode = "function", inherits = TRUE)) {
       source("R/utils_test_llm_provider.R", local = TRUE)
     }
@@ -72,6 +77,7 @@ kwallm_test_llm_provider <- function(
         data.frame(
           role = "assistant",
           content = response_text,
+          tool_result = FALSE,
           stringsAsFactors = FALSE
         )
       ),
@@ -98,7 +104,85 @@ kwallm_test_llm_provider <- function(
 }
 
 
+kwallm_test_llm_recognizes_prompt <- function(prompt_text) {
+  if (
+    !is.character(prompt_text) || length(prompt_text) != 1 || is.na(prompt_text)
+  ) {
+    return(FALSE)
+  }
+
+  any(c(
+    grepl(
+      "Your task is to distill a list of topics from the following texts:",
+      prompt_text,
+      fixed = TRUE
+    ),
+    grepl(
+      "Your task will be to distill a list of core topics from the following topics:",
+      prompt_text,
+      fixed = TRUE
+    ),
+    grepl(
+      "You must answer with only TRUE or FALSE",
+      prompt_text,
+      fixed = TRUE
+    ),
+    grepl(
+      "Write a short, summarizing paragraph describing the different perspectives",
+      prompt_text,
+      fixed = TRUE
+    ),
+    grepl(
+      "Characteristic to score the text on:",
+      prompt_text,
+      fixed = TRUE
+    ),
+    (grepl("<code>", prompt_text, fixed = TRUE) &&
+      grepl("<text>", prompt_text, fixed = TRUE) &&
+      grepl("\"text_parts\"", prompt_text, fixed = TRUE)),
+    (grepl(
+      "You need to categorize a text for a research project.",
+      prompt_text,
+      fixed = TRUE
+    ) &&
+      grepl("<categories>", prompt_text, fixed = TRUE)),
+    (grepl(
+      "You need to categorize a text for a research project.",
+      prompt_text,
+      fixed = TRUE
+    ) &&
+      grepl("Possible categories:", prompt_text, fixed = TRUE))
+  ))
+}
+
+
+kwallm_test_llm_resolve_prompt_text <- function(
+  prompt_text,
+  chat_history = NULL
+) {
+  candidates <- prompt_text
+
+  if (
+    !is.null(chat_history) &&
+      is.data.frame(chat_history) &&
+      "content" %in% names(chat_history)
+  ) {
+    candidates <- c(candidates, rev(as.character(chat_history$content)))
+  }
+
+  for (candidate in candidates) {
+    if (kwallm_test_llm_recognizes_prompt(candidate)) {
+      return(candidate)
+    }
+  }
+
+  prompt_text
+}
+
+
 kwallm_test_llm_reply <- function(prompt_text, chat_history = NULL) {
+  prompt_text <- kwallm_test_llm_resolve_prompt_text(prompt_text, chat_history)
+
   if (
     grepl(
       "Your task is to distill a list of topics from the following texts:",
@@ -171,15 +255,12 @@ kwallm_test_llm_reply <- function(prompt_text, chat_history = NULL) {
 
   if (
     grepl(
-      "Possible categories:",
+      "You need to categorize a text for a research project.",
       prompt_text,
       fixed = TRUE
     ) &&
-      grepl(
-        "You need to categorize a text for a research project.",
-        prompt_text,
-        fixed = TRUE
-      )
+      (grepl("<categories>", prompt_text, fixed = TRUE) ||
+        grepl("Possible categories:", prompt_text, fixed = TRUE))
   ) {
     return(kwallm_test_llm_category_reply(prompt_text))
   }
@@ -372,14 +453,29 @@ kwallm_test_llm_marking_json <- function(prompt_text) {
 kwallm_test_llm_category_reply <- function(prompt_text) {
   text_value <- stringr::str_match(
     prompt_text,
-    "(?s)Text:\\s*'(.+?)'\\s*\\n\\nPossible categories:"
+    "(?s)<text>\\s*(.*?)\\s*</text>"
   )[, 2]
+
+  if (is.na(text_value)) {
+    text_value <- stringr::str_match(
+      prompt_text,
+      "(?s)Text:\\s*'(.+?)'\\s*\\n\\nPossible categories:"
+    )[, 2]
+  }
   if (is.na(text_value)) {
     text_value <- ""
   }
 
-  category_lines <- stringr::str_match_all(
+  categories_block <- stringr::str_match(
     prompt_text,
+    "(?s)<categories>\\s*(.*?)\\s*</categories>"
+  )[, 2]
+  if (is.na(categories_block)) {
+    categories_block <- prompt_text
+  }
+
+  category_lines <- stringr::str_match_all(
+    categories_block,
     "(?m)^\\s*(\\d+)\\.\\s+(.+?)\\s*$"
   )[[1]]
 
