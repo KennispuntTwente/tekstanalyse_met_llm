@@ -720,11 +720,9 @@ text_management_server <- function(
 
 # 2 Helper functions for preprocessing texts -----------------------
 normalize_preprocessed_texts <- function(txts) {
-  if (!requireNamespace("stringr", quietly = TRUE)) {
-    stop("Please install and load the 'stringr' package.")
-  }
-
-  stringr::str_squish(as.character(txts))
+  # Preserve the exact anonymized text so downstream evidence and excerpts
+  # still reflect what the model actually saw.
+  as.character(txts)
 }
 
 

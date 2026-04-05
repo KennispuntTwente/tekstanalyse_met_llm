@@ -163,14 +163,14 @@ test_that("pre_process_texts leaves whitespace normalization to a separate helpe
 })
 
 
-test_that("normalize_preprocessed_texts squishes whitespace independently", {
+test_that("normalize_preprocessed_texts preserves whitespace independently", {
   out <- normalize_preprocessed_texts(c("  first\n\nsecond   third  "))
 
-  expect_identical(out, "first second third")
+  expect_identical(out, "  first\n\nsecond   third  ")
 })
 
 
-test_that("text_management_server normalizes preprocessed texts separately from anonymization mode", {
+test_that("text_management_server keeps structurally different texts distinct", {
   withr::local_options(list(
     anonymization__default = "none",
     anonymization__none = TRUE,
@@ -197,8 +197,12 @@ test_that("text_management_server normalizes preprocessed texts separately from 
       session$flushReact()
 
       expect_identical(texts$document_text, c(" same\n\ntext ", "same text"))
-      expect_identical(texts$preprocessed, "same text")
-      expect_identical(texts$df$analysis_unit_id, c(1L, 1L))
+      expect_identical(texts$preprocessed, c(" same\n\ntext ", "same text"))
+      expect_identical(
+        texts$analysis_units$preprocessed,
+        c(" same\n\ntext ", "same text")
+      )
+      expect_identical(texts$df$analysis_unit_id, c(1L, 2L))
     }
   )
 })
