@@ -36,6 +36,53 @@ processing_texts_under_maximum <- function(
 }
 
 
+#' Check whether GLiNER anonymization is still pending
+#'
+#' Used by `module_core_processing` to stop users from launching an analysis
+#' while they selected GLiNER but have not yet saved the anonymized texts.
+#'
+#' @param texts Reactive-values-like object from `text_management_server()`.
+#'
+#' @return `TRUE` when GLiNER is the requested anonymization mode and the
+#'   anonymization has not been completed yet, otherwise `FALSE`.
+processing_has_pending_gliner_anonymization <- function(texts) {
+  if (is.null(texts)) {
+    return(FALSE)
+  }
+
+  identical(texts$anonymization_requested_mode %||% NULL, "gliner") &&
+    !isTRUE(texts$anonymization_completed)
+}
+
+
+#' Check whether anonymization state allows launching processing
+#'
+#' Used in `module_core_processing` before dispatching an analysis run. GLiNER
+#' requires an explicit save step; until then, the app should not send the raw
+#' texts to the LLM.
+#'
+#' @param texts Reactive-values-like object from `text_management_server()`.
+#' @param lang Translator object used for notification text.
+#' @param notify_fn Function used to show the error notification.
+#'
+#' @return `TRUE` when processing may continue, otherwise `FALSE`.
+processing_anonymization_ready <- function(
+  texts,
+  lang,
+  notify_fn = shiny::showNotification
+) {
+  if (!processing_has_pending_gliner_anonymization(texts)) {
+    return(TRUE)
+  }
+
+  notify_fn(
+    lang$t("GLiNER-anonimisering nog niet voltooid..."),
+    type = "error"
+  )
+  FALSE
+}
+
+
 # 2 Report and paragraph helpers -----------------------------------------------
 
 #' Collect texts per label from processing results

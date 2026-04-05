@@ -988,6 +988,10 @@ processing_server <- function(
           return()
         }
 
+        if (!processing_anonymization_ready(texts, lang())) {
+          return()
+        }
+
         log_action(
           "analysis_process_clicked",
           details = sprintf(
@@ -1647,6 +1651,7 @@ processing_server <- function(
         disable_flag <- (n_pre == 0) ||
           isTRUE(context_window$any_fit_problem) ||
           isTRUE(context_window$too_many_batches) ||
+          isTRUE(processing_has_pending_gliner_anonymization(texts)) ||
           isTRUE(split_in_progress())
 
         actionButton(

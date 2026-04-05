@@ -83,6 +83,60 @@ test_that("processing_texts_under_maximum validates count and notifies", {
 })
 
 
+test_that("processing_has_pending_gliner_anonymization detects incomplete GLiNER state", {
+  expect_false(processing_has_pending_gliner_anonymization(NULL))
+
+  texts <- list(
+    anonymization_requested_mode = "gliner",
+    anonymization_completed = FALSE
+  )
+  expect_true(processing_has_pending_gliner_anonymization(texts))
+
+  texts$anonymization_completed <- TRUE
+  expect_false(processing_has_pending_gliner_anonymization(texts))
+
+  texts$anonymization_requested_mode <- "regex"
+  texts$anonymization_completed <- FALSE
+  expect_false(processing_has_pending_gliner_anonymization(texts))
+})
+
+
+test_that("processing_anonymization_ready blocks incomplete GLiNER anonymization", {
+  lang <- list(t = function(x) paste0("tr:", x))
+  notification <- NULL
+
+  notify_fn <- function(message, type = NULL) {
+    notification <<- list(message = message, type = type)
+    invisible(NULL)
+  }
+
+  expect_false(processing_anonymization_ready(
+    texts = list(
+      anonymization_requested_mode = "gliner",
+      anonymization_completed = FALSE
+    ),
+    lang = lang,
+    notify_fn = notify_fn
+  ))
+  expect_identical(notification$type, "error")
+  expect_identical(
+    notification$message,
+    "tr:GLiNER-anonimisering nog niet voltooid..."
+  )
+
+  notification <- NULL
+  expect_true(processing_anonymization_ready(
+    texts = list(
+      anonymization_requested_mode = "gliner",
+      anonymization_completed = TRUE
+    ),
+    lang = lang,
+    notify_fn = notify_fn
+  ))
+  expect_null(notification)
+})
+
+
 test_that("join_processing_results restores document texts without paragraph side channel", {
   texts_df <- data.frame(
     analysis_unit_id = c(1L, 2L),
