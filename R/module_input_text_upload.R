@@ -5,6 +5,67 @@
 # Note: pre-processing of texts is handled in the text_management module,
 #   this module establishes the source-document and current-document rows.
 
+.kwallm_raw_starts_with <- function(raw, prefix) {
+  stopifnot(is.raw(raw), is.numeric(prefix))
+
+  length(raw) >= length(prefix) && identical(
+    as.integer(raw[seq_along(prefix)]),
+    as.integer(prefix)
+  )
+}
+
+
+.kwallm_strip_utf_bom <- function(text) {
+  sub("^\ufeff", "", text)
+}
+
+
+.kwallm_read_text_with_encoding <- function(path, encoding) {
+  con <- file(path, open = "r", encoding = encoding)
+  on.exit(close(con), add = TRUE)
+
+  paste(readLines(con, warn = FALSE, skipNul = TRUE), collapse = "\n")
+}
+
+
+.kwallm_decode_txt_file <- function(path) {
+  stopifnot(is.character(path), length(path) == 1, nzchar(path))
+
+  raw <- readBin(path, "raw", file.info(path)$size)
+
+  if (.kwallm_raw_starts_with(raw, c(0xEF, 0xBB, 0xBF))) {
+    decoded <- rawToChar(raw[-seq_len(3)])
+    Encoding(decoded) <- "UTF-8"
+    return(.kwallm_strip_utf_bom(decoded))
+  }
+
+  if (.kwallm_raw_starts_with(raw, c(0xFF, 0xFE))) {
+    decoded <- .kwallm_read_text_with_encoding(path, "UTF-16LE")
+    return(.kwallm_strip_utf_bom(decoded))
+  }
+
+  if (.kwallm_raw_starts_with(raw, c(0xFE, 0xFF))) {
+    decoded <- .kwallm_read_text_with_encoding(path, "UTF-16BE")
+    return(.kwallm_strip_utf_bom(decoded))
+  }
+
+  txt_content <- tryCatch(
+    {
+      decoded <- rawToChar(raw)
+      if (!validUTF8(decoded)) {
+        stop("not valid utf-8")
+      }
+      Encoding(decoded) <- "UTF-8"
+      decoded
+    },
+    error = function(e) {
+      iconv(rawToChar(raw), from = "", to = "UTF-8", sub = "")
+    }
+  )
+
+  .kwallm_strip_utf_bom(txt_content)
+}
+
 # 1 UI ---------------------------------------------------------------
 text_upload_ui <- function(id) {
   ns <- NS(id)
@@ -107,25 +168,7 @@ text_upload_server <- function(
     }
 
     read_txt_file <- function(file_info, split_lines) {
-      raw <- readBin(
-        file_info$datapath,
-        "raw",
-        file.info(file_info$datapath)$size
-      )
-      txt_content <- tryCatch(
-        {
-          decoded <- rawToChar(raw)
-          if (!validUTF8(decoded)) {
-            stop("not valid utf-8")
-          }
-          Encoding(decoded) <- "UTF-8"
-          decoded
-        },
-        error = function(e) {
-          # Fall back to the system's native encoding (e.g. CP1252 on Windows)
-          iconv(rawToChar(raw), from = "", to = "UTF-8", sub = "")
-        }
-      )
+      txt_content <- .kwallm_decode_txt_file(file_info$datapath)
       txt_lines <- strsplit(txt_content, "\r?\n")[[1]]
 
       txt <- if (isTRUE(split_lines)) {
