@@ -348,3 +348,41 @@ test_that("split_texts_with_semchunk preserves row lineage metadata", {
     c("alpha__1", "alpha__2", "beta__1", "beta__2")
   )
 })
+
+
+test_that("text_split_server ignores manual splitting in marking mode", {
+  shiny::testServer(
+    function(input, output, session) {
+      document_texts <- reactiveVal(c("a", "b"))
+      processing <- reactiveVal(FALSE)
+      mode <- reactiveVal("Markeren")
+      lang <- make_test_lang("nl")
+
+      split_result <- text_split_server(
+        id = "split",
+        document_texts = document_texts,
+        processing = processing,
+        mode = mode,
+        lang = lang,
+        enabled = TRUE
+      )
+
+      texts <- split_result$texts
+      split_settings <- split_result$split_settings
+
+      list(
+        texts = texts,
+        split_settings = split_settings,
+        document_texts = document_texts,
+        lang = lang
+      )
+    },
+    {
+      session$setInputs(`split-toggle` = lang()$t("Ja"))
+      session$flushReact()
+
+      expect_identical(texts(), document_texts())
+      expect_false(split_settings()$enabled)
+    }
+  )
+})

@@ -11,11 +11,19 @@ text_split_server <- function(
   document_texts, # reactive vector with current document texts
   document_rows = NULL,
   processing = reactiveVal(FALSE),
+  mode = reactiveVal(NULL),
   lang = default_lang(),
   enabled = getOption("text_split__enabled", TRUE)
 ) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    active_marking_mode <- reactive({
+      tryCatch(
+        identical(mode(), "Markeren"),
+        error = function(...) FALSE
+      )
+    })
 
     input_rows <- reactive({
       if (!is.null(document_rows)) {
@@ -39,7 +47,7 @@ text_split_server <- function(
     rows <- reactive({
       # Output rows stay unchanged when splitting is off, and become chunk rows
       # when splitting is on.
-      if (!isTRUE(splitting())) {
+      if (isTRUE(active_marking_mode()) || !isTRUE(splitting())) {
         return(input_rows())
       }
 
@@ -66,6 +74,10 @@ text_split_server <- function(
 
     # If text splitting is activated
     splitting <- reactive({
+      if (isTRUE(active_marking_mode())) {
+        return(FALSE)
+      }
+
       if (isTRUE(input$toggle == lang()$t("Ja")) && isTRUE(enabled)) {
         TRUE
       } else {
@@ -132,6 +144,10 @@ text_split_server <- function(
     output$card <- renderUI({
       req(lang())
       req(isTRUE(enabled))
+
+      if (isTRUE(active_marking_mode())) {
+        return(NULL)
+      }
 
       tagList(
         bslib::card(
@@ -254,6 +270,7 @@ text_split_server <- function(
     observeEvent(input$split_texts, {
       req(input_rows())
       req(isTRUE(splitting()))
+      req(!isTRUE(active_marking_mode()))
       req(input$max_tokens)
       req(isFALSE(processing()))
       req(isTRUE(enabled))
@@ -470,7 +487,7 @@ text_split_server <- function(
 
     split_settings <- reactive({
       list(
-        enabled = isTRUE(splitting()),
+        enabled = isTRUE(splitting()) && !isTRUE(active_marking_mode()),
         chunk_size = max_tokens_val(),
         overlap = overlap_val()
       )

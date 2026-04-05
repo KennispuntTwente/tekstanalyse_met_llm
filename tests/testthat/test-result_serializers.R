@@ -371,6 +371,55 @@ test_that("marking results default source_marked_text per row when omitted", {
   expect_true(all(markings$response_status == "matched_all"))
 })
 
+test_that("marking results preserve unmarked chunk-code rows in report tables", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text about cats", "Text about dogs")
+  )
+
+  results_table <- data.frame(
+    analysis_unit_id = c(1L, 2L),
+    chunk_id = c(1L, 2L),
+    chunk_index = c(1L, 1L),
+    text = c("Text about cats", "Text about dogs"),
+    chunk_text = c("Text about cats", "Text about dogs"),
+    code = c("Code 1", "Code 1"),
+    marked_text = c("cats", NA_character_),
+    source_marked_text = c("cats", NA_character_),
+    match_start = c(12L, NA_integer_),
+    match_end = c(15L, NA_integer_),
+    match_distance = c(0L, NA_integer_),
+    match_method = c("exact", NA_character_),
+    response_status = c("matched_all", NA_character_),
+    stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-marking-unmatched-rows",
+    mode = "Markeren",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    codes = "Code 1",
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(marking = "prompt")
+  )
+
+  report_df <- .kwallm_report_results_df(analysis_result)
+
+  expect_equal(nrow(analysis_result@results@chunks), 2)
+  expect_equal(nrow(analysis_result@results@markings), 1)
+  expect_equal(nrow(report_df), 2)
+  expect_identical(report_df$marked_text[[1]], "cats")
+  expect_true(is.na(report_df$marked_text[[2]]))
+})
+
 test_that("single-label assignments use explicit analysis unit ids when shuffled", {
   texts_df <- .make_result_texts_df(
     document_text = c("Doc 1", "Doc 2"),

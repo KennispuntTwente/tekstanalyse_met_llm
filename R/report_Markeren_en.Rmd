@@ -30,7 +30,7 @@ source(here::here("R", "utils_quotes.R"), local = TRUE)
 
 ## Method
 
-`r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to mark texts that belonged to one of the following codes:
+`r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to mark text spans that belonged to one of the following codes:
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 cat("<blockquote>")
@@ -69,16 +69,16 @@ if (
 
 ### Marked texts
 
-Below table shows for each text and code which part of the text was marked by the language model.
+Below table shows, for each text row, chunk, and code, which part of the text was marked by the language model.
 
 Column 'Text' contains the current text row in the app, column 'Chunk' contains the chunk that was shown to the language model,
-the column 'Code' contains the code for which the text was marked, and the column 'Marked text' contains the literal text span returned by the language model.
+the column 'Code' contains the code for which the text was checked, and the column 'Marked text' contains the literal text span returned by the language model.
+An empty value in 'Marked text' means no relevant span was returned for that chunk/code combination.
 
 ```{r, echo=FALSE, results='asis', error=TRUE}
 
 report_df |>
-  # Filter out where marked_text is NA or empty
-  dplyr::filter(!is.na(marked_text) & marked_text != "") |>
+  dplyr::mutate(marked_text = dplyr::coalesce(marked_text, "")) |>
   dplyr::rename(
     `Text` = text,
     `Chunk` = chunk_text,
@@ -100,7 +100,7 @@ output <- list()
 
 output <- append(output, list(
   htmltools::HTML("<h3>Report</h3>"),
-  htmltools::HTML("<p>The following paragraphs are the summaries of the texts per topic.</p>"),
+  htmltools::HTML("<p>The following paragraphs are summaries of the marked texts per code.</p>"),
   htmltools::div(
     class = "d-flex justify-content-center",
     htmltools::div(
@@ -171,7 +171,7 @@ for (i in seq_len(nrow(paragraphs_df))) {
             bsicons::bs_icon("exclamation-triangle-fill", class = "me-2 fs-1"),
             htmltools::tags$small(
               htmltools::tags$i(
-                "The prompt for the summary of this category did",
+                "The prompt for the summary of this code did",
                 " not fit in the context window of the language model.",
                 " It is possible that not all instructions or texts were seen by the language model."
               )

@@ -30,7 +30,7 @@ source(here::here("R", "utils_quotes.R"), local = TRUE)
 
 ## Methode
 
-`r .kwallm_report_text_count_summary(analysis_result)` Het LLM (model: `r htmltools::htmlEscape(main_model)`) kreeg de vraag om teksten te markeren die hoorden bij één van de volgende codes:
+`r .kwallm_report_text_count_summary(analysis_result)` Het LLM (model: `r htmltools::htmlEscape(main_model)`) kreeg de vraag om tekstfragmenten te markeren die hoorden bij één van de volgende codes:
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 cat("<blockquote>")
@@ -69,16 +69,16 @@ if (
 
 ### Gemarkeerde teksten
 
-Onderstaande tabel toont per tekst en per code welk deel van de tekst is gemarkeerd door het taalmodel.
+Onderstaande tabel toont per tekstrij, chunk en code welk deel van de tekst is gemarkeerd door het taalmodel.
 
 Kolom 'Tekst' bevat de huidige tekstrij in de app, kolom 'Chunk' bevat de chunk die aan het taalmodel is getoond,
-de kolom 'Code' bevat de code waarvoor de tekst is gemarkeerd, en de kolom 'Gemarkeerde tekst' bevat het letterlijke tekstdeel dat door het taalmodel is teruggegeven.
+de kolom 'Code' bevat de code waarvoor de tekst is gecontroleerd, en de kolom 'Gemarkeerde tekst' bevat het letterlijke tekstdeel dat door het taalmodel is teruggegeven.
+Een lege waarde in 'Gemarkeerde tekst' betekent dat er voor die chunk/code-combinatie geen relevant tekstdeel is teruggegeven.
 
 ```{r, echo=FALSE, results='asis', error=TRUE}
 
 report_df |>
-  # Filter out where marked_text is NA or empty
-  dplyr::filter(!is.na(marked_text) & marked_text != "") |>
+  dplyr::mutate(marked_text = dplyr::coalesce(marked_text, "")) |>
   dplyr::rename(
     `Tekst` = text,
     `Chunk` = chunk_text,
@@ -171,7 +171,7 @@ for (i in seq_len(nrow(paragraphs_df))) {
             bsicons::bs_icon("exclamation-triangle-fill", class = "me-2 fs-1"),
             htmltools::tags$small(
               htmltools::tags$i(
-                "De prompt voor de samenvatting van deze categorie paste",
+                "De prompt voor de samenvatting van deze code paste",
                 " niet in het context-window van het taalmodel.",
                 " Mogelijk zijn niet alle instructies of teksten door het taalmodel gezien."
               )

@@ -210,8 +210,8 @@
         "en": "Here you can specify how the LLM should write the summaries."
       },
       {
-        "nl": " Deze instructies worden meegegeven wanneer het LLM samenvattingen schrijft over categorieën of onderwerpen.",
-        "en": " These instructions are provided when the LLM writes summaries about categories or topics."
+        "nl": " Deze instructies worden meegegeven wanneer het LLM samenvattingen schrijft over categorieën, onderwerpen of codes.",
+        "en": " These instructions are provided when the LLM writes summaries about categories, topics, or codes."
       },
       {
         "nl": " Je kan bijvoorbeeld aangeven welke toon, stijl of focus je wilt (bijv. 'schrijf in academische stijl' of 'focus op emotionele aspecten').",
@@ -422,8 +422,8 @@
         "en": "Write report"
       },
       {
-        "nl": "Rapport schrijven over categorieën?",
-        "en": "Write report about categories?"
+        "nl": "Rapport schrijven over resultaten?",
+        "en": "Write report about results?"
       },
       {
         "nl": "Inter-rater reliability",
@@ -1078,8 +1078,8 @@
         "en": " You can, for example, indicate what you are researching and what the texts stem from (e.g., what question respondents answered)."
       },
       {
-        "nl": "Indien je dit aanzet, zal het model per categorie een samenvattende paragraaf schrijven met quotes uit de bijbehorende teksten.",
-        "en": "If you enable this, the model will write a summary paragraph per category with quotes from the corresponding texts."
+        "nl": "Indien je dit aanzet, zal het model per categorie, onderwerp of code een samenvattende paragraaf schrijven met quotes uit de bijbehorende teksten.",
+        "en": "If you enable this, the model will write a summary paragraph per category, topic, or code with quotes from the corresponding texts."
       },
       {
         "nl": "Hier staan details over de geconfigureerde LLM-provider.",

@@ -580,6 +580,7 @@ main_server <- function(
     split_result <- text_split_server(
       "text_split",
       processing = processing,
+      mode = mode,
       document_texts = uploaded_document_texts,
       document_rows = uploaded_document_rows,
       lang = lang

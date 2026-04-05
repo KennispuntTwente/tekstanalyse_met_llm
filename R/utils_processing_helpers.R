@@ -394,7 +394,17 @@ processing_results_have_invalid_na <- function(results_df, mode) {
   stopifnot(is.character(mode), length(mode) == 1)
 
   if (mode == "Markeren") {
-    return(FALSE)
+    required_cols <- c("text", "chunk_text", "code")
+    if (!all(required_cols %in% names(results_df))) {
+      return(TRUE)
+    }
+
+    cols_to_validate <- intersect(
+      c(required_cols, "analysis_unit_id", "chunk_id"),
+      names(results_df)
+    )
+
+    return(anyNA(results_df[cols_to_validate]))
   }
 
   if ("result" %in% names(results_df)) {

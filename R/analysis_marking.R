@@ -134,7 +134,8 @@ mark_texts <- function(
   }
   longest_prompt_tokens <- mark_text_prompt(
     text = df$chunk_text[which.max(count_tokens(df$chunk_text))],
-    code = codes[which.max(count_tokens(codes))]
+    code = codes[which.max(count_tokens(codes))],
+    research_background = research_background
   ) |>
     tidyprompt::construct_prompt_text() |>
     count_tokens()
@@ -225,7 +226,12 @@ mark_texts <- function(
           interrupter$execInterrupts()
         }
 
-        prompt <- mark_text_prompt(txt, cd, max_interactions = max_interactions)
+        prompt <- mark_text_prompt(
+          txt,
+          cd,
+          research_background = research_background,
+          max_interactions = max_interactions
+        )
         result <- send_prompt_with_retries(
           prompt,
           llm_provider,
@@ -235,7 +241,10 @@ mark_texts <- function(
         .kwallm_normalize_marking_matches(txt, result)
       })
     ) |>
-    tidyr::unnest(marking_match) # This creates one row per marked section
+    tidyr::unnest(
+      marking_match,
+      keep_empty = TRUE
+    ) # Keep chunk/code rows even when nothing was marked.
   try(
     {
       progress_hide(progress_secondary)
@@ -473,6 +482,17 @@ mark_texts <- function(
   }
 
   cleaned <- df_result |>
+    dplyr::distinct(
+      analysis_unit_id,
+      code,
+      chunk_id,
+      match_start,
+      match_end,
+      marked_text,
+      .keep_all = TRUE
+    )
+
+  matched_rows <- cleaned |>
     dplyr::filter(!is.na(marked_text) & nzchar(marked_text)) |>
     dplyr::distinct(
       analysis_unit_id,
@@ -484,33 +504,42 @@ mark_texts <- function(
       .keep_all = TRUE
     )
 
-  if (!nrow(cleaned)) {
-    return(cleaned)
+  unmatched_rows <- cleaned |>
+    dplyr::filter(is.na(marked_text) | !nzchar(marked_text)) |>
+    dplyr::distinct(
+      analysis_unit_id,
+      code,
+      chunk_id,
+      .keep_all = TRUE
+    )
+
+  if (!nrow(matched_rows)) {
+    return(unmatched_rows)
   }
 
   absolute_spans <- purrr::pmap(
     list(
-      cleaned$analysis_unit_text,
-      cleaned$chunk_text,
-      cleaned$match_start,
-      cleaned$match_end,
-      cleaned$marked_text
+      matched_rows$analysis_unit_text,
+      matched_rows$chunk_text,
+      matched_rows$match_start,
+      matched_rows$match_end,
+      matched_rows$marked_text
     ),
     .kwallm_marking_find_absolute_span
   )
 
-  cleaned$absolute_match_start <- vapply(
+  matched_rows$absolute_match_start <- vapply(
     absolute_spans,
     function(span) span$start,
     integer(1)
   )
-  cleaned$absolute_match_end <- vapply(
+  matched_rows$absolute_match_end <- vapply(
     absolute_spans,
     function(span) span$end,
     integer(1)
   )
 
-  resolved <- cleaned |>
+  resolved <- matched_rows |>
     dplyr::filter(!is.na(absolute_match_start) & !is.na(absolute_match_end)) |>
     dplyr::distinct(
       analysis_unit_id,
@@ -520,10 +549,10 @@ mark_texts <- function(
       .keep_all = TRUE
     )
 
-  unresolved <- cleaned |>
+  unresolved <- matched_rows |>
     dplyr::filter(is.na(absolute_match_start) | is.na(absolute_match_end))
 
-  dplyr::bind_rows(resolved, unresolved) |>
+  dplyr::bind_rows(resolved, unresolved, unmatched_rows) |>
     dplyr::arrange(analysis_unit_id, code, chunk_id, match_start, match_end)
 }
 
@@ -575,11 +604,14 @@ mark_texts <- function(
 .kwallm_marking_collect_paragraph_inputs <- function(df_result_clean) {
   stopifnot(is.data.frame(df_result_clean))
 
-  if (!nrow(df_result_clean)) {
+  matched_rows <- df_result_clean |>
+    dplyr::filter(!is.na(marked_text) & nzchar(marked_text))
+
+  if (!nrow(matched_rows)) {
     return(list())
   }
 
-  excerpt_rows <- df_result_clean |>
+  excerpt_rows <- matched_rows |>
     dplyr::mutate(
       excerpt_text = purrr::pmap_chr(
         list(chunk_text, match_start, match_end),

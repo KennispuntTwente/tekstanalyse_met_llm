@@ -221,10 +221,17 @@ test_that("processing_results_have_invalid_na is mode-aware", {
     topic_b = c(FALSE, TRUE),
     stringsAsFactors = FALSE
   )
-  marking_results <- data.frame(
+  invalid_marking_results <- data.frame(
     text = c("a", "b"),
     chunk_text = c("a", NA),
     code = c("x", NA),
+    marked_text = c("a", NA),
+    stringsAsFactors = FALSE
+  )
+  valid_marking_results <- data.frame(
+    text = c("a", "b"),
+    chunk_text = c("a", "b"),
+    code = c("x", "x"),
     marked_text = c("a", NA),
     stringsAsFactors = FALSE
   )
@@ -236,5 +243,10 @@ test_that("processing_results_have_invalid_na is mode-aware", {
       "Onderwerpextractie"
     )
   )
-  expect_false(processing_results_have_invalid_na(marking_results, "Markeren"))
+  expect_true(
+    processing_results_have_invalid_na(invalid_marking_results, "Markeren")
+  )
+  expect_false(
+    processing_results_have_invalid_na(valid_marking_results, "Markeren")
+  )
 })
