@@ -567,61 +567,70 @@ main_server <- function(
 
     # 1 Text management ----------------------------------------------
 
-    # Text upload
+    # Upload defines the source-document rows. At this point source_document_*
+    # and document_* still refer to the same rows.
     text_upload_result <- text_upload_server("text_upload", processing, lang)
-    raw_texts <- text_upload_result$texts
+    uploaded_document_texts <- text_upload_result$texts
+    uploaded_document_rows <- text_upload_result$text_rows
     by_column_name <- text_upload_result$by_column_name
     by_column_lookup <- text_upload_result$by_column_lookup
+    upload_info <- text_upload_result$upload_info
 
-    # Split texts
+    # Splitting can turn one source document row into many current document rows.
     split_result <- text_split_server(
       "text_split",
       processing = processing,
-      raw_texts = raw_texts,
+      mode = mode,
+      document_texts = uploaded_document_texts,
+      document_rows = uploaded_document_rows,
       lang = lang
     )
-    split_texts <- split_result$texts
-    split_source_texts <- split_result$source_texts
+    split_document_texts <- split_result$texts
+    split_document_rows <- split_result$rows
     split_in_progress <- split_result$split_in_progress
+    split_settings <- split_result$split_settings
 
-    # When splitting is active, remap the by_column_lookup so that each
-    # chunk is associated with the groups of its original (source) text.
+    # Remap group metadata by source-document id so split chunks inherit the
+    # groups of their source rows without relying on text equality.
     split_by_column_lookup <- reactive({
       original_lookup <- by_column_lookup()
-      sources <- split_source_texts()
-      current_texts <- split_texts()
+      current_rows <- split_document_rows()
 
-      if (
-        is.null(original_lookup) || is.null(sources) || is.null(current_texts)
-      ) {
+      if (is.null(original_lookup) || is.null(current_rows)) {
         return(original_lookup)
       }
 
-      # Build a new lookup: for each chunk, find the groups of its source text.
-      chunk_df <- data.frame(
-        chunk_text = current_texts,
-        source_text = sources,
-        stringsAsFactors = FALSE
-      )
+      if (
+        !all(c("source_document_id", "by_value") %in% names(original_lookup))
+      ) {
+        stop(
+          "by_column_lookup must contain source_document_id and by_value"
+        )
+      }
+
       merged <- merge(
-        chunk_df,
-        original_lookup,
-        by.x = "source_text",
-        by.y = "text",
+        current_rows[c("document_id", "source_document_id", "document_text")],
+        original_lookup[c("source_document_id", "by_value")],
+        by = "source_document_id",
         all.x = TRUE
       )
+
       data.frame(
-        text = merged$chunk_text,
+        document_id = merged$document_id,
+        source_document_id = merged$source_document_id,
+        text = merged$document_text,
         by_value = merged$by_value,
         stringsAsFactors = FALSE
       )
     })
 
-    # Pre-process texts, show table
+    # Text management keeps the document rows but deduplicates them into
+    # analysis units for the LLM.
     texts <- text_management_server(
       id = "text_management",
       processing = processing,
-      raw_texts = split_texts,
+      document_texts = split_document_texts,
+      document_rows = split_document_rows,
       lang = lang,
       gliner_model = gliner_model
     )
@@ -761,6 +770,8 @@ main_server <- function(
       context_window = context_window,
       by_column_name = by_column_name,
       by_column_lookup = split_by_column_lookup,
+      split_settings = split_settings,
+      upload_info = upload_info,
       split_in_progress = split_in_progress,
       lang = lang
     )

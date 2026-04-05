@@ -22,6 +22,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   expect_equal(app$get_value(input = "kwallm_sections_step"), "1")
 
   # Upload texts
+  wait_for_text_upload_input(app)
   app$upload_file(
     `text_upload-text_file` = here::here(
       "tests",
@@ -101,17 +102,17 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
     timeout = 30000
   )
 
-  # Confirm results
-  app$expect_values(
-    export = c(
-      # Processing was successful
-      "processing-processing",
-      "processing-success"
-    )
+  expect_true(isTRUE(app$get_value(export = "processing-processing")))
+  expect_true(isTRUE(app$get_value(export = "processing-success")))
+
+  app$wait_for_value(
+    export = "processing-paragraph_entries",
+    timeout = 10000
   )
 
   # Read results
-  results <- app$get_value(export = "processing-final_results_df")
+  results <- app$get_value(export = "processing-results_table")
+  paragraphs <- app$get_value(export = "processing-paragraph_entries")
 
   # Expect that all texts are present in column 'text'
   texts <- readLines(
@@ -124,22 +125,24 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
     check.attributes = FALSE
   ))
 
-  # Expect that at least 1 other column is present (topic column)
-  expect_true(ncol(results) > 1)
-  # Expect that all columns besides 'text' are logical
-  expect_true(all(sapply(results[-1], is.logical)))
-  # Expect that all texts are categorized in at least one topic
-  expect_true(all(rowSums(results[-1]) > 0))
+  expect_true("analysis_unit_id" %in% names(results))
+  topic_columns <- names(results)[vapply(results, is.logical, logical(1))]
 
-  # Expect that results have 'paragraphs' attribute
-  expect_true("paragraphs" %in% names(attributes(results)))
-  paragraphs <- attr(results, "paragraphs")
+  expect_true(length(topic_columns) > 0)
+  # Expect that all texts are categorized in at least one topic
+  expect_true(all(rowSums(results[topic_columns]) > 0))
+
   # Expect correct paragraph structure
   expect_true(is.character(paragraphs[[1]]$paragraph))
   expect_true(is.logical(paragraphs[[1]]$prompt_fits))
   expect_true(is.vector(paragraphs[[1]]$texts))
   expect_true(is.character(paragraphs[[1]]$texts))
   expect_true(length(paragraphs[[1]]$texts) > 0)
+  expect_true(is.numeric(paragraphs[[1]]$analysis_unit_ids))
+  expect_identical(
+    length(paragraphs[[1]]$analysis_unit_ids),
+    length(paragraphs[[1]]$texts)
+  )
 
   app$stop()
 })

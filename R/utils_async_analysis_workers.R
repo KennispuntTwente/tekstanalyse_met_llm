@@ -201,6 +201,11 @@ analysis_async_processing_globals <- function(env = parent.frame()) {
       envir = env,
       inherits = TRUE
     ),
+    collect_grouped_paragraph_inputs = get(
+      "collect_grouped_paragraph_inputs",
+      envir = env,
+      inherits = TRUE
+    ),
     write_grouped_paragraphs = get(
       "write_grouped_paragraphs",
       envir = env,
@@ -292,8 +297,8 @@ analysis_async_code_generation_globals <- function(env = parent.frame()) {
       envir = env,
       inherits = TRUE
     ),
-    create_text_chunks = get(
-      "create_text_chunks",
+    create_text_batches = get(
+      "create_text_batches",
       envir = env,
       inherits = TRUE
     ),

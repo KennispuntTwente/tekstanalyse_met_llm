@@ -66,6 +66,8 @@ test_that("prompt_score returns a usable prompt object", {
   prompt_text <- tidyprompt::construct_prompt_text(prompt)
   expect_true(is.character(prompt_text))
   expect_true(nchar(prompt_text) > 0)
+  expect_match(prompt_text, "<text>", fixed = TRUE)
+  expect_match(prompt_text, "<scoring_characteristic>", fixed = TRUE)
 })
 
 test_that("prompt_score includes all parameters in prompt text", {
@@ -88,6 +90,7 @@ test_that("prompt_score includes all parameters in prompt text", {
   expect_match(prompt_text, "Daily mood survey", fixed = TRUE)
   expect_match(prompt_text, "happiness level", fixed = TRUE)
   expect_match(prompt_text, "0-100", fixed = TRUE)
+  expect_match(prompt_text, "<research_background>", fixed = TRUE)
 })
 
 test_that("prompt_score works with empty research background", {
@@ -113,11 +116,12 @@ test_that("score_texts supports progress, interruption, and early NA", {
     local = TRUE
   )
 
+  analysis_unit_ids <- c(10L, 20L, 30L)
   call_count <- 0
   interrupt_count <- 0
   progress_events <- list()
 
-  send_prompt_with_retries <- function(prompt, llm_provider) {
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
     call_count <<- call_count + 1
     if (call_count == 1) {
       return(42)
@@ -134,6 +138,7 @@ test_that("score_texts supports progress, interruption, and early NA", {
 
   result <- score_texts(
     texts = c("text a", "text b", "text c"),
+    analysis_unit_ids = analysis_unit_ids,
     scoring_characteristic = "clarity",
     llm_provider = create_test_provider(),
     on_progress = function(i, n, text) {
@@ -146,6 +151,7 @@ test_that("score_texts supports progress, interruption, and early NA", {
     interrupter = interrupter
   )
 
+  expect_identical(result$analysis_unit_id, analysis_unit_ids)
   expect_equal(result$text, c("text a", "text b", "text c"))
   expect_true(all(is.na(result$result)))
   expect_equal(call_count, 2)

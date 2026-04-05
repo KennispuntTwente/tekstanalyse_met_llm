@@ -11,6 +11,7 @@ test_that("{shinytest2} recording: standard process - scoring", {
   )
 
   # Upload texts
+  wait_for_text_upload_input(app)
   app$upload_file(
     `text_upload-text_file` = here::here(
       "tests",
@@ -56,7 +57,7 @@ test_that("{shinytest2} recording: standard process - scoring", {
     export = c(
       # Text upload & processing works
       "text_management-anonymization_mode",
-      "text_management-texts__raw",
+      "text_management-texts__document_text",
       "text_management-texts__preprocessed",
       "text_management-texts__df",
 
@@ -67,7 +68,7 @@ test_that("{shinytest2} recording: standard process - scoring", {
   )
 
   # Read results
-  results <- app$get_value(export = "processing-final_results_df")
+  results <- app$get_value(export = "processing-results_table")
 
   # Expect that all texts are present in column 'text'
   texts <- readLines(

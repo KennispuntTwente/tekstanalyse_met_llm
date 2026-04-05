@@ -21,8 +21,8 @@ write_paragraphs_toggle_server <- function(
   result <- yes_no_toggle_card_server(
     id = id,
     title = "Rapport schrijven",
-    tooltip_text = "Indien je dit aanzet, zal het model per categorie een samenvattende paragraaf schrijven met quotes uit de bijbehorende teksten.",
-    question_text = "Rapport schrijven over categorieën?",
+    tooltip_text = "Indien je dit aanzet, zal het model per categorie, onderwerp of code een samenvattende paragraaf schrijven met quotes uit de bijbehorende teksten.",
+    question_text = "Rapport schrijven over resultaten?",
     default_value = TRUE,
     show_when = reactive(
       mode() %in% c("Onderwerpextractie", "Categorisatie", "Markeren")
@@ -32,7 +32,7 @@ write_paragraphs_toggle_server <- function(
       tooltip = "Stijlprompt voor samenvattingen",
       title = "Stijlprompt voor samenvattingen",
       body_text1 = "Hier kan je aangeven hoe het LLM de samenvattingen moet schrijven.",
-      body_text2 = " Deze instructies worden meegegeven wanneer het LLM samenvattingen schrijft over categorieën of onderwerpen.",
+      body_text2 = " Deze instructies worden meegegeven wanneer het LLM samenvattingen schrijft over categorieën, onderwerpen of codes.",
       input_label = "Geef aan hoe de samenvattingen geschreven moeten worden. Welke stijl of focus wil je?",
       input_placeholder = "Bijvoorbeeld: 'Schrijf in een formele, academische stijl' of 'Focus op emotionele aspecten van de teksten'"
     ),

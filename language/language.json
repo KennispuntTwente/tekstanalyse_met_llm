@@ -210,8 +210,8 @@
         "en": "Here you can specify how the LLM should write the summaries."
       },
       {
-        "nl": " Deze instructies worden meegegeven wanneer het LLM samenvattingen schrijft over categorieën of onderwerpen.",
-        "en": " These instructions are provided when the LLM writes summaries about categories or topics."
+        "nl": " Deze instructies worden meegegeven wanneer het LLM samenvattingen schrijft over categorieën, onderwerpen of codes.",
+        "en": " These instructions are provided when the LLM writes summaries about categories, topics, or codes."
       },
       {
         "nl": " Je kan bijvoorbeeld aangeven welke toon, stijl of focus je wilt (bijv. 'schrijf in academische stijl' of 'focus op emotionele aspecten').",
@@ -310,32 +310,32 @@
         "en": " It is important to ensure that the research background and the (longest) text you input fit within the model's context window."
       },
       {
-        "nl": " Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen.",
-        "en": " Additionally, in the first step of topic extraction, the texts are divided into chunks; these chunks must also fit within the context window."
+        "nl": " Daarnaast worden bij de eerste stap van onderwerpextractie unieke analyse-eenheden in batches gegroepeerd; elke batch moet ook binnen het context-window passen.",
+        "en": " Additionally, in the first step of topic extraction, unique analysis units are grouped into batches; each batch must also fit within the context window."
       },
       {
-        "nl": " Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen.",
-        "en": " You can set the size of the chunks and the number of extractions per text with parameters."
+        "nl": " Met parameters kan je de batchgrootte en het aantal trekkingen per tekst instellen.",
+        "en": " You can set the batch size and the number of draws per text with parameters."
       },
       {
         "nl": "Context-window grootte (tokens)",
         "en": "Context window size (tokens)"
       },
       {
-        "nl": "Maximaal aantal teksten per chunk",
-        "en": "Maximum number of texts per chunk"
+        "nl": "Maximaal aantal teksten per batch",
+        "en": "Maximum number of texts per batch"
       },
       {
         "nl": "Aantal trekkingen per tekst",
         "en": "Number of draws per text"
       },
       {
-        "nl": "Aantal chunks:",
-        "en": "Number of chunks:"
+        "nl": "Aantal batches:",
+        "en": "Number of batches:"
       },
       {
-        "nl": "Te veel chunks",
-        "en": "Too many chunks"
+        "nl": "Te veel batches",
+        "en": "Too many batches"
       },
       {
         "nl": "Sommige teksten zijn te lang voor het context-window",
@@ -422,8 +422,8 @@
         "en": "Write report"
       },
       {
-        "nl": "Rapport schrijven over categorieën?",
-        "en": "Write report about categories?"
+        "nl": "Rapport schrijven over resultaten?",
+        "en": "Write report about results?"
       },
       {
         "nl": "Inter-rater reliability",
@@ -660,6 +660,14 @@
       {
         "nl": "Onderwerpen re-reduceren...",
         "en": "Re-reducing topics..."
+      },
+      {
+        "nl": "De huidige onderwerpenlijst past niet binnen het context-window van het toekenningsmodel (%d > %d tokens). Verminder het aantal of de lengte van de onderwerpen voordat je doorgaat.",
+        "en": "The current topic list does not fit within the assignment model context window (%d > %d tokens). Reduce the number or length of the topics before continuing."
+      },
+      {
+        "nl": "De gegenereerde onderwerpen passen niet binnen het context-window van het toekenningsmodel (%d > %d tokens). Daarom is het bewerkscherm voor onderwerpen geopend. Verminder het aantal of de lengte van de onderwerpen voordat je doorgaat.",
+        "en": "The generated topics do not fit within the assignment model context window (%d > %d tokens). The topic editor has therefore been opened. Reduce the number or length of the topics before continuing."
       },
       {
         "nl": "Re-reductie mislukt of ongeldige onderwerpen gegenereerd",
@@ -1054,8 +1062,8 @@
         "en": "Here you can view the texts that will be processed."
       },
       {
-        "nl": " Dubbele teksten worden automatisch gereduceerd tot één tekst.",
-        "en": " Duplicate texts are automatically reduced to one entry."
+          "nl": " Dubbele of gelijk voorbewerkte teksten worden voor LLM-calls hergebruikt als één analyse-eenheid, terwijl de originele rijen behouden blijven.",
+          "en": " Duplicate or identically preprocessed texts reuse one analysis unit for LLM calls, while the original rows remain available."
       },
       {
         "nl": " Daarnaast kan je kiezen om de teksten te anonimiseren met behulp van regex of een GLiNER-model. Regex verwijdert e-mailadressen, telefoonnummers en (Nederlandse) postcodes. Het GLiNER-model kan verschillende vormen van PII detecteren.",
@@ -1078,8 +1086,8 @@
         "en": " You can, for example, indicate what you are researching and what the texts stem from (e.g., what question respondents answered)."
       },
       {
-        "nl": "Indien je dit aanzet, zal het model per categorie een samenvattende paragraaf schrijven met quotes uit de bijbehorende teksten.",
-        "en": "If you enable this, the model will write a summary paragraph per category with quotes from the corresponding texts."
+        "nl": "Indien je dit aanzet, zal het model per categorie, onderwerp of code een samenvattende paragraaf schrijven met quotes uit de bijbehorende teksten.",
+        "en": "If you enable this, the model will write a summary paragraph per category, topic, or code with quotes from the corresponding texts."
       },
       {
         "nl": "Hier staan details over de geconfigureerde LLM-provider.",
@@ -1248,6 +1256,10 @@
       {
         "nl": "Teksten splitsen...",
         "en": "Splitting texts..."
+        },
+        {
+          "nl": "Teksten worden nog gesplitst...",
+          "en": "Texts are still being split..."
       },
       {
         "nl": "Teksten markeren...",
@@ -1294,8 +1306,8 @@
         "en": "Specify how the summaries should be written. What style or focus do you want?"
       },
       {
-        "nl": "Onderstaande parameters bepalen hoe de teksten worden verdeeld in chunks voor het genereren van onderwerpen in de 'onderwerpextractie'-modus.",
-        "en": "Below parameters determine how the texts are divided into chunks for generating topics in the 'topic extraction' mode."
+        "nl": "Onderstaande parameters bepalen hoe analyse-eenheden worden gegroepeerd in batches voor het genereren van onderwerpen in de 'onderwerpextractie'-modus.",
+        "en": "The parameters below determine how analysis units are grouped into batches for generating topics in the 'topic extraction' mode."
       },
       {
         "nl": "Onderstaande parameters bepalen of en hoe de teksten worden gesplitst naar kleinere stukken in de 'markeren'-modus.",
@@ -1457,5 +1469,5 @@
         "nl": "Sectie",
         "en": "Section"
       }
-    ]
+  ]
 }

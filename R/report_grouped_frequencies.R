@@ -1,29 +1,48 @@
 # Helper functions for generating grouped frequency tables in reports
 # Used by report_*.Rmd templates when a by_column is specified
 
-# Internal: join by_values to df by text column.
-# by_values is a data frame with 'text' and 'by_value' columns.
-# When the same text appears in multiple groups the join fans out,
-# so each group occurrence is counted.
+# Internal: join by_values to df by stable row identity when available.
+# by_values may contain either 'document_id' and 'by_value', or the older
+# fallback shape with 'text' and 'by_value'.
 .join_by_group <- function(df, by_values) {
-  if (is.data.frame(by_values)) {
-    lookup <- by_values
-  } else {
-    # Legacy fallback: positional vector (must match nrow)
-    stopifnot(length(by_values) == nrow(df))
-    lookup <- data.frame(
-      text = df$text,
-      by_value = by_values,
-      stringsAsFactors = FALSE
+  if (!is.data.frame(by_values)) {
+    stop(
+      paste(
+        "by_values must be a data frame with either",
+        "'document_id' and 'by_value' or 'text' and 'by_value'"
+      )
     )
   }
+
+  if (
+    "document_id" %in%
+      names(df) &&
+      all(c("document_id", "by_value") %in% names(by_values))
+  ) {
+    join_key <- "document_id"
+    lookup <- by_values[c("document_id", "by_value")]
+  } else if (
+    "text" %in% names(df) && all(c("text", "by_value") %in% names(by_values))
+  ) {
+    join_key <- "text"
+    lookup <- by_values[c("text", "by_value")]
+  } else {
+    stop(
+      paste(
+        "by_values must contain join columns compatible with df:",
+        "either shared document_id or shared text plus by_value"
+      )
+    )
+  }
+
   # Use left_join so every result row gets at least one group.
-  # relationship = "many-to-many" avoids warnings when a text maps to
-  # multiple groups or the result df has duplicate texts.
+  # relationship = "many-to-many" keeps the intentional fan-out when one row
+  # belongs to multiple groups, while document_id prevents false cross products
+  # for duplicate texts in the same group.
   df |>
     dplyr::left_join(
       lookup,
-      by = "text",
+      by = join_key,
       relationship = "many-to-many"
     ) |>
     dplyr::rename(.by_group = by_value)
@@ -31,8 +50,7 @@
 
 #' Generate grouped frequency table for single-category results
 #' @param df data frame with 'result' column containing category assignments
-#' @param by_values data frame with 'text' and 'by_value' columns (or legacy
-#'   positional vector aligned with df rows)
+#' @param by_values data frame with 'text' and 'by_value' columns
 #' @param by_column_name name of the grouping column for display
 #' @param categories vector of all possible categories
 #' @param language "en" or "nl"
@@ -112,8 +130,7 @@ generate_grouped_freq_table_single <- function(
 
 #' Generate grouped frequency table for multi-category results
 #' @param df data frame with binary category columns
-#' @param by_values data frame with 'text' and 'by_value' columns (or legacy
-#'   positional vector aligned with df rows)
+#' @param by_values data frame with 'text' and 'by_value' columns
 #' @param by_column_name name of the grouping column for display
 #' @param categories vector of category column names
 #' @param language "en" or "nl"
@@ -197,8 +214,7 @@ generate_grouped_freq_table_multi <- function(
 
 #' Generate grouped frequency table for scoring results
 #' @param df data frame with 'result' column containing numeric scores
-#' @param by_values data frame with 'text' and 'by_value' columns (or legacy
-#'   positional vector aligned with df rows)
+#' @param by_values data frame with 'text' and 'by_value' columns
 #' @param by_column_name name of the grouping column for display
 #' @param language "en" or "nl"
 #' @return DT::datatable with score statistics per group

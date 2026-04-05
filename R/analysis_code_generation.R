@@ -110,21 +110,24 @@ generate_codes_by_reading_texts <- function(
 
   # Subtract prompt overhead so chunks don't overflow once the prompt is added
   base_prompt_text <- prompt_candidate_topics(
-    text_chunk = c(""),
+    text_batch = c(""),
     research_background = research_background,
     language = language
   ) |>
     tidyprompt::construct_prompt_text()
 
-  chunks <- create_text_chunks(
+  batches <- create_text_batches(
     split_texts,
-    chunk_size = 50,
+    batch_size = 50,
     draws = 1,
     n_tokens_context_window = n_tokens_context_window,
-    base_prompt_text = base_prompt_text
+    base_prompt_text = base_prompt_text,
+    text_formatter = function(text, index) {
+      paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
+    }
   )
 
-  if (is.null(chunks) || length(chunks) == 0) {
+  if (is.null(batches) || length(batches) == 0) {
     stop(
       "Cannot generate codes: at least one text exceeds the context window ",
       "after subtracting prompt overhead (",
@@ -136,18 +139,19 @@ generate_codes_by_reading_texts <- function(
 
   print_message(paste0(
     "Created ",
-    length(chunks),
-    " text chunk(s) from the texts..."
+    length(batches),
+    " text batch(es) from the texts..."
   ))
 
   candidate_topics <- unique(create_candidate_topics(
-    text_chunks = chunks,
+    text_batches = batches,
     research_background = research_background,
     llm_provider = llm_provider,
     language = language,
-    on_progress = function(i, n, chunk, result) {
+    on_progress = function(i, n, batch, result) {
+      force(batch)
       print_message(paste0(
-        "Read chunk ",
+        "Read batch ",
         i,
         " of ",
         n,

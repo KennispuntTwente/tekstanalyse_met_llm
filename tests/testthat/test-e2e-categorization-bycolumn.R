@@ -39,6 +39,7 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
   )
 
   # Upload CSV file
+  wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
   Sys.sleep(2)
 
@@ -47,7 +48,7 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
 
   # Wait for texts to be populated after column selection
   app$wait_for_value(
-    export = "text_management-texts__raw",
+    export = "text_management-texts__document_text",
     timeout = 10000,
     ignore = c(NULL)
   )
@@ -117,7 +118,7 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
   )
 
   # Read results
-  results <- app$get_value(export = "processing-final_results_df")
+  results <- app$get_value(export = "processing-results_table")
 
   # Expect that all texts are present
   expect_true(all(test_data$text %in% results$text))

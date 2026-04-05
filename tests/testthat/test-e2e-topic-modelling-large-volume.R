@@ -69,17 +69,20 @@ test_that("{shinytest2} large-volume topic modelling launches app and uses async
     options = list(
       kwallm.test_async = TRUE,
       kwallm.test_fake_llm = TRUE,
-      topic_modelling__number_of_chunks_limit = 200
+      topic_modelling__number_of_batches_limit = 200
     )
   )
   on.exit(app$stop(), add = TRUE)
 
+  wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_txt)
   app$wait_for_value(
-    export = "text_management-texts__raw",
+    export = "text_management-texts__document_text",
     timeout = 30000
   )
-  uploaded_texts <- app$get_value(export = "text_management-texts__raw")
+  uploaded_texts <- app$get_value(
+    export = "text_management-texts__document_text"
+  )
   expect_identical(length(uploaded_texts), 3000L)
 
   app$set_inputs(
@@ -112,12 +115,13 @@ test_that("{shinytest2} large-volume topic modelling launches app and uses async
 
   expect_true(isTRUE(app$get_value(export = "processing-success")))
 
-  results <- app$get_value(export = "processing-final_results_df")
+  results <- app$get_value(export = "processing-results_table")
   expect_identical(nrow(results), 3000L)
   expect_identical(sort(results$text), sort(texts))
-  expect_true(ncol(results) >= 3)
-  expect_true(all(vapply(results[-1], is.logical, logical(1))))
-  expect_true(all(rowSums(results[-1]) > 0))
+  expect_true("analysis_unit_id" %in% names(results))
+  topic_columns <- names(results)[vapply(results, is.logical, logical(1))]
+  expect_true(length(topic_columns) >= 1)
+  expect_true(all(rowSums(results[topic_columns]) > 0))
 
   deadline <- Sys.time() + 15
   new_log_lines <- character()
@@ -138,7 +142,7 @@ test_that("{shinytest2} large-volume topic modelling launches app and uses async
     }
 
     if (
-      any(grepl("\\[async\\].*Topic generation: n_chunks=", new_log_lines)) &&
+      any(grepl("\\[async\\].*Topic generation: n_batches=", new_log_lines)) &&
         any(grepl(
           "\\[async\\].*Topic reduction complete: n_input=",
           new_log_lines
@@ -157,7 +161,7 @@ test_that("{shinytest2} large-volume topic modelling launches app and uses async
   expect_true(file.exists(log_file))
 
   topic_generation_log <- new_log_lines[
-    grepl("\\[async\\].*Topic generation: n_chunks=", new_log_lines)
+    grepl("\\[async\\].*Topic generation: n_batches=", new_log_lines)
   ]
   topic_reduction_log <- new_log_lines[
     grepl("\\[async\\].*Topic reduction complete: n_input=", new_log_lines)
@@ -168,7 +172,7 @@ test_that("{shinytest2} large-volume topic modelling launches app and uses async
 
   generation_match <- stringr::str_match(
     utils::tail(topic_generation_log, 1),
-    "n_chunks=(\\d+), n_candidates=(\\d+)"
+    "n_batches=(\\d+), n_candidates=(\\d+)"
   )
   reduction_match <- stringr::str_match(
     utils::tail(topic_reduction_log, 1),

@@ -1,5 +1,18 @@
 library(testthat)
 
+source(here::here("R", "module_input_text_upload.R"), local = TRUE)
+
+utf16le_ascii_raw <- function(text) {
+  text_raw <- as.integer(charToRaw(text))
+  as.raw(as.vector(rbind(text_raw, rep.int(0L, length(text_raw)))))
+}
+
+
+utf16be_ascii_raw <- function(text) {
+  text_raw <- as.integer(charToRaw(text))
+  as.raw(as.vector(rbind(rep.int(0L, length(text_raw)), text_raw)))
+}
+
 test_that("normalize_upload_info lowercases file extensions", {
   # Source the module to get the helper (it's defined inside the server,
   # but we can test the logic directly)
@@ -41,25 +54,40 @@ test_that("txt reading falls back from invalid UTF-8 to native encoding", {
   on.exit(unlink(tmp))
   writeBin(charToRaw("caf\xfc\n"), tmp)
 
-  # Read using the same logic as read_txt_file
-  raw <- readBin(tmp, "raw", file.info(tmp)$size)
-  txt_content <- tryCatch(
-    {
-      decoded <- rawToChar(raw)
-      if (!validUTF8(decoded)) {
-        stop("not valid utf-8")
-      }
-      Encoding(decoded) <- "UTF-8"
-      decoded
-    },
-    error = function(e) {
-      iconv(rawToChar(raw), from = "", to = "UTF-8", sub = "")
-    }
-  )
-  txt_lines <- strsplit(txt_content, "\r?\n")[[1]]
-
-  # Should not error and should produce some text
+  txt_lines <- strsplit(.kwallm_decode_txt_file(tmp), "\r?\n")[[1]]
 
   expect_true(length(txt_lines) >= 1)
   expect_true(nchar(txt_lines[1]) > 0)
+})
+
+
+test_that("txt decoding strips UTF-8 BOM", {
+  tmp <- tempfile(fileext = ".txt")
+  on.exit(unlink(tmp))
+
+  writeBin(c(as.raw(c(0xEF, 0xBB, 0xBF)), charToRaw("hello\nworld")), tmp)
+
+  expect_identical(.kwallm_decode_txt_file(tmp), "hello\nworld")
+})
+
+
+test_that("txt decoding handles UTF-16LE BOM", {
+  tmp <- tempfile(fileext = ".txt")
+  on.exit(unlink(tmp))
+
+  payload <- utf16le_ascii_raw("hello\nworld")
+  writeBin(c(as.raw(c(0xFF, 0xFE)), payload), tmp)
+
+  expect_identical(.kwallm_decode_txt_file(tmp), "hello\nworld")
+})
+
+
+test_that("txt decoding handles UTF-16BE BOM", {
+  tmp <- tempfile(fileext = ".txt")
+  on.exit(unlink(tmp))
+
+  payload <- utf16be_ascii_raw("hello\nworld")
+  writeBin(c(as.raw(c(0xFE, 0xFF)), payload), tmp)
+
+  expect_identical(.kwallm_decode_txt_file(tmp), "hello\nworld")
 })

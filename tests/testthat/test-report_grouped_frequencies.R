@@ -1,8 +1,116 @@
 library(testthat)
 
+if (!exists("%||%", mode = "function")) {
+  `%||%` <- function(x, y) {
+    if (is.null(x)) y else x
+  }
+}
+
 # Source helpers needed by the grouped-frequency functions
+source(here::here("R", "result_model.R"), local = TRUE)
+source(here::here("R", "result_builders.R"), local = TRUE)
+source(here::here("R", "result_serializers.R"), local = TRUE)
+source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
 source(here::here("R", "style_datatable_config.R"), local = TRUE)
 source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
+
+.grouped_report_models <- function() {
+  list(
+    main = list(
+      parameters = list(model = "test-model"),
+      url = "https://api.example.com/v1/chat/completions"
+    ),
+    large = list(
+      parameters = list(model = "test-large-model"),
+      url = "https://api.example.com/v1/chat/completions"
+    )
+  )
+}
+
+.grouped_render_env <- function(parent = environment()) {
+  list2env(analysis_result_report_globals(), parent = parent)
+}
+
+.grouped_language_from_path <- function(report_path) {
+  if (grepl("_en\\.Rmd$", basename(report_path))) {
+    return("en")
+  }
+
+  "nl"
+}
+
+.make_grouped_texts_df <- function(
+  document_text,
+  preprocessed = document_text,
+  source_document_id = seq_along(document_text),
+  source_document_text = document_text,
+  analysis_unit_id = match(preprocessed, unique(preprocessed))
+) {
+  data.frame(
+    source_document_id = as.integer(source_document_id),
+    document_id = seq_along(document_text),
+    source_document_text = as.character(source_document_text),
+    document_text = as.character(document_text),
+    preprocessed = as.character(preprocessed),
+    analysis_unit_id = as.integer(analysis_unit_id),
+    stringsAsFactors = FALSE
+  )
+}
+
+.build_grouped_categorization_result <- function(
+  report_path,
+  results_table,
+  by_column_lookup,
+  texts_df = NULL
+) {
+  texts_df <- texts_df %||% .make_grouped_texts_df(results_table$text)
+
+  build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = paste0("grouped-", basename(report_path)),
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = .grouped_language_from_path(report_path),
+    by_column_name = "group",
+    by_column_lookup = by_column_lookup,
+    models = .grouped_report_models(),
+    categories = c("A", "B"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+}
+
+.build_grouped_scoring_result <- function(
+  report_path,
+  results_table,
+  by_column_lookup,
+  texts_df = NULL
+) {
+  texts_df <- texts_df %||% .make_grouped_texts_df(results_table$text)
+
+  build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = paste0("grouped-", basename(report_path)),
+    mode = "Scoren",
+    research_background = "",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = .grouped_language_from_path(report_path),
+    by_column_name = "group",
+    by_column_lookup = by_column_lookup,
+    models = .grouped_report_models(),
+    scoring_characteristic = "test characteristic",
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(scoring = "prompt")
+  )
+}
 
 # -- Unit tests for .join_by_group and grouped helpers -------------------------
 
@@ -40,6 +148,27 @@ test_that(".join_by_group fans out duplicate texts in different groups", {
   # "Text 1" should appear twice (once per group), "Text 2" once
   expect_equal(nrow(out), 3)
   expect_equal(sort(out$.by_group), c("G1", "G1", "G2"))
+})
+
+test_that(".join_by_group uses document_id to avoid overcounting same-text rows", {
+  df <- data.frame(
+    document_id = c(1L, 2L),
+    text = c("Text 1", "Text 1"),
+    result = c("A", "A"),
+    stringsAsFactors = FALSE
+  )
+  by_vals <- data.frame(
+    document_id = c(1L, 2L),
+    text = c("Text 1", "Text 1"),
+    by_value = c("G1", "G1"),
+    stringsAsFactors = FALSE
+  )
+
+  out <- .join_by_group(df, by_vals)
+
+  expect_equal(nrow(out), 2)
+  expect_equal(out$document_id, c(1L, 2L))
+  expect_equal(out$.by_group, c("G1", "G1"))
 })
 
 test_that(".join_by_group handles result df rows without a group match", {
@@ -106,6 +235,35 @@ test_that("generate_grouped_freq_table_single works with dedup data frame", {
   expect_s3_class(tbl, "datatables")
 })
 
+test_that("generate_grouped_freq_table_single does not overcount same-text rows in one group", {
+  df <- data.frame(
+    document_id = c(1L, 2L),
+    text = c("Text 1", "Text 1"),
+    result = c("A", "A"),
+    stringsAsFactors = FALSE
+  )
+  by_vals <- data.frame(
+    document_id = c(1L, 2L),
+    text = c("Text 1", "Text 1"),
+    by_value = c("G1", "G1"),
+    stringsAsFactors = FALSE
+  )
+
+  tbl <- generate_grouped_freq_table_single(
+    df = df,
+    by_values = by_vals,
+    by_column_name = "group",
+    categories = c("A"),
+    language = "en"
+  )
+
+  expect_s3_class(tbl, "datatables")
+  expect_equal(tbl$x$data$Group, "G1")
+  expect_equal(tbl$x$data$Category, "A")
+  expect_equal(tbl$x$data$Number, 2L)
+  expect_equal(tbl$x$data$Percentage, 100)
+})
+
 test_that("generate_grouped_freq_table_multi works with dedup data frame", {
   df <- data.frame(
     text = c("Text 1", "Text 2"),
@@ -165,29 +323,9 @@ test_that("Categorisatie report renders with deduped by_column_values (no error 
   testthat::skip_if_not_installed("stringr")
   testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
 
-  # Scenario: original upload had 3 rows with "Text 1" appearing in two
-  # groups (G1 and G2). After discard_empty() dedup, result df has 2 rows,
-  # but the by_column_values lookup preserves both group memberships.
-  result_list <- list(
-    df = data.frame(
-      text = c("Text 1", "Text 2"),
-      result = c("A", "B"),
-      stringsAsFactors = FALSE
-    ),
-    categories = c("A", "B"),
-    model = "test-model",
-    assign_multiple_categories = FALSE,
-    research_background = "",
-    irr = NULL,
-    paragraphs = NULL,
-    by_column_name = "group",
-    by_column_values = data.frame(
-      text = c("Text 1", "Text 1", "Text 2"),
-      by_value = c("G1", "G2", "G1"),
-      stringsAsFactors = FALSE
-    )
-  )
-
+  # Scenario: original upload had 3 source rows with two rows sharing the same
+  # text content but different groups. The runtime now preserves all rows, and
+  # grouped reports must still render without grouped-frequency shape errors.
   out_dir <- withr::local_tempdir()
 
   report_paths <- list.files(
@@ -208,9 +346,26 @@ test_that("Categorisatie report renders with deduped by_column_values (no error 
         rmarkdown::render(
           input = report_path,
           output_file = out_file,
-          params = list(result_list = result_list),
+          params = list(
+            analysis_result = .build_grouped_categorization_result(
+              report_path = report_path,
+              results_table = data.frame(
+                text = c("Text 1", "Text 1", "Text 2"),
+                result = c("A", "A", "B"),
+                stringsAsFactors = FALSE
+              ),
+              texts_df = .make_grouped_texts_df(
+                document_text = c("Text 1", "Text 1", "Text 2")
+              ),
+              by_column_lookup = data.frame(
+                source_document_id = c(1L, 2L, 3L),
+                by_value = c("G1", "G2", "G1"),
+                stringsAsFactors = FALSE
+              )
+            )
+          ),
           quiet = TRUE,
-          envir = new.env(parent = globalenv())
+          envir = .grouped_render_env(environment())
         ),
         silent = TRUE
       )
@@ -255,24 +410,6 @@ test_that("Scoren report renders with deduped by_column_values (no error text)",
   testthat::skip_if_not_installed("stringr")
   testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
 
-  result_list <- list(
-    df = data.frame(
-      text = c("Text 1", "Text 2"),
-      result = c(10, 20),
-      stringsAsFactors = FALSE
-    ),
-    model = "test-model",
-    scoring_characteristic = "test characteristic",
-    research_background = "",
-    irr = NULL,
-    by_column_name = "group",
-    by_column_values = data.frame(
-      text = c("Text 1", "Text 1", "Text 2"),
-      by_value = c("G1", "G2", "G1"),
-      stringsAsFactors = FALSE
-    )
-  )
-
   out_dir <- withr::local_tempdir()
 
   report_paths <- list.files(
@@ -293,9 +430,26 @@ test_that("Scoren report renders with deduped by_column_values (no error text)",
         rmarkdown::render(
           input = report_path,
           output_file = out_file,
-          params = list(result_list = result_list),
+          params = list(
+            analysis_result = .build_grouped_scoring_result(
+              report_path = report_path,
+              results_table = data.frame(
+                text = c("Text 1", "Text 1", "Text 2"),
+                result = c(10, 10, 20),
+                stringsAsFactors = FALSE
+              ),
+              texts_df = .make_grouped_texts_df(
+                document_text = c("Text 1", "Text 1", "Text 2")
+              ),
+              by_column_lookup = data.frame(
+                source_document_id = c(1L, 2L, 3L),
+                by_value = c("G1", "G2", "G1"),
+                stringsAsFactors = FALSE
+              )
+            )
+          ),
           quiet = TRUE,
-          envir = new.env(parent = globalenv())
+          envir = .grouped_render_env(environment())
         ),
         silent = TRUE
       )
@@ -342,26 +496,6 @@ test_that("Categorisatie report renders correctly with split-chunk by_column_loo
   # Scenario: original upload had 2 texts ("Text 1" in G1, "Text 2" in G2).
   # After splitting, "Text 1" became two chunks. The chunk-aware lookup maps
   # each chunk back to its source text's group.
-  result_list <- list(
-    df = data.frame(
-      text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
-      result = c("A", "B", "A"),
-      stringsAsFactors = FALSE
-    ),
-    categories = c("A", "B"),
-    model = "test-model",
-    assign_multiple_categories = FALSE,
-    research_background = "",
-    irr = NULL,
-    paragraphs = NULL,
-    by_column_name = "group",
-    by_column_values = data.frame(
-      text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
-      by_value = c("G1", "G1", "G2"),
-      stringsAsFactors = FALSE
-    )
-  )
-
   out_dir <- withr::local_tempdir()
 
   report_paths <- list.files(
@@ -382,9 +516,32 @@ test_that("Categorisatie report renders correctly with split-chunk by_column_loo
         rmarkdown::render(
           input = report_path,
           output_file = out_file,
-          params = list(result_list = result_list),
+          params = list(
+            analysis_result = .build_grouped_categorization_result(
+              report_path = report_path,
+              results_table = data.frame(
+                text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+                result = c("A", "B", "A"),
+                stringsAsFactors = FALSE
+              ),
+              texts_df = .make_grouped_texts_df(
+                document_text = c(
+                  "Text 1 chunk A",
+                  "Text 1 chunk B",
+                  "Text 2 chunk A"
+                ),
+                source_document_id = c(1L, 1L, 2L),
+                source_document_text = c("Text 1", "Text 1", "Text 2")
+              ),
+              by_column_lookup = data.frame(
+                source_document_id = c(1L, 2L),
+                by_value = c("G1", "G2"),
+                stringsAsFactors = FALSE
+              )
+            )
+          ),
           quiet = TRUE,
-          envir = new.env(parent = globalenv())
+          envir = .grouped_render_env(environment())
         ),
         silent = TRUE
       )

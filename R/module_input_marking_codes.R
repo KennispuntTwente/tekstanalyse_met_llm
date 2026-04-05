@@ -7,6 +7,13 @@ marking_codes_ui <- function(id) {
   )
 }
 
+.kwallm_marking_code_generation_chunk_settings <- function(context_window) {
+  list(
+    text_size_tokens = as.numeric(context_window$max_tokens %||% 256),
+    overlap_size_tokens = as.numeric(context_window$overlap %||% 0)
+  )
+}
+
 marking_codes_server <- function(
   id,
   mode,
@@ -202,6 +209,9 @@ marking_codes_server <- function(
 
         # Set model
         llm_provider <- models$main
+        chunk_settings <- .kwallm_marking_code_generation_chunk_settings(
+          context_window
+        )
 
         # Async generate codes
         queue$consumer$start()
@@ -213,6 +223,8 @@ marking_codes_server <- function(
 
             generate_codes_by_reading_texts(
               texts = texts,
+              text_size_tokens = text_size_tokens,
+              overlap_size_tokens = overlap_size_tokens,
               research_background = research_background,
               llm_provider = llm_provider,
               queue = queue,
@@ -225,6 +237,8 @@ marking_codes_server <- function(
             send_prompt_with_retries_async_globals(),
             list(
               texts = texts$preprocessed,
+              text_size_tokens = chunk_settings$text_size_tokens,
+              overlap_size_tokens = chunk_settings$overlap_size_tokens,
               research_background = research_background(),
               llm_provider = llm_provider,
               queue = queue,

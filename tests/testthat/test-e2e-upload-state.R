@@ -19,10 +19,11 @@ test_that("{shinytest2} upload card keeps consistent state across navigation and
     options = list(kwallm.test_async = TRUE)
   )
 
+  wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
   app$set_inputs(`text_upload-column` = "text")
   app$wait_for_value(
-    export = "text_management-texts__raw",
+    export = "text_management-texts__document_text",
     timeout = 10000,
     ignore = c(NULL)
   )
@@ -70,6 +71,7 @@ test_that("{shinytest2} upload card keeps consistent state across navigation and
     basename(temp_csv)
   )))
 
+  wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
   app$wait_for_value(
     export = "text_upload-uploaded_file_name",

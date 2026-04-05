@@ -3,7 +3,69 @@
 # Can select a sheet for Excel files, and a specific column for files with multiple columns
 # Can filter rows based on column values through a modal dialog
 # Note: pre-processing of texts is handled in the text_management module,
-#   this module only uploads the raw data
+#   this module establishes the source-document and current-document rows.
+
+.kwallm_raw_starts_with <- function(raw, prefix) {
+  stopifnot(is.raw(raw), is.numeric(prefix))
+
+  length(raw) >= length(prefix) &&
+    identical(
+      as.integer(raw[seq_along(prefix)]),
+      as.integer(prefix)
+    )
+}
+
+
+.kwallm_strip_utf_bom <- function(text) {
+  sub("^\ufeff", "", text)
+}
+
+
+.kwallm_read_text_with_encoding <- function(path, encoding) {
+  con <- file(path, open = "r", encoding = encoding)
+  on.exit(close(con), add = TRUE)
+
+  paste(readLines(con, warn = FALSE, skipNul = TRUE), collapse = "\n")
+}
+
+
+.kwallm_decode_txt_file <- function(path) {
+  stopifnot(is.character(path), length(path) == 1, nzchar(path))
+
+  raw <- readBin(path, "raw", file.info(path)$size)
+
+  if (.kwallm_raw_starts_with(raw, c(0xEF, 0xBB, 0xBF))) {
+    decoded <- rawToChar(raw[-seq_len(3)])
+    Encoding(decoded) <- "UTF-8"
+    return(.kwallm_strip_utf_bom(decoded))
+  }
+
+  if (.kwallm_raw_starts_with(raw, c(0xFF, 0xFE))) {
+    decoded <- .kwallm_read_text_with_encoding(path, "UTF-16LE")
+    return(.kwallm_strip_utf_bom(decoded))
+  }
+
+  if (.kwallm_raw_starts_with(raw, c(0xFE, 0xFF))) {
+    decoded <- .kwallm_read_text_with_encoding(path, "UTF-16BE")
+    return(.kwallm_strip_utf_bom(decoded))
+  }
+
+  txt_content <- tryCatch(
+    {
+      decoded <- rawToChar(raw)
+      if (!validUTF8(decoded)) {
+        stop("not valid utf-8")
+      }
+      Encoding(decoded) <- "UTF-8"
+      decoded
+    },
+    error = function(e) {
+      iconv(rawToChar(raw), from = "", to = "UTF-8", sub = "")
+    }
+  )
+
+  .kwallm_strip_utf_bom(txt_content)
+}
 
 # 1 UI ---------------------------------------------------------------
 text_upload_ui <- function(id) {
@@ -25,12 +87,71 @@ text_upload_server <- function(
 ) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    # Stable id for the uploaded source row, even when text values repeat.
+    source_id_col <- ".kwallm_source_document_id"
 
     # ---- Helpers ------------------------------------------------------------
     discard_empty <- function(x) {
+      x <- as.character(x)
       x <- x[!is.na(x)]
       keep <- stringr::str_trim(x) != ""
-      unique(x[keep])
+      x[keep]
+    }
+
+    ensure_source_document_id <- function(df) {
+      stopifnot(is.data.frame(df))
+
+      if (!source_id_col %in% names(df)) {
+        df[[source_id_col]] <- seq_len(nrow(df))
+      }
+
+      df
+    }
+
+    visible_uploaded_columns <- function(df) {
+      if (is.null(df)) {
+        return(character())
+      }
+
+      setdiff(names(df), source_id_col)
+    }
+
+    build_unsplit_rows <- function(df, text_col) {
+      if (
+        is.null(df) ||
+          is.null(text_col) ||
+          !nzchar(text_col) ||
+          !text_col %in% names(df)
+      ) {
+        return(NULL)
+      }
+
+      text_vals <- as.character(df[[text_col]])
+      keep <- !is.na(text_vals) & stringr::str_trim(text_vals) != ""
+
+      if (!any(keep)) {
+        return(data.frame(
+          source_document_id = integer(),
+          document_id = integer(),
+          source_document_text = character(),
+          document_text = character(),
+          stringsAsFactors = FALSE
+        ))
+      }
+
+      source_ids <- as.integer(df[[source_id_col]][keep])
+      document_text_vals <- text_vals[keep]
+
+      # source_document_* describes the uploaded row.
+      # document_* describes the current row passed to later modules.
+      # Before splitting, those two layers are still the same row.
+      data.frame(
+        source_document_id = source_ids,
+        document_id = source_ids,
+        source_document_text = document_text_vals,
+        document_text = document_text_vals,
+        stringsAsFactors = FALSE
+      )
     }
 
     normalize_upload_info <- function(file_df) {
@@ -48,25 +169,7 @@ text_upload_server <- function(
     }
 
     read_txt_file <- function(file_info, split_lines) {
-      raw <- readBin(
-        file_info$datapath,
-        "raw",
-        file.info(file_info$datapath)$size
-      )
-      txt_content <- tryCatch(
-        {
-          decoded <- rawToChar(raw)
-          if (!validUTF8(decoded)) {
-            stop("not valid utf-8")
-          }
-          Encoding(decoded) <- "UTF-8"
-          decoded
-        },
-        error = function(e) {
-          # Fall back to the system's native encoding (e.g. CP1252 on Windows)
-          iconv(rawToChar(raw), from = "", to = "UTF-8", sub = "")
-        }
-      )
+      txt_content <- .kwallm_decode_txt_file(file_info$datapath)
       txt_lines <- strsplit(txt_content, "\r?\n")[[1]]
 
       txt <- if (isTRUE(split_lines)) {
@@ -75,7 +178,10 @@ text_upload_server <- function(
         paste(txt_lines, collapse = "\n")
       }
 
-      data.frame(text = txt, stringsAsFactors = FALSE)
+      ensure_source_document_id(data.frame(
+        text = txt,
+        stringsAsFactors = FALSE
+      ))
     }
 
     reset_file_input <- function(file_name = NULL) {
@@ -106,7 +212,8 @@ text_upload_server <- function(
     }
 
     clear_upload_state <- function() {
-      raw_texts(NULL)
+      document_texts(NULL)
+      text_rows(NULL)
       uploaded_data(NULL)
       sheet_names(NULL)
       filter_spec(NULL)
@@ -201,7 +308,8 @@ text_upload_server <- function(
     })
 
     # ---- Reactive values ----------------------------------------------------
-    raw_texts <- reactiveVal(NULL) # vector of texts returned by module
+    document_texts <- reactiveVal(NULL) # current document texts before preprocessing
+    text_rows <- reactiveVal(NULL) # row-level source/document lineage for those texts
     uploaded_data <- reactiveVal(NULL) # raw data (data.frame) read from file
     sheet_names <- reactiveVal(NULL) # character vector of Excel sheet names
     by_column <- reactiveVal(NULL) # name of optional grouping column
@@ -345,18 +453,40 @@ text_upload_server <- function(
       keep <- !is.na(text_vals) & stringr::str_trim(text_vals) != ""
       text_keep <- text_vals[keep]
       by_keep <- by_vals[keep]
+      source_ids <- as.integer(df[[source_id_col]][keep])
 
-      # Keep all non-empty text-group pairs so grouped reports can fan out
-      # duplicate texts that belong to more than one group.
       by_column_lookup(data.frame(
+        source_document_id = source_ids,
         text = text_keep,
         by_value = by_keep,
         stringsAsFactors = FALSE
       ))
 
-      # Align by-column values with discard_empty(), which keeps the first
-      # occurrence of each non-empty text.
-      by_column_values(by_keep[!duplicated(text_keep)])
+      by_column_values(by_keep)
+      invisible(NULL)
+    }
+
+    refresh_text_rows <- function() {
+      df <- filtered_data()
+      if (is.null(df)) {
+        text_rows(NULL)
+        document_texts(NULL)
+        return(invisible(NULL))
+      }
+
+      text_col <- if (identical(file_type(), "txt")) {
+        "text"
+      } else {
+        current_column()
+      }
+
+      rows <- build_unsplit_rows(df, text_col)
+      text_rows(rows)
+      if (is.null(rows)) {
+        document_texts(NULL)
+      } else {
+        document_texts(rows$document_text)
+      }
       invisible(NULL)
     }
 
@@ -397,7 +527,7 @@ text_upload_server <- function(
       )
 
       # Reset all state -------------------------------------------------------
-      raw_texts(NULL)
+      document_texts(NULL)
       uploaded_data(NULL)
       sheet_names(NULL)
       filter_spec(NULL)
@@ -414,7 +544,8 @@ text_upload_server <- function(
           {
             df <- read_txt_file(file_info, current_txt_split_lines())
             uploaded_data(df)
-            raw_texts(df$text)
+            text_rows(build_unsplit_rows(df, "text"))
+            document_texts(text_rows()$document_text)
           },
           error = function(e) {
             log_error(
@@ -437,7 +568,7 @@ text_upload_server <- function(
         tryCatch(
           {
             df <- vroom::vroom(file_info$datapath)
-            uploaded_data(df)
+            uploaded_data(ensure_source_document_id(df))
 
             if (!is.null(previous_column) && previous_column %in% names(df)) {
               selected_column(previous_column)
@@ -482,7 +613,9 @@ text_upload_server <- function(
             }
             selected_sheet(desired_sheet)
             uploaded_data(
-              readxl::read_excel(file_info$datapath, sheet = desired_sheet)
+              ensure_source_document_id(
+                readxl::read_excel(file_info$datapath, sheet = desired_sheet)
+              )
             )
 
             if (!is.null(previous_column)) {
@@ -513,7 +646,7 @@ text_upload_server <- function(
         tryCatch(
           {
             df <- haven::read_sav(file_info$datapath)
-            uploaded_data(df)
+            uploaded_data(ensure_source_document_id(df))
 
             if (!is.null(previous_column) && previous_column %in% names(df)) {
               selected_column(previous_column)
@@ -617,7 +750,7 @@ text_upload_server <- function(
       tryCatch(
         {
           df <- readxl::read_excel(file_info$datapath, sheet = selected_sheet())
-          uploaded_data(df)
+          uploaded_data(ensure_source_document_id(df))
         },
         error = function(e) {
           showNotification(
@@ -635,6 +768,7 @@ text_upload_server <- function(
         return(NULL)
       }
       cols <- names(filtered_data())
+      cols <- visible_uploaded_columns(filtered_data())
       # if (length(cols) <= 1) return(NULL)
       selectInput(
         ns("column"),
@@ -651,12 +785,13 @@ text_upload_server <- function(
         col <- input$column
         if (!is.null(col) && nzchar(col)) {
           selected_column(col)
-          raw_texts(discard_empty(filtered_data()[[col]]))
+          refresh_text_rows()
           refresh_by_column_values()
           log_action("column_selected", details = col)
         } else {
           selected_column(NULL)
-          raw_texts(NULL)
+          text_rows(NULL)
+          document_texts(NULL)
         }
       },
       ignoreInit = TRUE
@@ -669,6 +804,7 @@ text_upload_server <- function(
         return(NULL)
       }
       cols <- names(filtered_data())
+      cols <- visible_uploaded_columns(filtered_data())
       # Exclude the text column from available by columns
       text_col <- current_column()
       available_cols <- setdiff(cols, text_col)
@@ -752,7 +888,7 @@ text_upload_server <- function(
         return()
       }
 
-      cols <- names(uploaded_data())
+      cols <- visible_uploaded_columns(uploaded_data())
       current_column <- selected_column()
       if (is.null(current_column) || !current_column %in% cols) {
         selected_column(NULL)
@@ -838,7 +974,7 @@ text_upload_server <- function(
       shinyWidgets::pickerInput(
         ns("filter_col"),
         label = lang()$t("Kies kolom voor filter"),
-        choices = names(uploaded_data()),
+        choices = visible_uploaded_columns(uploaded_data()),
         selected = filter_spec()$col %||% current_column() %||% NULL,
         options = shinyWidgets::pickerOptions(container = "body")
       )
@@ -849,7 +985,9 @@ text_upload_server <- function(
       if (!is.null(input$filter_col)) {
         df_col <- uploaded_data()[[input$filter_col]]
       } else {
-        df_col <- uploaded_data()[[1]]
+        visible_cols <- visible_uploaded_columns(uploaded_data())
+        req(length(visible_cols) > 0)
+        df_col <- uploaded_data()[[visible_cols[[1]]]]
       }
 
       counts <- table(na.omit(df_col))
@@ -943,19 +1081,12 @@ text_upload_server <- function(
       removeModal()
     })
 
-    # Refresh raw_texts when filter or column changes ------------------------
+    # Refresh current document texts when filter or column changes ------------
     observe({
       df <- filtered_data()
       req(df)
 
-      if (file_type() == "txt") {
-        # single-column data.frame called “text”
-        raw_texts(discard_empty(df[["text"]]))
-      } else if (!is.null(current_column()) && nzchar(current_column())) {
-        raw_texts(discard_empty(df[[current_column()]]))
-      } else {
-        raw_texts(NULL)
-      }
+      refresh_text_rows()
     })
 
     # Re-read persisted txt upload when split mode changes after upload -------
@@ -969,7 +1100,8 @@ text_upload_server <- function(
           {
             df <- read_txt_file(file_info, current_txt_split_lines())
             uploaded_data(df)
-            raw_texts(df$text)
+            text_rows(build_unsplit_rows(df, "text"))
+            document_texts(text_rows()$document_text)
           },
           error = function(e) {
             log_error(
@@ -1005,13 +1137,40 @@ text_upload_server <- function(
     # ---- Reset fileInput on new session ------------------------------------
     shinyjs::reset("text_file")
 
-    # ---- Return raw texts and by_column info -------------------------------
-    # Return a list with raw_texts and by_column information
+    upload_info <- reactive({
+      spec <- filter_spec()
+      filter_df <- if (is.null(spec)) {
+        NULL
+      } else {
+        data.frame(
+          column = rep(
+            spec$col %||% NA_character_,
+            length(spec$vals %||% character())
+          ),
+          value = as.character(spec$vals %||% character()),
+          stringsAsFactors = FALSE
+        )
+      }
+
+      list(
+        file_type = file_type(),
+        selected_sheet = current_sheet(),
+        text_column = current_column(),
+        grouping_column = current_by_column(),
+        filter_spec = filter_df,
+        txt_split_lines = txt_split_lines_choice()
+      )
+    })
+
+    # ---- Return current document texts and by_column info ------------------
+    # Return a list with current document texts and grouping metadata.
     return(list(
-      texts = raw_texts,
+      texts = document_texts,
+      text_rows = text_rows,
       by_column_name = by_column,
       by_column_values = by_column_values,
-      by_column_lookup = by_column_lookup
+      by_column_lookup = by_column_lookup,
+      upload_info = upload_info
     ))
   })
 }
@@ -1032,11 +1191,11 @@ if (FALSE) {
   server <- function(input, output, session) {
     processing <- reactiveVal(FALSE) # Simulate processing state
 
-    raw_texts <- text_upload_server("text_upload_module", processing)
+    upload_result <- text_upload_server("text_upload_module", processing)
 
     observe({
-      req(raw_texts())
-      print(raw_texts()) # For debugging: print uploaded texts
+      req(upload_result$texts())
+      print(upload_result$texts())
     })
   }
 

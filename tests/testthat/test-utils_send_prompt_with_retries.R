@@ -359,6 +359,44 @@ test_that("send_prompt_with_retries respects max_interactions parameter", {
   expect_equal(captured_args$max_interactions, 42)
 })
 
+test_that("send_prompt_with_retries records execution provenance including retries", {
+  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+
+  call_count <- 0
+  .kwallm__prompt_execution_reset()
+
+  withr::local_options(kwallm__prompt_execution_stage = "scoring")
+
+  local_mocked_bindings(
+    send_prompt = function(...) {
+      call_count <<- call_count + 1
+      if (call_count < 3) {
+        stop("Temporary error")
+      }
+      create_mock_result("success after retries")
+    },
+    .package = "tidyprompt"
+  )
+
+  result <- send_prompt_with_retries(
+    prompt = "test prompt",
+    llm_provider = create_mock_llm_provider(),
+    max_tries = 5,
+    max_interactions = 7,
+    retry_delay_seconds = 0
+  )
+
+  execution_rows <- .kwallm__prompt_execution_get()
+
+  expect_equal(result, "success after retries")
+  expect_equal(nrow(execution_rows), 1)
+  expect_equal(execution_rows$stage_id[[1]], "scoring")
+  expect_equal(execution_rows$try_count[[1]], 3L)
+  expect_equal(execution_rows$max_interactions[[1]], 7L)
+  expect_equal(execution_rows$completion_status[[1]], "success")
+  expect_match(execution_rows$error_messages[[1]], "Temporary error")
+})
+
 test_that("send_prompt_with_retries uses default options", {
   source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
 

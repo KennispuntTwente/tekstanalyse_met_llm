@@ -22,16 +22,21 @@ text_management_ui <- function(id) {
 
 text_management_server <- function(
   id,
-  raw_texts, # reactive vector with raw texts
+  document_texts, # reactive vector with current document texts
+  document_rows = NULL,
   gliner_model, # pre‑loaded GLiNER model object (or NULL)
   processing = reactiveVal(FALSE),
   lang = default_lang()
 ) {
+  opt_none <- isTRUE(getOption("anonymization__none", TRUE))
+  opt_regex <- isTRUE(getOption("anonymization__regex", TRUE))
+  opt_gliner <- isTRUE(getOption("anonymization__gliner_model", FALSE))
+
   # Ensure at least one anonymization method is enabled
   if (
-    !isTRUE(getOption("anonymization__none", TRUE)) &&
-      !isTRUE(getOption("anonymization__regex", TRUE)) &&
-      !isTRUE(getOption("anonymization__gliner_model", FALSE))
+    !opt_none &&
+      !opt_regex &&
+      !opt_gliner
   ) {
     stop("At least one anonymization method must be enabled via options.")
   }
@@ -49,71 +54,52 @@ text_management_server <- function(
     opt_default <- NA_character_
   }
 
-  default_is_enabled <- switch(
-    as.character(opt_default),
-    none = isTRUE(getOption("anonymization__none", TRUE)),
-    regex = isTRUE(getOption("anonymization__regex", TRUE)),
-    gliner = isTRUE(getOption("anonymization__gliner_model", FALSE)),
-    FALSE
+  available_modes <- c(
+    none = if (opt_none) "none" else NA_character_,
+    simple = if (opt_regex) "simple" else NA_character_,
+    gliner = if (opt_gliner) "gliner" else NA_character_
+  ) |>
+    stats::na.omit() |>
+    unname()
+
+  configured_default_mode <- switch(
+    opt_default,
+    none = "none",
+    regex = "simple",
+    gliner = "gliner",
+    NULL
   )
 
-  if (!default_is_enabled) {
-    fallback_map <- list(
-      regex = isTRUE(getOption("anonymization__regex", TRUE)),
-      gliner = isTRUE(getOption("anonymization__gliner_model", FALSE)),
-      none = isTRUE(getOption("anonymization__none", TRUE))
-    )
-    resolved <- names(which(unlist(fallback_map)))[1]
-    warning(
-      "Default anonymization method '",
-      opt_default,
-      "' is not enabled; falling back to '",
-      resolved,
-      "'."
-    )
-    opt_default <- resolved
+  if (
+    !is.null(configured_default_mode) &&
+      configured_default_mode %in% available_modes
+  ) {
+    initial_mode <- configured_default_mode
+  } else {
+    initial_mode <- intersect(c("simple", "gliner", "none"), available_modes)[1]
+
+    if (!is.na(opt_default)) {
+      warning(
+        "Default anonymization method '",
+        opt_default,
+        "' is not enabled; falling back to '",
+        initial_mode,
+        "'."
+      )
+    }
   }
 
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # -- 0  Global options ------------------------------------------
-    opt_default <- getOption("anonymization__default", "regex")
-    opt_none <- isTRUE(getOption("anonymization__none", TRUE))
-    opt_regex <- isTRUE(getOption("anonymization__regex", TRUE))
-    opt_gliner <- isTRUE(getOption("anonymization__gliner_model", FALSE))
-
-    # Determine which methods are actually available ----------------
-    available_modes <- c(
-      none = if (opt_none) "none" else NA,
-      simple = if (opt_regex) "simple" else NA,
-      gliner = if (opt_gliner) "gliner" else NA
-    ) |>
-      stats::na.omit() |>
-      unname()
-
     if (length(available_modes) == 0) {
       stop("At least one anonymization method must be enabled via options.")
-    }
-
-    # Determine the initial mode ------------------------------------
-    initial_mode <- switch(
-      opt_default,
-      none = if ("none" %in% available_modes) "none" else NULL,
-      regex = if ("simple" %in% available_modes) "simple" else NULL,
-      gliner = if ("gliner" %in% available_modes) "gliner" else NULL,
-      NULL
-    )
-    if (is.null(initial_mode)) {
-      # fall‑back order: regex → gliner → none
-      fallback_order <- c("simple", "gliner", "none")
-      initial_mode <- intersect(fallback_order, available_modes)[1]
     }
 
     # -- 1  Child module: GLiNER ------------------------------------
     gliner <- gliner_server(
       id = "gliner", # namespacing inside current module
-      pii_texts = reactive(raw_texts()),
+      pii_texts = reactive(input_rows()$document_text),
       lang = lang,
       gliner_model = gliner_model
     )
@@ -121,12 +107,50 @@ text_management_server <- function(
     # -- 2  State ----------------------------------------------------
     anonymization_mode <- reactiveVal(initial_mode)
 
-    texts <- reactiveValues(raw = NULL, preprocessed = NULL, df = NULL)
+    # document_text = current rows before anonymization/preprocessing.
+    # preprocessed = unique texts the LLM will actually see.
+    # analysis_units = lookup table from analysis_unit_id to one preprocessed text.
+    # df = row-level bridge from source row -> current document row -> analysis unit.
+    texts <- reactiveValues(
+      document_text = NULL,
+      preprocessed = NULL,
+      analysis_units = NULL,
+      df = NULL,
+      anonymization_mode = NULL,
+      anonymization_requested_mode = NULL,
+      anonymization_applied_mode = NULL,
+      anonymization_completed = NULL
+    )
+
+    input_rows <- reactive({
+      # Upstream modules may already have split one source row into many
+      # document rows. Keep that lineage intact when it is provided.
+      if (!is.null(document_rows)) {
+        return(document_rows())
+      }
+
+      values <- document_texts()
+      if (is.null(values)) {
+        return(NULL)
+      }
+
+      data.frame(
+        source_document_id = seq_along(values),
+        document_id = seq_along(values),
+        source_document_text = as.character(values),
+        document_text = as.character(values),
+        stringsAsFactors = FALSE
+      )
+    })
 
     shiny::exportTestValues(
       anonymization_mode = anonymization_mode(),
-      texts__raw = texts$raw,
+      anonymization_requested_mode = texts$anonymization_requested_mode,
+      anonymization_applied_mode = texts$anonymization_applied_mode,
+      anonymization_completed = texts$anonymization_completed,
+      texts__document_text = texts$document_text,
       texts__preprocessed = texts$preprocessed,
+      texts__analysis_units = texts$analysis_units,
       texts__df = texts$df
     )
 
@@ -179,7 +203,7 @@ text_management_server <- function(
                       "Hier kun je de teksten bekijken die zullen worden verwerkt."
                     ),
                     lang()$t(
-                      " Dubbele teksten worden automatisch gereduceerd tot één tekst."
+                      " Dubbele of gelijk voorbewerkte teksten worden voor LLM-calls hergebruikt als één analyse-eenheid, terwijl de originele rijen behouden blijven."
                     ),
                     lang()$t(
                       " Daarnaast kan je kiezen om de teksten te anonimiseren met behulp van regex of een GLiNER-model. Regex verwijdert e-mailadressen, telefoonnummers en (Nederlandse) postcodes. Het GLiNER-model kan verschillende vormen van PII detecteren."
@@ -313,7 +337,7 @@ text_management_server <- function(
           return()
         }
         if (isTRUE(processing())) {
-          glossy <- shinyjs::disable(id)
+          shinyjs::disable(id)
         } else {
           shinyjs::enable(id)
         }
@@ -322,50 +346,88 @@ text_management_server <- function(
 
     # -- 5  Compute/refresh texts -----------------------------------
     # Track previous state to avoid duplicate logs
-    prev_text_state <- reactiveVal(list(raw = 0, unique = 0, mode = ""))
+    prev_text_state <- reactiveVal(list(
+      source = 0,
+      document = 0,
+      unique = 0,
+      mode = ""
+    ))
 
     observe({
-      req(raw_texts())
+      req(input_rows())
       mode <- anonymization_mode()
+      requested_mode <- if (identical(mode, "simple")) "regex" else mode
+      anonymization_completed <- TRUE
+      document_text_vals <- input_rows()$document_text
 
-      out <- switch(
+      anonymized_texts <- switch(
         mode,
-        none = raw_texts(),
-        simple = pre_process_texts(raw_texts(), lang = lang()),
+        none = document_text_vals,
+        simple = anonymize_texts_with_regex(document_text_vals, lang = lang()),
         gliner = {
           if (isTRUE(gliner$done)) {
             unname(gliner$anonymized_texts)
           } else {
-            raw_texts()
+            anonymization_completed <- FALSE
+            document_text_vals
           }
         }
       )
+      # `preprocessed` remains the cross-module contract name for the exact
+      # text that will be sent to the LLM after optional anonymization.
+      llm_input_texts <- as.character(anonymized_texts)
+      applied_mode <- switch(
+        mode,
+        simple = "regex",
+        gliner = if (isTRUE(gliner$done)) "gliner" else "none",
+        "none"
+      )
 
-      texts$raw <- raw_texts()
-      texts$preprocessed <- unique(out)
-      texts$df <- data.frame(
-        raw = raw_texts(),
-        preprocessed = out,
+      # Many document rows can collapse to the same analysis unit after
+      # anonymization/preprocessing. The LLM only sees the unique texts.
+      analysis_unit_id <- match(llm_input_texts, unique(llm_input_texts))
+      analysis_units <- data.frame(
+        analysis_unit_id = seq_along(unique(llm_input_texts)),
+        preprocessed = unique(llm_input_texts),
         stringsAsFactors = FALSE
       )
 
+      texts$document_text <- document_text_vals
+      texts$preprocessed <- analysis_units$preprocessed
+      texts$analysis_units <- analysis_units
+      # Keep row-level lineage so results can later fan back out from one
+      # analysis unit to all document rows that reuse it.
+      texts$df <- data.frame(
+        input_rows(),
+        preprocessed = llm_input_texts,
+        analysis_unit_id = as.integer(analysis_unit_id),
+        stringsAsFactors = FALSE
+      )
+      texts$anonymization_mode <- mode
+      texts$anonymization_requested_mode <- requested_mode
+      texts$anonymization_applied_mode <- applied_mode
+      texts$anonymization_completed <- anonymization_completed
+
       # Only log when there's an actual change in counts
       new_state <- list(
-        raw = length(texts$raw),
+        source = length(unique(texts$df$source_document_id %||% integer())),
+        document = length(texts$document_text),
         unique = length(texts$preprocessed),
         mode = mode
       )
       old_state <- prev_text_state()
 
       if (
-        new_state$raw != old_state$raw ||
+        new_state$source != old_state$source ||
+          new_state$document != old_state$document ||
           new_state$unique != old_state$unique ||
           new_state$mode != old_state$mode
       ) {
         log_info(
           sprintf(
-            "Text count changed: raw=%d, unique=%d, mode=%s",
-            new_state$raw,
+            "Text count changed: source=%d, document=%d, unique=%d, mode=%s",
+            new_state$source,
+            new_state$document,
             new_state$unique,
             mode
           ),
@@ -378,20 +440,61 @@ text_management_server <- function(
     # -- 6  Summary counts ------------------------------------------
     output$preprocess_counts <- renderUI({
       req(texts$preprocessed)
-      dup_box <- {
-        total <- length(texts$raw)
-        uniq <- length(texts$preprocessed)
+      count_labels <- if (identical(lang()$get_translation_language(), "en")) {
+        list(
+          source = "Uploaded text rows",
+          document = "Current texts/chunks",
+          units = "Unique analysis units sent to the LLM",
+          reused = "Rows reusing an existing analysis"
+        )
+      } else {
+        list(
+          source = "Geuploade tekstrijen",
+          document = "Huidige teksten/chunks",
+          units = "Unieke analyse-eenheden voor het LLM",
+          reused = "Rijen die een bestaande analyse hergebruiken"
+        )
+      }
+
+      count_box <- {
+        source_total <- length(unique(texts$df$source_document_id))
+        document_total <- nrow(texts$df)
+        unit_total <- length(texts$preprocessed)
+        reused_total <- max(document_total - unit_total, 0)
+
+        count_items <- list(
+          div(
+            class = "d-flex align-items-center justify-content-between gap-3",
+            span(class = "text-muted small", count_labels$source),
+            span(class = "badge bg-secondary", source_total)
+          )
+        )
+
+        if (document_total != source_total) {
+          count_items[[length(count_items) + 1L]] <- div(
+            class = "d-flex align-items-center justify-content-between gap-3",
+            span(class = "text-muted small", count_labels$document),
+            span(class = "badge bg-secondary", document_total)
+          )
+        }
+
+        count_items[[length(count_items) + 1L]] <- div(
+          class = "d-flex align-items-center justify-content-between gap-3",
+          span(class = "text-muted small", count_labels$units),
+          span(class = "badge bg-secondary", unit_total)
+        )
+
+        if (reused_total > 0) {
+          count_items[[length(count_items) + 1L]] <- div(
+            class = "d-flex align-items-center justify-content-between gap-3",
+            span(class = "text-muted small", count_labels$reused),
+            span(class = "badge bg-secondary", reused_total)
+          )
+        }
+
         div(
           class = "border rounded p-2 mb-3 bg-light fade-in gap-2",
-          div(
-            class = "text-muted small mb-1 text-center",
-            lang()$t("Dubbele teksten verwijderd:")
-          ),
-          div(
-            class = "d-flex align-items-center justify-content-center gap-2",
-            bsicons::bs_icon("trash"),
-            span(class = "badge bg-secondary", total - uniq)
-          )
+          do.call(tagList, count_items)
         )
       }
 
@@ -447,7 +550,7 @@ text_management_server <- function(
         tagList(div(
           class = "mx-auto",
           style = "max-width:700px;",
-          dup_box,
+          count_box,
           simp_box
         ))
       } else if (mode == "gliner") {
@@ -497,7 +600,7 @@ text_management_server <- function(
             div(
               class = "mx-auto",
               style = "max-width:700px;",
-              dup_box,
+              count_box,
               div(
                 class = "border rounded p-2 bg-light fade-in",
                 div(
@@ -511,7 +614,7 @@ text_management_server <- function(
         }
       } else {
         # mode == "none"
-        dup_box
+        count_box
       }
     })
 
@@ -617,8 +720,8 @@ text_management_server <- function(
 }
 
 
-# 2 Helper function for preprocessing texts ------------------------
-pre_process_texts <- function(
+# 2 Helper functions for anonymization ----------------------------
+anonymize_texts_with_regex <- function(
   txts,
   lang = shiny.i18n::Translator$new(
     translation_json_path = "language/language.json"
@@ -628,8 +731,6 @@ pre_process_texts <- function(
   if (!requireNamespace("stringr", quietly = TRUE)) {
     stop("Please install and load the 'stringr' package.")
   }
-
-  txts <- stringr::str_squish(txts)
 
   # Find all e-mail addresses, replace with "<< e-mailadres verwijderd >>"
   txts <- stringr::str_replace_all(
@@ -690,7 +791,7 @@ if (FALSE) {
   )
 
   server <- function(input, output, session) {
-    raw <- reactive(c(
+    document_texts <- reactive(c(
       "My name is Luka Koning, I live on 5th avenue street in London.",
       "Call me on +3125251512 or mail me at bob@bobthebob.com",
       "It's a nice and sunny day today!"
@@ -698,7 +799,7 @@ if (FALSE) {
 
     text_management_server(
       "tm",
-      raw_texts = raw,
+      document_texts = document_texts,
       gliner_model = gliner_model
     )
   }

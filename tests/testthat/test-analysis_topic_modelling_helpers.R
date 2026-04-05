@@ -1,5 +1,5 @@
 # Tests for topic reduction logic in analysis_inductive_topic_modelling.R
-# Tests prompt construction and chunking logic (not LLM calls)
+# Tests prompt construction and batching logic (not LLM calls)
 
 library(testthat)
 
@@ -8,10 +8,10 @@ test_that("prompt_reduce_topics (via reduce_topics logic) creates valid prompt",
 
   # Test prompt_candidate_topics for different inputs
   topics <- c("Customer service", "Product quality", "Shipping speed")
-  text_chunk <- c("Great product!", "Fast delivery")
+  text_batch <- c("Great product!", "Fast delivery")
 
   prompt <- prompt_candidate_topics(
-    text_chunk = text_chunk,
+    text_batch = text_batch,
     research_background = "",
     language = "en"
   )
@@ -27,7 +27,7 @@ test_that("prompt_candidate_topics handles empty research background", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
   prompt <- prompt_candidate_topics(
-    text_chunk = c("Test text"),
+    text_batch = c("Test text"),
     research_background = "",
     language = "en"
   )
@@ -42,7 +42,7 @@ test_that("prompt_candidate_topics includes research background when provided", 
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
   prompt <- prompt_candidate_topics(
-    text_chunk = c("Test text"),
+    text_batch = c("Test text"),
     research_background = "Customer satisfaction study 2024",
     language = "en"
   )
@@ -51,11 +51,11 @@ test_that("prompt_candidate_topics includes research background when provided", 
   expect_match(prompt_text, "Customer satisfaction study 2024")
 })
 
-test_that("prompt_candidate_topics formats text chunks with XML tags", {
+test_that("prompt_candidate_topics formats text batches with XML tags", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
   prompt <- prompt_candidate_topics(
-    text_chunk = c("First text", "Second text"),
+    text_batch = c("First text", "Second text"),
     research_background = "",
     language = "en"
   )

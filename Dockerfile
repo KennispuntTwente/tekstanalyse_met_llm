@@ -32,6 +32,7 @@ COPY --chown=appuser:appuser Dockerfile-app.R app.R
 COPY --chown=appuser:appuser www/ www/
 COPY --chown=appuser:appuser language/ language/
 COPY --chown=appuser:appuser LICENSE.md LICENSE.md
+COPY --chown=appuser:appuser package.json package.json
 COPY --chown=appuser:appuser pyproject.toml pyproject.toml
 COPY --chown=appuser:appuser uv.lock uv.lock
 COPY --chown=appuser:appuser tekstanalyse_met_llm.Rproj tekstanalyse_met_llm.Rproj

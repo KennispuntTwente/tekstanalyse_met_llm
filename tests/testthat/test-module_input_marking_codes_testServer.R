@@ -10,6 +10,20 @@ source(here::here("R", "analysis_code_generation.R"))
 source(here::here("R", "module_input_marking_codes.R"))
 
 
+test_that(".kwallm_marking_code_generation_chunk_settings uses current context window values", {
+  settings <- .kwallm_marking_code_generation_chunk_settings(list(
+    max_tokens = 512,
+    overlap = 24
+  ))
+  defaults <- .kwallm_marking_code_generation_chunk_settings(list())
+
+  expect_identical(settings$text_size_tokens, 512)
+  expect_identical(settings$overlap_size_tokens, 24)
+  expect_identical(defaults$text_size_tokens, 256)
+  expect_identical(defaults$overlap_size_tokens, 0)
+})
+
+
 test_that("marking_codes_server: save/edit cycle returns trimmed unique codes", {
   testthat::skip_if_not_installed("ipc")
 
@@ -21,7 +35,10 @@ test_that("marking_codes_server: save/edit cycle returns trimmed unique codes", 
       processing <- reactiveVal(FALSE)
 
       # Minimal texts/context_window objects required by the module.
-      texts <- reactiveValues(preprocessed = c("t1"), raw = character())
+      texts <- reactiveValues(
+        preprocessed = c("t1"),
+        document_text = character()
+      )
       research_background <- reactiveVal("background")
       context_window <- reactiveValues(any_fit_problem = FALSE)
 
@@ -93,7 +110,10 @@ test_that("marking_codes_server: mode other than Markeren does not error", {
         id = "codes",
         mode = mode,
         processing = reactiveVal(FALSE),
-        texts = reactiveValues(preprocessed = character(), raw = character()),
+        texts = reactiveValues(
+          preprocessed = character(),
+          document_text = character()
+        ),
         research_background = reactiveVal(""),
         context_window = reactiveValues(any_fit_problem = FALSE),
         llm_provider_rv = NULL,

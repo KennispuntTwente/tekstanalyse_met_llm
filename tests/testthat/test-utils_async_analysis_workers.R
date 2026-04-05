@@ -89,6 +89,7 @@ test_that("analysis async globals helpers expose the expected names", {
     "score_texts",
     "prompt_score",
     "collect_grouped_texts",
+    "collect_grouped_paragraph_inputs",
     "write_grouped_paragraphs",
     "mark_texts",
     "mark_text_prompt",
@@ -136,6 +137,7 @@ test_that("analysis async globals helpers expose the expected names", {
     analysis_async_processing_globals(),
     c(
       "collect_grouped_texts",
+      "collect_grouped_paragraph_inputs",
       "write_grouped_paragraphs",
       "write_paragraph"
     )

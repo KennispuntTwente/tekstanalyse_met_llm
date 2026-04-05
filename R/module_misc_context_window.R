@@ -1,4 +1,4 @@
-# Module for context window and chunking parameters
+# Module for context window, topic batching, and marking chunking parameters
 # Ensures that the texts fit within the context window of the LLM
 
 # 1 UI ---------------------------------------------------------------
@@ -17,7 +17,7 @@ context_window_ui <- function(id) {
 
 # 2 Server ---------------------------------------------------------
 
-#' Manage context window and chunking parameters.
+#' Manage context window plus topic-batch and marking-chunk parameters.
 #'
 #' @param mode Reactive returning current analysis mode (character scalar).
 #' @param models reactiveValues with `$main` and `$large` tidyprompt providers (must have `$parameters$model`).
@@ -38,20 +38,20 @@ context_window_server <- function(
   assign_multiple_categories = reactiveVal(FALSE),
   texts = reactiveValues(
     preprocessed = character(),
-    raw = character()
+    document_text = character()
   ),
   processing = reactiveVal(FALSE),
   lang = default_lang(),
-  chunk_size_default = getOption(
-    "topic_modelling__chunk_size_default",
+  batch_size_default = getOption(
+    "topic_modelling__batch_size_default",
     25
   ),
-  chunk_size_limit = getOption(
-    "topic_modelling__chunk_size_limit",
+  batch_size_limit = getOption(
+    "topic_modelling__batch_size_limit",
     50
   ),
-  number_of_chunks_limit = getOption(
-    "topic_modelling__number_of_chunks_limit",
+  number_of_batches_limit = getOption(
+    "topic_modelling__number_of_batches_limit",
     100
   ),
   draws_default = getOption(
@@ -81,10 +81,10 @@ context_window_server <- function(
                 " Er moet voor worden gezorgd dat de onderzoeksachtergrond met de (langste) tekst die je invoert binnen het context-window van het model past."
               ),
               lang()$t(
-                " Daarnaast worden bij de eerste stap van onderwerpextractie de teksten in chunks verdeeld; deze chunks moeten ook binnen het context-window passen."
+                " Daarnaast worden bij de eerste stap van onderwerpextractie unieke analyse-eenheden in batches gegroepeerd; elke batch moet ook binnen het context-window passen."
               ),
               lang()$t(
-                " Met parameters kan je de grootte van de chunks en het aantal trekkingen per tekst instellen."
+                " Met parameters kan je de batchgrootte en het aantal trekkingen per tekst instellen."
               )
             )
           ),
@@ -93,8 +93,8 @@ context_window_server <- function(
               class = "d-flex flex-column align-items-center",
               uiOutput(ns("context_window_ui")),
               uiOutput(ns("fit_context_window_warning")),
-              uiOutput(ns("too_many_chunks_warning")),
-              uiOutput(ns("n_chunks_display")),
+              uiOutput(ns("too_many_batches_warning")),
+              uiOutput(ns("n_batches_display")),
             )
           )
         )
@@ -102,31 +102,32 @@ context_window_server <- function(
 
       # Reactive values ----------------------------------------------
       rv <- reactiveValues(
-        chunk_size = chunk_size_default,
+        batch_size = batch_size_default,
         draws = draws_default,
         n_tokens_context_window = NULL,
         max_tokens = 256,
         overlap = 0,
         base_prompt_text = NULL,
         fit_context_window_assigning = NULL,
-        fit_context_window_chunks = NULL,
-        text_chunks = NULL,
-        n_chunks = NULL
+        fit_context_window_batches = NULL,
+        text_batches = NULL,
+        n_batches = NULL,
+        too_many_batches = NULL
       )
 
       prev_params <- reactiveVal(NULL)
       prev_states <- reactiveVal(list(
         any_fit_problem = NULL,
-        too_many_chunks = NULL,
-        n_chunks = NULL,
+        too_many_batches = NULL,
+        n_batches = NULL,
         fit_context_window_assigning = NULL,
-        fit_context_window_chunks = NULL
+        fit_context_window_batches = NULL
       ))
 
       # Keep rv in sync with numeric inputs
       observe({
-        if (is_valid_number(input$chunk_size)) {
-          rv$chunk_size <- input$chunk_size
+        if (is_valid_number(input$batch_size)) {
+          rv$batch_size <- input$batch_size
         }
 
         if (
@@ -149,6 +150,44 @@ context_window_server <- function(
         }
       })
 
+      observe({
+        req(identical(mode(), "Markeren"))
+
+        sanitized <- .kwallm_sanitize_marking_chunk_settings(
+          max_tokens = rv$max_tokens,
+          overlap = rv$overlap
+        )
+
+        if (!identical(rv$max_tokens, sanitized$max_tokens)) {
+          rv$max_tokens <- sanitized$max_tokens
+        }
+        if (!identical(rv$overlap, sanitized$overlap)) {
+          rv$overlap <- sanitized$overlap
+        }
+
+        if (
+          is_valid_number(input$max_tokens) &&
+            !isTRUE(all.equal(input$max_tokens, sanitized$max_tokens))
+        ) {
+          updateNumericInput(
+            session,
+            "max_tokens",
+            value = sanitized$max_tokens
+          )
+        }
+
+        if (
+          is_valid_number(input$overlap) &&
+            !isTRUE(all.equal(input$overlap, sanitized$overlap))
+        ) {
+          updateNumericInput(
+            session,
+            "overlap",
+            value = sanitized$overlap
+          )
+        }
+      })
+
       # Log parameter changes (debounced by diffing previous values)
       observe({
         req(!isTRUE(processing()))
@@ -157,7 +196,7 @@ context_window_server <- function(
         current <- list(
           mode = mode() %||% "unknown",
           context_window = rv$n_tokens_context_window,
-          chunk_size = rv$chunk_size,
+          batch_size = rv$batch_size,
           draws = rv$draws,
           max_tokens = rv$max_tokens,
           overlap = rv$overlap
@@ -173,10 +212,10 @@ context_window_server <- function(
           log_action(
             "context_window_params_changed",
             details = sprintf(
-              "mode=%s context_window=%s chunk_size=%s draws=%s max_tokens=%s overlap=%s",
+              "mode=%s context_window=%s batch_size=%s draws=%s max_tokens=%s overlap=%s",
               as.character(current$mode),
               as.character(current$context_window),
-              as.character(current$chunk_size),
+              as.character(current$batch_size),
               as.character(current$draws),
               as.character(current$max_tokens),
               as.character(current$overlap)
@@ -186,13 +225,13 @@ context_window_server <- function(
         }
       })
 
-      # Enforce limit on chunk_size
+      # Enforce limit on batch_size
       observe({
-        req(input$chunk_size)
-        if (input$chunk_size > chunk_size_limit) {
-          updateNumericInput(session, "chunk_size", value = chunk_size_limit)
-        } else if (input$chunk_size < 1) {
-          updateNumericInput(session, "chunk_size", value = 1)
+        req(input$batch_size)
+        if (input$batch_size > batch_size_limit) {
+          updateNumericInput(session, "batch_size", value = batch_size_limit)
+        } else if (input$batch_size < 1) {
+          updateNumericInput(session, "batch_size", value = 1)
         }
       })
 
@@ -344,52 +383,57 @@ context_window_server <- function(
         }
       })
 
-      # Make chunks & check if they fit ------------------------------
+      # Make topic batches & check if they fit -----------------------
       observe({
         req(mode() == "Onderwerpextractie")
         req(texts$preprocessed)
         req(rv$n_tokens_context_window)
-        req(rv$chunk_size)
+        req(rv$batch_size)
         req(rv$draws)
 
+        # Topic extraction groups the unique analysis-unit texts into
+        # prompt batches before asking the LLM for candidate topics.
         texts <- texts$preprocessed
 
         # Based on prompt for candidate topic generation; 600 characters + background
         base_prompt_text <- prompt_candidate_topics(
-          text_chunk = c(""),
+          text_batch = c(""),
           research_background = research_background(),
           language = lang()$get_translation_language()
         ) |>
           tidyprompt::construct_prompt_text()
 
-        rv$text_chunks <- create_text_chunks(
+        rv$text_batches <- create_text_batches(
           texts = texts,
-          chunk_size = rv$chunk_size,
+          batch_size = rv$batch_size,
           draws = rv$draws,
           n_tokens_context_window = rv$n_tokens_context_window,
-          base_prompt_text = base_prompt_text
+          base_prompt_text = base_prompt_text,
+          text_formatter = function(text, index) {
+            paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
+          }
         )
 
-        if (is.null(rv$text_chunks)) {
-          rv$fit_context_window_chunks <- FALSE
+        if (is.null(rv$text_batches)) {
+          rv$fit_context_window_batches <- FALSE
         } else {
-          rv$fit_context_window_chunks <- TRUE
+          rv$fit_context_window_batches <- TRUE
         }
 
-        if (length(rv$text_chunks) > number_of_chunks_limit) {
-          rv$too_many_chunks <- TRUE
+        if (length(rv$text_batches) > number_of_batches_limit) {
+          rv$too_many_batches <- TRUE
         } else {
-          rv$too_many_chunks <- FALSE
+          rv$too_many_batches <- FALSE
         }
 
-        rv$n_chunks <- length(rv$text_chunks)
+        rv$n_batches <- length(rv$text_batches)
       })
 
       # Check for presence of any fit problem ------------------------
       observe({
         if (isTRUE(mode() == "Onderwerpextractie")) {
           if (
-            isFALSE(rv$fit_context_window_chunks) ||
+            isFALSE(rv$fit_context_window_batches) ||
               isFALSE(rv$fit_context_window_assigning)
           ) {
             rv$any_fit_problem <- TRUE
@@ -413,10 +457,10 @@ context_window_server <- function(
 
         current_states <- list(
           any_fit_problem = rv$any_fit_problem,
-          too_many_chunks = rv$too_many_chunks,
-          n_chunks = rv$n_chunks,
+          too_many_batches = rv$too_many_batches,
+          n_batches = rv$n_batches,
           fit_context_window_assigning = rv$fit_context_window_assigning,
-          fit_context_window_chunks = rv$fit_context_window_chunks
+          fit_context_window_batches = rv$fit_context_window_batches
         )
 
         prev <- prev_states()
@@ -427,41 +471,41 @@ context_window_server <- function(
           log_action(
             "context_window_fit_problem_changed",
             details = sprintf(
-              "mode=%s any_fit_problem=%s fit_assigning=%s fit_chunks=%s",
+              "mode=%s any_fit_problem=%s fit_assigning=%s fit_batches=%s",
               mode() %||% "unknown",
               as.character(current_states$any_fit_problem),
               as.character(current_states$fit_context_window_assigning),
-              as.character(current_states$fit_context_window_chunks)
+              as.character(current_states$fit_context_window_batches)
             )
           )
         }
 
         if (
-          !identical(current_states$too_many_chunks, prev$too_many_chunks) &&
-            !is.null(current_states$too_many_chunks)
+          !identical(current_states$too_many_batches, prev$too_many_batches) &&
+            !is.null(current_states$too_many_batches)
         ) {
           log_action(
-            "too_many_chunks_changed",
+            "too_many_batches_changed",
             details = sprintf(
-              "mode=%s too_many_chunks=%s n_chunks=%s limit=%d",
+              "mode=%s too_many_batches=%s n_batches=%s limit=%d",
               mode() %||% "unknown",
-              as.character(current_states$too_many_chunks),
-              as.character(current_states$n_chunks),
-              number_of_chunks_limit
+              as.character(current_states$too_many_batches),
+              as.character(current_states$n_batches),
+              number_of_batches_limit
             )
           )
         }
 
         if (
-          !identical(current_states$n_chunks, prev$n_chunks) &&
-            !is.null(current_states$n_chunks)
+          !identical(current_states$n_batches, prev$n_batches) &&
+            !is.null(current_states$n_batches)
         ) {
           log_action(
-            "n_chunks_changed",
+            "n_batches_changed",
             details = sprintf(
-              "mode=%s n_chunks=%s",
+              "mode=%s n_batches=%s",
               mode() %||% "unknown",
-              as.character(current_states$n_chunks)
+              as.character(current_states$n_batches)
             )
           )
         }
@@ -469,7 +513,7 @@ context_window_server <- function(
         prev_states(current_states)
       })
 
-      # Show inputs (context window, chunking parameters), based on mode ----
+      # Show inputs (context window, topic-batching, and chunking), based on mode ----
       output$context_window_ui <- renderUI({
         req(
           mode() %in%
@@ -501,18 +545,18 @@ context_window_server <- function(
           ),
           if (mode() == "Onderwerpextractie") {
             list(
-              # Add subtle text to explain chunking parameters
+              # Add subtle text to explain topic-batch parameters
               description_box(
                 lang()$t(
-                  "Onderstaande parameters bepalen hoe de teksten worden verdeeld in chunks voor het genereren van onderwerpen in de 'onderwerpextractie'-modus."
+                  "Onderstaande parameters bepalen hoe analyse-eenheden worden gegroepeerd in batches voor het genereren van onderwerpen in de 'onderwerpextractie'-modus."
                 )
               ),
               numericInput(
-                ns("chunk_size"),
-                lang()$t("Maximaal aantal teksten per chunk"),
-                value = rv$chunk_size,
+                ns("batch_size"),
+                lang()$t("Maximaal aantal teksten per batch"),
+                value = rv$batch_size,
                 min = 1,
-                max = chunk_size_limit
+                max = batch_size_limit
               ),
               numericInput(
                 ns("draws"),
@@ -561,41 +605,41 @@ context_window_server <- function(
                 ),
                 value = isolate(rv$overlap),
                 min = 0,
-                step = 1
+                step = 0.1
               )
             )
           }
         ))
       })
 
-      # Show number of chunks and warnings, based on mode ------------
-      # Show number of chunks
-      output$n_chunks_display <- renderUI({
+      # Show number of topic batches and warnings, based on mode -----
+      # Show number of topic batches
+      output$n_batches_display <- renderUI({
         req(mode() == "Onderwerpextractie")
-        req(rv$n_chunks)
+        req(rv$n_batches)
         return(div(
           class = "alert alert-info d-flex align-items-center mt-2",
           bsicons::bs_icon("blockquote-left"),
           span(
             class = "ms-2 fw",
-            paste(lang()$t("Aantal chunks:"), rv$n_chunks)
+            paste(lang()$t("Aantal batches:"), rv$n_batches)
           )
         ))
       })
 
-      # Show warning if too many chunks
-      output$too_many_chunks_warning <- renderUI({
+      # Show warning if too many topic batches
+      output$too_many_batches_warning <- renderUI({
         req(isTRUE(mode() == "Onderwerpextractie"))
-        req(isTRUE(rv$too_many_chunks))
+        req(isTRUE(rv$too_many_batches))
         return(div(
           class = "alert alert-danger d-flex align-items-center mt-2",
           bsicons::bs_icon("exclamation-triangle-fill"),
           span(
             class = "ms-2",
             paste0(
-              lang()$t("Te veel chunks"),
+              lang()$t("Te veel batches"),
               " (> ",
-              number_of_chunks_limit,
+              number_of_batches_limit,
               ")"
             )
           )
@@ -636,7 +680,7 @@ context_window_server <- function(
       # Disable when processing
       disable_when_processing(
         processing,
-        c("context_window", "chunk_size", "draws", "max_tokens", "overlap")
+        c("context_window", "batch_size", "draws", "max_tokens", "overlap")
       )
 
       return(rv)
@@ -645,6 +689,43 @@ context_window_server <- function(
 }
 
 # 3 Helper functions -----------------------------------------------
+
+.kwallm_sanitize_marking_chunk_settings <- function(max_tokens, overlap) {
+  if (
+    is.null(max_tokens) ||
+      length(max_tokens) != 1 ||
+      is.na(max_tokens) ||
+      !is.finite(max_tokens)
+  ) {
+    max_tokens <- 1
+  }
+  if (
+    is.null(overlap) ||
+      length(overlap) != 1 ||
+      is.na(overlap) ||
+      !is.finite(overlap)
+  ) {
+    overlap <- 0
+  }
+
+  max_tokens <- max(1, as.numeric(round(max_tokens)))
+  overlap <- max(0, as.numeric(overlap))
+
+  if (overlap >= 1) {
+    overlap <- as.numeric(round(overlap))
+  }
+
+  if (max_tokens <= 1) {
+    overlap <- 0
+  } else if (overlap >= max_tokens) {
+    overlap <- max_tokens - 1
+  }
+
+  list(
+    max_tokens = as.numeric(max_tokens),
+    overlap = as.numeric(overlap)
+  )
+}
 
 # 4 Example/development usage ----------------------------------------
 if (FALSE) {
@@ -702,7 +783,7 @@ if (FALSE) {
         "This is a negative review.",
         "This is a neutral review."
       ),
-      raw = c(
+      document_text = c(
         "Dit is een positieve review.",
         "Dit is een negatieve review.",
         "Dit is een neutrale review."

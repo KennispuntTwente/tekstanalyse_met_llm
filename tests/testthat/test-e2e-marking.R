@@ -11,6 +11,7 @@ test_that("{shinytest2} recording: standard process - marking", {
   )
 
   # Upload texts
+  wait_for_text_upload_input(app)
   app$upload_file(
     `text_upload-text_file` = here::here(
       "tests",
@@ -73,11 +74,11 @@ test_that("{shinytest2} recording: standard process - marking", {
   )
 
   # Read results
-  results <- app$get_value(export = "processing-final_results_df")
+  results <- app$get_value(export = "processing-results_table")
 
-  # Expect that columns 'text', 'sub_text', 'code', & 'marked_text' are present
+  # Expect that columns 'text', 'chunk_text', 'code', & 'marked_text' are present
   expect_true(all(
-    c("text", "sub_text", "code", "marked_text") %in% colnames(results)
+    c("text", "chunk_text", "code", "marked_text") %in% colnames(results)
   ))
   # Expect that all columns are character
   expect_true(all(sapply(results, is.character)))
@@ -88,10 +89,10 @@ test_that("{shinytest2} recording: standard process - marking", {
   )
   expect_true(all(texts %in% results$text))
 
-  # Expect that when marked_text is not NA, it is part of the sub_text
+  # Expect that when marked_text is not NA, it is part of the chunk_text
   expect_true(all(
     is.na(results$marked_text) |
-      mapply(grepl, pattern = results$marked_text, x = results$sub_text)
+      mapply(grepl, pattern = results$marked_text, x = results$chunk_text)
   ))
 
   # Expect that all unique values in results$code are present in

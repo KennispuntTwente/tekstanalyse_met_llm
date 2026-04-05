@@ -322,6 +322,7 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
 
       mark_texts(
         texts = texts,
+        analysis_unit_ids = analysis_unit_ids,
         codes = codes,
         text_size_tokens = text_size_tokens,
         overlap_size_tokens = overlap_size_tokens,
@@ -334,6 +335,7 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
     .args = c(
       list(
         texts = texts,
+        analysis_unit_ids = seq_along(texts),
         codes = codes,
         text_size_tokens = 256,
         overlap_size_tokens = 0,
@@ -355,9 +357,9 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
 
   expect_true(nrow(results) >= 3000L)
   expect_true(all(results$code %in% codes))
-  expect_identical(length(unique(results$text)), 3000L)
+  expect_identical(length(unique(results$analysis_unit_id)), 3000L)
   expect_true(all(vapply(results$marked_text, is.character, logical(1))))
-  expect_true(all(results$marked_text == results$sub_text))
+  expect_true(all(results$marked_text == results$chunk_text))
   expect_true(all(nchar(results$marked_text) > 0))
 
   log_file <- file.path(

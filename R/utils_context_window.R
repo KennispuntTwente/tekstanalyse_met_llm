@@ -90,3 +90,65 @@ get_context_window_size_in_tokens <- function(model) {
 
   return(NULL)
 }
+
+
+# Check whether the real topic-assignment prompt fits in the model context window.
+# This uses the current topic list plus the longest text that will be assigned.
+topic_assignment_prompt_context_window_check <- function(
+  texts,
+  topics,
+  research_background = "",
+  llm_provider,
+  assign_multiple_categories = FALSE,
+  exclusive_topics = character()
+) {
+  provider_model <- tryCatch(
+    llm_provider$parameters$model,
+    error = function(e) NULL
+  )
+
+  stopifnot(
+    is.character(texts),
+    length(texts) > 0,
+    is.character(topics),
+    length(topics) > 0,
+    is.character(research_background),
+    length(research_background) == 1,
+    !is.null(provider_model),
+    is.character(provider_model),
+    length(provider_model) == 1,
+    all(exclusive_topics %in% topics)
+  )
+
+  longest_text <- texts[[which.max(count_tokens(texts))]]
+
+  assignment_prompt <- if (isTRUE(assign_multiple_categories)) {
+    prompt_multi_category(
+      text = longest_text,
+      categories = topics,
+      research_background = research_background,
+      exclusive_categories = exclusive_topics
+    )
+  } else {
+    prompt_category(
+      text = longest_text,
+      categories = topics,
+      research_background = research_background
+    )
+  }
+
+  assignment_context_window <- get_context_window_size_in_tokens(provider_model)
+  if (is.null(assignment_context_window)) {
+    assignment_context_window <- 2048
+  }
+
+  assignment_prompt_tokens <- assignment_prompt |>
+    tidyprompt::construct_prompt_text() |>
+    count_tokens()
+
+  list(
+    fits = assignment_prompt_tokens <= assignment_context_window,
+    prompt_tokens = as.integer(assignment_prompt_tokens),
+    context_window_tokens = as.integer(assignment_context_window)
+  )
+}

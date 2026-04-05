@@ -9,9 +9,22 @@ testthat::skip_if_not_installed("later")
 # Stub modal side effects; we only assert state changes.
 showModal <- function(...) invisible(NULL)
 removeModal <- function(...) invisible(NULL)
+last_notification <- NULL
+showNotification <- function(
+  ui,
+  type = c("default", "message", "warning", "error"),
+  ...
+) {
+  last_notification <<- list(
+    ui = as.character(ui),
+    type = match.arg(type)
+  )
+  invisible(NULL)
+}
 
 # Source locally so these stubs are used.
 source(here::here("R", "component_modal_helpers.R"), local = TRUE)
+source(here::here("R", "utils_context_window.R"), local = TRUE)
 source(here::here("R", "module_misc_edit_topics.R"), local = TRUE)
 
 # Minimal stubs for async/LLM helpers.
@@ -67,6 +80,9 @@ tiktoken_load_tokenizer <- function(...) NULL
 count_tokens <- function(...) 0
 async_message_printer <- function(...) function(...) invisible(NULL)
 app_error <- function(...) invisible(NULL)
+topic_assignment_prompt_context_window_check <- function(...) {
+  list(fits = TRUE, prompt_tokens = 10L, context_window_tokens = 100L)
+}
 
 
 test_that("edit_topics_server: confirm sets edited topics and updates exclusive topics", {
@@ -84,6 +100,10 @@ test_that("edit_topics_server: confirm sets edited topics and updates exclusive 
         research_background = reactiveVal("bg"),
         assign_multiple_categories = reactiveVal(TRUE),
         llm_provider = list(parameters = list(model = "unit-test")),
+        assignment_texts = reactive(c("short text")),
+        assignment_llm_provider = reactive(list(
+          parameters = list(model = "unit-test")
+        )),
         lang = lang
       )
 
@@ -135,6 +155,10 @@ test_that("edit_topics_server: reduce_again applies re-reduced topics and keeps 
         research_background = reactiveVal("bg"),
         assign_multiple_categories = reactiveVal(TRUE),
         llm_provider = list(parameters = list(model = "unit-test")),
+        assignment_texts = reactive(c("short text")),
+        assignment_llm_provider = reactive(list(
+          parameters = list(model = "unit-test")
+        )),
         lang = lang
       )
 
@@ -166,6 +190,89 @@ test_that("edit_topics_server: reduce_again applies re-reduced topics and keeps 
       expect_equal(
         sort(exclusive()),
         sort(c("Topic 2", "Onbekend/niet van toepassing"))
+      )
+    }
+  )
+})
+
+
+test_that("edit_topics_server: confirm blocks topics that exceed context window", {
+  module_env <- environment(edit_topics_server)
+  shiny_ns <- asNamespace("shiny")
+  old_fit_check <- get(
+    "topic_assignment_prompt_context_window_check",
+    envir = module_env
+  )
+  old_show_notification <- get("showNotification", envir = shiny_ns)
+  withr::defer({
+    assign(
+      "topic_assignment_prompt_context_window_check",
+      old_fit_check,
+      envir = module_env
+    )
+    unlockBinding("showNotification", shiny_ns)
+    assign("showNotification", old_show_notification, envir = shiny_ns)
+    lockBinding("showNotification", shiny_ns)
+  })
+  assign(
+    "topic_assignment_prompt_context_window_check",
+    function(...) {
+      list(fits = FALSE, prompt_tokens = 140L, context_window_tokens = 100L)
+    },
+    envir = module_env
+  )
+
+  unlockBinding("showNotification", shiny_ns)
+  assign(
+    "showNotification",
+    function(ui, type = c("default", "message", "warning", "error"), ...) {
+      last_notification <<- list(
+        ui = as.character(ui),
+        type = match.arg(type)
+      )
+      invisible(NULL)
+    },
+    envir = shiny_ns
+  )
+  lockBinding("showNotification", shiny_ns)
+
+  last_notification <<- NULL
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+
+      topics <- reactiveVal(c("Topic 1", "Topic 2", "Topic 3"))
+      exclusive <- reactiveVal(c("Topic 2"))
+
+      edited <- edit_topics_server(
+        id = "edit",
+        topics = topics,
+        exclusive_topics = exclusive,
+        research_background = reactiveVal("bg"),
+        assign_multiple_categories = reactiveVal(TRUE),
+        llm_provider = list(parameters = list(model = "unit-test")),
+        assignment_texts = reactive(c("short text")),
+        assignment_llm_provider = reactive(list(
+          parameters = list(model = "unit-test")
+        )),
+        lang = lang
+      )
+
+      list(edited = edited, exclusive = exclusive)
+    },
+    {
+      session$flushReact()
+
+      session$setInputs(`edit-confirm_topics` = 1)
+      session$flushReact()
+
+      expect_null(edited())
+      expect_false(is.null(last_notification))
+      expect_identical(last_notification$type, "error")
+      expect_match(
+        last_notification$ui,
+        "context-window van het toekenningsmodel"
       )
     }
   )
