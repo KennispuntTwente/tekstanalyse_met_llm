@@ -451,7 +451,11 @@ test_that("Markeren reports escape supporting text HTML in paragraph accordions"
       language <- .report_language_from_path(report_path)
       out_file <- file.path(
         out_dir,
-        paste0("escape-", tools::file_path_sans_ext(basename(report_path)), ".html")
+        paste0(
+          "escape-",
+          tools::file_path_sans_ext(basename(report_path)),
+          ".html"
+        )
       )
 
       res <- try(
