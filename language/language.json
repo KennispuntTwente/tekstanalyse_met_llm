@@ -662,6 +662,14 @@
         "en": "Re-reducing topics..."
       },
       {
+        "nl": "De huidige onderwerpenlijst past niet binnen het context-window van het toekenningsmodel (%d > %d tokens). Verminder het aantal of de lengte van de onderwerpen voordat je doorgaat.",
+        "en": "The current topic list does not fit within the assignment model context window (%d > %d tokens). Reduce the number or length of the topics before continuing."
+      },
+      {
+        "nl": "De gegenereerde onderwerpen passen niet binnen het context-window van het toekenningsmodel (%d > %d tokens). Daarom is het bewerkscherm voor onderwerpen geopend. Verminder het aantal of de lengte van de onderwerpen voordat je doorgaat.",
+        "en": "The generated topics do not fit within the assignment model context window (%d > %d tokens). The topic editor has therefore been opened. Reduce the number or length of the topics before continuing."
+      },
+      {
         "nl": "Re-reductie mislukt of ongeldige onderwerpen gegenereerd",
         "en": "Re-reduction failed or invalid topics generated"
       },

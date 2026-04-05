@@ -1,6 +1,7 @@
 library(testthat)
 library(shiny)
 
+source(here::here("R", "utils_context_window.R"), local = TRUE)
 source(here::here("R", "utils_create_text_batches.R"), local = TRUE)
 source(here::here("R", "module_misc_context_window.R"), local = TRUE)
 
@@ -39,6 +40,79 @@ prompt_candidate_topics <- function(...) list(prompt = "candidate_topics")
 count_tokens <- function(x) {
   nchar(x)
 }
+
+
+test_that("topic_assignment_prompt_context_window_check uses the real topic list", {
+  tidyprompt_ns <- asNamespace("tidyprompt")
+  helper_env <- environment(topic_assignment_prompt_context_window_check)
+  old_construct <- get("construct_prompt_text", envir = tidyprompt_ns)
+  old_prompt_category <- get("prompt_category", envir = helper_env)
+  old_prompt_multi_category <- get("prompt_multi_category", envir = helper_env)
+  withr::defer({
+    unlockBinding("construct_prompt_text", tidyprompt_ns)
+    assign("construct_prompt_text", old_construct, envir = tidyprompt_ns)
+    lockBinding("construct_prompt_text", tidyprompt_ns)
+    assign("prompt_category", old_prompt_category, envir = helper_env)
+    assign("prompt_multi_category", old_prompt_multi_category, envir = helper_env)
+  })
+
+  unlockBinding("construct_prompt_text", tidyprompt_ns)
+  assign(
+    "construct_prompt_text",
+    function(x, ...) {
+      paste(c(x$text, x$categories, x$exclusive_categories), collapse = "|")
+    },
+    envir = tidyprompt_ns
+  )
+  lockBinding("construct_prompt_text", tidyprompt_ns)
+
+  assign(
+    "prompt_category",
+    function(text, research_background, categories) {
+      list(
+        text = text,
+        categories = categories,
+        research_background = research_background
+      )
+    },
+    envir = helper_env
+  )
+  assign(
+    "prompt_multi_category",
+    function(
+      text,
+      research_background = "",
+      categories,
+      exclusive_categories
+    ) {
+      list(
+        text = text,
+        categories = categories,
+        research_background = research_background,
+        exclusive_categories = exclusive_categories
+      )
+    },
+    envir = helper_env
+  )
+
+  old_get_cw <- get_context_window_size_in_tokens
+  withr::defer({
+    get_context_window_size_in_tokens <<- old_get_cw
+  })
+  get_context_window_size_in_tokens <<- function(model) 20
+
+  check <- topic_assignment_prompt_context_window_check(
+    texts = c("short", "this is the longest text"),
+    topics = c("Topic A", "Topic B", "Topic C"),
+    research_background = "background",
+    llm_provider = list(parameters = list(model = "unit-test-model")),
+    assign_multiple_categories = TRUE,
+    exclusive_topics = "Topic C"
+  )
+
+  expect_false(check$fits)
+  expect_gt(check$prompt_tokens, check$context_window_tokens)
+})
 
 
 test_that("context_window_server: fit flag flips based on context window size", {

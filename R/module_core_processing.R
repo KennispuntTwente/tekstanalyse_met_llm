@@ -111,6 +111,7 @@ processing_server <- function(
       candidate_topics_generated <- reactiveVal(NULL)
       reduced_topics_generated <- reactiveVal(NULL)
       topics_were_edited <- reactiveVal(FALSE)
+      topic_editor_was_used <- reactiveVal(FALSE)
       success <- reactiveVal(NULL)
 
       # Stable identifier for the current processing task and export bundle
@@ -128,6 +129,30 @@ processing_server <- function(
         }
 
         as.integer(ids)
+      }
+
+      topic_assignment_fit_info <- function(
+        current_topics,
+        current_exclusive_topics = exclusive_topics() %||% character()
+      ) {
+        topic_assignment_prompt_context_window_check(
+          texts = texts$preprocessed,
+          topics = current_topics,
+          research_background = research_background(),
+          llm_provider = models$main,
+          assign_multiple_categories = assign_multiple_categories(),
+          exclusive_topics = current_exclusive_topics
+        )
+      }
+
+      topic_assignment_overflow_notice <- function(fit_info) {
+        sprintf(
+          lang()$t(
+            "De gegenereerde onderwerpen passen niet binnen het context-window van het toekenningsmodel (%d > %d tokens). Daarom is het bewerkscherm voor onderwerpen geopend. Verminder het aantal of de lengte van de onderwerpen voordat je doorgaat."
+          ),
+          fit_info$prompt_tokens,
+          fit_info$context_window_tokens
+        )
       }
 
       ### 2.1.2 Test exports ---------------------------------------------------
@@ -163,6 +188,7 @@ processing_server <- function(
         candidate_topics_generated(NULL)
         reduced_topics_generated(NULL)
         topics_were_edited(FALSE)
+        topic_editor_was_used(FALSE)
         irr_result(NULL)
         irr_sample(NULL)
         stage_execution_rows_generated(NULL)
@@ -646,12 +672,36 @@ processing_server <- function(
           exclusive_topics()[exclusive_topics() %in% topics()]
         )
 
-        # If no human in the loop, auto-confirm
-        if (!isTRUE(human_in_the_loop())) {
+        fit_info <- topic_assignment_fit_info(topics())
+        topic_assignment_overflow <- !isTRUE(fit_info$fits)
+
+        if (topic_assignment_overflow) {
+          showNotification(
+            topic_assignment_overflow_notice(fit_info),
+            type = "error",
+            duration = NULL
+          )
+          log_warn(
+            sprintf(
+              paste0(
+                "Generated topics exceed assignment context window: ",
+                "prompt_tokens=%d, context_window_tokens=%d"
+              ),
+              fit_info$prompt_tokens,
+              fit_info$context_window_tokens
+            ),
+            component = "topics"
+          )
+        }
+
+        # If no human in the loop and the generated topics fit, auto-confirm.
+        if (!isTRUE(human_in_the_loop()) && !topic_assignment_overflow) {
           topics_were_edited(FALSE)
           topics_definitive(TRUE)
           return()
         }
+
+        topic_editor_was_used(TRUE)
 
         progress_primary$set_with_total(
           2.5,
@@ -664,6 +714,8 @@ processing_server <- function(
           topics = topics,
           exclusive_topics = exclusive_topics,
           llm_provider = models$large,
+          assignment_texts = reactive(texts$preprocessed),
+          assignment_llm_provider = reactive(models$main),
           research_background = research_background,
           assign_multiple_categories = assign_multiple_categories,
           lang = lang
@@ -1239,7 +1291,7 @@ processing_server <- function(
           exclusive_topics = exclusive_topics(),
           codes = codes$texts(),
           assign_multiple_categories = assign_multiple_categories(),
-          human_in_the_loop = human_in_the_loop(),
+          human_in_the_loop = human_in_the_loop() || topic_editor_was_used(),
           write_paragraphs = write_paragraphs(),
           context_window = context_window,
           stage_prompt_previews = build_stage_prompt_previews(),
