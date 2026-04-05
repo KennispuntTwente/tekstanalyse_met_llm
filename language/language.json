@@ -650,6 +650,10 @@
         "en": "Topics must be unique."
       },
       {
+        "nl": "Codes moeten uniek zijn.",
+        "en": "Codes must be unique."
+      },
+      {
         "nl": "Je moet minimaal 2 onderwerpen opgeven.",
         "en": "You must specify at least 2 topics."
       },
@@ -738,8 +742,20 @@
         "en": "Yes, new analysis"
       },
       {
+        "nl": "Annuleren?",
+        "en": "Cancel?"
+      },
+      {
         "nl": "<< TEKST >>",
         "en": "<< TEXT >>"
+      },
+      {
+        "nl": "<< TEKST 1 >>",
+        "en": "<< TEXT 1 >>"
+      },
+      {
+        "nl": "<< TEKST 2 >>",
+        "en": "<< TEXT 2 >>"
       },
       {
         "nl": "Categoriseer",
@@ -752,6 +768,10 @@
       {
         "nl": "Extraheer",
         "en": "Extract"
+      },
+      {
+        "nl": "Markeer",
+        "en": "Mark"
       },
       {
         "nl": "Klik hier deze foutmelding te rapporteren als GitHub issue. Bedankt!",
@@ -1158,6 +1178,10 @@
         "en": " You can, for example, add, remove, merge, or split certain topics yourself."
       },
       {
+        "nl": "Indien je dit aanzet, kun je de de onderwerpen die het taalmodel heeft geïdentificeerd in de teksten bekijken en bewerken. Dit kan je dan doen dan voordat de onderwerpen worden toegewezen aan de teksten. Je kan bijvoorbeeld zelf bepaalde onderwerpen toevoegen, verwijderen, samenvoegen, of uitsplitsen.",
+        "en": "If you enable this, you can view and edit the topics identified by the language model in the texts. You can do this before the topics are assigned to the texts. You can, for example, add, remove, merge, or split certain topics yourself."
+      },
+      {
         "nl": "Het model zal verschillende perspectieven extraheren uit de teksten, en de teksten hiernaar categoriseren. Per categorie kan het model een samenvatting met quotes schrijven.",
         "en": "The model will extract different perspectives from the texts and categorize the texts accordingly. For each category, the model can write a summary with quotes."
       },
@@ -1232,6 +1256,10 @@
       {
         "nl": "Geen teksten beschikbaar om codes voor te genereren",
         "en": "No texts available to generate codes for"
+      },
+      {
+        "nl": "Geen codes gegenereerd",
+        "en": "No codes generated"
       },
       {
         "nl": " Geef beknopte, duidelijke omschrijvingen (met optioneel voorbeelden van teksten die bij de code zouden moeten horen).",
@@ -1330,6 +1358,10 @@
         "en": "Advanced settings — primary model"
       },
       {
+        "nl": "Geavanceerde instellingen — groot model",
+        "en": "Advanced settings — large model"
+      },
+      {
         "nl": "Niet ingesteld",
         "en": "Not set"
       },
@@ -1406,7 +1438,7 @@
         "en": "Test provider (JSON output)"
       },
       {
-        "nl": "Top-p (nucleus sampling)'",
+        "nl": "Top-p (nucleus sampling)",
         "en": "Top-p (nucleus sampling)"
       },
       {

@@ -592,7 +592,7 @@ text_upload_server <- function(
             )
             showNotification(
               paste(
-                lang()$t("Error bij lezen van CSV/TSV bestand:"),
+                lang()$t("Error bij lezen van CSV/TSV-bestand:"),
                 e$message
               ),
               type = "error"

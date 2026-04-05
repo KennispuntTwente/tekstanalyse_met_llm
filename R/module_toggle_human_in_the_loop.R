@@ -21,11 +21,7 @@ human_in_the_loop_toggle_server <- function(
   yes_no_toggle_card_server(
     id = id,
     title = "Human-in-the-loop",
-    tooltip_text = paste0(
-      "Indien je dit aanzet, kun je de de onderwerpen die het taalmodel heeft geïdentificeerd in de teksten bekijken en bewerken.",
-      " Dit kan je dan doen dan voordat de onderwerpen worden toegewezen aan de teksten.",
-      " Je kan bijvoorbeeld zelf bepaalde onderwerpen toevoegen, verwijderen, samenvoegen, of uitsplitsen."
-    ),
+    tooltip_text = "Indien je dit aanzet, kun je de de onderwerpen die het taalmodel heeft geïdentificeerd in de teksten bekijken en bewerken. Dit kan je dan doen dan voordat de onderwerpen worden toegewezen aan de teksten. Je kan bijvoorbeeld zelf bepaalde onderwerpen toevoegen, verwijderen, samenvoegen, of uitsplitsen.",
     question_text = "Zelf onderwerpen bewerken?",
     default_value = FALSE,
     show_when = reactive(mode() == "Onderwerpextractie"),
