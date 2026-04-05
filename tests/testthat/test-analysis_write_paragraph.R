@@ -1,5 +1,26 @@
 library(testthat)
 
+test_that("prompt_write_paragraph builds structured tagged prompt", {
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  prompt <- prompt_write_paragraph(
+    texts = c("First text", "Second text"),
+    topic = "weather",
+    research_background = "Survey context",
+    style_prompt = "Keep it concise.",
+    language = "en"
+  )
+
+  prompt_text <- tidyprompt::construct_prompt_text(prompt)
+
+  expect_match(prompt_text, "<research_background>", fixed = TRUE)
+  expect_match(prompt_text, "<topic>", fixed = TRUE)
+  expect_match(prompt_text, "<texts>", fixed = TRUE)
+  expect_match(prompt_text, "<text 1>", fixed = TRUE)
+  expect_match(prompt_text, "<style_instructions>", fixed = TRUE)
+})
+
+
 test_that("write_paragraph re-raises send_prompt_with_retries errors", {
   # Stub dependencies before sourcing
   send_prompt_with_retries <- function(...) {
@@ -20,4 +41,30 @@ test_that("write_paragraph re-raises send_prompt_with_retries errors", {
     ),
     "Failed to write paragraph"
   )
+})
+
+
+test_that("write_paragraph checks prompt fit before sending", {
+  send_call_count <- 0
+  send_prompt_with_retries <- function(...) {
+    send_call_count <<- send_call_count + 1
+    "unused"
+  }
+  get_context_window_size_in_tokens <- function(...) 10
+  count_tokens <- function(...) 999
+
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  expect_error(
+    write_paragraph(
+      texts = c("some text"),
+      analysis_unit_ids = 1L,
+      topic = "weather",
+      llm_provider = list(parameters = list(model = "test")),
+      language = "en"
+    ),
+    "exceeds the model context window"
+  )
+
+  expect_identical(send_call_count, 0)
 })

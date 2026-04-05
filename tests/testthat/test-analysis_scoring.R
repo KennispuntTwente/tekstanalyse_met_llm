@@ -66,6 +66,8 @@ test_that("prompt_score returns a usable prompt object", {
   prompt_text <- tidyprompt::construct_prompt_text(prompt)
   expect_true(is.character(prompt_text))
   expect_true(nchar(prompt_text) > 0)
+  expect_match(prompt_text, "<text>", fixed = TRUE)
+  expect_match(prompt_text, "<scoring_characteristic>", fixed = TRUE)
 })
 
 test_that("prompt_score includes all parameters in prompt text", {
@@ -88,6 +90,7 @@ test_that("prompt_score includes all parameters in prompt text", {
   expect_match(prompt_text, "Daily mood survey", fixed = TRUE)
   expect_match(prompt_text, "happiness level", fixed = TRUE)
   expect_match(prompt_text, "0-100", fixed = TRUE)
+  expect_match(prompt_text, "<research_background>", fixed = TRUE)
 })
 
 test_that("prompt_score works with empty research background", {

@@ -63,6 +63,8 @@ test_that("prompt_category returns a usable prompt object", {
   prompt_text <- tidyprompt::construct_prompt_text(prompt)
   expect_true(is.character(prompt_text))
   expect_true(nchar(prompt_text) > 0)
+  expect_match(prompt_text, "<text>", fixed = TRUE)
+  expect_match(prompt_text, "<categories>", fixed = TRUE)
 })
 
 test_that("prompt_multi_category validates input and exclusive categories", {
@@ -117,7 +119,7 @@ test_that("prompt_category includes research background when provided", {
   )
 
   prompt_text <- tidyprompt::construct_prompt_text(prompt_with_bg)
-  expect_match(prompt_text, "Research background")
+  expect_match(prompt_text, "<research_background>", fixed = TRUE)
   expect_match(prompt_text, "customer feedback research")
 })
 
@@ -133,6 +135,7 @@ test_that("prompt_multi_category includes exclusive category annotation", {
   prompt_text <- tidyprompt::construct_prompt_text(prompt)
   expect_match(prompt_text, "\\[exclusive\\]")
   expect_match(prompt_text, "unclear")
+  expect_match(prompt_text, "<categories>", fixed = TRUE)
 })
 
 test_that("categorize_texts returns binary columns for multi-label output", {
@@ -194,6 +197,7 @@ test_that("categorize_texts supports progress, interruption, and early NA", {
 
   result <- categorize_texts(
     texts = c("text a", "text b", "text c"),
+    analysis_unit_ids = c(1L, 2L, 3L),
     categories = c("cat1", "cat2"),
     llm_provider = create_test_provider(),
     on_progress = function(i, n, text) {
@@ -231,6 +235,7 @@ test_that("categorize_texts multi-label: early NA produces NA category columns",
 
   result <- categorize_texts(
     texts = c("text a", "text b", "text c"),
+    analysis_unit_ids = c(1L, 2L, 3L),
     categories = c("cat1", "cat2"),
     llm_provider = create_test_provider(),
     assign_multiple_categories = TRUE
