@@ -71,9 +71,8 @@ if (
 
 Onderstaande tabel toont per tekst en per code welk deel van de tekst is gemarkeerd door het taalmodel.
 
-Kolom 'Tekst' bevat de originele tekst, kolom 'Subtekst' bevat een gedeelte van de originele tekst die is bekeken in één prompt door het taalmodel,
-de kolom 'code' bevat de code waarvoor de tekst is gemarkeerd, en de kolom 'Gemarkeerde tekst' bevat de gemarkeerde tekst die volgens het taalmodel
-relevant is voor de code.
+Kolom 'Tekst' bevat de huidige tekstrij in de app, kolom 'Chunk' bevat de chunk die aan het taalmodel is getoond,
+de kolom 'Code' bevat de code waarvoor de tekst is gemarkeerd, en de kolom 'Gemarkeerde tekst' bevat het letterlijke tekstdeel dat door het taalmodel is teruggegeven.
 
 ```{r, echo=FALSE, results='asis', error=TRUE}
 
@@ -145,15 +144,10 @@ for (i in seq_len(nrow(paragraphs_df))) {
   if (!length(supporting_texts)) {
     next
   }
-  supporting_texts_html <- paste(
-    htmltools::htmlEscape(supporting_texts),
-    collapse = " "
-  )
-  
   #### 1 Verify quotes on presence in supporting texts ####
   paragraph_text <- verify_and_decorate_quotes(
     paragraph_text = paragraph_text,
-    supporting_texts = supporting_texts_html,
+    supporting_texts = supporting_texts,
     lang = "nl",
     escape_html = FALSE
   )
@@ -202,7 +196,7 @@ for (i in seq_len(nrow(paragraphs_df))) {
       htmltools::HTML(gsub(
         "\\*\\*(.*?)\\*\\*",
         "<span style='font-weight: 900; color: #b30000; background-color: #ffcccc; text-decoration: underline;'>\\1</span>",
-        txt
+        htmltools::htmlEscape(txt)
       ))
     })
   

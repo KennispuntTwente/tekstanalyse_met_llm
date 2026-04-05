@@ -80,20 +80,34 @@ verify_and_decorate_quotes <- function(
 ) {
   lang <- match.arg(lang)
 
-  # Normalize supporting texts to single string
-  if (length(supporting_texts) > 1) {
-    supporting_texts <- supporting_texts[!is.na(supporting_texts)]
-    if (length(supporting_texts) == 0) {
-      supporting_texts <- ""
-    } else {
-      supporting_texts <- paste(supporting_texts, collapse = " ")
-    }
-  }
   if (!is.character(supporting_texts)) {
     supporting_texts <- as.character(supporting_texts)
   }
-  if (length(supporting_texts) == 0 || is.na(supporting_texts)) {
-    supporting_texts <- ""
+
+  supporting_texts <- supporting_texts[!is.na(supporting_texts)]
+  supporting_texts <- supporting_texts[nzchar(supporting_texts)]
+
+  quote_present_in_supporting_texts <- function(query, texts) {
+    if (
+      !is.character(query) ||
+        length(query) != 1 ||
+        is.na(query) ||
+        !nzchar(query) ||
+        !length(texts)
+    ) {
+      return(FALSE)
+    }
+
+    any(vapply(
+      texts,
+      function(txt) {
+        isTRUE(stringr::str_detect(
+          txt,
+          stringr::fixed(query, ignore_case = TRUE)
+        ))
+      },
+      logical(1)
+    ))
   }
 
   # Localized tooltips
@@ -114,23 +128,19 @@ verify_and_decorate_quotes <- function(
       q <- quote_matches[j, 2]
       # Remove trailing punctuation/symbols (e.g., .,;:!?), quotes stuck to parentheses, etc.
       q_clean <- stringr::str_remove(q, "[\\u2000-\\u206F\\p{P}\\p{S}]+$")
-      q_clean <- stringr::str_squish(q_clean)
+      q_clean <- trimws(q_clean)
       placeholder <- paste0("___QUOTEPLACEHOLDER", j, "___")
 
       has_query <- is.character(q_clean) &&
         length(q_clean) == 1 &&
         !is.na(q_clean) &&
         nzchar(q_clean)
-      has_texts <- is.character(supporting_texts) &&
-        length(supporting_texts) == 1 &&
-        !is.na(supporting_texts) &&
-        nzchar(supporting_texts)
       is_present <- FALSE
-      if (has_query && has_texts) {
-        is_present <- isTRUE(stringr::str_detect(
-          supporting_texts,
-          stringr::fixed(q_clean, ignore_case = TRUE)
-        ))
+      if (has_query) {
+        is_present <- quote_present_in_supporting_texts(
+          q_clean,
+          supporting_texts
+        )
       }
 
       if (is_present) {

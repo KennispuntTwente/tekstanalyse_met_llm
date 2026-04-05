@@ -285,15 +285,10 @@ for (i in seq_len(nrow(paragraphs_df))) {
   if (!length(supporting_texts)) {
     next
   }
-  supporting_texts_html <- paste(
-    htmltools::htmlEscape(supporting_texts),
-    collapse = " "
-  )
-  
   #### 1 Verify quotes on presence in supporting texts ####
   paragraph_text <- verify_and_decorate_quotes(
     paragraph_text = paragraph_text,
-    supporting_texts = supporting_texts_html,
+    supporting_texts = supporting_texts,
     lang = "nl",
     escape_html = FALSE
   )

@@ -191,3 +191,35 @@ test_that("verify_and_decorate_quotes drops NA within supporting_texts vectors",
   )
   expect_match(out, "check-circle-fill")
 })
+
+test_that("verify_and_decorate_quotes does not verify across supporting text boundaries", {
+  source(here::here("R", "utils_quotes.R"), local = TRUE)
+
+  paragraph <- 'Contains "alpha beta".'
+  supporting <- c("alpha", "beta")
+  out <- verify_and_decorate_quotes(
+    paragraph,
+    supporting_texts = supporting,
+    lang = "en",
+    escape_html = FALSE
+  )
+
+  expect_no_match(out, "check-circle-fill")
+  expect_match(out, "exclamation-triangle-fill")
+})
+
+test_that("verify_and_decorate_quotes preserves internal whitespace during verification", {
+  source(here::here("R", "utils_quotes.R"), local = TRUE)
+
+  paragraph <- 'Contains "alpha   beta".'
+  supporting <- "alpha beta"
+  out <- verify_and_decorate_quotes(
+    paragraph,
+    supporting_texts = supporting,
+    lang = "en",
+    escape_html = FALSE
+  )
+
+  expect_no_match(out, "check-circle-fill")
+  expect_match(out, "exclamation-triangle-fill")
+})
