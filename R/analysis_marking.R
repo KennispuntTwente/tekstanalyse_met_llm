@@ -862,7 +862,9 @@ mark_text_prompt <- function(
 #' @param needles  Character vector. Candidate snippets to match.
 #' @param rel      Numeric. Relative tolerance (default 0.12).
 #' @param abs      Integer. Absolute minimum tolerance (default 2).
-#' @param step_div Integer. Window step divisor; step = max(1, floor(nlen / step_div)).
+#' @param step_div Integer. Retained for backward compatibility; matching now
+#'   uses an exhaustive scan across admissible windows for deterministic
+#'   correctness.
 #'
 #' @return A tibble with columns:
 #'   - needle: original input
@@ -991,6 +993,8 @@ best_literal_substring <- function(
   abs = 2,
   step_div = 5L
 ) {
+  force(step_div)
+
   # 0) guard: NA/empty needles and empty haystacks
   if (is.na(needle) || is.null(needle)) {
     return(list(
@@ -1053,7 +1057,7 @@ best_literal_substring <- function(
     ))
   }
 
-  # 3) fuzzy on normalized; coarse scan then refine to guarantee correctness
+  # 3) fuzzy on normalized; exhaustively scan all admissible windows.
   minw <- max(1L, nlen - md)
   maxw <- min(Ln, nlen + md)
   if (Ln < minw) {
@@ -1065,31 +1069,24 @@ best_literal_substring <- function(
     ))
   }
 
-  scan_step <- function(step) {
-    cands <- list()
-    for (w in seq.int(minw, maxw)) {
-      last_start <- Ln - w + 1L
-      if (last_start <= 0L) {
-        next
-      }
-      for (i in seq.int(1L, last_start)) {
-        subn <- substr(Hn, i, i + w - 1L)
-        d <- stringdist::stringdist(n, subn, method = "lv")
-        if (d <= md) {
-          cands[[length(cands) + 1L]] <- list(
-            d = as.integer(d),
-            w = as.integer(w),
-            i = as.integer(i)
-          )
-        }
+  cands <- list()
+  for (w in seq.int(minw, maxw)) {
+    last_start <- Ln - w + 1L
+    if (last_start <= 0L) {
+      next
+    }
+    for (i in seq.int(1L, last_start)) {
+      subn <- substr(Hn, i, i + w - 1L)
+      d <- stringdist::stringdist(n, subn, method = "lv")
+      if (d <= md) {
+        cands[[length(cands) + 1L]] <- list(
+          d = as.integer(d),
+          w = as.integer(w),
+          i = as.integer(i)
+        )
       }
     }
-    cands
   }
-
-  # coarse pass using requested granularity
-  step_coarse <- max(1L, floor(nlen / step_div))
-  cands <- scan_step(step_coarse)
 
   if (!length(cands)) {
     return(list(
@@ -1098,19 +1095,6 @@ best_literal_substring <- function(
       start = NA_integer_,
       end = NA_integer_
     ))
-  }
-
-  # refine pass (step = 1) only if coarse found nothing
-  if (!length(cands)) {
-    cands <- scan_step(1L)
-    if (!length(cands)) {
-      return(list(
-        match = NA_character_,
-        distance = NA_integer_,
-        start = NA_integer_,
-        end = NA_integer_
-      ))
-    }
   }
 
   # Prefer: (1) window length closest to needle, (2) smaller distance, (3) earlier start
