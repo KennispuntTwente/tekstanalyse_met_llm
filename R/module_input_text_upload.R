@@ -8,10 +8,11 @@
 .kwallm_raw_starts_with <- function(raw, prefix) {
   stopifnot(is.raw(raw), is.numeric(prefix))
 
-  length(raw) >= length(prefix) && identical(
-    as.integer(raw[seq_along(prefix)]),
-    as.integer(prefix)
-  )
+  length(raw) >= length(prefix) &&
+    identical(
+      as.integer(raw[seq_along(prefix)]),
+      as.integer(prefix)
+    )
 }
 
 

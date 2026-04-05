@@ -435,7 +435,9 @@ mark_texts <- function(
       return(NULL)
     }
 
-    if (!identical(substr(analysis_unit_text, abs_start, abs_end), expected_match)) {
+    if (
+      !identical(substr(analysis_unit_text, abs_start, abs_end), expected_match)
+    ) {
       return(NULL)
     }
 

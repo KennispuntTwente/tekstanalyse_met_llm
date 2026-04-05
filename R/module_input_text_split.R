@@ -314,7 +314,12 @@ text_split_server <- function(
         {
           result <- .
 
-          if (!identical(request_input_rows_version, isolate(input_rows_version()))) {
+          if (
+            !identical(
+              request_input_rows_version,
+              isolate(input_rows_version())
+            )
+          ) {
             log_info(
               "Ignoring stale split result after source texts changed",
               component = "split"
@@ -358,7 +363,12 @@ text_split_server <- function(
         {
           error <- .
 
-          if (!identical(request_input_rows_version, isolate(input_rows_version()))) {
+          if (
+            !identical(
+              request_input_rows_version,
+              isolate(input_rows_version())
+            )
+          ) {
             log_info(
               "Ignoring stale split error after source texts changed",
               component = "split"

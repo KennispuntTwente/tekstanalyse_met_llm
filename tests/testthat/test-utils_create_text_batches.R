@@ -77,9 +77,13 @@ test_that("create_text_batches: accounts for formatter overhead in token budget"
   sums <- vapply(
     batches,
     function(batch) {
-      sum(vapply(seq_along(batch), function(i) {
-        count_tokens(formatter(batch[[i]], i))
-      }, numeric(1)))
+      sum(vapply(
+        seq_along(batch),
+        function(i) {
+          count_tokens(formatter(batch[[i]], i))
+        },
+        numeric(1)
+      ))
     },
     numeric(1)
   )

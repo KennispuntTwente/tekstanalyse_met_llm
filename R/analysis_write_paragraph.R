@@ -70,11 +70,18 @@ prompt_write_paragraph <- function(
 
   prompt_instructions <- c(
     "Write a short, summarizing paragraph describing the different perspectives presented in the texts.",
-    paste0("Describe only perspectives which are related to the topic ('", topic, "').")
+    paste0(
+      "Describe only perspectives which are related to the topic ('",
+      topic,
+      "')."
+    )
   )
 
   if (language == "nl") {
-    prompt_instructions <- c(prompt_instructions, "Write the paragraph in Dutch.")
+    prompt_instructions <- c(
+      prompt_instructions,
+      "Write the paragraph in Dutch."
+    )
   }
 
   prompt_instructions <- c(
