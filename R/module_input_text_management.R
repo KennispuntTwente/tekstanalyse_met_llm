@@ -363,7 +363,7 @@ text_management_server <- function(
       anonymized_texts <- switch(
         mode,
         none = document_text_vals,
-        simple = pre_process_texts(document_text_vals, lang = lang()),
+        simple = anonymize_texts_with_regex(document_text_vals, lang = lang()),
         gliner = {
           if (isTRUE(gliner$done)) {
             unname(gliner$anonymized_texts)
@@ -373,7 +373,9 @@ text_management_server <- function(
           }
         }
       )
-      preprocessed_texts <- as.character(anonymized_texts)
+      # `preprocessed` remains the cross-module contract name for the exact
+      # text that will be sent to the LLM after optional anonymization.
+      llm_input_texts <- as.character(anonymized_texts)
       applied_mode <- switch(
         mode,
         simple = "regex",
@@ -383,10 +385,10 @@ text_management_server <- function(
 
       # Many document rows can collapse to the same analysis unit after
       # anonymization/preprocessing. The LLM only sees the unique texts.
-      analysis_unit_id <- match(preprocessed_texts, unique(preprocessed_texts))
+      analysis_unit_id <- match(llm_input_texts, unique(llm_input_texts))
       analysis_units <- data.frame(
-        analysis_unit_id = seq_along(unique(preprocessed_texts)),
-        preprocessed = unique(preprocessed_texts),
+        analysis_unit_id = seq_along(unique(llm_input_texts)),
+        preprocessed = unique(llm_input_texts),
         stringsAsFactors = FALSE
       )
 
@@ -397,7 +399,7 @@ text_management_server <- function(
       # analysis unit to all document rows that reuse it.
       texts$df <- data.frame(
         input_rows(),
-        preprocessed = preprocessed_texts,
+        preprocessed = llm_input_texts,
         analysis_unit_id = as.integer(analysis_unit_id),
         stringsAsFactors = FALSE
       )
@@ -716,7 +718,10 @@ text_management_server <- function(
     return(texts)
   })
 }
-pre_process_texts <- function(
+
+
+# 2 Helper functions for anonymization ----------------------------
+anonymize_texts_with_regex <- function(
   txts,
   lang = shiny.i18n::Translator$new(
     translation_json_path = "language/language.json"

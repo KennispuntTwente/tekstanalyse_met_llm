@@ -115,12 +115,12 @@ test_that("text_management_server: fallback to 'none' when regex disabled and de
 })
 
 
-test_that("pre_process_texts: replaces email/phone/postcode markers", {
+test_that("anonymize_texts_with_regex replaces email/phone/postcode markers", {
   lang <- shiny.i18n::Translator$new(
     translation_json_path = here::here("language", "language.json")
   )
   lang$set_translation_language("nl")
-  out <- pre_process_texts(
+  out <- anonymize_texts_with_regex(
     c(
       "a@b.com",
       "+31 6 1234 5678",
@@ -147,13 +147,13 @@ test_that("pre_process_texts: replaces email/phone/postcode markers", {
 })
 
 
-test_that("pre_process_texts leaves whitespace normalization to a separate helper", {
+test_that("anonymize_texts_with_regex preserves surrounding whitespace", {
   lang <- shiny.i18n::Translator$new(
     translation_json_path = here::here("language", "language.json")
   )
   lang$set_translation_language("nl")
 
-  out <- pre_process_texts(
+  out <- anonymize_texts_with_regex(
     c("  a@b.com  "),
     lang = lang
   )
