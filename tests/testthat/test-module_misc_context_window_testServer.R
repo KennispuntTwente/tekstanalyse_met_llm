@@ -226,6 +226,122 @@ test_that("context_window_server: topic mode sets batch flags and too-many-batch
 })
 
 
+test_that(".kwallm_sanitize_marking_chunk_settings clamps invalid values", {
+  sanitized <- .kwallm_sanitize_marking_chunk_settings(
+    max_tokens = 0,
+    overlap = 99
+  )
+
+  expect_identical(sanitized$max_tokens, 1)
+  expect_identical(sanitized$overlap, 0)
+
+  sanitized_ratio <- .kwallm_sanitize_marking_chunk_settings(
+    max_tokens = 8,
+    overlap = 0.5
+  )
+
+  expect_identical(sanitized_ratio$max_tokens, 8)
+  expect_identical(sanitized_ratio$overlap, 0.5)
+
+  sanitized_absolute <- .kwallm_sanitize_marking_chunk_settings(
+    max_tokens = 4,
+    overlap = 6
+  )
+
+  expect_identical(sanitized_absolute$max_tokens, 4)
+  expect_identical(sanitized_absolute$overlap, 3)
+})
+
+
+test_that("context_window_server: marking mode sanitizes chunk settings server-side", {
+  tidyprompt_ns <- asNamespace("tidyprompt")
+  old_construct <- get("construct_prompt_text", envir = tidyprompt_ns)
+  withr::defer({
+    unlockBinding("construct_prompt_text", tidyprompt_ns)
+    assign("construct_prompt_text", old_construct, envir = tidyprompt_ns)
+    lockBinding("construct_prompt_text", tidyprompt_ns)
+  })
+
+  unlockBinding("construct_prompt_text", tidyprompt_ns)
+  assign(
+    "construct_prompt_text",
+    function(x, ...) "PROMPTTT",
+    envir = tidyprompt_ns
+  )
+  lockBinding("construct_prompt_text", tidyprompt_ns)
+
+  old_get_cw <- get_context_window_size_in_tokens
+  withr::defer({
+    get_context_window_size_in_tokens <<- old_get_cw
+  })
+  get_context_window_size_in_tokens <<- function(model) 100
+
+  shiny::testServer(
+    function(input, output, session) {
+      mode <- reactiveVal("Markeren")
+      lang <- make_test_lang("nl")
+
+      models <- reactiveValues(
+        main = list(parameters = list(model = "unit-test-model")),
+        large = NULL
+      )
+
+      categories <- list(
+        texts = reactiveVal(c("CatA")),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(1),
+        exclusive_texts = reactiveVal(character())
+      )
+
+      codes <- list(
+        texts = reactiveVal(c("Code1")),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(1)
+      )
+
+      texts <- reactiveValues(
+        preprocessed = c("some text"),
+        document_text = character()
+      )
+
+      rv <- context_window_server(
+        id = "cw",
+        mode = mode,
+        models = models,
+        categories = categories,
+        scoring_characteristic = reactiveVal("X"),
+        codes = codes,
+        research_background = reactiveVal("background"),
+        assign_multiple_categories = reactiveVal(FALSE),
+        texts = texts,
+        processing = reactiveVal(FALSE),
+        lang = lang
+      )
+
+      list(rv = rv)
+    },
+    {
+      session$setInputs(`cw-max_tokens` = 4)
+      session$setInputs(`cw-overlap` = 99)
+
+      for (i in 1:10) {
+        session$flushReact()
+      }
+
+      expect_identical(rv$max_tokens, 4)
+      expect_identical(rv$overlap, 3)
+
+      session$setInputs(`cw-overlap` = 0.5)
+      for (i in 1:10) {
+        session$flushReact()
+      }
+
+      expect_identical(rv$overlap, 0.5)
+    }
+  )
+})
+
+
 test_that("context_window_server: multi-label uses actual exclusive_texts, not fabricated ones", {
   # Capture what prompt_multi_category receives for exclusive_categories.
   captured_exclusive <- NULL

@@ -150,6 +150,44 @@ context_window_server <- function(
         }
       })
 
+      observe({
+        req(identical(mode(), "Markeren"))
+
+        sanitized <- .kwallm_sanitize_marking_chunk_settings(
+          max_tokens = rv$max_tokens,
+          overlap = rv$overlap
+        )
+
+        if (!identical(rv$max_tokens, sanitized$max_tokens)) {
+          rv$max_tokens <- sanitized$max_tokens
+        }
+        if (!identical(rv$overlap, sanitized$overlap)) {
+          rv$overlap <- sanitized$overlap
+        }
+
+        if (
+          is_valid_number(input$max_tokens) &&
+            !isTRUE(all.equal(input$max_tokens, sanitized$max_tokens))
+        ) {
+          updateNumericInput(
+            session,
+            "max_tokens",
+            value = sanitized$max_tokens
+          )
+        }
+
+        if (
+          is_valid_number(input$overlap) &&
+            !isTRUE(all.equal(input$overlap, sanitized$overlap))
+        ) {
+          updateNumericInput(
+            session,
+            "overlap",
+            value = sanitized$overlap
+          )
+        }
+      })
+
       # Log parameter changes (debounced by diffing previous values)
       observe({
         req(!isTRUE(processing()))
@@ -567,7 +605,7 @@ context_window_server <- function(
                 ),
                 value = isolate(rv$overlap),
                 min = 0,
-                step = 1
+                step = 0.1
               )
             )
           }
@@ -651,6 +689,43 @@ context_window_server <- function(
 }
 
 # 3 Helper functions -----------------------------------------------
+
+.kwallm_sanitize_marking_chunk_settings <- function(max_tokens, overlap) {
+  if (
+    is.null(max_tokens) ||
+      length(max_tokens) != 1 ||
+      is.na(max_tokens) ||
+      !is.finite(max_tokens)
+  ) {
+    max_tokens <- 1
+  }
+  if (
+    is.null(overlap) ||
+      length(overlap) != 1 ||
+      is.na(overlap) ||
+      !is.finite(overlap)
+  ) {
+    overlap <- 0
+  }
+
+  max_tokens <- max(1, as.numeric(round(max_tokens)))
+  overlap <- max(0, as.numeric(overlap))
+
+  if (overlap >= 1) {
+    overlap <- as.numeric(round(overlap))
+  }
+
+  if (max_tokens <= 1) {
+    overlap <- 0
+  } else if (overlap >= max_tokens) {
+    overlap <- max_tokens - 1
+  }
+
+  list(
+    max_tokens = as.numeric(max_tokens),
+    overlap = as.numeric(overlap)
+  )
+}
 
 # 4 Example/development usage ----------------------------------------
 if (FALSE) {
