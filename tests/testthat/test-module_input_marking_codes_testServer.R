@@ -10,6 +10,20 @@ source(here::here("R", "analysis_code_generation.R"))
 source(here::here("R", "module_input_marking_codes.R"))
 
 
+test_that(".kwallm_marking_code_generation_chunk_settings uses current context window values", {
+  settings <- .kwallm_marking_code_generation_chunk_settings(list(
+    max_tokens = 512,
+    overlap = 24
+  ))
+  defaults <- .kwallm_marking_code_generation_chunk_settings(list())
+
+  expect_identical(settings$text_size_tokens, 512)
+  expect_identical(settings$overlap_size_tokens, 24)
+  expect_identical(defaults$text_size_tokens, 256)
+  expect_identical(defaults$overlap_size_tokens, 0)
+})
+
+
 test_that("marking_codes_server: save/edit cycle returns trimmed unique codes", {
   testthat::skip_if_not_installed("ipc")
 
