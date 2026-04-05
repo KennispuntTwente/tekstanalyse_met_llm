@@ -121,7 +121,10 @@ generate_codes_by_reading_texts <- function(
     batch_size = 50,
     draws = 1,
     n_tokens_context_window = n_tokens_context_window,
-    base_prompt_text = base_prompt_text
+    base_prompt_text = base_prompt_text,
+    text_formatter = function(text, index) {
+      paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
+    }
   )
 
   if (is.null(batches) || length(batches) == 0) {

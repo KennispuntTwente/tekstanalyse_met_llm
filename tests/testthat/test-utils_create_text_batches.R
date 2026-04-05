@@ -56,6 +56,38 @@ test_that("create_text_batches: respects batch_size and allowed token budget", {
 })
 
 
+test_that("create_text_batches: accounts for formatter overhead in token budget", {
+  set.seed(99)
+
+  formatter <- function(text, index) {
+    paste0("<", index, ">", text, "</", index, ">")
+  }
+
+  texts <- c("aa", "bb", "cc")
+
+  batches <- create_text_batches(
+    texts = texts,
+    batch_size = 10,
+    draws = 1,
+    n_tokens_context_window = 14,
+    base_prompt_text = "",
+    text_formatter = formatter
+  )
+
+  sums <- vapply(
+    batches,
+    function(batch) {
+      sum(vapply(seq_along(batch), function(i) {
+        count_tokens(formatter(batch[[i]], i))
+      }, numeric(1)))
+    },
+    numeric(1)
+  )
+
+  expect_true(all(sums <= 14))
+})
+
+
 test_that("create_text_batches: draws replicates texts", {
   set.seed(123)
 
@@ -75,4 +107,11 @@ test_that("create_text_batches: draws replicates texts", {
   # Each text appears exactly 'draws' times overall.
   tab <- table(flat)
   expect_true(all(unname(tab[texts]) == 2))
+
+  # Repeated draws of the same text should not be grouped into the same batch.
+  expect_true(all(vapply(
+    batches,
+    function(batch) all(table(batch) <= 1),
+    logical(1)
+  )))
 })

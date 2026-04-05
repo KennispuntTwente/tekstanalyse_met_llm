@@ -734,6 +734,43 @@ processing_server <- function(
             .kwallm__prompt_execution_reset()
 
             # Step 4: Assign topics via standalone batch function
+            longest_assignment_text <- texts[[which.max(count_tokens(texts))]]
+            assignment_prompt <- if (assign_multiple_categories) {
+              prompt_multi_category(
+                text = longest_assignment_text,
+                categories = topics,
+                research_background = research_background,
+                exclusive_categories = exclusive_topics
+              )
+            } else {
+              prompt_category(
+                text = longest_assignment_text,
+                categories = topics,
+                research_background = research_background
+              )
+            }
+
+            assignment_context_window <- get_context_window_size_in_tokens(
+              llm_provider$parameters$model
+            )
+            if (is.null(assignment_context_window)) {
+              assignment_context_window <- 2048
+            }
+
+            assignment_prompt_tokens <- assignment_prompt |>
+              tidyprompt::construct_prompt_text() |>
+              count_tokens()
+
+            if (assignment_prompt_tokens > assignment_context_window) {
+              stop(paste0(
+                "Topic assignment prompt exceeds the model context window (",
+                assignment_prompt_tokens,
+                " > ",
+                assignment_context_window,
+                " tokens)."
+              ))
+            }
+
             on_progress <- function(i, n, text) {
               progress_secondary$set_with_total(i, n, text)
             }
@@ -985,6 +1022,10 @@ processing_server <- function(
       # Logs the click once and dispatches to the matching mode-specific starter.
       observeEvent(input$process, {
         if (processing()) {
+          return()
+        }
+
+        if (!processing_split_ready(split_in_progress(), lang())) {
           return()
         }
 

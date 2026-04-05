@@ -83,6 +83,35 @@ processing_anonymization_ready <- function(
 }
 
 
+#' Check whether text splitting is still in progress
+#'
+#' Used in `module_core_processing` before dispatching an analysis run. While
+#' a split job is still running, `texts$preprocessed` may still reflect the
+#' old unsplit snapshot, so launching analysis would use stale text state.
+#'
+#' @param split_in_progress Logical scalar indicating whether splitting is
+#'   currently running.
+#' @param lang Translator object used for notification text.
+#' @param notify_fn Function used to show the error notification.
+#'
+#' @return `TRUE` when processing may continue, otherwise `FALSE`.
+processing_split_ready <- function(
+  split_in_progress,
+  lang,
+  notify_fn = shiny::showNotification
+) {
+  if (!isTRUE(split_in_progress)) {
+    return(TRUE)
+  }
+
+  notify_fn(
+    lang$t("Teksten worden nog gesplitst..."),
+    type = "error"
+  )
+  FALSE
+}
+
+
 # 2 Report and paragraph helpers -----------------------------------------------
 
 #' Collect texts per label from processing results

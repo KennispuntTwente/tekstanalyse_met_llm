@@ -137,6 +137,33 @@ test_that("processing_anonymization_ready blocks incomplete GLiNER anonymization
 })
 
 
+test_that("processing_split_ready blocks launches while splitting is active", {
+  lang <- list(t = function(x) paste0("tr:", x))
+  notification <- NULL
+
+  notify_fn <- function(message, type = NULL) {
+    notification <<- list(message = message, type = type)
+    invisible(NULL)
+  }
+
+  expect_false(processing_split_ready(
+    split_in_progress = TRUE,
+    lang = lang,
+    notify_fn = notify_fn
+  ))
+  expect_identical(notification$type, "error")
+  expect_identical(notification$message, "tr:Teksten worden nog gesplitst...")
+
+  notification <- NULL
+  expect_true(processing_split_ready(
+    split_in_progress = FALSE,
+    lang = lang,
+    notify_fn = notify_fn
+  ))
+  expect_null(notification)
+})
+
+
 test_that("join_processing_results restores document texts without paragraph side channel", {
   texts_df <- data.frame(
     analysis_unit_id = c(1L, 2L),

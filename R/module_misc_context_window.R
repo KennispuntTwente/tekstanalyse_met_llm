@@ -370,7 +370,10 @@ context_window_server <- function(
           batch_size = rv$batch_size,
           draws = rv$draws,
           n_tokens_context_window = rv$n_tokens_context_window,
-          base_prompt_text = base_prompt_text
+          base_prompt_text = base_prompt_text,
+          text_formatter = function(text, index) {
+            paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
+          }
         )
 
         if (is.null(rv$text_batches)) {

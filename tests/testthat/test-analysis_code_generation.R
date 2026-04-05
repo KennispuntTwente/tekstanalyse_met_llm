@@ -10,7 +10,8 @@ make_codegen_env <- function(
     batch_size,
     draws,
     n_tokens_context_window,
-    base_prompt_text
+    base_prompt_text,
+    text_formatter = NULL
   ) {
     NULL
   }
@@ -45,7 +46,8 @@ test_that("generate_codes_by_reading_texts stops when batches are NULL", {
       batch_size,
       draws,
       n_tokens_context_window,
-      base_prompt_text
+      base_prompt_text,
+      text_formatter = NULL
     ) {
       NULL
     }
@@ -70,7 +72,8 @@ test_that("generate_codes_by_reading_texts stops when batches are empty list", {
       batch_size,
       draws,
       n_tokens_context_window,
-      base_prompt_text
+      base_prompt_text,
+      text_formatter = NULL
     ) {
       list()
     }
@@ -96,7 +99,8 @@ test_that("generate_codes_by_reading_texts error includes token count", {
       batch_size,
       draws,
       n_tokens_context_window,
-      base_prompt_text
+      base_prompt_text,
+      text_formatter = NULL
     ) {
       NULL
     }
@@ -190,7 +194,8 @@ test_that("generate_codes_by_reading_texts defaults to 2048 for unknown model", 
       batch_size,
       draws,
       n_tokens_context_window,
-      base_prompt_text
+      base_prompt_text,
+      text_formatter = NULL
     ) {
       received_window <<- n_tokens_context_window
       NULL

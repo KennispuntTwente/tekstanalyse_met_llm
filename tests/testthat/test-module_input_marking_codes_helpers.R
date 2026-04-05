@@ -32,12 +32,14 @@ create_text_batches <- function(
   batch_size = 50,
   draws = 1,
   n_tokens_context_window = 2048,
-  base_prompt_text = ""
+  base_prompt_text = "",
+  text_formatter = NULL
 ) {
   force(batch_size)
   force(draws)
   force(n_tokens_context_window)
   force(base_prompt_text)
+  force(text_formatter)
 
   # Use first half and second half as two batches.
   split_at <- ceiling(length(texts) / 2)
