@@ -37,7 +37,7 @@ test_that("text_management_server: errors if all anonymization methods disabled"
 })
 
 
-test_that("text_management_server: regex default produces anonymized + squished texts", {
+test_that("text_management_server: regex default produces anonymized preprocessed texts", {
   withr::local_options(list(
     anonymization__default = "regex",
     anonymization__none = TRUE,
@@ -85,9 +85,6 @@ test_that("text_management_server: regex default produces anonymized + squished 
         joined,
         fixed = TRUE
       ))
-
-      # squish happened
-      expect_false(grepl("  ", joined, fixed = TRUE))
     }
   )
 })
@@ -147,6 +144,63 @@ test_that("pre_process_texts: replaces email/phone/postcode markers", {
     out,
     fixed = TRUE
   )))
+})
+
+
+test_that("pre_process_texts leaves whitespace normalization to a separate helper", {
+  lang <- shiny.i18n::Translator$new(
+    translation_json_path = here::here("language", "language.json")
+  )
+  lang$set_translation_language("nl")
+
+  out <- pre_process_texts(
+    c("  a@b.com  "),
+    lang = lang
+  )
+
+  expect_true(startsWith(out[[1]], "  "))
+  expect_true(endsWith(out[[1]], "  "))
+})
+
+
+test_that("normalize_preprocessed_texts squishes whitespace independently", {
+  out <- normalize_preprocessed_texts(c("  first\n\nsecond   third  "))
+
+  expect_identical(out, "first second third")
+})
+
+
+test_that("text_management_server normalizes preprocessed texts separately from anonymization mode", {
+  withr::local_options(list(
+    anonymization__default = "none",
+    anonymization__none = TRUE,
+    anonymization__regex = TRUE,
+    anonymization__gliner_model = FALSE
+  ))
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("en")
+      document_texts <- reactiveVal(c(" same\n\ntext ", "same text"))
+
+      texts <- text_management_server(
+        id = "tm",
+        document_texts = reactive(document_texts()),
+        gliner_model = NULL,
+        processing = reactiveVal(FALSE),
+        lang = lang
+      )
+
+      list(texts = texts)
+    },
+    {
+      session$flushReact()
+
+      expect_identical(texts$document_text, c(" same\n\ntext ", "same text"))
+      expect_identical(texts$preprocessed, "same text")
+      expect_identical(texts$df$analysis_unit_id, c(1L, 1L))
+    }
+  )
 })
 
 

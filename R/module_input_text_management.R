@@ -203,7 +203,7 @@ text_management_server <- function(
                       "Hier kun je de teksten bekijken die zullen worden verwerkt."
                     ),
                     lang()$t(
-                      " Dubbele of gelijk geanonimiseerde teksten worden voor LLM-calls hergebruikt als één analyse-eenheid, terwijl de originele rijen behouden blijven."
+                      " Dubbele of gelijk voorbewerkte teksten worden voor LLM-calls hergebruikt als één analyse-eenheid, terwijl de originele rijen behouden blijven."
                     ),
                     lang()$t(
                       " Daarnaast kan je kiezen om de teksten te anonimiseren met behulp van regex of een GLiNER-model. Regex verwijdert e-mailadressen, telefoonnummers en (Nederlandse) postcodes. Het GLiNER-model kan verschillende vormen van PII detecteren."
@@ -360,7 +360,7 @@ text_management_server <- function(
       anonymization_completed <- TRUE
       document_text_vals <- input_rows()$document_text
 
-      out <- switch(
+      anonymized_texts <- switch(
         mode,
         none = document_text_vals,
         simple = pre_process_texts(document_text_vals, lang = lang()),
@@ -373,6 +373,7 @@ text_management_server <- function(
           }
         }
       )
+      preprocessed_texts <- normalize_preprocessed_texts(anonymized_texts)
       applied_mode <- switch(
         mode,
         simple = "regex",
@@ -382,10 +383,10 @@ text_management_server <- function(
 
       # Many document rows can collapse to the same analysis unit after
       # anonymization/preprocessing. The LLM only sees the unique texts.
-      analysis_unit_id <- match(out, unique(out))
+      analysis_unit_id <- match(preprocessed_texts, unique(preprocessed_texts))
       analysis_units <- data.frame(
-        analysis_unit_id = seq_along(unique(out)),
-        preprocessed = unique(out),
+        analysis_unit_id = seq_along(unique(preprocessed_texts)),
+        preprocessed = unique(preprocessed_texts),
         stringsAsFactors = FALSE
       )
 
@@ -396,7 +397,7 @@ text_management_server <- function(
       # analysis unit to all document rows that reuse it.
       texts$df <- data.frame(
         input_rows(),
-        preprocessed = out,
+        preprocessed = preprocessed_texts,
         analysis_unit_id = as.integer(analysis_unit_id),
         stringsAsFactors = FALSE
       )
@@ -717,7 +718,16 @@ text_management_server <- function(
 }
 
 
-# 2 Helper function for preprocessing texts ------------------------
+# 2 Helper functions for preprocessing texts -----------------------
+normalize_preprocessed_texts <- function(txts) {
+  if (!requireNamespace("stringr", quietly = TRUE)) {
+    stop("Please install and load the 'stringr' package.")
+  }
+
+  stringr::str_squish(as.character(txts))
+}
+
+
 pre_process_texts <- function(
   txts,
   lang = shiny.i18n::Translator$new(
@@ -728,8 +738,6 @@ pre_process_texts <- function(
   if (!requireNamespace("stringr", quietly = TRUE)) {
     stop("Please install and load the 'stringr' package.")
   }
-
-  txts <- stringr::str_squish(txts)
 
   # Find all e-mail addresses, replace with "<< e-mailadres verwijderd >>"
   txts <- stringr::str_replace_all(
