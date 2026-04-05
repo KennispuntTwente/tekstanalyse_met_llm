@@ -206,6 +206,121 @@ test_that("text_split_server: clicking split produces split texts (sync-mocked m
 })
 
 
+test_that("text_split_server ignores stale async split results after source text changes", {
+  testthat::skip_if_not_installed("ipc")
+  testthat::skip_if_not_installed("mirai")
+
+  ipc_ns <- asNamespace("ipc")
+  mirai_ns <- asNamespace("mirai")
+
+  old_shinyQueue <- get("shinyQueue", envir = ipc_ns)
+  old_mirai <- get("mirai", envir = mirai_ns)
+  deferred <- new.env(parent = emptyenv())
+
+  withr::defer({
+    unlockBinding("shinyQueue", ipc_ns)
+    assign("shinyQueue", old_shinyQueue, envir = ipc_ns)
+    lockBinding("shinyQueue", ipc_ns)
+
+    unlockBinding("mirai", mirai_ns)
+    assign("mirai", old_mirai, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  unlockBinding("shinyQueue", ipc_ns)
+  assign(
+    "shinyQueue",
+    function() {
+      list(
+        consumer = list(
+          start = function(millis = 50) invisible(millis),
+          stop = function() invisible(NULL)
+        ),
+        producer = list(
+          fireAssignReactive = function(...) invisible(NULL)
+        )
+      )
+    },
+    envir = ipc_ns
+  )
+  lockBinding("shinyQueue", ipc_ns)
+
+  unlockBinding("mirai", mirai_ns)
+  assign(
+    "mirai",
+    function(
+      .expr,
+      ...,
+      .args = list(),
+      .timeout = NULL,
+      .compute = NULL
+    ) {
+      promises::promise(function(resolve, reject) {
+        deferred$resolve <- resolve
+        deferred$reject <- reject
+      })
+    },
+    envir = mirai_ns
+  )
+  lockBinding("mirai", mirai_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      document_texts <- reactiveVal(c("alpha", "beta"))
+      processing <- reactiveVal(FALSE)
+      lang <- make_test_lang("nl")
+
+      split_result <- text_split_server(
+        id = "split",
+        document_texts = document_texts,
+        processing = processing,
+        lang = lang,
+        enabled = TRUE
+      )
+
+      texts <- split_result$texts
+      source_document_texts <- split_result$source_document_texts
+
+      list(
+        texts = texts,
+        source_document_texts = source_document_texts,
+        document_texts = document_texts,
+        lang = lang
+      )
+    },
+    {
+      session$setInputs(`split-toggle` = lang()$t("Ja"))
+      session$flushReact()
+
+      session$setInputs(`split-max_tokens` = 5)
+      session$flushReact()
+
+      session$setInputs(`split-split_texts` = 1)
+      session$flushReact()
+
+      expect_null(texts())
+
+      stale_result <- split_texts_with_semchunk(
+        texts = c("alpha", "beta"),
+        source_document_ids = c(1L, 2L),
+        source_document_texts = c("alpha", "beta"),
+        chunk_size = 5
+      )
+
+      document_texts(c("gamma"))
+      session$flushReact()
+
+      deferred$resolve(stale_result)
+      later::run_now(0.25)
+      session$flushReact()
+
+      expect_identical(texts(), c("gamma"))
+      expect_null(source_document_texts())
+    }
+  )
+})
+
+
 test_that("split_texts_with_semchunk preserves row lineage metadata", {
   result <- split_texts_with_semchunk(
     texts = c("alpha", "beta"),

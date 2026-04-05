@@ -75,9 +75,11 @@ text_split_server <- function(
 
     # If right now we are running the splitting process
     split_in_progress <- reactiveVal(FALSE)
+    input_rows_version <- reactiveVal(0L)
 
     # Upon observing new document texts, reset the split texts and message.
     observeEvent(input_rows(), {
+      input_rows_version(input_rows_version() + 1L)
       split_document_texts(NULL)
       split_rows(NULL)
       source_document_texts(NULL)
@@ -258,6 +260,7 @@ text_split_server <- function(
 
       # Set processing state
       split_in_progress(TRUE)
+      request_input_rows_version <- isolate(input_rows_version())
       # Reset previous split texts
       split_document_texts(NULL)
       # Disable the button while splitting
@@ -310,6 +313,18 @@ text_split_server <- function(
       ) %...>%
         {
           result <- .
+
+          if (!identical(request_input_rows_version, isolate(input_rows_version()))) {
+            log_info(
+              "Ignoring stale split result after source texts changed",
+              component = "split"
+            )
+            split_in_progress(FALSE)
+            shinyjs::enable("split_texts")
+            queue$consumer$stop()
+            return(NULL)
+          }
+
           split_in_progress(FALSE)
           split_rows(result$rows)
           split_document_texts(result$rows$document_text)
@@ -342,6 +357,18 @@ text_split_server <- function(
         } %...!%
         {
           error <- .
+
+          if (!identical(request_input_rows_version, isolate(input_rows_version()))) {
+            log_info(
+              "Ignoring stale split error after source texts changed",
+              component = "split"
+            )
+            split_in_progress(FALSE)
+            shinyjs::enable("split_texts")
+            queue$consumer$stop()
+            return(NULL)
+          }
+
           log_error(
             paste("Text split error:", error$message %||% as.character(error)),
             component = "split"
