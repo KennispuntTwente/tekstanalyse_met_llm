@@ -427,10 +427,13 @@ test_that("marking results preserve unmarked chunk-code rows in report tables", 
   expect_equal(nrow(report_df), 2)
   expect_identical(report_df$marked_text[[1]], "cats")
   expect_true(is.na(report_df$marked_text[[2]]))
-  expect_identical(report_df$response_status, c(
-    "matched_all",
-    "partial_after_max_interactions"
-  ))
+  expect_identical(
+    report_df$response_status,
+    c(
+      "matched_all",
+      "partial_after_max_interactions"
+    )
+  )
   expect_equal(
     metadata$results$responses[[2]]$response_status,
     "partial_after_max_interactions"

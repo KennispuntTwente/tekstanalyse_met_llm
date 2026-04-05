@@ -784,11 +784,15 @@ build_analysis_result <- function(
     stringsAsFactors = FALSE
   ))
 
-  response_rows <- response_rows[order(
-    response_rows$chunk_id,
-    response_rows$code,
-    is.na(response_rows$response_status)
-  ), , drop = FALSE]
+  response_rows <- response_rows[
+    order(
+      response_rows$chunk_id,
+      response_rows$code,
+      is.na(response_rows$response_status)
+    ),
+    ,
+    drop = FALSE
+  ]
   response_rows <- response_rows[
     !duplicated(response_rows[c("chunk_id", "code")]),
     ,
@@ -804,7 +808,9 @@ build_analysis_result <- function(
     stop("marking response rows must contain non-missing chunk_id values")
   }
   if (nrow(response_rows) > 0 && anyNA(response_code_id)) {
-    stop("marking response rows must contain codes that are present in codes_df")
+    stop(
+      "marking response rows must contain codes that are present in codes_df"
+    )
   }
 
   responses <- if (!nrow(response_rows)) {
