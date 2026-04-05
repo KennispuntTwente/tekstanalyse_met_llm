@@ -160,6 +160,21 @@ test_that(".kwallm_marking_find_absolute_span resolves chunk-relative matches", 
 })
 
 
+test_that(".kwallm_marking_find_absolute_span uses chunk occurrence rank when chunk text repeats", {
+  span <- .kwallm_marking_find_absolute_span(
+    analysis_unit_text = "alpha beta alpha beta",
+    chunk_text = "alpha beta",
+    match_start = 1L,
+    match_end = 5L,
+    marked_text = "alpha",
+    chunk_occurrence_rank = 2L
+  )
+
+  expect_identical(span$start, 12L)
+  expect_identical(span$end, 16L)
+})
+
+
 test_that(".kwallm_marking_clean_results keeps distinct substring matches", {
   df_result <- data.frame(
     analysis_unit_id = c(1L, 1L),

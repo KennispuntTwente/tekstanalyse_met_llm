@@ -398,7 +398,8 @@ mark_texts <- function(
   chunk_text,
   match_start,
   match_end,
-  marked_text
+  marked_text,
+  chunk_occurrence_rank = NA_integer_
 ) {
   if (
     is.na(analysis_unit_text) ||
@@ -464,7 +465,19 @@ mark_texts <- function(
 
   candidates <- unique(do.call(rbind, candidates))
   if (nrow(candidates) != 1L) {
-    return(list(start = NA_integer_, end = NA_integer_))
+    chunk_occurrence_rank <- suppressWarnings(as.integer(chunk_occurrence_rank))
+    if (!is.na(chunk_occurrence_rank) && chunk_occurrence_rank >= 1L) {
+      chosen_index <- min(chunk_occurrence_rank, nrow(candidates))
+      return(list(
+        start = as.integer(candidates$start[[chosen_index]]),
+        end = as.integer(candidates$end[[chosen_index]])
+      ))
+    }
+
+    return(list(
+      start = as.integer(candidates$start[[1]]),
+      end = as.integer(candidates$end[[1]])
+    ))
   }
 
   list(
@@ -517,13 +530,33 @@ mark_texts <- function(
     return(unmatched_rows)
   }
 
+  chunk_occurrence_lookup <- matched_rows |>
+    dplyr::distinct(
+      analysis_unit_id,
+      chunk_id,
+      chunk_index,
+      chunk_text
+    ) |>
+    dplyr::arrange(analysis_unit_id, chunk_index, chunk_id) |>
+    dplyr::group_by(analysis_unit_id, chunk_text) |>
+    dplyr::mutate(chunk_occurrence_rank = dplyr::row_number()) |>
+    dplyr::ungroup() |>
+    dplyr::select(chunk_id, chunk_occurrence_rank)
+
+  matched_rows <- dplyr::left_join(
+    matched_rows,
+    chunk_occurrence_lookup,
+    by = "chunk_id"
+  )
+
   absolute_spans <- purrr::pmap(
     list(
       matched_rows$analysis_unit_text,
       matched_rows$chunk_text,
       matched_rows$match_start,
       matched_rows$match_end,
-      matched_rows$marked_text
+      matched_rows$marked_text,
+      matched_rows$chunk_occurrence_rank
     ),
     .kwallm_marking_find_absolute_span
   )
