@@ -335,6 +335,58 @@ test_that(".kwallm_marking_matches_from_find_matches keeps partial status withou
   )
 })
 
+test_that("mark_text_prompt allows one correction turn before partial fallback", {
+  source(here::here("R", "analysis_marking.R"), local = TRUE)
+
+  find_match_calls <- 0L
+  find_matches <- function(
+    haystack,
+    needles,
+    rel = 0.12,
+    abs = 2,
+    step_div = 5L
+  ) {
+    force(rel)
+    force(abs)
+    force(step_div)
+
+    find_match_calls <<- find_match_calls + 1L
+
+    if (find_match_calls == 1L) {
+      return(tibble::tibble(
+        needle = needles,
+        match = NA_character_,
+        distance = NA_integer_,
+        start = NA_integer_,
+        end = NA_integer_
+      ))
+    }
+
+    tibble::tibble(
+      needle = needles,
+      match = haystack,
+      distance = 0L,
+      start = 1L,
+      end = nchar(haystack)
+    )
+  }
+
+  prompt <- mark_text_prompt(
+    text = "literal text",
+    code = "Code A",
+    max_interactions = 2
+  )
+  extraction_fn <- prompt$get_prompt_wraps()[[3]]$extraction_fn
+
+  first_result <- extraction_fn(list(text_parts = "wrong text"))
+  second_result <- extraction_fn(list(text_parts = "literal text"))
+
+  expect_false(is.data.frame(first_result))
+  expect_s3_class(second_result, "tbl_df")
+  expect_identical(second_result$marked_text[[1]], "literal text")
+  expect_identical(second_result$response_status[[1]], "matched_all")
+})
+
 test_that("mark_texts and mark_text_prompt respect send_prompt_with_retries__max_interactions option", {
   source(here::here("R", "analysis_marking.R"), local = TRUE)
 

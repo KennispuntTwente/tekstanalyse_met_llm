@@ -712,7 +712,7 @@ mark_text_prompt <- function(
       type = "auto"
     )
 
-  interaction_count <- 1
+  interaction_count <- 0
 
   prompt <- prompt |>
     tidyprompt::prompt_wrap(
