@@ -251,27 +251,10 @@ mark_texts <- function(
     silent = TRUE
   )
 
-  # Clean up the result: remove NA marked_text, normalize, and check for substrings
-  # (substring is when overlapped text parts are present in other marked sections;
-  # i.e., same analysis unit, same code)
-  df_result_clean <- df_result |>
-    dplyr::filter(!is.na(marked_text)) |>
-    dplyr::group_by(analysis_unit_id, analysis_unit_text, code) |>
-    dplyr::mutate(
-      # Normalize for comparison: lowercase, remove punctuation and spaces
-      norm_text = stringr::str_remove_all(
-        stringr::str_to_lower(marked_text),
-        "[[:punct:]\\s]+"
-      ),
-      is_substring = purrr::map_lgl(norm_text, function(txt) {
-        others <- setdiff(norm_text, txt)
-        any(stringr::str_detect(others, stringr::fixed(txt)))
-      })
-    ) |>
-    dplyr::filter(!is_substring) |>
-    dplyr::select(-norm_text, -is_substring) |>
-    dplyr::ungroup() |>
-    dplyr::distinct()
+  # Clean up the result. Keep distinct matched spans and only collapse overlap
+  # duplicates when the same absolute span can be resolved back into the full
+  # analysis-unit text.
+  df_result_clean <- .kwallm_marking_clean_results(df_result)
 
   paragraphs <- NULL
 
@@ -293,49 +276,10 @@ mark_texts <- function(
       silent = TRUE
     )
 
-    # Collect the marked snippets for each text-code combo;
-    # this is used to highlight supporting snippets in the full analysis unit.
-    df_highlight <- df_result_clean |>
-      dplyr::group_by(analysis_unit_id, analysis_unit_text, code) |>
-      dplyr::summarise(
-        marked_texts = list(unique(na.omit(marked_text))),
-        .groups = "drop"
-      ) |>
-      dplyr::mutate(
-        highlighted_text = purrr::pmap_chr(
-          list(analysis_unit_text, marked_texts),
-          function(orig, mlist) {
-            highlighted <- orig
-            for (m in mlist) {
-              highlighted <- stringr::str_replace_all(
-                highlighted,
-                stringr::fixed(m),
-                paste0("**", m, "**")
-              )
-            }
-            highlighted
-          }
-        )
-      )
-
-    # Create list of code + all relevant original texts with highlighted marked texts
-    paragraph_input_df <- df_highlight |>
-      dplyr::group_by(code) |>
-      dplyr::summarise(
-        texts = list(highlighted_text),
-        analysis_unit_ids = list(as.integer(analysis_unit_id)),
-        .groups = "drop"
-      )
-
-    text_list <- stats::setNames(
-      lapply(seq_len(nrow(paragraph_input_df)), function(i) {
-        list(
-          texts = paragraph_input_df$texts[[i]],
-          analysis_unit_ids = paragraph_input_df$analysis_unit_ids[[i]]
-        )
-      }),
-      paragraph_input_df$code
-    )
+    # Build one highlighted excerpt per matched span. This keeps paragraph
+    # evidence tied to the exact snippet the model matched instead of globally
+    # replacing every repeated string in the full analysis-unit text.
+    text_list <- .kwallm_marking_collect_paragraph_inputs(df_result_clean)
 
     # Create paragraphs for each code
     try(
@@ -437,6 +381,228 @@ mark_texts <- function(
       match_method,
       response_status
     )
+}
+
+
+.kwallm_marking_find_absolute_span <- function(
+  analysis_unit_text,
+  chunk_text,
+  match_start,
+  match_end,
+  marked_text
+) {
+  if (
+    is.na(analysis_unit_text) ||
+      is.na(chunk_text) ||
+      is.na(match_start) ||
+      is.na(match_end)
+  ) {
+    return(list(start = NA_integer_, end = NA_integer_))
+  }
+
+  analysis_unit_text <- as.character(analysis_unit_text)
+  chunk_text <- as.character(chunk_text)
+  marked_text <- as.character(marked_text)
+  match_start <- as.integer(match_start)
+  match_end <- as.integer(match_end)
+
+  if (
+    !nzchar(analysis_unit_text) ||
+      !nzchar(chunk_text) ||
+      match_start < 1L ||
+      match_end < match_start ||
+      match_end > nchar(chunk_text)
+  ) {
+    return(list(start = NA_integer_, end = NA_integer_))
+  }
+
+  expected_match <- if (!is.na(marked_text) && nzchar(marked_text)) {
+    marked_text
+  } else {
+    substr(chunk_text, match_start, match_end)
+  }
+
+  chunk_starts <- gregexpr(chunk_text, analysis_unit_text, fixed = TRUE)[[1]]
+  if (length(chunk_starts) == 1L && identical(chunk_starts[[1]], -1L)) {
+    return(list(start = NA_integer_, end = NA_integer_))
+  }
+
+  candidates <- lapply(chunk_starts, function(chunk_start) {
+    abs_start <- as.integer(chunk_start + match_start - 1L)
+    abs_end <- as.integer(chunk_start + match_end - 1L)
+
+    if (abs_end > nchar(analysis_unit_text)) {
+      return(NULL)
+    }
+
+    if (!identical(substr(analysis_unit_text, abs_start, abs_end), expected_match)) {
+      return(NULL)
+    }
+
+    data.frame(
+      start = abs_start,
+      end = abs_end,
+      stringsAsFactors = FALSE
+    )
+  })
+  candidates <- Filter(Negate(is.null), candidates)
+
+  if (!length(candidates)) {
+    return(list(start = NA_integer_, end = NA_integer_))
+  }
+
+  candidates <- unique(do.call(rbind, candidates))
+  if (nrow(candidates) != 1L) {
+    return(list(start = NA_integer_, end = NA_integer_))
+  }
+
+  list(
+    start = as.integer(candidates$start[[1]]),
+    end = as.integer(candidates$end[[1]])
+  )
+}
+
+
+.kwallm_marking_clean_results <- function(df_result) {
+  stopifnot(is.data.frame(df_result))
+
+  if (!nrow(df_result)) {
+    return(df_result)
+  }
+
+  cleaned <- df_result |>
+    dplyr::filter(!is.na(marked_text) & nzchar(marked_text)) |>
+    dplyr::distinct(
+      analysis_unit_id,
+      code,
+      chunk_id,
+      match_start,
+      match_end,
+      marked_text,
+      .keep_all = TRUE
+    )
+
+  if (!nrow(cleaned)) {
+    return(cleaned)
+  }
+
+  absolute_spans <- purrr::pmap(
+    list(
+      cleaned$analysis_unit_text,
+      cleaned$chunk_text,
+      cleaned$match_start,
+      cleaned$match_end,
+      cleaned$marked_text
+    ),
+    .kwallm_marking_find_absolute_span
+  )
+
+  cleaned$absolute_match_start <- vapply(
+    absolute_spans,
+    function(span) span$start,
+    integer(1)
+  )
+  cleaned$absolute_match_end <- vapply(
+    absolute_spans,
+    function(span) span$end,
+    integer(1)
+  )
+
+  resolved <- cleaned |>
+    dplyr::filter(!is.na(absolute_match_start) & !is.na(absolute_match_end)) |>
+    dplyr::distinct(
+      analysis_unit_id,
+      code,
+      absolute_match_start,
+      absolute_match_end,
+      .keep_all = TRUE
+    )
+
+  unresolved <- cleaned |>
+    dplyr::filter(is.na(absolute_match_start) | is.na(absolute_match_end))
+
+  dplyr::bind_rows(resolved, unresolved) |>
+    dplyr::arrange(analysis_unit_id, code, chunk_id, match_start, match_end)
+}
+
+
+.kwallm_marking_build_highlighted_excerpt <- function(
+  chunk_text,
+  match_start,
+  match_end,
+  context_chars = 120L
+) {
+  if (is.na(chunk_text) || !nzchar(chunk_text)) {
+    return("")
+  }
+
+  chunk_text <- as.character(chunk_text)
+  match_start <- as.integer(match_start)
+  match_end <- as.integer(match_end)
+  context_chars <- max(as.integer(context_chars), 0L)
+
+  if (
+    is.na(match_start) ||
+      is.na(match_end) ||
+      match_start < 1L ||
+      match_end < match_start ||
+      match_end > nchar(chunk_text)
+  ) {
+    return(chunk_text)
+  }
+
+  excerpt_start <- max(1L, match_start - context_chars)
+  excerpt_end <- min(nchar(chunk_text), match_end + context_chars)
+
+  prefix <- substr(chunk_text, excerpt_start, match_start - 1L)
+  matched <- substr(chunk_text, match_start, match_end)
+  suffix <- substr(chunk_text, match_end + 1L, excerpt_end)
+
+  paste0(
+    if (excerpt_start > 1L) "..." else "",
+    prefix,
+    "**",
+    matched,
+    "**",
+    suffix,
+    if (excerpt_end < nchar(chunk_text)) "..." else ""
+  )
+}
+
+
+.kwallm_marking_collect_paragraph_inputs <- function(df_result_clean) {
+  stopifnot(is.data.frame(df_result_clean))
+
+  if (!nrow(df_result_clean)) {
+    return(list())
+  }
+
+  excerpt_rows <- df_result_clean |>
+    dplyr::mutate(
+      excerpt_text = purrr::pmap_chr(
+        list(chunk_text, match_start, match_end),
+        .kwallm_marking_build_highlighted_excerpt
+      )
+    ) |>
+    dplyr::distinct(analysis_unit_id, code, excerpt_text)
+
+  paragraph_input_df <- excerpt_rows |>
+    dplyr::group_by(code) |>
+    dplyr::summarise(
+      texts = list(excerpt_text),
+      analysis_unit_ids = list(as.integer(analysis_unit_id)),
+      .groups = "drop"
+    )
+
+  stats::setNames(
+    lapply(seq_len(nrow(paragraph_input_df)), function(i) {
+      list(
+        texts = paragraph_input_df$texts[[i]],
+        analysis_unit_ids = paragraph_input_df$analysis_unit_ids[[i]]
+      )
+    }),
+    paragraph_input_df$code
+  )
 }
 
 # Helper: prompt to mark text
