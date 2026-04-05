@@ -361,7 +361,7 @@ gliner_server <- function(
           queue$consumer$start(millis = 250)
 
           session_id <- get_session_id()
-          log_ctx <- log_context_capture(
+          log_context <- log_context_capture(
             session_id = session_id,
             is_async = TRUE
           )
@@ -369,7 +369,7 @@ gliner_server <- function(
           ## 4 Spawn the mirai worker that runs GLiNER model on texts
           mirai::mirai(
             {
-              log_context_apply(log_ctx)
+              log_context_apply(log_context)
 
               if (is.null(gliner_model)) {
                 # If we are truly in async mode, we load the model here;
@@ -395,7 +395,7 @@ gliner_server <- function(
                 setNames(pii_texts)
             },
             .args = c(
-              log_async_globals(log_ctx),
+              log_async_globals(log_context),
               list(
                 gliner_model = gliner_model,
                 gliner_load_model = gliner_load_model,

@@ -71,7 +71,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
   withr::defer(options(old_opts), testthat::teardown_env())
 
   log_init(mode = "test")
-  log_ctx <- log_context_capture(is_async = TRUE, mode = "test")
+  log_context <- log_context_capture(is_async = TRUE, mode = "test")
 
   texts <- build_large_volume_topic_texts(3000)
   base_prompt_text <- prompt_candidate_topics(
@@ -103,7 +103,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
 
   generation_worker <- mirai::mirai(
     {
-      log_context_apply(log_ctx)
+      log_context_apply(log_context)
 
       candidate_topics <- create_candidate_topics(
         text_batches = text_batches,
@@ -134,7 +134,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
       ),
       analysis_async_topic_modelling_globals(),
       analysis_async_tokenizer_globals(),
-      log_async_globals(log_ctx),
+      log_async_globals(log_context),
       send_prompt_with_retries_async_globals()
     )
   )
@@ -154,7 +154,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
 
   assignment_worker <- mirai::mirai(
     {
-      log_context_apply(log_ctx)
+      log_context_apply(log_context)
       prepare_async_analysis_worker("topic_assignment")
 
       assign_topics(
@@ -176,7 +176,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
       ),
       analysis_async_topic_modelling_globals(),
       analysis_async_worker_setup_globals(),
-      log_async_globals(log_ctx),
+      log_async_globals(log_context),
       send_prompt_with_retries_async_globals()
     )
   )

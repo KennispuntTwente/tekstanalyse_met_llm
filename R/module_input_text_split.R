@@ -300,11 +300,11 @@ text_split_server <- function(
       queue$consumer$start(millis = 50)
 
       # Async text splitting
-      log_ctx <- log_context_capture(is_async = TRUE)
+      log_context <- log_context_capture(is_async = TRUE)
 
       mirai::mirai(
         {
-          log_context_apply(log_ctx)
+          log_context_apply(log_context)
 
           split_texts_with_semchunk(
             texts = input_rows$document_text,
@@ -316,7 +316,7 @@ text_split_server <- function(
           )
         },
         .args = c(
-          log_async_globals(log_ctx),
+          log_async_globals(log_context),
           list(
             input_rows = input_rows(),
             chunk_size = max_tokens_val(),

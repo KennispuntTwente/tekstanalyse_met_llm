@@ -445,12 +445,12 @@ log_context_apply <- function(ctx) {
 #' Use this helper to consistently export the logger functions alongside the
 #' captured context produced by `log_context_capture()`.
 #'
-#' @param log_ctx A `kwallm_log_context` from `log_context_capture()`.
+#' @param log_context A `kwallm_log_context` from `log_context_capture()`.
 #' @return A named list suitable for merging into an `.args =` list.
 #' @export
-log_async_globals <- function(log_ctx = NULL) {
+log_async_globals <- function(log_context = NULL) {
   list(
-    log_ctx = log_ctx,
+    log_context = log_context,
     log_context_apply = log_context_apply,
     log_info = log_info,
     log_debug = log_debug,

@@ -98,7 +98,7 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
   withr::defer(options(old_opts), testthat::teardown_env())
 
   log_init(mode = "test")
-  log_ctx <- log_context_capture(is_async = TRUE, mode = "test")
+  log_context <- log_context_capture(is_async = TRUE, mode = "test")
 
   texts <- build_large_volume_analysis_texts(3000)
   categories <- c(
@@ -121,7 +121,7 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
 
   worker <- mirai::mirai(
     {
-      log_context_apply(log_ctx)
+      log_context_apply(log_context)
       prepare_async_analysis_worker("categorization")
 
       categorize_texts(
@@ -150,7 +150,7 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
       ),
       analysis_async_categorization_globals(),
       analysis_async_worker_setup_globals(),
-      log_async_globals(log_ctx),
+      log_async_globals(log_context),
       send_prompt_with_retries_async_globals()
     )
   )
@@ -207,7 +207,7 @@ test_that("scoring async integration handles 3000 texts with fake LLM", {
   withr::defer(options(old_opts), testthat::teardown_env())
 
   log_init(mode = "test")
-  log_ctx <- log_context_capture(is_async = TRUE, mode = "test")
+  log_context <- log_context_capture(is_async = TRUE, mode = "test")
 
   texts <- build_large_volume_analysis_texts(3000)
   provider <- kwallm_test_llm_provider("kwallm-fake-main-1024")
@@ -220,7 +220,7 @@ test_that("scoring async integration handles 3000 texts with fake LLM", {
 
   worker <- mirai::mirai(
     {
-      log_context_apply(log_ctx)
+      log_context_apply(log_context)
       prepare_async_analysis_worker("scoring")
 
       score_texts(
@@ -247,7 +247,7 @@ test_that("scoring async integration handles 3000 texts with fake LLM", {
       ),
       analysis_async_scoring_globals(),
       analysis_async_worker_setup_globals(),
-      log_async_globals(log_ctx),
+      log_async_globals(log_context),
       send_prompt_with_retries_async_globals()
     )
   )
@@ -303,7 +303,7 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
   withr::defer(options(old_opts), testthat::teardown_env())
 
   log_init(mode = "test")
-  log_ctx <- log_context_capture(is_async = TRUE, mode = "test")
+  log_context <- log_context_capture(is_async = TRUE, mode = "test")
 
   texts <- build_large_volume_marking_texts(3000)
   codes <- c("refund", "support")
@@ -317,7 +317,7 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
 
   worker <- mirai::mirai(
     {
-      log_context_apply(log_ctx)
+      log_context_apply(log_context)
       prepare_async_analysis_worker("marking")
 
       mark_texts(
@@ -345,7 +345,7 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
       analysis_async_marking_globals(),
       analysis_async_worker_setup_globals(),
       analysis_async_tokenizer_globals(),
-      log_async_globals(log_ctx),
+      log_async_globals(log_context),
       send_prompt_with_retries_async_globals()
     )
   )

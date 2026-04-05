@@ -245,7 +245,7 @@ test_that("log_async_globals returns a list with all required logging functions"
   globals <- log_async_globals(ctx)
 
   expect_type(globals, "list")
-  expect_identical(globals$log_ctx, ctx)
+  expect_identical(globals$log_context, ctx)
   expect_true(is.function(globals$log_context_apply))
   expect_true(is.function(globals$log_info))
   expect_true(is.function(globals$log_debug))
@@ -300,13 +300,13 @@ test_that("log_context_apply bootstraps logger in mirai daemon worker", {
   )
 
   # Use the actual log_context_capture function (matches app pattern)
-  log_ctx <- log_context_capture(is_async = TRUE, mode = "unit-test")
+  log_context <- log_context_capture(is_async = TRUE, mode = "unit-test")
 
   # Verify context was captured correctly
-  expect_s3_class(log_ctx, "kwallm_log_context")
-  expect_equal(log_ctx$dir, log_dir)
-  expect_equal(log_ctx$session_id, "deadbeef")
-  expect_true(log_ctx$is_async)
+  expect_s3_class(log_context, "kwallm_log_context")
+  expect_equal(log_context$dir, log_dir)
+  expect_equal(log_context$session_id, "deadbeef")
+  expect_true(log_context$is_async)
 
   # With mirai, functions are passed by value and lose their closure environments.
   # The worker needs to source the logger code to have all functions available.
@@ -323,11 +323,11 @@ test_that("log_context_apply bootstraps logger in mirai daemon worker", {
       source(logger_source_file, local = FALSE)
 
       # This is the exact pattern used in all async modules:
-      log_context_apply(log_ctx)
+      log_context_apply(log_context)
       log_info("hello from worker", component = "unit")
       TRUE
     },
-    log_ctx = log_ctx,
+    log_context = log_context,
     logger_source_file = logger_file
   )
 

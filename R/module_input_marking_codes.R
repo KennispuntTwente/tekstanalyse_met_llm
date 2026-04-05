@@ -215,11 +215,11 @@ marking_codes_server <- function(
 
         # Async generate codes
         queue$consumer$start()
-        log_ctx <- log_context_capture(is_async = TRUE)
+        log_context <- log_context_capture(is_async = TRUE)
 
         mirai::mirai(
           {
-            log_context_apply(log_ctx)
+            log_context_apply(log_context)
 
             generate_codes_by_reading_texts(
               texts = texts,
@@ -233,7 +233,7 @@ marking_codes_server <- function(
             )
           },
           .args = c(
-            log_async_globals(log_ctx),
+            log_async_globals(log_context),
             send_prompt_with_retries_async_globals(),
             list(
               texts = texts$preprocessed,

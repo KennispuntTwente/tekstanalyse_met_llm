@@ -384,11 +384,11 @@ edit_topics_server <- function(
           component = "topics"
         )
 
-        log_ctx <- log_context_capture(is_async = TRUE)
+        log_context <- log_context_capture(is_async = TRUE)
 
         mirai::mirai(
           {
-            log_context_apply(log_ctx)
+            log_context_apply(log_context)
 
             reduce_topics(
               updated_topics,
@@ -406,7 +406,7 @@ edit_topics_server <- function(
             ),
             analysis_async_topic_reduction_globals(),
             analysis_async_tokenizer_globals(),
-            log_async_globals(log_ctx),
+            log_async_globals(log_context),
             send_prompt_with_retries_async_globals()
           )
         ) %...>%
