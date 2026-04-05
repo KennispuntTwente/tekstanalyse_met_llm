@@ -380,6 +380,17 @@
   )
 }
 
+# Builds an empty marking-response table.
+# We use this to preserve one response status per chunk/code combination.
+.kwallm_empty_marking_responses <- function() {
+  data.frame(
+    chunk_id = integer(),
+    code_id = integer(),
+    response_status = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
 # Builds an empty topic-generation settings table.
 # We use this as the default for topic mode configuration.
 .kwallm_empty_topic_generation_settings <- function() {
@@ -934,6 +945,15 @@ MarkingResult <- S7::new_class(
         "chunk_text"
       ))
     ),
+    responses = S7::new_property(
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_marking_responses()),
+      validator = .kwallm_validate_df_columns(c(
+        "chunk_id",
+        "code_id",
+        "response_status"
+      ))
+    ),
     markings = S7::new_property(
       S7::class_data.frame,
       default = quote(.kwallm_empty_markings()),
@@ -959,8 +979,26 @@ MarkingResult <- S7::new_class(
     if (anyDuplicated(self@chunks$chunk_id)) {
       problems <- c(problems, "chunks$chunk_id must be unique")
     }
+    if (anyDuplicated(self@responses[c("chunk_id", "code_id")])) {
+      problems <- c(
+        problems,
+        "responses must contain at most one row per chunk_id/code_id"
+      )
+    }
     if (anyDuplicated(self@markings$mark_id)) {
       problems <- c(problems, "markings$mark_id must be unique")
+    }
+    if (
+      nrow(self@responses) > 0 &&
+        !all(self@responses$chunk_id %in% self@chunks$chunk_id)
+    ) {
+      problems <- c(problems, "responses$chunk_id must reference chunks")
+    }
+    if (
+      nrow(self@responses) > 0 &&
+        !all(self@responses$code_id %in% self@codes$code_id)
+    ) {
+      problems <- c(problems, "responses$code_id must reference codes")
     }
     if (
       nrow(self@markings) > 0 &&

@@ -697,10 +697,10 @@ mark_text_prompt <- function(
 
         # Empty handling
         if (length(text_parts) == 0) {
-          return(.kwallm_empty_marking_matches())
+          return(.kwallm_marking_status_row("matched_all"))
         }
         if (length(text_parts) == 1 && identical(text_parts[1], "")) {
-          return(.kwallm_empty_marking_matches())
+          return(.kwallm_marking_status_row("matched_all"))
         }
 
         # Find matches
@@ -717,6 +717,11 @@ mark_text_prompt <- function(
           # If we've hit max interactions, drop unmatched parts and return what *did* match
           if (interaction_count >= max_interactions) {
             matched <- res[!is.na(res$match), , drop = FALSE]
+            if (!nrow(matched)) {
+              return(.kwallm_marking_status_row(
+                "partial_after_max_interactions"
+              ))
+            }
             return(.kwallm_marking_matches_from_find_matches(
               matched,
               response_status = "partial_after_max_interactions"
@@ -751,13 +756,26 @@ mark_text_prompt <- function(
   )
 }
 
+
+.kwallm_marking_status_row <- function(response_status = NA_character_) {
+  tibble::tibble(
+    source_marked_text = NA_character_,
+    marked_text = NA_character_,
+    match_start = NA_integer_,
+    match_end = NA_integer_,
+    match_distance = NA_integer_,
+    match_method = NA_character_,
+    response_status = as.character(response_status)
+  )
+}
+
 # Helper: convert raw fuzzy-match output into the stored marking schema.
 .kwallm_marking_matches_from_find_matches <- function(
   matches,
   response_status = "matched_all"
 ) {
   if (!nrow(matches)) {
-    return(.kwallm_empty_marking_matches())
+    return(.kwallm_marking_status_row(response_status))
   }
 
   tibble::tibble(

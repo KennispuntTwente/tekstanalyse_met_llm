@@ -705,19 +705,13 @@ build_analysis_result <- function(
     )
   }
 
-  column_or <- function(column, default) {
-    if (column %in% names(mark_rows)) {
-      return(mark_rows[[column]])
+  column_or <- function(df, column, default) {
+    if (column %in% names(df)) {
+      return(df[[column]])
     }
 
-    rep_len(default, nrow(mark_rows))
+    rep_len(default, nrow(df))
   }
-
-  mark_rows <- results_table[
-    !is.na(results_table$marked_text) & nzchar(results_table$marked_text),
-    ,
-    drop = FALSE
-  ]
 
   if (!"analysis_unit_id" %in% names(results_table)) {
     stop("results_table must contain analysis_unit_id for marking results")
@@ -736,24 +730,105 @@ build_analysis_result <- function(
     return(MarkingResult(
       codes = codes_df,
       chunks = .kwallm_empty_chunks(),
+      responses = .kwallm_empty_marking_responses(),
+      markings = .kwallm_empty_markings()
+    ))
+  }
+
+  chunk_rows <- results_table[
+    !is.na(results_table$chunk_id),
+    ,
+    drop = FALSE
+  ]
+
+  if (!nrow(chunk_rows)) {
+    return(MarkingResult(
+      codes = codes_df,
+      chunks = .kwallm_empty_chunks(),
+      responses = .kwallm_empty_marking_responses(),
       markings = .kwallm_empty_markings()
     ))
   }
 
   chunks <- unique(data.frame(
     # Each chunk belongs to one analysis unit and keeps its own row id.
-    chunk_id = as.integer(results_table$chunk_id),
-    analysis_unit_id = as.integer(results_table$analysis_unit_id),
-    chunk_index = as.integer(results_table$chunk_index),
-    chunk_text = as.character(results_table$chunk_text),
+    chunk_id = as.integer(chunk_rows$chunk_id),
+    analysis_unit_id = as.integer(chunk_rows$analysis_unit_id),
+    chunk_index = as.integer(chunk_rows$chunk_index),
+    chunk_text = as.character(chunk_rows$chunk_text),
     stringsAsFactors = FALSE
   ))
   chunks <- chunks[order(chunks$chunk_id), , drop = FALSE]
+
+  response_input_rows <- results_table[
+    !is.na(results_table$chunk_id) &
+      !is.na(results_table$code) &
+      nzchar(as.character(results_table$code)),
+    ,
+    drop = FALSE
+  ]
+
+  marked_text_values <- as.character(response_input_rows$marked_text)
+  response_rows <- unique(data.frame(
+    chunk_id = as.integer(response_input_rows$chunk_id),
+    code = as.character(response_input_rows$code),
+    response_status = as.character(column_or(
+      response_input_rows,
+      "response_status",
+      ifelse(
+        !is.na(marked_text_values) & nzchar(marked_text_values),
+        "matched_all",
+        NA_character_
+      )
+    )),
+    stringsAsFactors = FALSE
+  ))
+
+  response_rows <- response_rows[order(
+    response_rows$chunk_id,
+    response_rows$code,
+    is.na(response_rows$response_status)
+  ), , drop = FALSE]
+  response_rows <- response_rows[
+    !duplicated(response_rows[c("chunk_id", "code")]),
+    ,
+    drop = FALSE
+  ]
+
+  response_code_id <- codes_df$code_id[match(
+    response_rows$code,
+    codes_df$code_text
+  )]
+
+  if (nrow(response_rows) > 0 && anyNA(response_rows$chunk_id)) {
+    stop("marking response rows must contain non-missing chunk_id values")
+  }
+  if (nrow(response_rows) > 0 && anyNA(response_code_id)) {
+    stop("marking response rows must contain codes that are present in codes_df")
+  }
+
+  responses <- if (!nrow(response_rows)) {
+    .kwallm_empty_marking_responses()
+  } else {
+    data.frame(
+      chunk_id = as.integer(response_rows$chunk_id),
+      code_id = as.integer(response_code_id),
+      response_status = as.character(response_rows$response_status),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  mark_rows <- results_table[
+    !is.na(results_table$marked_text) & nzchar(results_table$marked_text),
+    ,
+    drop = FALSE
+  ]
 
   if (!nrow(mark_rows)) {
     return(MarkingResult(
       codes = codes_df,
       chunks = chunks,
+      responses = responses,
       markings = .kwallm_empty_markings()
     ))
   }
@@ -772,23 +847,23 @@ build_analysis_result <- function(
     chunk_id = chunk_id,
     code_id = code_id,
     source_marked_text = as.character(
-      column_or("source_marked_text", mark_rows$marked_text)
+      column_or(mark_rows, "source_marked_text", mark_rows$marked_text)
     ),
     marked_text = as.character(mark_rows$marked_text),
     match_start = as.integer(
-      column_or("match_start", NA_integer_)
+      column_or(mark_rows, "match_start", NA_integer_)
     ),
     match_end = as.integer(
-      column_or("match_end", NA_integer_)
+      column_or(mark_rows, "match_end", NA_integer_)
     ),
     match_distance = as.integer(
-      column_or("match_distance", NA_integer_)
+      column_or(mark_rows, "match_distance", NA_integer_)
     ),
     match_method = as.character(
-      column_or("match_method", NA_character_)
+      column_or(mark_rows, "match_method", NA_character_)
     ),
     response_status = as.character(
-      column_or("response_status", "matched_all")
+      column_or(mark_rows, "response_status", "matched_all")
     ),
     stringsAsFactors = FALSE
   ))
@@ -812,6 +887,7 @@ build_analysis_result <- function(
   MarkingResult(
     codes = codes_df,
     chunks = chunks,
+    responses = responses,
     markings = markings
   )
 }

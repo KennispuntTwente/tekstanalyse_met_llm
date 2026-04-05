@@ -311,6 +311,30 @@ test_that("mark_texts preserves chunk-code rows when nothing matches", {
   expect_true(is.na(result$marked_text))
 })
 
+test_that(".kwallm_marking_matches_from_find_matches keeps partial status without spans", {
+  source(here::here("R", "analysis_marking.R"), local = TRUE)
+
+  matches <- tibble::tibble(
+    needle = character(),
+    match = character(),
+    distance = integer(),
+    start = integer(),
+    end = integer()
+  )
+
+  result <- .kwallm_marking_matches_from_find_matches(
+    matches,
+    response_status = "partial_after_max_interactions"
+  )
+
+  expect_equal(nrow(result), 1)
+  expect_true(is.na(result$marked_text[[1]]))
+  expect_equal(
+    result$response_status[[1]],
+    "partial_after_max_interactions"
+  )
+})
+
 test_that("mark_texts and mark_text_prompt respect send_prompt_with_retries__max_interactions option", {
   source(here::here("R", "analysis_marking.R"), local = TRUE)
 

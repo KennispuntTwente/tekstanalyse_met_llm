@@ -270,6 +270,7 @@ test_that("marking paragraphs retain supporting excerpts in report helpers", {
     "Code 1"
   )
   expect_equal(supporting_texts, c("Text about **dogs**"))
+  expect_equal(metadata$results$responses[[1]]$response_status, "matched_all")
   expect_equal(metadata$results$markings[[1]]$source_marked_text, "dogs?")
   expect_equal(metadata$results$markings[[1]]$match_start, 12L)
   expect_equal(metadata$results$markings[[1]]$match_method, "fuzzy")
@@ -321,13 +322,16 @@ test_that("marking results deduplicate shared analysis-unit rows before report f
   sheets <- analysis_result_to_export_sheets(analysis_result)
 
   expect_equal(nrow(analysis_result@results@chunks), 1)
+  expect_equal(nrow(analysis_result@results@responses), 1)
   expect_equal(nrow(analysis_result@results@markings), 1)
   expect_equal(nrow(report_df), 2)
   expect_true("document_id" %in% names(report_df))
   expect_identical(report_df$document_id, c(1L, 2L))
   expect_true(all(report_df$marked_text == "Shared"))
+  expect_true(all(report_df$response_status == "matched_all"))
   expect_true("document_id" %in% names(sheets$results))
   expect_identical(sheets$results$document_id, c(1L, 2L))
+  expect_true("marking_responses" %in% names(sheets))
 })
 
 test_that("marking results default source_marked_text per row when omitted", {
@@ -365,10 +369,13 @@ test_that("marking results default source_marked_text per row when omitted", {
   )
 
   markings <- analysis_result@results@markings
+  responses <- analysis_result@results@responses
 
   expect_equal(nrow(markings), 2)
+  expect_equal(nrow(responses), 2)
   expect_identical(markings$source_marked_text, markings$marked_text)
   expect_true(all(markings$response_status == "matched_all"))
+  expect_true(all(responses$response_status == "matched_all"))
 })
 
 test_that("marking results preserve unmarked chunk-code rows in report tables", {
@@ -389,7 +396,7 @@ test_that("marking results preserve unmarked chunk-code rows in report tables", 
     match_end = c(15L, NA_integer_),
     match_distance = c(0L, NA_integer_),
     match_method = c("exact", NA_character_),
-    response_status = c("matched_all", NA_character_),
+    response_status = c("matched_all", "partial_after_max_interactions"),
     stringsAsFactors = FALSE
   )
 
@@ -412,12 +419,22 @@ test_that("marking results preserve unmarked chunk-code rows in report tables", 
   )
 
   report_df <- .kwallm_report_results_df(analysis_result)
+  metadata <- analysis_result_to_metadata_list(analysis_result)
 
   expect_equal(nrow(analysis_result@results@chunks), 2)
+  expect_equal(nrow(analysis_result@results@responses), 2)
   expect_equal(nrow(analysis_result@results@markings), 1)
   expect_equal(nrow(report_df), 2)
   expect_identical(report_df$marked_text[[1]], "cats")
   expect_true(is.na(report_df$marked_text[[2]]))
+  expect_identical(report_df$response_status, c(
+    "matched_all",
+    "partial_after_max_interactions"
+  ))
+  expect_equal(
+    metadata$results$responses[[2]]$response_status,
+    "partial_after_max_interactions"
+  )
 })
 
 test_that("single-label assignments use explicit analysis unit ids when shuffled", {

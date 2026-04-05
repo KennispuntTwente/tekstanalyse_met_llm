@@ -132,6 +132,7 @@ analysis_result_to_metadata_list <- function(analysis_result) {
       marking = list(
         codes = .kwallm_df_to_records(analysis_result@results@codes),
         chunks = .kwallm_df_to_records(analysis_result@results@chunks),
+        responses = .kwallm_df_to_records(analysis_result@results@responses),
         markings = .kwallm_df_to_records(analysis_result@results@markings)
       )
     ),
@@ -254,6 +255,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
   if (inherits(analysis_result@results, "MarkingResult")) {
     sheets$codes <- analysis_result@results@codes
     sheets$chunks <- analysis_result@results@chunks
+    sheets$marking_responses <- analysis_result@results@responses
     sheets$markings <- analysis_result@results@markings
   }
 
@@ -427,6 +429,7 @@ write_analysis_result_metadata_json <- function(
       chunk_text = character(),
       code = character(),
       marked_text = character(),
+      response_status = character(),
       stringsAsFactors = FALSE
     ))
   }
@@ -443,6 +446,7 @@ write_analysis_result_metadata_json <- function(
     out <- chunk_docs[c("document_id", "document_text", "chunk_text")]
     out$code <- character(nrow(out))
     out$marked_text <- NA_character_
+    out$response_status <- NA_character_
     names(out)[1:3] <- c("document_id", "text", "chunk_text")
     return(out)
   }
@@ -457,9 +461,17 @@ write_analysis_result_metadata_json <- function(
   }
   grid <- do.call(rbind, grids)
 
+  responses <- result@responses
   marks <- result@markings
   merged <- merge(
     grid,
+    responses[c("chunk_id", "code_id", "response_status")],
+    by = c("chunk_id", "code_id"),
+    all.x = TRUE,
+    all.y = FALSE
+  )
+  merged <- merge(
+    merged,
     marks[c("chunk_id", "code_id", "marked_text")],
     by = c("chunk_id", "code_id"),
     all.x = TRUE,
@@ -472,9 +484,17 @@ write_analysis_result_metadata_json <- function(
     "document_text",
     "chunk_text",
     "code",
-    "marked_text"
+    "marked_text",
+    "response_status"
   )]
-  names(out) <- c("document_id", "text", "chunk_text", "code", "marked_text")
+  names(out) <- c(
+    "document_id",
+    "text",
+    "chunk_text",
+    "code",
+    "marked_text",
+    "response_status"
+  )
   out
 }
 
