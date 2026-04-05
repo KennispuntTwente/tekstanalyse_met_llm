@@ -373,7 +373,7 @@ text_management_server <- function(
           }
         }
       )
-      preprocessed_texts <- normalize_preprocessed_texts(anonymized_texts)
+      preprocessed_texts <- as.character(anonymized_texts)
       applied_mode <- switch(
         mode,
         simple = "regex",
@@ -716,16 +716,6 @@ text_management_server <- function(
     return(texts)
   })
 }
-
-
-# 2 Helper functions for preprocessing texts -----------------------
-normalize_preprocessed_texts <- function(txts) {
-  # Preserve the exact anonymized text so downstream evidence and excerpts
-  # still reflect what the model actually saw.
-  as.character(txts)
-}
-
-
 pre_process_texts <- function(
   txts,
   lang = shiny.i18n::Translator$new(

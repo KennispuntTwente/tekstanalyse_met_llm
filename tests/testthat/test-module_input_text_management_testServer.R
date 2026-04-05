@@ -163,13 +163,6 @@ test_that("pre_process_texts leaves whitespace normalization to a separate helpe
 })
 
 
-test_that("normalize_preprocessed_texts preserves whitespace independently", {
-  out <- normalize_preprocessed_texts(c("  first\n\nsecond   third  "))
-
-  expect_identical(out, "  first\n\nsecond   third  ")
-})
-
-
 test_that("text_management_server keeps structurally different texts distinct", {
   withr::local_options(list(
     anonymization__default = "none",
