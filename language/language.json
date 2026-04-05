@@ -1054,8 +1054,8 @@
         "en": "Here you can view the texts that will be processed."
       },
       {
-        "nl": " Dubbele of gelijk geanonimiseerde teksten worden voor LLM-calls hergebruikt als één analyse-eenheid, terwijl de originele rijen behouden blijven.",
-        "en": " Duplicate or identically anonymized texts reuse one analysis unit for LLM calls, while the original rows remain available."
+          "nl": " Dubbele of gelijk voorbewerkte teksten worden voor LLM-calls hergebruikt als één analyse-eenheid, terwijl de originele rijen behouden blijven.",
+          "en": " Duplicate or identically preprocessed texts reuse one analysis unit for LLM calls, while the original rows remain available."
       },
       {
         "nl": " Daarnaast kan je kiezen om de teksten te anonimiseren met behulp van regex of een GLiNER-model. Regex verwijdert e-mailadressen, telefoonnummers en (Nederlandse) postcodes. Het GLiNER-model kan verschillende vormen van PII detecteren.",
@@ -1248,6 +1248,10 @@
       {
         "nl": "Teksten splitsen...",
         "en": "Splitting texts..."
+        },
+        {
+          "nl": "Teksten worden nog gesplitst...",
+          "en": "Texts are still being split..."
       },
       {
         "nl": "Teksten markeren...",
