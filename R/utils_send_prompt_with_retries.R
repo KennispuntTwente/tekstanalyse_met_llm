@@ -28,13 +28,103 @@ send_prompt_with_retries <- function(
     "send_prompt_with_retries__max_interactions",
     10
   ),
-  stream_callback = NULL
+  stream_callback = NULL,
+  execution_scope = NULL
 ) {
   tries <- 0
 
   result <- NULL
   call_start_time <- Sys.time()
   model_name <- llm_provider$parameters$model %||% "unknown"
+
+  normalize_scope_scalar <- function(value) {
+    if (is.null(value) || !length(value) || all(is.na(value))) {
+      return(NULL)
+    }
+
+    as.character(value)[1]
+  }
+
+  normalize_scope_int <- function(value) {
+    if (is.null(value) || !length(value) || all(is.na(value))) {
+      return(NULL)
+    }
+
+    as.integer(value)[1]
+  }
+
+  normalize_scope_int_vector <- function(value) {
+    if (is.null(value) || !length(value)) {
+      return(NULL)
+    }
+
+    value <- as.integer(value[!is.na(value)])
+    if (!length(value)) {
+      return(NULL)
+    }
+
+    unname(value)
+  }
+
+  normalize_scope_chr_vector <- function(value) {
+    if (is.null(value) || !length(value)) {
+      return(NULL)
+    }
+
+    value <- as.character(value[!is.na(value)])
+    if (!length(value)) {
+      return(NULL)
+    }
+
+    unname(value)
+  }
+
+  normalize_execution_scope <- function(scope) {
+    if (is.null(scope)) {
+      return(NULL)
+    }
+    if (!is.list(scope) || is.data.frame(scope)) {
+      stop("execution_scope must be NULL or a named list")
+    }
+
+    allowed_fields <- c(
+      "kind",
+      "analysis_unit_ids",
+      "chunk_ids",
+      "chunk_indexes",
+      "batch_index",
+      "subject_kind",
+      "subject_value",
+      "topic_values",
+      "reduction_iteration"
+    )
+
+    scope <- scope[intersect(names(scope), allowed_fields)]
+    if (!length(scope)) {
+      return(NULL)
+    }
+
+    scope$kind <- normalize_scope_scalar(scope$kind)
+    scope$analysis_unit_ids <- normalize_scope_int_vector(
+      scope$analysis_unit_ids
+    )
+    scope$chunk_ids <- normalize_scope_int_vector(scope$chunk_ids)
+    scope$chunk_indexes <- normalize_scope_int_vector(scope$chunk_indexes)
+    scope$batch_index <- normalize_scope_int(scope$batch_index)
+    scope$subject_kind <- normalize_scope_scalar(scope$subject_kind)
+    scope$subject_value <- normalize_scope_scalar(scope$subject_value)
+    scope$topic_values <- normalize_scope_chr_vector(scope$topic_values)
+    scope$reduction_iteration <- normalize_scope_int(scope$reduction_iteration)
+
+    scope <- scope[!vapply(scope, is.null, logical(1))]
+    if (!length(scope)) {
+      return(NULL)
+    }
+
+    scope
+  }
+
+  execution_scope <- normalize_execution_scope(execution_scope)
 
   # Inline helper resolver (needed for mirai async contexts where helpers
   # are passed via .args and not in lexical scope)
@@ -110,8 +200,7 @@ send_prompt_with_retries <- function(
         tz = "UTC"
       ),
       duration_ms = duration_ms,
-      attempt_count = as.integer(tries),
-      retry_count = as.integer(max(tries - 1, 0)),
+      try_count = as.integer(tries),
       max_tries = as.integer(max_tries),
       retry_delay_seconds = as.numeric(retry_delay_seconds),
       max_interactions = as.integer(max_interactions),
@@ -126,6 +215,7 @@ send_prompt_with_retries <- function(
       } else {
         as.character(final_error_message)
       },
+      prompt_scope = I(list(execution_scope)),
       stringsAsFactors = FALSE
     ))
   }
@@ -375,19 +465,20 @@ send_prompt_with_retries <- function(
       started_at = character(),
       completed_at = character(),
       duration_ms = numeric(),
-      attempt_count = integer(),
-      retry_count = integer(),
+      try_count = integer(),
       max_tries = integer(),
       retry_delay_seconds = numeric(),
       max_interactions = integer(),
       completion_status = character(),
       error_messages = character(),
       final_error_message = character(),
+      prompt_scope = I(list()),
       stringsAsFactors = FALSE
     ))
   }
 
-  unique(do.call(rbind, records))
+  rows <- do.call(rbind, records)
+  rows[!duplicated(rows$prompt_id), , drop = FALSE]
 }
 
 

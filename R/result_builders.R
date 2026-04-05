@@ -60,9 +60,9 @@
 #' @param stage_execution_rows Optional data frame with one row per
 #'   `send_prompt_with_retries()` call made during the run. Expected columns are
 #'   `prompt_id`, `stage_id`, `model_id`, `started_at`, `completed_at`,
-#'   `duration_ms`, `attempt_count`, `retry_count`, `max_tries`,
+#'   `duration_ms`, `try_count`, `max_tries`,
 #'   `retry_delay_seconds`, `max_interactions`, `completion_status`,
-#'   `error_messages`, and `final_error_message`.
+#'   `error_messages`, `final_error_message`, and `prompt_scope`.
 #' @param input_info List with upload, anonymization, and split provenance.
 #'   This usually comes from `upload_info()`, `texts$anonymization_*`, and
 #'   `split_settings()`, and may include `file_type`, `selected_sheet`,
@@ -526,18 +526,41 @@ build_analysis_result <- function(
     "started_at",
     "completed_at",
     "duration_ms",
-    "attempt_count",
-    "retry_count",
+    "try_count",
     "max_tries",
     "retry_delay_seconds",
     "max_interactions",
     "completion_status",
     "error_messages",
-    "final_error_message"
+    "final_error_message",
+    "prompt_scope"
   )
 
-  for (column in setdiff(required_cols, names(stage_execution_rows))) {
+  for (column in setdiff(
+    setdiff(required_cols, "prompt_scope"),
+    names(stage_execution_rows)
+  )) {
     stage_execution_rows[[column]] <- NA
+  }
+
+  if (!"prompt_scope" %in% names(stage_execution_rows)) {
+    stage_execution_rows[["prompt_scope"]] <- I(rep(
+      list(NULL),
+      nrow(stage_execution_rows)
+    ))
+  }
+
+  if (!is.list(stage_execution_rows$prompt_scope)) {
+    stage_execution_rows$prompt_scope <- I(lapply(
+      stage_execution_rows$prompt_scope,
+      function(value) {
+        if (is.null(value) || !length(value) || all(is.na(value))) {
+          return(NULL)
+        }
+
+        value
+      }
+    ))
   }
 
   rows <- stage_execution_rows[required_cols]
@@ -547,8 +570,7 @@ build_analysis_result <- function(
   rows$started_at <- as.character(rows$started_at)
   rows$completed_at <- as.character(rows$completed_at)
   rows$duration_ms <- as.numeric(rows$duration_ms)
-  rows$attempt_count <- as.integer(rows$attempt_count)
-  rows$retry_count <- as.integer(rows$retry_count)
+  rows$try_count <- as.integer(rows$try_count)
   rows$max_tries <- as.integer(rows$max_tries)
   rows$retry_delay_seconds <- as.numeric(rows$retry_delay_seconds)
   rows$max_interactions <- as.integer(rows$max_interactions)
@@ -556,7 +578,7 @@ build_analysis_result <- function(
   rows$error_messages <- as.character(rows$error_messages)
   rows$final_error_message <- as.character(rows$final_error_message)
 
-  unique(rows)
+  rows[!duplicated(rows$prompt_id), , drop = FALSE]
 }
 
 # Builds the typed categorization payload.

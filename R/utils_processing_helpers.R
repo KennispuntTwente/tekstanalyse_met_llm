@@ -234,12 +234,14 @@ write_grouped_paragraphs <- function(
   style_prompt,
   llm_provider,
   lang,
+  subject_kind = "topic",
   progress_secondary = NULL,
   interrupter = NULL,
   llm_stream_async = NULL,
   streaming_enabled = FALSE
 ) {
   stopifnot(is.list(grouped_texts), !is.null(names(grouped_texts)))
+  stopifnot(is.character(subject_kind), length(subject_kind) == 1)
 
   normalize_group_entry <- function(entry) {
     if (!is.list(entry) || is.null(entry$texts)) {
@@ -322,6 +324,7 @@ write_grouped_paragraphs <- function(
         texts = normalized_entry$texts,
         analysis_unit_ids = normalized_entry$analysis_unit_ids,
         topic = topic_name,
+        subject_kind = subject_kind,
         research_background = research_background,
         style_prompt = style_prompt,
         llm_provider = llm_provider,

@@ -144,7 +144,7 @@ test_that("categorize_texts returns binary columns for multi-label output", {
 
   analysis_unit_ids <- c(11L, 22L)
 
-  send_prompt_with_retries <- function(prompt, llm_provider) {
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
     force(prompt)
     force(llm_provider)
 
@@ -180,7 +180,7 @@ test_that("categorize_texts supports progress, interruption, and early NA", {
   interrupt_count <- 0
   progress_events <- list()
 
-  send_prompt_with_retries <- function(prompt, llm_provider) {
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
     call_count <<- call_count + 1
     if (call_count == 1) {
       return("cat1")
@@ -225,7 +225,7 @@ test_that("categorize_texts multi-label: early NA produces NA category columns",
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
 
   call_count <- 0
-  send_prompt_with_retries <- function(prompt, llm_provider) {
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
     call_count <<- call_count + 1
     if (call_count == 1) {
       return("cat1")

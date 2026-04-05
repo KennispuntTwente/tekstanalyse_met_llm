@@ -152,7 +152,8 @@ test_that("mark_texts works with lang = NULL", {
   send_prompt_with_retries <- function(
     prompt,
     llm_provider,
-    max_interactions = 10
+    max_interactions = 10,
+    ...
   ) {
     force(prompt)
     force(llm_provider)
@@ -229,7 +230,8 @@ test_that("mark_texts includes research background in live marking prompts", {
   send_prompt_with_retries <- function(
     prompt,
     llm_provider,
-    max_interactions = 10
+    max_interactions = 10,
+    ...
   ) {
     force(llm_provider)
     force(max_interactions)
@@ -287,7 +289,8 @@ test_that("mark_texts preserves chunk-code rows when nothing matches", {
   send_prompt_with_retries <- function(
     prompt,
     llm_provider,
-    max_interactions = 10
+    max_interactions = 10,
+    ...
   ) {
     force(prompt)
     force(llm_provider)

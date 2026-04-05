@@ -196,14 +196,17 @@ test_that("metadata and export sheets include text counts", {
     list(
       source_documents = 2L,
       documents = 3L,
-      analysis_units = 2L,
-      reused_analyses = 1L
+      analysis_units = 2L
     )
   )
   expect_equal(metadata_values[["source_documents"]], "2")
   expect_equal(metadata_values[["documents"]], "3")
   expect_equal(metadata_values[["analysis_units"]], "2")
-  expect_equal(metadata_values[["reused_analyses"]], "1")
+  expect_false("reused_analyses" %in% sheets$metadata$field)
+  expect_identical(
+    names(metadata$results),
+    c("labels", "multi_label", "assignments")
+  )
 })
 
 test_that("marking paragraphs retain supporting excerpts in report helpers", {
@@ -860,11 +863,14 @@ test_that("topic metadata includes candidate and reduced topics", {
     metadata$results$topic_provenance$not_applicable_check_performed
   ))
   expect_equal(metadata$results$topic_provenance$reduction_iterations, 2L)
-  expect_true(any(vapply(
-    metadata$stage_models,
-    function(x) identical(x$stage_id, "topic_not_applicable_check"),
-    logical(1)
-  )))
+  expect_identical(
+    names(metadata$results),
+    c("topic_provenance", "labels", "multi_label", "assignments")
+  )
+  expect_equal(
+    metadata$stage_models$topic_not_applicable_check$model_id,
+    "large-model"
+  )
   expect_equal(reduction_model, "large-model")
 })
 
@@ -969,14 +975,17 @@ test_that("stage execution provenance is serialized", {
     started_at = "2026-04-04T10:00:00.000Z",
     completed_at = "2026-04-04T10:00:01.250Z",
     duration_ms = 1250,
-    attempt_count = 2L,
-    retry_count = 1L,
+    try_count = 2L,
     max_tries = 5L,
     retry_delay_seconds = 3,
     max_interactions = 10L,
     completion_status = "success",
     error_messages = "temporary timeout",
     final_error_message = NA_character_,
+    prompt_scope = I(list(list(
+      kind = "analysis_unit",
+      analysis_unit_ids = 2L
+    ))),
     stringsAsFactors = FALSE
   )
 
@@ -1001,14 +1010,28 @@ test_that("stage execution provenance is serialized", {
   metadata <- analysis_result_to_metadata_list(analysis_result)
   sheets <- analysis_result_to_export_sheets(analysis_result)
 
-  expect_equal(metadata$stage_executions[[1]]$stage_id, "scoring")
-  expect_equal(metadata$stage_executions[[1]]$retry_count, 1L)
+  expect_true("scoring" %in% names(metadata$stage_executions))
+  expect_equal(metadata$stage_executions$scoring[[1]]$prompt_id, "prompt-1")
+  expect_equal(metadata$stage_executions$scoring[[1]]$try_count, 2L)
   expect_equal(
-    metadata$stage_executions[[1]]$error_messages,
+    metadata$stage_executions$scoring[[1]]$error_messages,
     "temporary timeout"
+  )
+  expect_equal(
+    metadata$stage_executions$scoring[[1]]$prompt_scope$kind,
+    "analysis_unit"
+  )
+  expect_equal(
+    metadata$stage_executions$scoring[[1]]$prompt_scope$analysis_unit_ids,
+    2L
   )
   expect_true("stage_executions" %in% names(sheets))
   expect_equal(sheets$stage_executions$completion_status[[1]], "success")
+  scope_from_sheet <- jsonlite::fromJSON(
+    sheets$stage_executions$prompt_scope[[1]]
+  )
+  expect_equal(scope_from_sheet$kind, "analysis_unit")
+  expect_equal(as.integer(scope_from_sheet$analysis_unit_ids), 2L)
 })
 
 test_that("AnalysisResult rejects result rows that do not reference text lineage", {
@@ -1088,6 +1111,7 @@ test_that("app_version and api_url are serialized", {
     models = .test_models(),
     scoring_characteristic = "helpfulness",
     write_paragraphs = FALSE,
+    stage_prompt_previews = list(scoring = "prompt"),
     app_version = "1.3.2"
   )
 
@@ -1104,9 +1128,10 @@ test_that("app_version and api_url are serialized", {
 
   # api_url in stage_models
   expect_equal(
-    metadata$stage_models[[1]]$api_url,
+    metadata$stage_models$scoring$api_url,
     "https://api.example.com/v1/chat/completions"
   )
+  expect_equal(metadata$stage_prompts$scoring$prompt_preview, "prompt")
   expect_true("api_url" %in% names(sheets$stage_models))
 
   # NULL app_version is handled

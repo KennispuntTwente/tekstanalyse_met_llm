@@ -194,52 +194,63 @@ mark_texts <- function(
   df_result <- df |>
     tidyr::crossing(code = codes) |>
     dplyr::mutate(
-      marking_match = purrr::map2(chunk_text, code, function(txt, cd) {
-        current_count <<- current_count + 1
-        if (current_count == 1 || current_count %% 10 == 0) {
-          log_info(
-            sprintf(
-              "Marking progress: %d/%d",
-              current_count,
-              total_combinations
-            ),
-            component = "analysis"
-          )
-        }
-        try(
-          {
-            progress_set_with_total(
-              progress_secondary,
-              current_count,
-              total_combinations,
-              paste0(
-                translate("Tekst markeren voor code '"),
-                cd,
-                "'..."
-              )
+      marking_match = purrr::pmap(
+        list(chunk_text, code, analysis_unit_id, chunk_id, chunk_index),
+        function(txt, cd, analysis_unit_id, chunk_id, chunk_index) {
+          current_count <<- current_count + 1
+          if (current_count == 1 || current_count %% 10 == 0) {
+            log_info(
+              sprintf(
+                "Marking progress: %d/%d",
+                current_count,
+                total_combinations
+              ),
+              component = "analysis"
             )
-          },
-          silent = TRUE
-        )
+          }
+          try(
+            {
+              progress_set_with_total(
+                progress_secondary,
+                current_count,
+                total_combinations,
+                paste0(
+                  translate("Tekst markeren voor code '"),
+                  cd,
+                  "'..."
+                )
+              )
+            },
+            silent = TRUE
+          )
 
-        if (!is.null(interrupter)) {
-          interrupter$execInterrupts()
+          if (!is.null(interrupter)) {
+            interrupter$execInterrupts()
+          }
+
+          prompt <- mark_text_prompt(
+            txt,
+            cd,
+            research_background = research_background,
+            max_interactions = max_interactions
+          )
+          result <- send_prompt_with_retries(
+            prompt,
+            llm_provider,
+            max_interactions = max_interactions,
+            execution_scope = list(
+              kind = "chunk_code",
+              analysis_unit_ids = as.integer(analysis_unit_id),
+              chunk_ids = as.integer(chunk_id),
+              chunk_indexes = as.integer(chunk_index),
+              subject_kind = "code",
+              subject_value = as.character(cd)
+            )
+          )
+
+          .kwallm_normalize_marking_matches(txt, result)
         }
-
-        prompt <- mark_text_prompt(
-          txt,
-          cd,
-          research_background = research_background,
-          max_interactions = max_interactions
-        )
-        result <- send_prompt_with_retries(
-          prompt,
-          llm_provider,
-          max_interactions = max_interactions
-        )
-
-        .kwallm_normalize_marking_matches(txt, result)
-      })
+      )
     ) |>
     tidyr::unnest(
       marking_match,
@@ -348,6 +359,7 @@ mark_texts <- function(
           texts = paragraph_input$texts,
           analysis_unit_ids = paragraph_input$analysis_unit_ids,
           topic = code,
+          subject_kind = "code",
           research_background = research_background,
           style_prompt = style_prompt,
           llm_provider = llm_provider,

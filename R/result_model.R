@@ -261,14 +261,14 @@
     started_at = character(),
     completed_at = character(),
     duration_ms = numeric(),
-    attempt_count = integer(),
-    retry_count = integer(),
+    try_count = integer(),
     max_tries = integer(),
     retry_delay_seconds = numeric(),
     max_interactions = integer(),
     completion_status = character(),
     error_messages = character(),
     final_error_message = character(),
+    prompt_scope = I(list()),
     stringsAsFactors = FALSE
   )
 }
@@ -1171,14 +1171,14 @@ AnalysisResult <- S7::new_class(
         "started_at",
         "completed_at",
         "duration_ms",
-        "attempt_count",
-        "retry_count",
+        "try_count",
         "max_tries",
         "retry_delay_seconds",
         "max_interactions",
         "completion_status",
         "error_messages",
-        "final_error_message"
+        "final_error_message",
+        "prompt_scope"
       ))
     ),
     results = S7::new_property(ResultPayload),

@@ -42,9 +42,18 @@ analysis_result_to_metadata_list <- function(analysis_result) {
       split_chunk_size = analysis_result@input@split_chunk_size,
       split_overlap = analysis_result@input@split_overlap
     ),
-    stage_models = .kwallm_df_to_records(analysis_result@stage_models),
-    stage_prompts = .kwallm_df_to_records(analysis_result@stage_prompts),
-    stage_executions = .kwallm_df_to_records(analysis_result@stage_executions),
+    stage_models = .kwallm_stage_records_by_stage(
+      analysis_result@stage_models,
+      singleton = TRUE
+    ),
+    stage_prompts = .kwallm_stage_records_by_stage(
+      analysis_result@stage_prompts,
+      singleton = TRUE
+    ),
+    stage_executions = .kwallm_stage_records_by_stage(
+      analysis_result@stage_executions,
+      singleton = FALSE
+    ),
     text_lineage = list(
       source_documents = .kwallm_df_to_records(
         analysis_result@text_lineage@source_documents
@@ -91,10 +100,10 @@ analysis_result_to_metadata_list <- function(analysis_result) {
       analysis_result@metadata@mode_id,
       categorization = list(
         labels = .kwallm_df_to_records(analysis_result@results@labels),
+        multi_label = analysis_result@results@multi_label,
         assignments = .kwallm_df_to_records(
           analysis_result@results@assignments
-        ),
-        multi_label = analysis_result@results@multi_label
+        )
       ),
       scoring = list(
         scores = .kwallm_df_to_records(analysis_result@results@scores),
@@ -103,11 +112,6 @@ analysis_result_to_metadata_list <- function(analysis_result) {
         scale_max = analysis_result@results@scale_max
       ),
       topic_extraction = list(
-        labels = .kwallm_df_to_records(analysis_result@results@labels),
-        assignments = .kwallm_df_to_records(
-          analysis_result@results@assignments
-        ),
-        multi_label = analysis_result@results@multi_label,
         topic_provenance = list(
           candidate_topics = as.character(
             analysis_result@results@topic_provenance@candidate_topics
@@ -127,6 +131,11 @@ analysis_result_to_metadata_list <- function(analysis_result) {
           draws = analysis_result@results@topic_provenance@draws,
           n_batches = analysis_result@results@topic_provenance@n_batches,
           context_window_tokens = analysis_result@results@topic_provenance@context_window_tokens
+        ),
+        labels = .kwallm_df_to_records(analysis_result@results@labels),
+        multi_label = analysis_result@results@multi_label,
+        assignments = .kwallm_df_to_records(
+          analysis_result@results@assignments
         )
       ),
       marking = list(
@@ -178,8 +187,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         "app_version",
         "source_documents",
         "documents",
-        "analysis_units",
-        "reused_analyses"
+        "analysis_units"
       ),
       value = c(
         as.character(analysis_result@metadata@schema_version),
@@ -191,8 +199,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         .kwallm_excel_scalar(analysis_result@metadata@app_version),
         .kwallm_excel_scalar(text_counts$source_documents),
         .kwallm_excel_scalar(text_counts$documents),
-        .kwallm_excel_scalar(text_counts$analysis_units),
-        .kwallm_excel_scalar(text_counts$reused_analyses)
+        .kwallm_excel_scalar(text_counts$analysis_units)
       ),
       stringsAsFactors = FALSE
     ),
@@ -235,7 +242,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
     document_groups = analysis_result@text_lineage@document_groups,
     stage_models = analysis_result@stage_models,
     stage_prompts = analysis_result@stage_prompts,
-    stage_executions = analysis_result@stage_executions,
+    stage_executions = .kwallm_excel_df(analysis_result@stage_executions),
     paragraphs = analysis_result@paragraphs@paragraphs,
     paragraph_sources = analysis_result@paragraphs@paragraph_sources,
     issues = analysis_result@issues
@@ -579,6 +586,32 @@ write_analysis_result_metadata_json <- function(
   })
 }
 
+# Groups stage-keyed provenance rows into a nested metadata structure.
+# We use this so metadata.json is organized by stage instead of one flat list.
+.kwallm_stage_records_by_stage <- function(df, singleton = FALSE) {
+  if (!is.data.frame(df) || !nrow(df)) {
+    return(list())
+  }
+
+  stage_ids <- unique(as.character(df$stage_id))
+  grouped <- vector("list", length(stage_ids))
+  names(grouped) <- stage_ids
+
+  for (stage_id in stage_ids) {
+    stage_rows <- df[df$stage_id == stage_id, , drop = FALSE]
+    stage_rows$stage_id <- NULL
+    stage_records <- .kwallm_df_to_records(stage_rows)
+
+    if (isTRUE(singleton)) {
+      grouped[[stage_id]] <- stage_records[[1]] %||% list()
+    } else {
+      grouped[[stage_id]] <- stage_records
+    }
+  }
+
+  grouped
+}
+
 # Computes the main text-count layers used across metadata and reports.
 # We keep these counts together so every output surface describes the run the same way.
 .kwallm_analysis_result_text_counts <- function(analysis_result) {
@@ -587,11 +620,7 @@ write_analysis_result_metadata_json <- function(
   list(
     source_documents = nrow(lineage@source_documents),
     documents = nrow(lineage@documents),
-    analysis_units = nrow(lineage@analysis_units),
-    reused_analyses = max(
-      0L,
-      nrow(lineage@documents) - nrow(lineage@analysis_units)
-    )
+    analysis_units = nrow(lineage@analysis_units)
   )
 }
 
@@ -624,16 +653,6 @@ write_analysis_result_metadata_json <- function(
       )
     )
 
-    if (counts$reused_analyses > 0L) {
-      parts <- c(
-        parts,
-        paste0(
-          counts$reused_analyses,
-          " teksten hergebruikten een bestaande analyse omdat ze na preprocessing gelijk waren"
-        )
-      )
-    }
-
     return(paste0(paste(parts, collapse = "; "), "."))
   }
 
@@ -656,16 +675,6 @@ write_analysis_result_metadata_json <- function(
     parts,
     paste0(counts$analysis_units, " unique texts were sent to the LLM")
   )
-
-  if (counts$reused_analyses > 0L) {
-    parts <- c(
-      parts,
-      paste0(
-        counts$reused_analyses,
-        " texts reused an existing analysis because they were identical after preprocessing"
-      )
-    )
-  }
 
   paste0(paste(parts, collapse = "; "), ".")
 }
@@ -753,9 +762,30 @@ write_analysis_result_metadata_json <- function(
 # Returns a scalar value when possible, otherwise a cleaned vector or NULL.
 # We use this to make JSON output stable for both single values and small vectors.
 .kwallm_scalar_or_null <- function(x) {
-  if (is.null(x) || !length(x) || all(is.na(x))) {
+  if (is.null(x) || !length(x)) {
     return(NULL)
   }
+
+  if (is.list(x) && !is.data.frame(x)) {
+    if (
+      length(x) == 1L &&
+        is.list(x[[1]]) &&
+        !is.data.frame(x[[1]])
+    ) {
+      return(x[[1]])
+    }
+
+    if (all(vapply(x, is.null, logical(1)))) {
+      return(NULL)
+    }
+
+    return(x)
+  }
+
+  if (all(is.na(x))) {
+    return(NULL)
+  }
+
   if (length(x) == 1L) {
     return(unname(x[[1]]))
   }
@@ -776,4 +806,40 @@ write_analysis_result_metadata_json <- function(
     return(NA_character_)
   }
   as.character(x)
+}
+
+# Converts list columns to JSON strings for Excel-safe data frames.
+# We use this for sheets like stage_executions that carry structured scope data.
+.kwallm_excel_df <- function(df) {
+  if (!is.data.frame(df)) {
+    return(df)
+  }
+
+  out <- df
+  list_cols <- vapply(out, is.list, logical(1))
+  if (!any(list_cols)) {
+    return(out)
+  }
+
+  for (column in names(out)[list_cols]) {
+    if (!nrow(out)) {
+      out[[column]] <- character(0)
+      next
+    }
+
+    out[[column]] <- vapply(
+      out[[column]],
+      function(value) {
+        value <- .kwallm_scalar_or_null(value)
+        if (is.null(value)) {
+          return(NA_character_)
+        }
+
+        jsonlite::toJSON(value, auto_unbox = TRUE, null = "null")
+      },
+      character(1)
+    )
+  }
+
+  out
 }

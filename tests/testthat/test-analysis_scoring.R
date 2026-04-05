@@ -121,7 +121,7 @@ test_that("score_texts supports progress, interruption, and early NA", {
   interrupt_count <- 0
   progress_events <- list()
 
-  send_prompt_with_retries <- function(prompt, llm_provider) {
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
     call_count <<- call_count + 1
     if (call_count == 1) {
       return(42)

@@ -278,7 +278,10 @@ processing_server <- function(
         ) {
           stage_execution_rows_generated(rows)
         } else {
-          stage_execution_rows_generated(unique(rbind(current_rows, rows)))
+          combined_rows <- rbind(current_rows, rows)
+          stage_execution_rows_generated(
+            combined_rows[!duplicated(combined_rows$prompt_id), , drop = FALSE]
+          )
         }
 
         invisible(NULL)
@@ -367,6 +370,7 @@ processing_server <- function(
                     style_prompt = style_prompt,
                     llm_provider = llm_provider,
                     lang = lang,
+                    subject_kind = "category",
                     progress_secondary = progress_secondary,
                     interrupter = interrupter,
                     llm_stream_async = llm_stream_async,
@@ -570,6 +574,7 @@ processing_server <- function(
             candidate_topics <- tryCatch(
               create_candidate_topics(
                 text_batches = text_batches,
+                analysis_unit_ids = analysis_unit_ids,
                 research_background = research_background,
                 llm_provider = llm_provider_main,
                 language = lang$get_translation_language(),
@@ -619,6 +624,7 @@ processing_server <- function(
               llm_provider_main = models$main,
               llm_provider_large = models$large,
               texts = texts$preprocessed,
+              analysis_unit_ids = current_analysis_unit_ids(),
               research_background = research_background(),
               mode = mode(),
               handle_detailed_error = handle_detailed_error,
@@ -872,6 +878,7 @@ processing_server <- function(
                     style_prompt = style_prompt,
                     llm_provider = llm_provider,
                     lang = lang,
+                    subject_kind = "topic",
                     progress_secondary = progress_secondary,
                     interrupter = interrupter,
                     llm_stream_async = llm_stream_async,

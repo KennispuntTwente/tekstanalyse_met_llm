@@ -70,6 +70,12 @@ create_text_batches <- function(
   current_source_ids <- integer(0)
   current_total <- 0
 
+  append_current_batch <- function() {
+    batch <- current_batch
+    attr(batch, "source_indexes") <- as.integer(current_source_ids)
+    batches <<- c(batches, list(batch))
+  }
+
   for (entry_index in seq_along(entry_texts)) {
     txt <- entry_texts[[entry_index]]
     source_id <- source_ids[[entry_index]]
@@ -88,7 +94,7 @@ create_text_batches <- function(
       current_total <- new_total
     } else {
       if (length(current_batch) > 0) {
-        batches <- c(batches, list(current_batch))
+        append_current_batch()
       }
       txt_tokens <- token_cost(txt, 1L)
       current_batch <- c(txt)
@@ -98,7 +104,7 @@ create_text_batches <- function(
   }
 
   if (length(current_batch) > 0) {
-    batches <- c(batches, list(current_batch))
+    append_current_batch()
   }
 
   batches

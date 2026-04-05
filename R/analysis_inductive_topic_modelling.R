@@ -29,6 +29,7 @@
 #' @export
 create_candidate_topics <- function(
   text_batches,
+  analysis_unit_ids = NULL,
   research_background = "",
   llm_provider,
   language = c("nl", "en"),
@@ -43,6 +44,19 @@ create_candidate_topics <- function(
     is.character(research_background),
     length(research_background) == 1
   )
+  if (!is.null(analysis_unit_ids)) {
+    max_source_index <- max(unlist(lapply(
+      text_batches,
+      function(batch) {
+        attr(batch, "source_indexes", exact = TRUE) %||% 0L
+      }
+    )))
+
+    stopifnot(
+      is.numeric(analysis_unit_ids),
+      length(analysis_unit_ids) >= max_source_index
+    )
+  }
 
   stage_options <- options(
     kwallm__prompt_execution_stage = "topic_candidate_generation"
@@ -66,7 +80,21 @@ create_candidate_topics <- function(
       language = language
     )
 
-    result <- send_prompt_with_retries(prompt, llm_provider)
+    source_indexes <- attr(batch, "source_indexes", exact = TRUE)
+    batch_analysis_unit_ids <- NULL
+    if (!is.null(analysis_unit_ids) && !is.null(source_indexes)) {
+      batch_analysis_unit_ids <- as.integer(analysis_unit_ids[source_indexes])
+    }
+
+    result <- send_prompt_with_retries(
+      prompt,
+      llm_provider,
+      execution_scope = list(
+        kind = "analysis_unit_batch",
+        analysis_unit_ids = batch_analysis_unit_ids,
+        batch_index = as.integer(i)
+      )
+    )
 
     candidate_topics[[i]] <- result$topics
 
@@ -403,7 +431,7 @@ reduce_topics <- function(
     count_tokens()
 
   ### helper: run a single reduce prompt ------------------------------------
-  reduce_once <- function(topics_vec) {
+  reduce_once <- function(topics_vec, batch_index, reduction_iteration) {
     prompt <- prompt_reduce_topics(
       candidate_topics = topics_vec,
       research_background = research_background,
@@ -413,7 +441,16 @@ reduce_topics <- function(
     )
     result <- with_execution_stage(
       "topic_reduction",
-      send_prompt_with_retries(prompt, llm_provider)
+      send_prompt_with_retries(
+        prompt,
+        llm_provider,
+        execution_scope = list(
+          kind = "topic_value_batch",
+          batch_index = as.integer(batch_index),
+          reduction_iteration = as.integer(reduction_iteration),
+          topic_values = as.character(topics_vec)
+        )
+      )
     )
 
     stopifnot(
@@ -503,7 +540,16 @@ reduce_topics <- function(
       )
     }
 
-    reduced_batches <- purrr::map(batches, reduce_once)
+    reduced_batches <- purrr::imap(
+      batches,
+      function(batch_topics, batch_index) {
+        reduce_once(
+          topics_vec = batch_topics,
+          batch_index = batch_index,
+          reduction_iteration = iteration
+        )
+      }
+    )
     combined <- unique(unlist(reduced_batches))
 
     if (length(batches) == 1) {
@@ -539,7 +585,13 @@ reduce_topics <- function(
           topics = current_topics,
           language = language
         ) |>
-          send_prompt_with_retries(llm_provider)
+          send_prompt_with_retries(
+            llm_provider,
+            execution_scope = list(
+              kind = "topic_value_set",
+              topic_values = as.character(current_topics)
+            )
+          )
       )
 
       if (!is_present) {
@@ -645,7 +697,14 @@ assign_topics <- function(
       )
     }
 
-    result <- send_prompt_with_retries(prompt, llm_provider)
+    result <- send_prompt_with_retries(
+      prompt,
+      llm_provider,
+      execution_scope = list(
+        kind = "analysis_unit",
+        analysis_unit_ids = as.integer(analysis_unit_ids[[i]])
+      )
+    )
     results[[i]] <- result
 
     if (!is.null(on_progress)) {

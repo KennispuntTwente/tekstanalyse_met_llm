@@ -148,7 +148,14 @@ score_texts <- function(
       scoring_characteristic = scoring_characteristic
     )
 
-    result <- send_prompt_with_retries(prompt, llm_provider)
+    result <- send_prompt_with_retries(
+      prompt,
+      llm_provider,
+      execution_scope = list(
+        kind = "analysis_unit",
+        analysis_unit_ids = as.integer(analysis_unit_ids[[i]])
+      )
+    )
     results[[i]] <- result
 
     if (!is.null(on_progress)) {

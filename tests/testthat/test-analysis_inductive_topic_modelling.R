@@ -68,7 +68,7 @@ test_that("create_candidate_topics supports progress and interruption", {
   interrupt_count <- 0
   progress_events <- list()
 
-  send_prompt_with_retries <- function(prompt, llm_provider) {
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
     force(llm_provider)
     list(topics = paste0("topic:", prompt$text_batch))
   }
@@ -124,7 +124,7 @@ test_that("assign_topics returns binary columns for multi-label output", {
 
   analysis_unit_ids <- c(31L, 32L)
 
-  send_prompt_with_retries <- function(prompt, llm_provider) {
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
     force(llm_provider)
 
     if (
@@ -160,7 +160,7 @@ test_that("assign_topics supports progress, interruption, and early NA", {
   interrupt_count <- 0
   progress_events <- list()
 
-  send_prompt_with_retries <- function(prompt, llm_provider) {
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
     call_count <<- call_count + 1
     if (call_count == 1) {
       return("Topic A")
@@ -206,7 +206,7 @@ test_that("assign_topics multi-label: early NA produces NA topic columns", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
   call_count <- 0
-  send_prompt_with_retries <- function(prompt, llm_provider) {
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
     call_count <<- call_count + 1
     if (call_count == 1) {
       return("Topic A")

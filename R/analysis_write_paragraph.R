@@ -162,6 +162,7 @@ write_paragraph <- function(
   texts,
   analysis_unit_ids,
   topic,
+  subject_kind = "topic",
   research_background = "",
   style_prompt = "",
   llm_provider,
@@ -177,6 +178,8 @@ write_paragraph <- function(
     length(analysis_unit_ids) == length(texts),
     is.character(topic),
     length(topic) == 1,
+    is.character(subject_kind),
+    length(subject_kind) == 1,
     is.character(research_background),
     length(research_background) == 1,
     (is.character(style_prompt) & length(style_prompt) == 1) |
@@ -213,7 +216,13 @@ write_paragraph <- function(
       send_prompt_with_retries(
         prompt,
         llm_provider = llm_provider,
-        stream_callback = stream_callback
+        stream_callback = stream_callback,
+        execution_scope = list(
+          kind = "analysis_unit_group",
+          analysis_unit_ids = as.integer(analysis_unit_ids),
+          subject_kind = subject_kind,
+          subject_value = topic
+        )
       )
     },
     error = function(e) {
