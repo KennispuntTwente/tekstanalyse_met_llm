@@ -721,7 +721,7 @@ assign_topics <- function(
       stringsAsFactors = FALSE
     )
     normalized_results <- purrr::map(results, function(x) {
-      if (length(x) == 1 && is.na(x)) {
+      if (is.null(x) || (length(x) == 1 && is.na(x))) {
         return(NA_character_)
       }
 
@@ -738,10 +738,8 @@ assign_topics <- function(
     return(results_df)
   }
 
+  results <- purrr::map(results, ~ if (is.null(.x)) NA_character_ else .x)
   results <- unlist(results)
-  if (anyNA(results)) {
-    results <- rep(NA, n)
-  }
 
   data.frame(
     analysis_unit_id = as.integer(analysis_unit_ids),

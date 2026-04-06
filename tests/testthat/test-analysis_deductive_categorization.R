@@ -212,7 +212,8 @@ test_that("categorize_texts supports progress, interruption, and early NA", {
 
   expect_identical(result$analysis_unit_id, c(1L, 2L, 3L))
   expect_equal(result$text, c("text a", "text b", "text c"))
-  expect_true(all(is.na(result$result)))
+  # Row 1 succeeded, row 2 failed (NA), row 3 was never processed (NA)
+  expect_equal(result$result, c("cat1", NA, NA))
   expect_equal(call_count, 2)
   expect_equal(interrupt_count, 2)
   expect_length(progress_events, 2)
@@ -250,4 +251,7 @@ test_that("categorize_texts multi-label: early NA produces NA category columns",
   expect_false(is.na(result$cat1[1]))
   # Second text failed so should be NA
   expect_true(is.na(result$cat1[2]))
+  # Third text was never processed so should be NA, not FALSE
+  expect_true(is.na(result$cat1[3]))
+  expect_true(is.na(result$cat2[3]))
 })

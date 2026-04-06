@@ -192,7 +192,8 @@ test_that("assign_topics supports progress, interruption, and early NA", {
 
   expect_identical(result$analysis_unit_id, c(1L, 2L, 3L))
   expect_equal(result$text, c("text a", "text b", "text c"))
-  expect_true(all(is.na(result$result)))
+  # Row 1 succeeded, row 2 failed (NA), row 3 was never processed (NA)
+  expect_equal(result$result, c("Topic A", NA, NA))
   expect_equal(call_count, 2)
   expect_equal(interrupt_count, 2)
   expect_length(progress_events, 2)
@@ -231,4 +232,7 @@ test_that("assign_topics multi-label: early NA produces NA topic columns", {
   expect_false(is.na(result[["Topic A"]][1]))
   # Second text failed
   expect_true(is.na(result[["Topic A"]][2]))
+  # Third text was never processed so should be NA, not FALSE
+  expect_true(is.na(result[["Topic A"]][3]))
+  expect_true(is.na(result[["Topic B"]][3]))
 })

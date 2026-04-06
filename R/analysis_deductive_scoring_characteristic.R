@@ -165,10 +165,8 @@ score_texts <- function(
     if (is.na(result)) break
   }
 
+  results <- purrr::map(results, ~ if (is.null(.x)) NA else .x)
   results <- unlist(results)
-  if (anyNA(results)) {
-    results <- rep(NA, n)
-  }
 
   data.frame(
     analysis_unit_id = as.integer(analysis_unit_ids),
