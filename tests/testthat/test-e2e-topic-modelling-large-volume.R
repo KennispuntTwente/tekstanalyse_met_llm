@@ -123,40 +123,33 @@ test_that("{shinytest2} large-volume topic modelling launches app and uses async
   expect_true(length(topic_columns) >= 1)
   expect_true(all(rowSums(results[topic_columns]) > 0))
 
-  deadline <- Sys.time() + 15
   new_log_lines <- character()
+  wait_until(
+    function() {
+      all_log_lines <- if (file.exists(log_file)) {
+        readLines(log_file, warn = FALSE)
+      } else {
+        character()
+      }
 
-  repeat {
-    all_log_lines <- if (file.exists(log_file)) {
-      readLines(log_file, warn = FALSE)
-    } else {
-      character()
-    }
+      if (length(all_log_lines) > length(initial_log_lines)) {
+        new_log_lines <<- all_log_lines[
+          seq.int(length(initial_log_lines) + 1, length(all_log_lines))
+        ]
+      } else {
+        new_log_lines <<- character()
+      }
 
-    if (length(all_log_lines) > length(initial_log_lines)) {
-      new_log_lines <- all_log_lines[
-        seq.int(length(initial_log_lines) + 1, length(all_log_lines))
-      ]
-    } else {
-      new_log_lines <- character()
-    }
-
-    if (
       any(grepl("\\[async\\].*Topic generation: n_batches=", new_log_lines)) &&
         any(grepl(
           "\\[async\\].*Topic reduction complete: n_input=",
           new_log_lines
         ))
-    ) {
-      break
-    }
-
-    if (Sys.time() >= deadline) {
-      break
-    }
-
-    Sys.sleep(0.5)
-  }
+    },
+    timeout = 15000,
+    interval = 500,
+    description = "topic-modelling async log markers"
+  )
 
   expect_true(file.exists(log_file))
 

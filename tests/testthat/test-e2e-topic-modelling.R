@@ -12,6 +12,7 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
       kwallm.test_fake_llm = TRUE
     )
   )
+  on.exit(app$stop(), add = TRUE)
 
   # Upload texts
   wait_for_text_upload_input(app)
@@ -32,12 +33,11 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   app$set_inputs(`mode-mode` = "Topic extraction")
 
   # Set deterministic fake models
-  app$wait_for_js(
-    "!!document.getElementById('model-main_model') && !!document.getElementById('model-large_model')",
-    timeout = 30000
+  set_fake_models(
+    app,
+    main = "kwallm-fake-main-1024",
+    large = "kwallm-fake-reducer-320"
   )
-  app$set_inputs(`model-main_model` = "kwallm-fake-main-1024")
-  app$set_inputs(`model-large_model` = "kwallm-fake-reducer-320")
 
   # Set analysis options
   app$set_inputs(`assign_multiple_categories_toggle-toggle` = "Yes")
@@ -52,7 +52,8 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     export = "processing-edit_topics-started",
     timeout = 60000
   )
-  Sys.sleep(3)
+  wait_for_modal(app, timeout = 30000)
+  wait_for_enabled_element(app, "processing-edit_topics-confirm_topics")
   app$click("processing-edit_topics-confirm_topics")
   app$wait_for_value(
     export = "processing-success",
@@ -115,6 +116,4 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     length(paragraphs[[1]]$analysis_unit_ids),
     length(paragraphs[[1]]$texts)
   )
-
-  app$stop()
 })

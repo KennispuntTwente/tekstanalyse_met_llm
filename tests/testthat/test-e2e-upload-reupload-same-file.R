@@ -24,15 +24,18 @@ test_that("{shinytest2} reuploading the same file refreshes upload state", {
     seed = 123,
     options = list(kwallm.test_async = TRUE)
   )
+  on.exit(app$stop(), add = TRUE)
 
   wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
+  wait_for_select_option(app, "text_upload-column", "text")
   app$set_inputs(`text_upload-column` = "text")
   app$wait_for_value(
     export = "text_management-texts__document_text",
     timeout = 10000,
     ignore = c(NULL)
   )
+  wait_for_bound_input(app, "text_upload-by_column")
   app$set_inputs(`text_upload-by_column` = "group")
 
   expect_equal(
@@ -46,19 +49,13 @@ test_that("{shinytest2} reuploading the same file refreshes upload state", {
   wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
 
-  refreshed <- FALSE
-  for (i in seq_len(20)) {
-    Sys.sleep(0.25)
-    current_texts <- sort(app$get_value(
-      export = "text_management-texts__document_text"
-    ))
-    if (identical(current_texts, sort(second_data$text))) {
-      refreshed <- TRUE
-      break
-    }
-  }
-
-  expect_true(refreshed)
+  wait_for_export(
+    app,
+    export = "text_management-texts__document_text",
+    predicate = function(x) identical(sort(x), sort(second_data$text)),
+    timeout = 5000,
+    description = "refreshed uploaded texts"
+  )
   expect_equal(
     sort(app$get_value(export = "text_management-texts__document_text")),
     sort(second_data$text)
@@ -71,6 +68,4 @@ test_that("{shinytest2} reuploading the same file refreshes upload state", {
   expect_true(app$get_js("!!document.getElementById('text_upload-by_column')"))
   expect_equal(app$get_value(input = "text_upload-column"), "text")
   expect_equal(app$get_value(input = "text_upload-by_column"), "group")
-
-  app$stop()
 })

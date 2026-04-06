@@ -7,8 +7,12 @@ test_that("{shinytest2} recording: standard process - marking", {
     width = 2400,
     load_timeout = 30000,
     seed = 123,
-    options = list(kwallm.test_async = TRUE)
+    options = list(
+      kwallm.test_async = TRUE,
+      kwallm.test_fake_llm = TRUE
+    )
   )
+  on.exit(app$stop(), add = TRUE)
 
   # Upload texts
   wait_for_text_upload_input(app)
@@ -28,28 +32,27 @@ test_that("{shinytest2} recording: standard process - marking", {
   # Set mode
   app$set_inputs(`mode-mode` = "Mark")
 
-  # Set model
-  app$set_inputs(
-    `llm_provider-select_openai` = 0.123,
-    allow_no_input_binding_ = TRUE
-  )
-  Sys.sleep(3)
-  app$click("llm_provider-get_models")
-  app$wait_for_value(
-    export = "llm_provider-available_models_openai",
-  )
-  models <- app$get_value(export = "llm_provider-available_models_openai")
-  expect_true("gpt-4.1-nano-2025-04-14" %in% models)
-  app$set_inputs(`model-main_model` = "gpt-4.1-nano-2025-04-14")
+  set_fake_models(app)
 
-  # Generate codes & save them
+  # Generate codes so the workflow exercises code generation as well.
+  wait_for_enabled_element(app, "marking_codes-generateCodes")
+  app$click("marking_codes-generateCodes")
+  generated_codes <- wait_for_nonempty_export(
+    app,
+    export = "marking_codes-generated_codes",
+    timeout = 30000
+  )
+  expect_true(length(generated_codes) > 0)
+  wait_for_export(
+    app,
+    export = "marking_codes-txt_in_fields",
+    predicate = function(x) is.character(x) && any(nzchar(x)),
+    timeout = 30000,
+    description = "generated marking code fields"
+  )
+
+  # Force one known matching code so result assertions stay meaningful.
   app$set_inputs(`marking_codes-fields-field1` = "Product feedback")
-  # app$click("marking_codes-generateCodes")
-  # app$wait_for_value(
-  #   export = "marking_codes-generated_codes",
-  #   timeout = 15000
-  # )
-  Sys.sleep(3)
   app$click("marking_codes-fields-toggleEdit")
   app$wait_for_value(
     export = "marking_codes-fields-isEditing",
@@ -58,19 +61,11 @@ test_that("{shinytest2} recording: standard process - marking", {
   )
 
   # Start processing
+  wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
   app$wait_for_value(
     export = "processing-success",
     timeout = 30000
-  )
-
-  # Confirm results
-  app$expect_values(
-    export = c(
-      # Processing was successful
-      "processing-processing",
-      "processing-success"
-    )
   )
 
   # Read results
@@ -98,11 +93,10 @@ test_that("{shinytest2} recording: standard process - marking", {
     is.na(results$marked_text) |
       mapply(grepl, pattern = results$marked_text, x = results$chunk_text)
   ))
+  expect_true(!all(is.na(results$marked_text)))
 
   # Expect that all unique values in results$code are present in
   #   txt_in_fields of marking_codes
   codes <- c(app$get_value(export = "marking_codes-txt_in_fields"), NA)
   expect_true(all(unique(results$code) %in% codes))
-
-  app$stop()
 })

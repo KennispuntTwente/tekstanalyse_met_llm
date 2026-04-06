@@ -12,10 +12,11 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
       kwallm.test_fake_llm = TRUE
     )
   )
+  on.exit(app$stop(), add = TRUE)
 
   # Switch to horizontal/sections mode
   app$set_inputs(kwallm_layout_view = "sections")
-  Sys.sleep(1)
+  wait_for_radio_value(app, "kwallm_sections_step", "1")
 
   # ---- Section 1: Texts ----
   # Verify we start on section 1
@@ -33,7 +34,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
 
   # Navigate to section 2 using next button
   app$click("kwallm_sections_next")
-  Sys.sleep(0.5)
+  wait_for_radio_value(app, "kwallm_sections_step", "2")
 
   # ---- Section 2: Research & Mode ----
   expect_equal(app$get_value(input = "kwallm_sections_step"), "2")
@@ -48,7 +49,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
 
   # Navigate to section 3 using step button directly
   app$set_inputs(kwallm_sections_step = "3")
-  Sys.sleep(0.5)
+  wait_for_radio_value(app, "kwallm_sections_step", "3")
 
   # ---- Section 3: Analysis ----
   expect_equal(app$get_value(input = "kwallm_sections_step"), "3")
@@ -58,27 +59,26 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
 
   # Navigate to section 4 using next button
   app$click("kwallm_sections_next")
-  Sys.sleep(0.5)
+  wait_for_radio_value(app, "kwallm_sections_step", "4")
 
   # ---- Section 4: LLM & Context ----
   expect_equal(app$get_value(input = "kwallm_sections_step"), "4")
 
   # Set deterministic fake models
-  app$wait_for_js(
-    "!!document.getElementById('model-main_model') && !!document.getElementById('model-large_model')",
-    timeout = 30000
+  set_fake_models(
+    app,
+    main = "kwallm-fake-main-1024",
+    large = "kwallm-fake-reducer-320"
   )
-  app$set_inputs(`model-main_model` = "kwallm-fake-main-1024")
-  app$set_inputs(`model-large_model` = "kwallm-fake-reducer-320")
 
   # Test back navigation - go back to section 3 and then forward again
   app$click("kwallm_sections_prev")
-  Sys.sleep(0.5)
+  wait_for_radio_value(app, "kwallm_sections_step", "3")
   expect_equal(app$get_value(input = "kwallm_sections_step"), "3")
 
   # Navigate directly to section 5 using step button
   app$set_inputs(kwallm_sections_step = "5")
-  Sys.sleep(0.5)
+  wait_for_radio_value(app, "kwallm_sections_step", "5")
 
   # ---- Section 5: Run ----
   expect_equal(app$get_value(input = "kwallm_sections_step"), "5")
@@ -95,7 +95,8 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
     export = "processing-edit_topics-started",
     timeout = 60000
   )
-  Sys.sleep(3)
+  wait_for_modal(app, timeout = 30000)
+  wait_for_enabled_element(app, "processing-edit_topics-confirm_topics")
   app$click("processing-edit_topics-confirm_topics")
   app$wait_for_value(
     export = "processing-success",
@@ -143,6 +144,4 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
     length(paragraphs[[1]]$analysis_unit_ids),
     length(paragraphs[[1]]$texts)
   )
-
-  app$stop()
 })

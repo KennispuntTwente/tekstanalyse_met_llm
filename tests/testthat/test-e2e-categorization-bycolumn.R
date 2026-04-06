@@ -35,30 +35,36 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
     width = 2400,
     load_timeout = 30000,
     seed = 123,
-    options = list(kwallm.test_async = TRUE)
+    options = list(
+      kwallm.test_async = TRUE,
+      kwallm.test_fake_llm = TRUE
+    )
   )
+  on.exit(app$stop(), add = TRUE)
+  on.exit(unlink(temp_csv), add = TRUE)
 
   # Upload CSV file
   wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
-  Sys.sleep(2)
 
   # Select text column and wait for texts to be loaded
+  wait_for_select_option(app, "text_upload-column", "text")
   app$set_inputs(`text_upload-column` = "text")
 
   # Wait for texts to be populated after column selection
-  app$wait_for_value(
+  wait_for_export(
+    app,
     export = "text_management-texts__document_text",
+    predicate = function(x) identical(length(x), 8L),
     timeout = 10000,
-    ignore = c(NULL)
+    description = "loaded CSV texts"
   )
 
   # Wait for the by_column selector UI to render
-  Sys.sleep(1)
+  wait_for_bound_input(app, "text_upload-by_column")
 
   # Select by_column (grouping variable)
   app$set_inputs(`text_upload-by_column` = "group")
-  Sys.sleep(1)
 
   # Enter background
   app$set_inputs(
@@ -68,7 +74,6 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
   # Set categories (mode defaults to Categorization)
   app$set_inputs(`categories-fields-field1` = "Positive")
   app$set_inputs(`categories-fields-field2` = "Negative")
-  Sys.sleep(1)
   app$click("categories-fields-toggleEdit")
   app$wait_for_value(
     export = "categories-fields-isEditing",
@@ -76,25 +81,14 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
     ignore = c(NULL, TRUE)
   )
 
-  # Set model
-  app$set_inputs(
-    `llm_provider-select_openai` = 0.123,
-    allow_no_input_binding_ = TRUE
-  )
-  Sys.sleep(3)
-  app$click("llm_provider-get_models")
-  app$wait_for_value(
-    export = "llm_provider-available_models_openai",
-  )
-  models <- app$get_value(export = "llm_provider-available_models_openai")
-  expect_true("gpt-4.1-nano-2025-04-14" %in% models)
-  app$set_inputs(`model-main_model` = "gpt-4.1-nano-2025-04-14")
+  set_fake_models(app)
 
   # Set analysis options (no paragraphs/IRR for faster test)
   app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
   app$set_inputs(`interrater_toggle-toggle` = "No")
 
   # Start processing
+  wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
 
   # Wait for processing to start
@@ -109,14 +103,6 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
     timeout = 60000 # Longer timeout for by_column processing
   )
 
-  # Confirm results
-  app$expect_values(
-    export = c(
-      "processing-processing",
-      "processing-success"
-    )
-  )
-
   # Read results
   results <- app$get_value(export = "processing-results_table")
 
@@ -129,10 +115,12 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
   # Expect that category columns are logical
   expect_true(all(sapply(results[c("Positive", "Negative")], is.logical)))
 
-  # Expect that all texts are categorized in at least one category
-  expect_true(all(rowSums(results[c("Positive", "Negative")]) > 0))
-
-  # Clean up
-  unlink(temp_csv)
-  app$stop()
+  results_by_text <- results[
+    match(test_data$text, results$text),
+    ,
+    drop = FALSE
+  ]
+  expect_identical(results_by_text$Positive, test_data$group == "Positive")
+  expect_identical(results_by_text$Negative, test_data$group == "Negative")
+  expect_true(all(rowSums(results[c("Positive", "Negative")]) == 1))
 })

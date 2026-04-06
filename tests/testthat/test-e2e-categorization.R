@@ -7,8 +7,12 @@ test_that("{shinytest2} recording: standard process - categorization", {
     width = 2400,
     load_timeout = 30000,
     seed = 123,
-    options = list(kwallm.test_async = TRUE)
+    options = list(
+      kwallm.test_async = TRUE,
+      kwallm.test_fake_llm = TRUE
+    )
   )
+  on.exit(app$stop(), add = TRUE)
 
   # Upload texts
   wait_for_text_upload_input(app)
@@ -22,52 +26,26 @@ test_that("{shinytest2} recording: standard process - categorization", {
 
   # Enter categories
   app$set_inputs(`research_background-research_background` = "no clue!")
-  app$set_inputs(`categories-fields-field1` = "a")
-  app$set_inputs(`categories-fields-field2` = "b")
+  app$set_inputs(`categories-fields-field1` = "Positive")
+  app$set_inputs(`categories-fields-field2` = "Negative")
   app$click("categories-fields-toggleEdit")
-
-  # Set model
-  app$set_inputs(
-    `llm_provider-select_openai` = 0.123,
-    allow_no_input_binding_ = TRUE
-  )
-  Sys.sleep(3)
-  app$click("llm_provider-get_models")
   app$wait_for_value(
-    export = "llm_provider-available_models_openai",
+    export = "categories-fields-isEditing",
+    timeout = 5000,
+    ignore = c(NULL, TRUE)
   )
-  models <- app$get_value(export = "llm_provider-available_models_openai")
-  expect_true("gpt-4.1-nano-2025-04-14" %in% models)
-  app$set_inputs(`model-main_model` = "gpt-4.1-nano-2025-04-14")
+
+  set_fake_models(app)
 
   # Set writing paragraphs toggle
   app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
 
   # Start processing
+  wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
   app$wait_for_value(
     export = "processing-success",
     timeout = 30000
-  )
-
-  # Confirm results
-  app$expect_values(
-    export = c(
-      # Text upload & processing works
-      "text_management-anonymization_mode",
-      "text_management-texts__document_text",
-      "text_management-texts__preprocessed",
-      "text_management-texts__df",
-
-      # Categories works
-      "categories-fields-n_fields",
-      "categories-fields-txt_in_fields",
-      "categories-fields-isEditing",
-
-      # Processing was successful
-      "processing-processing",
-      "processing-success"
-    )
   )
 
   # Read results
@@ -83,13 +61,21 @@ test_that("{shinytest2} recording: standard process - categorization", {
     table(results$text),
     check.attributes = FALSE
   ))
+  expect_false(any(grepl(
+    "kennispunttwente.nl",
+    app$get_value(export = "text_management-texts__preprocessed"),
+    fixed = TRUE
+  )))
 
   # Expect that all categories are present as columns in results
-  expect_true(all(c("a", "b") %in% colnames(results)))
+  expect_true(all(c("Positive", "Negative") %in% colnames(results)))
   # Expect that all category columns are logical
-  expect_true(all(sapply(results[c("a", "b")], is.logical)))
-  # Expect that all texts are categorized in at least one category
-  expect_true(all(rowSums(results[c("a", "b")]) > 0))
+  expect_true(all(sapply(results[c("Positive", "Negative")], is.logical)))
 
-  app$stop()
+  results_by_text <- results[match(texts, results$text), , drop = FALSE]
+  expect_identical(
+    results_by_text$Negative,
+    c(FALSE, TRUE, FALSE, FALSE, FALSE)
+  )
+  expect_true(all(rowSums(results[c("Positive", "Negative")]) > 0))
 })
