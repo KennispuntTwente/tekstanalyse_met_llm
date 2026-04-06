@@ -112,6 +112,41 @@ processing_split_ready <- function(
 }
 
 
+#' Normalize stored reduced topics while preserving reduction metadata
+#'
+#' Topic extraction stores the reduced topic list separately from the final
+#' editable topic vector. The reduced-topic copy must keep the
+#' `reduction_summary` attribute because downstream result assembly uses it to
+#' determine which topic-reduction stages were executed.
+#'
+#' @param reduced_topics Reduced topic vector returned by `reduce_topics()`.
+#'
+#' @return A normalized character vector with the original `reduction_summary`
+#'   attribute preserved when present.
+processing_normalize_reduced_topics <- function(reduced_topics) {
+  if (is.null(reduced_topics)) {
+    return(character())
+  }
+
+  reduction_summary <- attr(
+    reduced_topics,
+    "reduction_summary",
+    exact = TRUE
+  )
+
+  normalized_topics <- as.character(reduced_topics)
+  normalized_topics <- normalized_topics[!is.na(normalized_topics)]
+  normalized_topics <- trimws(normalized_topics)
+  normalized_topics <- unique(normalized_topics[nzchar(normalized_topics)])
+
+  if (!is.null(reduction_summary)) {
+    attr(normalized_topics, "reduction_summary") <- reduction_summary
+  }
+
+  normalized_topics
+}
+
+
 # 2 Report and paragraph helpers -----------------------------------------------
 
 #' Collect texts per label from processing results

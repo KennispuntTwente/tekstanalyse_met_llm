@@ -59,6 +59,10 @@ create_text_batches <- function(
   original_texts <- as.character(texts)
   draw_orders <- lapply(seq_len(draws), function(draw_index) {
     force(draw_index)
+    if (draw_index == 1L) {
+      return(seq_along(original_texts))
+    }
+
     sample(seq_along(original_texts))
   })
 

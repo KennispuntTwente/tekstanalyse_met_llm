@@ -164,6 +164,25 @@ test_that("processing_split_ready blocks launches while splitting is active", {
 })
 
 
+test_that("processing_normalize_reduced_topics preserves reduction_summary", {
+  reduced_topics <- c(" Topic A ", "", "Topic B", "Topic A")
+  attr(reduced_topics, "reduction_summary") <- list(
+    not_applicable_requested = TRUE,
+    auto_added_not_applicable = FALSE,
+    not_applicable_check_performed = TRUE,
+    reduction_iterations = 2L
+  )
+
+  normalized_topics <- processing_normalize_reduced_topics(reduced_topics)
+
+  expect_identical(as.character(normalized_topics), c("Topic A", "Topic B"))
+  expect_identical(
+    attr(normalized_topics, "reduction_summary", exact = TRUE),
+    attr(reduced_topics, "reduction_summary", exact = TRUE)
+  )
+})
+
+
 test_that("join_processing_results restores document texts without paragraph side channel", {
   texts_df <- data.frame(
     analysis_unit_id = c(1L, 2L),

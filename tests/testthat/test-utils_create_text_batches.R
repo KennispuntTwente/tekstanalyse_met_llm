@@ -56,6 +56,30 @@ test_that("create_text_batches: respects batch_size and allowed token budget", {
 })
 
 
+test_that("create_text_batches: first draw preserves input order", {
+  set.seed(42)
+
+  texts <- c("alpha", "beta", "gamma")
+
+  batches <- create_text_batches(
+    texts = texts,
+    batch_size = 10,
+    draws = 1,
+    n_tokens_context_window = 100,
+    base_prompt_text = ""
+  )
+
+  flat <- unlist(batches, use.names = FALSE)
+  source_indexes <- unlist(lapply(
+    batches,
+    function(batch) attr(batch, "source_indexes", exact = TRUE)
+  ))
+
+  expect_identical(flat, texts)
+  expect_identical(as.integer(source_indexes), seq_along(texts))
+})
+
+
 test_that("create_text_batches: accounts for formatter overhead in token budget", {
   set.seed(99)
 

@@ -654,9 +654,12 @@ processing_server <- function(
           promise = promise,
           setter = function(value) {
             normalized_topics <- normalize_topic_labels(value$topics)
+            normalized_reduced_topics <- processing_normalize_reduced_topics(
+              value$topics
+            )
             append_stage_execution_rows(value$stage_execution_rows)
             candidate_topics_generated(value$candidate_topics)
-            reduced_topics_generated(normalized_topics)
+            reduced_topics_generated(normalized_reduced_topics)
             topics_were_edited(FALSE)
             topics(normalized_topics)
           },
@@ -744,7 +747,10 @@ processing_server <- function(
           edited_topics(),
           {
             topics_were_edited(
-              !identical(edited_topics(), reduced_topics_generated())
+              !identical(
+                normalize_topic_labels(edited_topics()),
+                normalize_topic_labels(reduced_topics_generated())
+              )
             )
             topics(edited_topics())
             topics_definitive(TRUE)
