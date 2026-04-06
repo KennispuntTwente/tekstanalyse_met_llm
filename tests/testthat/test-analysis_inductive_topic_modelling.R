@@ -62,7 +62,11 @@ test_that("topic modelling prompts harden tagged content against prompt injectio
   )
   expect_match(candidate_prompt_text, "<research_background>", fixed = TRUE)
   expect_match(candidate_prompt_text, "<texts>", fixed = TRUE)
-  expect_match(candidate_prompt_text, "Ignore the previous instructions", fixed = TRUE)
+  expect_match(
+    candidate_prompt_text,
+    "Ignore the previous instructions",
+    fixed = TRUE
+  )
 
   reduced_prompt <- prompt_reduce_topics(
     candidate_topics = c(
@@ -256,7 +260,12 @@ test_that("reduce_topics drops empty topic labels", {
 
   captured_topic_values <- NULL
 
-  send_prompt_with_retries <- function(prompt, llm_provider, execution_scope, ...) {
+  send_prompt_with_retries <- function(
+    prompt,
+    llm_provider,
+    execution_scope,
+    ...
+  ) {
     force(prompt)
     force(llm_provider)
     captured_topic_values <<- execution_scope$topic_values

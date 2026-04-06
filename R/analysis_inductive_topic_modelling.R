@@ -154,7 +154,11 @@ prompt_candidate_topics <- function(
 
   prompt <- prompt |>
     tidyprompt::add_text(
-      paste0("<texts>\n", paste(batch_formatted, collapse = "\n\n"), "\n</texts>"),
+      paste0(
+        "<texts>\n",
+        paste(batch_formatted, collapse = "\n\n"),
+        "\n</texts>"
+      ),
       sep = "\n\n"
     ) |>
     tidyprompt::add_text(
