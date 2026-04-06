@@ -210,15 +210,13 @@ test_that("categorize_texts supports progress, interruption, and early NA", {
     interrupter = interrupter
   )
 
-  expect_identical(result$analysis_unit_id, c(1L, 2L, 3L))
-  expect_equal(result$text, c("text a", "text b", "text c"))
-  # Row 1 succeeded, row 2 failed (NA), row 3 was never processed (NA)
-  expect_equal(result$result, c("cat1", NA, NA))
+  expect_identical(result$analysis_unit_id, 1L)
+  expect_equal(result$text, "text a")
+  expect_equal(result$result, "cat1")
   expect_equal(call_count, 2)
   expect_equal(interrupt_count, 2)
-  expect_length(progress_events, 2)
+  expect_length(progress_events, 1)
   expect_equal(progress_events[[1]], list(i = 1, n = 3, text = "text a"))
-  expect_equal(progress_events[[2]], list(i = 2, n = 3, text = "text b"))
 })
 
 test_that("categorize_texts multi-label: early NA produces NA category columns", {
@@ -254,4 +252,60 @@ test_that("categorize_texts multi-label: early NA produces NA category columns",
   # Third text was never processed so should be NA, not FALSE
   expect_true(is.na(result$cat1[3]))
   expect_true(is.na(result$cat2[3]))
+})
+
+test_that("categorize_texts can return a decision payload and resume after skip", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  call_count <- 0
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
+    force(prompt)
+    force(llm_provider)
+
+    call_count <<- call_count + 1
+    if (call_count == 1) {
+      return("cat1")
+    }
+    if (call_count == 2) {
+      return(NA_character_)
+    }
+
+    "cat2"
+  }
+
+  decision <- categorize_texts(
+    texts = c("text a", "text b", "text c"),
+    analysis_unit_ids = c(1L, 2L, 3L),
+    categories = c("cat1", "cat2"),
+    llm_provider = create_test_provider(),
+    failure_action = "return_decision"
+  )
+
+  expect_identical(decision$status, "decision_required")
+  expect_identical(decision$failed_index, 2L)
+  expect_identical(decision$failed_analysis_unit_id, 2L)
+  expect_identical(decision$results$result, "cat1")
+  expect_identical(decision$results$response_status, "completed")
+  expect_identical(decision$skip_row$response_status, "skipped")
+  expect_true(is.na(decision$skip_row$result))
+
+  decision$skip_row$response_status <- "skipped_after_user_confirmation"
+
+  resumed <- categorize_texts(
+    texts = c("text a", "text b", "text c"),
+    analysis_unit_ids = c(1L, 2L, 3L),
+    categories = c("cat1", "cat2"),
+    llm_provider = create_test_provider(),
+    existing_results = rbind(decision$results, decision$skip_row),
+    start_index = decision$failed_index + 1L,
+    failure_action = "return_decision"
+  )
+
+  expect_identical(resumed$status, "completed")
+  expect_identical(resumed$results$result, c("cat1", NA, "cat2"))
+  expect_identical(
+    resumed$results$response_status,
+    c("completed", "skipped_after_user_confirmation", "completed")
+  )
 })

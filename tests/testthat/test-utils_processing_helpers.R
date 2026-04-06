@@ -250,3 +250,42 @@ test_that("processing_results_have_invalid_na is mode-aware", {
     processing_results_have_invalid_na(valid_marking_results, "Markeren")
   )
 })
+
+
+test_that("analysis_unit_failure_next_action resolves ask, skip, and limit fallback", {
+  expect_identical(
+    analysis_unit_failure_next_action(action = "ask", skip_count = 0L),
+    "ask"
+  )
+  expect_identical(
+    analysis_unit_failure_next_action(action = "skip", skip_count = 0L),
+    "skip"
+  )
+  expect_identical(
+    analysis_unit_failure_next_action(
+      action = "skip",
+      skip_count = 0L,
+      max_auto_skips = 1L,
+      on_max_auto_skips = "ask"
+    ),
+    "skip"
+  )
+  expect_identical(
+    analysis_unit_failure_next_action(
+      action = "skip",
+      skip_count = 1L,
+      max_auto_skips = 1L,
+      on_max_auto_skips = "ask"
+    ),
+    "ask"
+  )
+  expect_identical(
+    analysis_unit_failure_next_action(
+      action = "skip",
+      skip_count = 1L,
+      max_auto_skips = 1L,
+      on_max_auto_skips = "fail"
+    ),
+    "fail"
+  )
+})

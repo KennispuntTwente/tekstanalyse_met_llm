@@ -119,6 +119,8 @@ processing_server <- function(
 
       # Timestamp for end-to-end duration (click -> download-ready)
       analysis_started_at <- reactiveVal(NULL)
+      pending_prompt_scope_decision <- reactiveVal(NULL)
+      prompt_scope_skip_counts <- reactiveVal(list())
 
       current_analysis_unit_ids <- function() {
         # These ids line up with texts$preprocessed: one id per unique analysis
@@ -167,6 +169,385 @@ processing_server <- function(
         )
       }
 
+      prompt_scope_failure_settings <- function(scope_kind = "analysis_unit") {
+        scope_kind <- as.character(scope_kind %||% "analysis_unit")[[1]]
+        scope_option_prefix <- paste0(
+          "prompt_scope_failure__",
+          gsub("[^A-Za-z0-9]+", "_", scope_kind),
+          "__"
+        )
+
+        get_scope_option <- function(name, default = NULL, legacy_name = NULL) {
+          value <- getOption(paste0(scope_option_prefix, name), NULL)
+          if (
+            is.null(value) &&
+              identical(scope_kind, "analysis_unit") &&
+              !is.null(legacy_name)
+          ) {
+            value <- getOption(legacy_name, NULL)
+          }
+          if (is.null(value)) {
+            value <- getOption(
+              paste0("prompt_scope_failure__default_", name),
+              default
+            )
+          }
+
+          value
+        }
+
+        action <- get_scope_option(
+          name = "action",
+          default = "fail",
+          legacy_name = "analysis_unit_failure__action"
+        )
+        action <- as.character(action %||% "fail")[[1]]
+        if (!action %in% c("ask", "skip", "fail")) {
+          action <- "fail"
+        }
+
+        max_auto_skips <- get_scope_option(
+          name = "max_auto_skips",
+          default = NULL,
+          legacy_name = "analysis_unit_failure__max_auto_skips"
+        )
+        if (
+          is.null(max_auto_skips) ||
+            !length(max_auto_skips) ||
+            is.na(max_auto_skips[[1]])
+        ) {
+          max_auto_skips <- NULL
+        } else {
+          max_auto_skips <- max(0L, as.integer(max_auto_skips[[1]]))
+        }
+
+        on_max_auto_skips <- get_scope_option(
+          name = "on_max_auto_skips",
+          default = "fail",
+          legacy_name = "analysis_unit_failure__on_max_auto_skips"
+        )
+        on_max_auto_skips <- as.character(on_max_auto_skips %||% "fail")[[1]]
+        if (!on_max_auto_skips %in% c("ask", "fail")) {
+          on_max_auto_skips <- "fail"
+        }
+
+        list(
+          scope_kind = scope_kind,
+          action = action,
+          max_auto_skips = max_auto_skips,
+          on_max_auto_skips = on_max_auto_skips
+        )
+      }
+
+      get_prompt_scope_skip_count <- function(scope_kind) {
+        counts <- prompt_scope_skip_counts()
+        if (!is.list(counts)) {
+          return(0L)
+        }
+
+        value <- counts[[scope_kind]] %||% 0L
+        value <- as.integer(value)[1]
+        if (is.na(value) || value < 0L) {
+          return(0L)
+        }
+
+        value
+      }
+
+      increment_prompt_scope_skip_count <- function(scope_kind) {
+        counts <- prompt_scope_skip_counts()
+        if (!is.list(counts)) {
+          counts <- list()
+        }
+
+        counts[[scope_kind]] <- get_prompt_scope_skip_count(scope_kind) + 1L
+        prompt_scope_skip_counts(counts)
+        invisible(counts[[scope_kind]])
+      }
+
+      prompt_scope_failure_preview <- function(text, max_chars = 280L) {
+        text <- as.character(text %||% "")[[1]]
+        text <- trimws(text)
+
+        if (!nzchar(text)) {
+          return(lang()$t("[geen tekst beschikbaar]"))
+        }
+
+        if (nchar(text) <= max_chars) {
+          return(text)
+        }
+
+        paste0(substr(text, 1, max_chars), "...")
+      }
+
+      prompt_scope_subject_label <- function(subject_kind) {
+        label <- switch(
+          as.character(subject_kind %||% "")[[1]],
+          category = lang()$t("Categorie"),
+          topic = lang()$t("Onderwerp"),
+          code = lang()$t("Code"),
+          as.character(subject_kind %||% lang()$t("Prompt"))[[1]]
+        )
+
+        tolower(label)
+      }
+
+      prompt_scope_failure_label <- function(state) {
+        scope_kind <- as.character(state$scope_kind %||% "analysis_unit")[[1]]
+
+        if (identical(scope_kind, "analysis_unit")) {
+          total_units <- state$total_scopes %||%
+            length(texts$preprocessed %||% character(0))
+          return(sprintf(
+            lang()$t("analyse-eenheid %d van %d"),
+            state$failed_index %||% NA_integer_,
+            total_units
+          ))
+        }
+
+        if (identical(scope_kind, "analysis_unit_group")) {
+          return(sprintf(
+            "%s '%s'",
+            prompt_scope_subject_label(state$subject_kind),
+            as.character(state$subject_value %||% "?")[[1]]
+          ))
+        }
+
+        if (identical(scope_kind, "chunk_code")) {
+          return(sprintf(
+            lang()$t("chunk %d voor code '%s'"),
+            as.integer(
+              state$failed_chunk_index %||% state$failed_index %||% NA_integer_
+            ),
+            as.character(state$subject_value %||% "?")[[1]]
+          ))
+        }
+
+        as.character(scope_kind %||% lang()$t("Prompt"))[[1]]
+      }
+
+      show_prompt_scope_failure_modal <- function(state) {
+        settings <- prompt_scope_failure_settings(state$scope_kind)
+        limit_notice <- NULL
+        if (
+          identical(settings$action, "skip") &&
+            !is.null(settings$max_auto_skips) &&
+            isTRUE(state$skip_count >= settings$max_auto_skips)
+        ) {
+          limit_notice <- if (identical(settings$on_max_auto_skips, "ask")) {
+            lang()$t(
+              "De limiet voor automatisch overslaan is bereikt. Kies hieronder of je deze prompt opnieuw wilt proberen of alsnog handmatig wilt overslaan."
+            )
+          } else {
+            lang()$t(
+              "De limiet voor automatisch overslaan is bereikt. Nieuwe fouten stoppen de analyse volledig."
+            )
+          }
+        }
+
+        showModal(modalDialog(
+          title = lang()$t("Prompt mislukt"),
+          easyClose = FALSE,
+          tags$div(
+            style = "display:none;",
+            `data-kwallm-modal-id` = "prompt_scope_failure_modal",
+            `data-kwallm-modal-details` = sprintf(
+              "mode=%s scope_kind=%s failed_index=%d analysis_unit_id=%d chunk_id=%d",
+              state$mode_label %||% "unknown",
+              state$scope_kind %||% "unknown",
+              state$failed_index %||% NA_integer_,
+              state$failed_analysis_unit_id %||% NA_integer_,
+              state$failed_chunk_id %||% NA_integer_
+            )
+          ),
+          tags$p(sprintf(
+            lang()$t(
+              "De prompt voor %s kon niet worden verwerkt nadat de standaard retries zijn uitgeput."
+            ),
+            prompt_scope_failure_label(state)
+          )),
+          if (!is.null(limit_notice)) {
+            div(class = "alert alert-warning", limit_notice)
+          },
+          tags$p(lang()$t("Foutmelding:")),
+          tags$pre(
+            style = "white-space: pre-wrap; word-break: break-word;",
+            state$failure_message %||% lang()$t("Onbekende fout.")
+          ),
+          tags$p(lang()$t("Tekstvoorbeeld:")),
+          tags$div(
+            class = "border rounded p-2 bg-light",
+            style = "white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto;",
+            prompt_scope_failure_preview(state$failed_text)
+          ),
+          footer = modal_footer_buttons(
+            left = actionButton(
+              ns("skip_failed_prompt_scope"),
+              lang()$t("Sla prompt over"),
+              class = "btn btn-secondary"
+            ),
+            right = actionButton(
+              ns("retry_failed_prompt_scope"),
+              lang()$t("Probeer opnieuw"),
+              class = "btn btn-primary"
+            )
+          )
+        ))
+      }
+
+      handle_prompt_scope_failure <- function(
+        decision,
+        mode_label,
+        on_retry,
+        on_skip
+      ) {
+        scope_kind <- as.character(decision$scope_kind %||% "analysis_unit")[[
+          1
+        ]]
+        settings <- prompt_scope_failure_settings(scope_kind)
+        skip_count <- get_prompt_scope_skip_count(scope_kind)
+        next_action <- prompt_scope_failure_next_action(
+          action = settings$action,
+          skip_count = skip_count,
+          max_auto_skips = settings$max_auto_skips,
+          on_max_auto_skips = settings$on_max_auto_skips
+        )
+
+        if (identical(next_action, "fail")) {
+          app_error(
+            paste0(
+              "Maximum number of automatic prompt-scope skips reached for ",
+              scope_kind,
+              " (",
+              settings$max_auto_skips,
+              ")"
+            ),
+            when = "prompt-scope failure handling",
+            fatal = TRUE,
+            lang = lang()
+          )
+          return(invisible(NULL))
+        }
+
+        if (identical(next_action, "skip")) {
+          skip_total <- increment_prompt_scope_skip_count(scope_kind)
+          log_action(
+            "prompt_scope_auto_skipped",
+            details = sprintf(
+              paste0(
+                "mode=%s scope_kind=%s failed_index=%d analysis_unit_id=%d ",
+                "chunk_id=%d subject_value=%s skip_count=%d"
+              ),
+              mode_label %||% "unknown",
+              scope_kind,
+              decision$failed_index %||% NA_integer_,
+              decision$failed_analysis_unit_id %||% NA_integer_,
+              decision$failed_chunk_id %||% NA_integer_,
+              decision$subject_value %||% NA_character_,
+              skip_total
+            )
+          )
+          on_skip("skipped_automatically")
+          return(invisible(NULL))
+        }
+
+        pending_prompt_scope_decision(list(
+          mode_label = mode_label,
+          scope_kind = scope_kind,
+          failed_index = as.integer(decision$failed_index),
+          total_scopes = as.integer(
+            decision$total_scopes %||%
+              length(texts$preprocessed %||% character(0))
+          ),
+          failed_analysis_unit_id = as.integer(
+            decision$failed_analysis_unit_id
+          ),
+          failed_chunk_id = as.integer(
+            decision$failed_chunk_id %||% NA_integer_
+          ),
+          failed_chunk_index = as.integer(
+            decision$failed_chunk_index %||% NA_integer_
+          ),
+          subject_kind = as.character(decision$subject_kind %||% "")[[1]],
+          subject_value = as.character(decision$subject_value %||% "")[[1]],
+          failed_text = as.character(decision$failed_text %||% ""),
+          failure_message = as.character(decision$failure_message %||% ""),
+          skip_count = as.integer(skip_count),
+          resume = function(action) {
+            if (identical(action, "retry")) {
+              log_action(
+                "prompt_scope_retry_requested",
+                details = sprintf(
+                  paste0(
+                    "mode=%s scope_kind=%s failed_index=%d analysis_unit_id=%d ",
+                    "chunk_id=%d subject_value=%s"
+                  ),
+                  mode_label %||% "unknown",
+                  scope_kind,
+                  decision$failed_index %||% NA_integer_,
+                  decision$failed_analysis_unit_id %||% NA_integer_,
+                  decision$failed_chunk_id %||% NA_integer_,
+                  decision$subject_value %||% NA_character_
+                )
+              )
+              on_retry()
+              return(invisible(NULL))
+            }
+
+            skip_total <- increment_prompt_scope_skip_count(scope_kind)
+            log_action(
+              "prompt_scope_skip_requested",
+              details = sprintf(
+                paste0(
+                  "mode=%s scope_kind=%s failed_index=%d analysis_unit_id=%d ",
+                  "chunk_id=%d subject_value=%s skip_count=%d"
+                ),
+                mode_label %||% "unknown",
+                scope_kind,
+                decision$failed_index %||% NA_integer_,
+                decision$failed_analysis_unit_id %||% NA_integer_,
+                decision$failed_chunk_id %||% NA_integer_,
+                decision$subject_value %||% NA_character_,
+                skip_total
+              )
+            )
+            on_skip("skipped_after_user_confirmation")
+            invisible(NULL)
+          }
+        ))
+
+        show_prompt_scope_failure_modal(pending_prompt_scope_decision())
+        invisible(NULL)
+      }
+
+      resolve_prompt_scope_decision <- function(action) {
+        state <- pending_prompt_scope_decision()
+        if (is.null(state) || !is.function(state$resume)) {
+          return(invisible(NULL))
+        }
+
+        pending_prompt_scope_decision(NULL)
+        removeModal()
+        state$resume(action)
+        invisible(NULL)
+      }
+
+      observeEvent(
+        input$retry_failed_prompt_scope,
+        {
+          resolve_prompt_scope_decision("retry")
+        },
+        ignoreInit = TRUE
+      )
+
+      observeEvent(
+        input$skip_failed_prompt_scope,
+        {
+          resolve_prompt_scope_decision("skip")
+        },
+        ignoreInit = TRUE
+      )
+
       ### 2.1.2 Test exports ---------------------------------------------------
 
       # Export a small state snapshot so tests can wait for milestones.
@@ -175,7 +556,9 @@ processing_server <- function(
         started = started(),
         success = success(),
         paragraph_entries = paragraph_entries_generated(),
-        results_table = results_table()
+        results_table = results_table(),
+        prompt_scope_decision_pending = !is.null(pending_prompt_scope_decision()),
+        analysis_unit_decision_pending = !is.null(pending_prompt_scope_decision())
       )
 
       ## 2.2 Launch setup ------------------------------------------------------
@@ -204,6 +587,8 @@ processing_server <- function(
         irr_result(NULL)
         irr_sample(NULL)
         stage_execution_rows_generated(NULL)
+        pending_prompt_scope_decision(NULL)
+        prompt_scope_skip_counts(list())
         analysis_started_at(Sys.time())
         log_analysis_start(
           mode = mode(),
@@ -307,35 +692,51 @@ processing_server <- function(
       ### 2.3.1 Worker launch --------------------------------------------------
 
       # Runs categorization for all texts and optionally writes category paragraphs.
-      start_categorization <- function() {
+      start_categorization <- function(
+        existing_results = NULL,
+        paragraph_entries = NULL,
+        start_index = 1L,
+        resume_stage = c("analysis", "paragraph_generation"),
+        is_resume = FALSE
+      ) {
+        resume_stage <- match.arg(resume_stage)
         req(texts$preprocessed)
-        if (
-          !processing_texts_under_maximum(
-            preprocessed_texts = texts$preprocessed,
-            lang = lang()
-          )
-        ) {
-          return()
+        if (!isTRUE(is_resume)) {
+          if (
+            !processing_texts_under_maximum(
+              preprocessed_texts = texts$preprocessed,
+              lang = lang()
+            )
+          ) {
+            return()
+          }
+          if (categories$editing()) {
+            shiny::showNotification(
+              lang()$t(
+                "Je moet eerst de categorieen opslaan voordat je verder kunt gaan."
+              ),
+              type = "error"
+            )
+            return()
+          }
+          if (categories$unique_non_empty_count() < 2) {
+            shiny::showNotification(
+              lang()$t("Je moet minimaal 2 categorieen opgeven."),
+              type = "error"
+            )
+            return()
+          }
+          req(isFALSE(context_window$any_fit_problem))
         }
-        if (categories$editing()) {
-          shiny::showNotification(
-            lang()$t(
-              "Je moet eerst de categorieen opslaan voordat je verder kunt gaan."
-            ),
-            type = "error"
-          )
-          return()
-        }
-        if (categories$unique_non_empty_count() < 2) {
-          shiny::showNotification(
-            lang()$t("Je moet minimaal 2 categorieen opgeven."),
-            type = "error"
-          )
-          return()
-        }
-        req(isFALSE(context_window$any_fit_problem))
 
-        log_context <- start_processing_run()
+        log_context <- if (isTRUE(is_resume)) {
+          log_context_capture(
+            is_async = TRUE,
+            mode = getOption("app__mode", "unknown")
+          )
+        } else {
+          start_processing_run()
+        }
 
         promise <- mirai::mirai(
           {
@@ -353,22 +754,43 @@ processing_server <- function(
               }
             }
 
-            results <- categorize_texts(
-              texts = texts,
-              analysis_unit_ids = analysis_unit_ids,
-              categories = categories,
-              research_background = research_background,
-              llm_provider = llm_provider,
-              assign_multiple_categories = assign_multiple_categories,
-              exclusive_categories = exclusive_categories,
-              on_progress = on_progress,
-              interrupter = interrupter
-            )
+            results <- existing_results
+            paragraphs <- paragraph_entries
 
-            paragraphs <- NULL
+            if (identical(resume_stage, "analysis")) {
+              categorization_output <- categorize_texts(
+                texts = texts,
+                analysis_unit_ids = analysis_unit_ids,
+                categories = categories,
+                research_background = research_background,
+                llm_provider = llm_provider,
+                assign_multiple_categories = assign_multiple_categories,
+                exclusive_categories = exclusive_categories,
+                on_progress = on_progress,
+                interrupter = interrupter,
+                start_index = start_index,
+                existing_results = existing_results,
+                failure_action = "return_decision"
+              )
+
+              if (
+                identical(
+                  categorization_output$status %||% NULL,
+                  "decision_required"
+                )
+              ) {
+                categorization_output$stage_execution_rows <-
+                  .kwallm__prompt_execution_get()
+                categorization_output$resume_stage <- "analysis"
+                return(categorization_output)
+              }
+
+              results <- categorization_output$results %||%
+                categorization_output
+            }
 
             if (write_paragraphs) {
-              paragraphs <- tryCatch(
+              paragraph_output <- tryCatch(
                 {
                   categories_texts <- collect_grouped_paragraph_inputs(
                     results = results,
@@ -386,11 +808,43 @@ processing_server <- function(
                     progress_secondary = progress_secondary,
                     interrupter = interrupter,
                     llm_stream_async = llm_stream_async,
-                    streaming_enabled = streaming_enabled
+                    streaming_enabled = streaming_enabled,
+                    existing_paragraphs = if (
+                      identical(resume_stage, "paragraph_generation")
+                    ) {
+                      paragraph_entries
+                    } else {
+                      NULL
+                    },
+                    start_index = if (
+                      identical(resume_stage, "paragraph_generation")
+                    ) {
+                      start_index
+                    } else {
+                      1L
+                    },
+                    failure_action = "return_decision"
                   )
                 },
                 error = handle_detailed_error("Category paragraph writing")
               )
+
+              if (
+                identical(
+                  paragraph_output$status %||% NULL,
+                  "decision_required"
+                )
+              ) {
+                paragraph_output$results <- results
+                paragraph_output$resume_stage <- "paragraph_generation"
+                paragraph_output$stage_execution_rows <-
+                  .kwallm__prompt_execution_get()
+                return(paragraph_output)
+              }
+
+              paragraphs <- paragraph_output$paragraphs %||% paragraph_output
+            } else {
+              paragraphs <- NULL
             }
 
             list(
@@ -404,6 +858,10 @@ processing_server <- function(
               llm_provider = models$main,
               texts = texts$preprocessed,
               analysis_unit_ids = current_analysis_unit_ids(),
+              existing_results = existing_results,
+              paragraph_entries = paragraph_entries,
+              start_index = as.integer(start_index),
+              resume_stage = as.character(resume_stage),
               research_background = research_background(),
               style_prompt = style_prompt(),
               categories = categories$texts(),
@@ -432,6 +890,55 @@ processing_server <- function(
           promise = promise,
           setter = function(value) {
             append_stage_execution_rows(value$stage_execution_rows)
+
+            if (identical(value$status %||% NULL, "decision_required")) {
+              handle_prompt_scope_failure(
+                decision = value,
+                mode_label = mode(),
+                on_retry = function() {
+                  if (identical(value$scope_kind %||% NULL, "analysis_unit")) {
+                    start_categorization(
+                      existing_results = value$results,
+                      start_index = value$failed_index,
+                      resume_stage = "analysis",
+                      is_resume = TRUE
+                    )
+                  } else {
+                    start_categorization(
+                      existing_results = value$results,
+                      paragraph_entries = value$paragraphs,
+                      start_index = value$failed_index,
+                      resume_stage = value$resume_stage %||%
+                        "paragraph_generation",
+                      is_resume = TRUE
+                    )
+                  }
+                },
+                on_skip = function(skip_status) {
+                  if (identical(value$scope_kind %||% NULL, "analysis_unit")) {
+                    skip_row <- value$skip_row
+                    skip_row$response_status <- skip_status
+                    start_categorization(
+                      existing_results = rbind(value$results, skip_row),
+                      start_index = value$failed_index + 1L,
+                      resume_stage = "analysis",
+                      is_resume = TRUE
+                    )
+                  } else {
+                    start_categorization(
+                      existing_results = value$results,
+                      paragraph_entries = value$paragraphs,
+                      start_index = value$failed_index + 1L,
+                      resume_stage = value$resume_stage %||%
+                        "paragraph_generation",
+                      is_resume = TRUE
+                    )
+                  }
+                }
+              )
+              return(invisible(NULL))
+            }
+
             paragraph_entries_generated(value$paragraphs %||% NULL)
             results_table_pre(value$results)
           },
@@ -448,26 +955,39 @@ processing_server <- function(
       ### 2.4.1 Worker launch --------------------------------------------------
 
       # Runs scoring for all texts. Unlike categorization, no paragraph step follows.
-      start_scoring <- function() {
+      start_scoring <- function(
+        existing_results = NULL,
+        start_index = 1L,
+        is_resume = FALSE
+      ) {
         req(texts$preprocessed)
-        if (
-          !processing_texts_under_maximum(
-            preprocessed_texts = texts$preprocessed,
-            lang = lang()
-          )
-        ) {
-          return()
+        if (!isTRUE(is_resume)) {
+          if (
+            !processing_texts_under_maximum(
+              preprocessed_texts = texts$preprocessed,
+              lang = lang()
+            )
+          ) {
+            return()
+          }
+          if (isTRUE(nchar(scoring_characteristic()) < 1)) {
+            shiny::showNotification(
+              lang()$t("Geef een karakteristiek op."),
+              type = "error"
+            )
+            return()
+          }
+          req(isFALSE(context_window$any_fit_problem))
         }
-        if (isTRUE(nchar(scoring_characteristic()) < 1)) {
-          shiny::showNotification(
-            lang()$t("Geef een karakteristiek op."),
-            type = "error"
-          )
-          return()
-        }
-        req(isFALSE(context_window$any_fit_problem))
 
-        log_context <- start_processing_run()
+        log_context <- if (isTRUE(is_resume)) {
+          log_context_capture(
+            is_async = TRUE,
+            mode = getOption("app__mode", "unknown")
+          )
+        } else {
+          start_processing_run()
+        }
 
         promise <- mirai::mirai(
           {
@@ -485,18 +1005,29 @@ processing_server <- function(
               }
             }
 
-            results <- score_texts(
+            scoring_output <- score_texts(
               texts = texts,
               analysis_unit_ids = analysis_unit_ids,
               scoring_characteristic = scoring_characteristic,
               research_background = research_background,
               llm_provider = llm_provider,
               on_progress = on_progress,
-              interrupter = interrupter
+              interrupter = interrupter,
+              start_index = start_index,
+              existing_results = existing_results,
+              failure_action = "return_decision"
             )
 
+            if (
+              identical(scoring_output$status %||% NULL, "decision_required")
+            ) {
+              scoring_output$stage_execution_rows <-
+                .kwallm__prompt_execution_get()
+              return(scoring_output)
+            }
+
             list(
-              results = results,
+              results = scoring_output$results %||% scoring_output,
               stage_execution_rows = .kwallm__prompt_execution_get()
             )
           },
@@ -505,6 +1036,8 @@ processing_server <- function(
               llm_provider = models$main,
               texts = texts$preprocessed,
               analysis_unit_ids = current_analysis_unit_ids(),
+              existing_results = existing_results,
+              start_index = as.integer(start_index),
               research_background = research_background(),
               scoring_characteristic = scoring_characteristic(),
               progress_primary = progress_primary$async,
@@ -521,6 +1054,31 @@ processing_server <- function(
           promise = promise,
           setter = function(value) {
             append_stage_execution_rows(value$stage_execution_rows)
+
+            if (identical(value$status %||% NULL, "decision_required")) {
+              handle_prompt_scope_failure(
+                decision = value,
+                mode_label = mode(),
+                on_retry = function() {
+                  start_scoring(
+                    existing_results = value$results,
+                    start_index = value$failed_index,
+                    is_resume = TRUE
+                  )
+                },
+                on_skip = function(skip_status) {
+                  skip_row <- value$skip_row
+                  skip_row$response_status <- skip_status
+                  start_scoring(
+                    existing_results = rbind(value$results, skip_row),
+                    start_index = value$failed_index + 1L,
+                    is_resume = TRUE
+                  )
+                }
+              )
+              return(invisible(NULL))
+            }
+
             results_table_pre(value$results)
           },
           when = "main processing of scoring",
@@ -763,7 +1321,14 @@ processing_server <- function(
       # Starts the second topic-modelling phase after topics are definitive.
       # This worker assigns topics to texts and optionally writes topic
       # paragraphs.
-      start_topic_assignment <- function() {
+      start_topic_assignment <- function(
+        existing_results = NULL,
+        paragraph_entries = NULL,
+        start_index = 1L,
+        resume_stage = c("analysis", "paragraph_generation"),
+        is_resume = FALSE
+      ) {
+        resume_stage <- match.arg(resume_stage)
         req(topics())
         if (!assign_multiple_categories()) {
           # If not assigning multiple categories, set each topic is exclusive
@@ -793,10 +1358,17 @@ processing_server <- function(
           "..."
         )
 
-        log_context <- log_context_capture(
-          is_async = TRUE,
-          mode = getOption("app__mode", "unknown")
-        )
+        log_context <- if (isTRUE(is_resume)) {
+          log_context_capture(
+            is_async = TRUE,
+            mode = getOption("app__mode", "unknown")
+          )
+        } else {
+          log_context_capture(
+            is_async = TRUE,
+            mode = getOption("app__mode", "unknown")
+          )
+        }
 
         promise <- mirai::mirai(
           {
@@ -846,25 +1418,47 @@ processing_server <- function(
               progress_secondary$set_with_total(i, n, text)
             }
 
-            topic_assignment_results <- tryCatch(
-              {
-                results <- assign_topics(
-                  texts = texts,
-                  analysis_unit_ids = analysis_unit_ids,
-                  topics = topics,
-                  research_background = research_background,
-                  llm_provider = llm_provider,
-                  assign_multiple_categories = assign_multiple_categories,
-                  exclusive_topics = exclusive_topics,
-                  on_progress = on_progress,
-                  interrupter = interrupter
-                )
-                progress_secondary$hide()
+            topic_assignment_results <- existing_results
+            paragraphs <- paragraph_entries
 
-                results
-              },
-              error = handle_detailed_error("Topic assignment")
-            )
+            if (identical(resume_stage, "analysis")) {
+              topic_assignment_output <- tryCatch(
+                {
+                  assign_topics(
+                    texts = texts,
+                    analysis_unit_ids = analysis_unit_ids,
+                    topics = topics,
+                    research_background = research_background,
+                    llm_provider = llm_provider,
+                    assign_multiple_categories = assign_multiple_categories,
+                    exclusive_topics = exclusive_topics,
+                    on_progress = on_progress,
+                    interrupter = interrupter,
+                    start_index = start_index,
+                    existing_results = existing_results,
+                    failure_action = "return_decision"
+                  )
+                },
+                error = handle_detailed_error("Topic assignment")
+              )
+
+              if (
+                identical(
+                  topic_assignment_output$status %||% NULL,
+                  "decision_required"
+                )
+              ) {
+                progress_secondary$hide()
+                topic_assignment_output$stage_execution_rows <-
+                  .kwallm__prompt_execution_get()
+                topic_assignment_output$resume_stage <- "analysis"
+                return(topic_assignment_output)
+              }
+
+              topic_assignment_results <-
+                topic_assignment_output$results %||% topic_assignment_output
+              progress_secondary$hide()
+            }
 
             ## Step 5: Write paragraphs about the topics
             log_info("Step 5/5: Writing paragraphs...", component = "analysis")
@@ -874,10 +1468,8 @@ processing_server <- function(
               lang$t("Rapport schrijven...")
             )
 
-            paragraphs <- NULL
-
             if (write_paragraphs) {
-              paragraphs <- tryCatch(
+              paragraph_output <- tryCatch(
                 {
                   topics_texts_list <- collect_grouped_paragraph_inputs(
                     results = topic_assignment_results,
@@ -895,11 +1487,43 @@ processing_server <- function(
                     progress_secondary = progress_secondary,
                     interrupter = interrupter,
                     llm_stream_async = llm_stream_async,
-                    streaming_enabled = streaming_enabled
+                    streaming_enabled = streaming_enabled,
+                    existing_paragraphs = if (
+                      identical(resume_stage, "paragraph_generation")
+                    ) {
+                      paragraph_entries
+                    } else {
+                      NULL
+                    },
+                    start_index = if (
+                      identical(resume_stage, "paragraph_generation")
+                    ) {
+                      start_index
+                    } else {
+                      1L
+                    },
+                    failure_action = "return_decision"
                   )
                 },
                 error = handle_detailed_error("Topic report generation")
               )
+
+              if (
+                identical(
+                  paragraph_output$status %||% NULL,
+                  "decision_required"
+                )
+              ) {
+                paragraph_output$results <- topic_assignment_results
+                paragraph_output$resume_stage <- "paragraph_generation"
+                paragraph_output$stage_execution_rows <-
+                  .kwallm__prompt_execution_get()
+                return(paragraph_output)
+              }
+
+              paragraphs <- paragraph_output$paragraphs %||% paragraph_output
+            } else {
+              paragraphs <- NULL
             }
 
             list(
@@ -915,6 +1539,10 @@ processing_server <- function(
               llm_provider = models$main,
               texts = texts$preprocessed,
               analysis_unit_ids = current_analysis_unit_ids(),
+              existing_results = existing_results,
+              paragraph_entries = paragraph_entries,
+              start_index = as.integer(start_index),
+              resume_stage = as.character(resume_stage),
               research_background = research_background(),
               style_prompt = style_prompt(),
               mode = mode(),
@@ -941,6 +1569,55 @@ processing_server <- function(
           promise = promise,
           setter = function(value) {
             append_stage_execution_rows(value$stage_execution_rows)
+
+            if (identical(value$status %||% NULL, "decision_required")) {
+              handle_prompt_scope_failure(
+                decision = value,
+                mode_label = mode(),
+                on_retry = function() {
+                  if (identical(value$scope_kind %||% NULL, "analysis_unit")) {
+                    start_topic_assignment(
+                      existing_results = value$results,
+                      start_index = value$failed_index,
+                      resume_stage = "analysis",
+                      is_resume = TRUE
+                    )
+                  } else {
+                    start_topic_assignment(
+                      existing_results = value$results,
+                      paragraph_entries = value$paragraphs,
+                      start_index = value$failed_index,
+                      resume_stage = value$resume_stage %||%
+                        "paragraph_generation",
+                      is_resume = TRUE
+                    )
+                  }
+                },
+                on_skip = function(skip_status) {
+                  if (identical(value$scope_kind %||% NULL, "analysis_unit")) {
+                    skip_row <- value$skip_row
+                    skip_row$response_status <- skip_status
+                    start_topic_assignment(
+                      existing_results = rbind(value$results, skip_row),
+                      start_index = value$failed_index + 1L,
+                      resume_stage = "analysis",
+                      is_resume = TRUE
+                    )
+                  } else {
+                    start_topic_assignment(
+                      existing_results = value$results,
+                      paragraph_entries = value$paragraphs,
+                      start_index = value$failed_index + 1L,
+                      resume_stage = value$resume_stage %||%
+                        "paragraph_generation",
+                      is_resume = TRUE
+                    )
+                  }
+                }
+              )
+              return(invisible(NULL))
+            }
+
             paragraph_entries_generated(value$paragraphs %||% NULL)
             results_table_pre(value$results)
           },
@@ -972,8 +1649,19 @@ processing_server <- function(
       # Starts the async worker for marking mode.
       # Kept separate so the marking validation and worker call do not clutter
       # the shared process observer.
-      start_marking <- function() {
+      start_marking <- function(
+        existing_results = NULL,
+        paragraph_entries = NULL,
+        start_index = 1L,
+        resume_stage = c("marking", "paragraph_generation"),
+        is_resume = FALSE
+      ) {
+        resume_stage <- match.arg(resume_stage)
         req(texts$preprocessed)
+        if (!isTRUE(is_resume)) {
+          paragraph_entries_generated(NULL)
+          results_table_pre(NULL)
+        }
         if (
           !processing_texts_under_maximum(
             preprocessed_texts = texts$preprocessed,
@@ -1032,14 +1720,29 @@ processing_server <- function(
               text_size_tokens = text_size_tokens,
               overlap_size_tokens = overlap_size_tokens,
               llm_stream_async = llm_stream_async,
-              streaming_enabled = streaming_enabled
+              streaming_enabled = streaming_enabled,
+              existing_results = existing_results,
+              paragraph_entries = paragraph_entries,
+              start_index = start_index,
+              resume_stage = resume_stage,
+              failure_action = "return_decision"
             )
 
-            paragraphs <- attr(marking_output, "paragraphs", exact = TRUE)
-            attr(marking_output, "paragraphs") <- NULL
+            if (
+              identical(marking_output$status %||% NULL, "decision_required")
+            ) {
+              marking_output$stage_execution_rows <-
+                .kwallm__prompt_execution_get()
+              return(marking_output)
+            }
+
+            marking_results <- marking_output$results %||% marking_output
+            paragraphs <- marking_output$paragraphs %||%
+              attr(marking_results, "paragraphs", exact = TRUE)
+            attr(marking_results, "paragraphs") <- NULL
 
             list(
-              results = marking_output,
+              results = marking_results,
               paragraphs = paragraphs,
               stage_execution_rows = .kwallm__prompt_execution_get()
             )
@@ -1052,6 +1755,10 @@ processing_server <- function(
               research_background = research_background(),
               style_prompt = style_prompt(),
               codes = codes$texts(),
+              existing_results = existing_results,
+              paragraph_entries = paragraph_entries,
+              start_index = as.integer(start_index),
+              resume_stage = as.character(resume_stage),
               lang = lang(),
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
@@ -1075,6 +1782,55 @@ processing_server <- function(
           promise = promise,
           setter = function(value) {
             append_stage_execution_rows(value$stage_execution_rows)
+
+            if (identical(value$status %||% NULL, "decision_required")) {
+              handle_prompt_scope_failure(
+                decision = value,
+                mode_label = mode(),
+                on_retry = function() {
+                  if (identical(value$scope_kind %||% NULL, "chunk_code")) {
+                    start_marking(
+                      existing_results = value$results,
+                      start_index = value$failed_index,
+                      resume_stage = "marking",
+                      is_resume = TRUE
+                    )
+                  } else {
+                    start_marking(
+                      existing_results = value$results,
+                      paragraph_entries = value$paragraphs,
+                      start_index = value$failed_index,
+                      resume_stage = value$resume_stage %||%
+                        "paragraph_generation",
+                      is_resume = TRUE
+                    )
+                  }
+                },
+                on_skip = function(skip_status) {
+                  if (identical(value$scope_kind %||% NULL, "chunk_code")) {
+                    skip_row <- value$skip_row
+                    skip_row$response_status <- skip_status
+                    start_marking(
+                      existing_results = rbind(value$results, skip_row),
+                      start_index = value$failed_index + 1L,
+                      resume_stage = "marking",
+                      is_resume = TRUE
+                    )
+                  } else {
+                    start_marking(
+                      existing_results = value$results,
+                      paragraph_entries = value$paragraphs,
+                      start_index = value$failed_index + 1L,
+                      resume_stage = value$resume_stage %||%
+                        "paragraph_generation",
+                      is_resume = TRUE
+                    )
+                  }
+                }
+              )
+              return(invisible(NULL))
+            }
+
             paragraph_entries_generated(value$paragraphs %||% NULL)
             results_table_pre(value$results)
           },
@@ -1456,6 +2212,26 @@ processing_server <- function(
         llm_stream$hide()
 
         if (interrater_reliability_toggle()) {
+          irr_rating_data <- result
+          if ("response_status" %in% names(irr_rating_data)) {
+            irr_rating_data <- irr_rating_data[
+              is.na(irr_rating_data$response_status) |
+                irr_rating_data$response_status == "completed",
+              ,
+              drop = FALSE
+            ]
+          }
+
+          if (nrow(irr_rating_data) == 0L) {
+            shiny::showNotification(
+              lang()$t(
+                "Geen voltooide analyse-eenheden aanwezig; kan geen interrater-reliability berekenen"
+              )
+            )
+            prepare_download_after_irr()
+            return()
+          }
+
           all_categories <- switch(
             mode(),
             "Categorisatie" = categories$texts(),
@@ -1478,7 +2254,7 @@ processing_server <- function(
 
           irr <- interrater_server(
             id = "rater_modal",
-            rating_data = result,
+            rating_data = irr_rating_data,
             text_col = "text",
             all_categories = all_categories,
             mode = mode(),

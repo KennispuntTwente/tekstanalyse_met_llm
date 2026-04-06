@@ -15,6 +15,14 @@ analysis_result <- params$analysis_result
 stopifnot(inherits(analysis_result, "AnalysisResult"))
 
 report_df <- .kwallm_report_results_df(analysis_result)
+report_df_completed <- if ("response_status" %in% names(report_df)) {
+  dplyr::filter(
+    report_df,
+    is.na(response_status) | response_status == "completed"
+  )
+} else {
+  report_df
+}
 group_lookup <- .kwallm_report_group_lookup(analysis_result)
 result_payload <- analysis_result@results
 assign_multiple_categories <- isTRUE(result_payload@multi_label)
@@ -138,38 +146,69 @@ they were mentioned in the texts.
 ```{r, echo=FALSE, results='asis', error=TRUE}
 
 if (!assign_multiple_categories) {
-  report_df |>
-  dplyr::group_by(result) |>
-  dplyr::summarise(
-    Number = dplyr::n(),
-    Percentage = round(dplyr::n() / nrow(report_df) * 100, 2)
-  ) |>
-  dplyr::arrange(dplyr::desc(Number)) |>
-  dplyr::rename(Topic = result) |>
-  DT::datatable(
-    rownames = FALSE,
-    extensions = 'Buttons',
-    options = get_datatable_options_en(additional_options = list(fixedHeader = TRUE))
-  )
-} else {
-  report_df |>
-    dplyr::select(-dplyr::any_of(c("document_id", "text"))) |>
-    # For each binary category column, count the number of TRUE values
-    dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(.x, na.rm = TRUE))) |>
-    tidyr::pivot_longer(
-      cols = dplyr::everything(),
-      names_to = "Topic",
-      values_to = "Number"
+  if (nrow(report_df_completed) == 0L) {
+    tibble::tibble(
+      Topic = result_payload@labels$label_text,
+      Number = 0L,
+      Percentage = 0
     ) |>
-    dplyr::mutate(
-      Percentage = round(Number / nrow(report_df) * 100, 2)
+      DT::datatable(
+        rownames = FALSE,
+        extensions = 'Buttons',
+        options = get_datatable_options_en(additional_options = list(fixedHeader = TRUE))
+      )
+  } else {
+    report_df_completed |>
+    dplyr::group_by(result) |>
+    dplyr::summarise(
+      Number = dplyr::n(),
+      Percentage = round(dplyr::n() / nrow(report_df_completed) * 100, 2)
     ) |>
     dplyr::arrange(dplyr::desc(Number)) |>
+    dplyr::rename(Topic = result) |>
     DT::datatable(
       rownames = FALSE,
       extensions = 'Buttons',
-      options = get_datatable_options_en()
+      options = get_datatable_options_en(additional_options = list(fixedHeader = TRUE))
     )
+  }
+} else {
+  topic_cols <- setdiff(
+    names(report_df_completed),
+    c("document_id", "text", "response_status", "response_error_message")
+  )
+
+  if (nrow(report_df_completed) == 0L) {
+    tibble::tibble(
+      Topic = topic_cols,
+      Number = 0L,
+      Percentage = 0
+    ) |>
+      dplyr::arrange(dplyr::desc(Number)) |>
+      DT::datatable(
+        rownames = FALSE,
+        extensions = 'Buttons',
+        options = get_datatable_options_en()
+      )
+  } else {
+    report_df_completed |>
+      dplyr::select(dplyr::all_of(topic_cols)) |>
+      dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(.x, na.rm = TRUE))) |>
+      tidyr::pivot_longer(
+        cols = dplyr::everything(),
+        names_to = "Topic",
+        values_to = "Number"
+      ) |>
+      dplyr::mutate(
+        Percentage = round(Number / nrow(report_df_completed) * 100, 2)
+      ) |>
+      dplyr::arrange(dplyr::desc(Number)) |>
+      DT::datatable(
+        rownames = FALSE,
+        extensions = 'Buttons',
+        options = get_datatable_options_en()
+      )
+  }
 }
 
 
@@ -177,7 +216,7 @@ if (!assign_multiple_categories) {
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 # Show grouped frequencies if by_column is specified
-if (!is.null(by_column_name) && !is.null(group_lookup)) {
+if (!is.null(by_column_name) && !is.null(group_lookup) && nrow(report_df_completed) > 0L) {
   cat("\n### Frequency per group\n\n")
   cat(paste0(
     "Below table shows how often each topic was assigned, ",
@@ -187,10 +226,10 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
 ```
 
 ```{r echo=FALSE, results='asis', error=TRUE}
-if (!is.null(by_column_name) && !is.null(group_lookup)) {
+if (!is.null(by_column_name) && !is.null(group_lookup) && nrow(report_df_completed) > 0L) {
   if (!assign_multiple_categories) {
     generate_grouped_topic_table_single(
-      df = report_df,
+      df = report_df_completed,
       by_values = group_lookup,
       by_column_name = by_column_name,
       categories = result_payload@labels$label_text,
@@ -198,9 +237,12 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
     )
   } else {
     # Get topic columns (excluding report identity columns)
-    topic_cols <- setdiff(names(report_df), c("document_id", "text"))
+    topic_cols <- setdiff(
+      names(report_df_completed),
+      c("document_id", "text", "response_status", "response_error_message")
+    )
     generate_grouped_topic_table_multi(
-      df = report_df,
+      df = report_df_completed,
       by_values = group_lookup,
       by_column_name = by_column_name,
       categories = topic_cols,
@@ -217,8 +259,18 @@ Below table shows the assigned topic for each text.
 ```{r, echo=FALSE, results='asis', error=TRUE}
 if (!assign_multiple_categories) {
   report_df |>
-  dplyr::select(result, text) |>
-  dplyr::rename(Text = text, Topic = result) |>
+  dplyr::select(dplyr::any_of(c(
+    "result",
+    "response_status",
+    "response_error_message",
+    "text"
+  ))) |>
+  dplyr::rename(
+    Text = text,
+    Topic = result,
+    `Response status` = response_status,
+    `Response error message` = response_error_message
+  ) |>
   dplyr::arrange(dplyr::desc(Topic)) |>
   DT::datatable(
     extensions = 'Buttons',
@@ -226,7 +278,11 @@ if (!assign_multiple_categories) {
   )
 } else {
   report_df |>
-    dplyr::rename(Text = text) |>
+    dplyr::rename(
+      Text = text,
+      `Response status` = response_status,
+      `Response error message` = response_error_message
+    ) |>
     dplyr::arrange(dplyr::desc(Text)) |>
     DT::datatable(
       options = get_datatable_options_en()

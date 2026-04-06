@@ -613,6 +613,7 @@ build_analysis_result <- function(
   CategorizationResult(
     labels = labels_df,
     assignments = assignments,
+    responses = .kwallm_build_analysis_unit_responses(texts_df, results_table),
     multi_label = isTRUE(multi_label)
   )
 }
@@ -625,15 +626,25 @@ build_analysis_result <- function(
   scoring_characteristic
 ) {
   analysis_unit_id <- .kwallm_result_analysis_unit_ids(texts_df, results_table)
+  responses <- .kwallm_build_analysis_unit_responses(texts_df, results_table)
+  completed_unit_ids <- responses$analysis_unit_id[
+    responses$response_status %in% c("completed", NA_character_)
+  ]
 
   scores <- unique(data.frame(
     analysis_unit_id = analysis_unit_id,
     score = as.numeric(results_table$result),
     stringsAsFactors = FALSE
   ))
+  scores <- scores[
+    scores$analysis_unit_id %in% completed_unit_ids & !is.na(scores$score),
+    ,
+    drop = FALSE
+  ]
 
   ScoringResult(
     scores = scores,
+    responses = responses,
     characteristic = as.character(scoring_characteristic %||% "Score"),
     scale_min = 0,
     scale_max = 100
@@ -678,6 +689,7 @@ build_analysis_result <- function(
   TopicResult(
     labels = labels_df,
     assignments = assignments,
+    responses = .kwallm_build_analysis_unit_responses(texts_df, results_table),
     multi_label = isTRUE(multi_label),
     topic_provenance = TopicProvenance(
       candidate_topics = as.character(candidate_topics %||% character()),
@@ -1180,6 +1192,36 @@ build_analysis_result <- function(
   }
 
   unique(do.call(rbind, rows))
+}
+
+# Builds one status row per analysis unit for categorization/scoring/topic runs.
+# We use this to preserve skipped analysis-unit state without forcing invalid
+# placeholder assignments or scores into the typed result payload.
+.kwallm_build_analysis_unit_responses <- function(texts_df, result_df) {
+  analysis_unit_id <- .kwallm_result_analysis_unit_ids(texts_df, result_df)
+
+  response_status <- if ("response_status" %in% names(result_df)) {
+    as.character(result_df$response_status)
+  } else {
+    rep("completed", nrow(result_df))
+  }
+  response_status[is.na(response_status) | !nzchar(trimws(response_status))] <-
+    "completed"
+
+  response_error_message <- if (
+    "response_error_message" %in% names(result_df)
+  ) {
+    as.character(result_df$response_error_message)
+  } else {
+    rep(NA_character_, nrow(result_df))
+  }
+
+  unique(data.frame(
+    analysis_unit_id = as.integer(analysis_unit_id),
+    response_status = response_status,
+    response_error_message = response_error_message,
+    stringsAsFactors = FALSE
+  ))
 }
 
 

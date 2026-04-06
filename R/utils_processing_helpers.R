@@ -235,13 +235,35 @@ write_grouped_paragraphs <- function(
   llm_provider,
   lang,
   subject_kind = "topic",
+  focus_on_highlighted_text = FALSE,
   progress_secondary = NULL,
   interrupter = NULL,
   llm_stream_async = NULL,
-  streaming_enabled = FALSE
+  streaming_enabled = FALSE,
+  existing_paragraphs = NULL,
+  start_index = 1L,
+  failure_action = c("error", "return_decision")
 ) {
   stopifnot(is.list(grouped_texts), !is.null(names(grouped_texts)))
   stopifnot(is.character(subject_kind), length(subject_kind) == 1)
+  stopifnot(
+    is.logical(focus_on_highlighted_text),
+    length(focus_on_highlighted_text) == 1
+  )
+  failure_action <- match.arg(failure_action)
+  start_index <- as.integer(start_index)[1]
+  stopifnot(!is.na(start_index), start_index >= 1L)
+
+  translate <- if (is.null(lang)) {
+    function(text) text
+  } else {
+    lang$t
+  }
+  paragraph_language <- if (is.null(lang)) {
+    "en"
+  } else {
+    lang$get_translation_language()
+  }
 
   normalize_group_entry <- function(entry) {
     if (!is.list(entry) || is.null(entry$texts)) {
@@ -268,15 +290,38 @@ write_grouped_paragraphs <- function(
     )
   }
 
+  normalize_existing_paragraphs <- function(value) {
+    if (is.null(value)) {
+      return(list())
+    }
+
+    stopifnot(is.list(value))
+    out <- unname(as.list(value))
+    if (length(out) && is.null(names(value))) {
+      stop("existing_paragraphs must be a named list when provided")
+    }
+
+    names(out) <- names(value)
+    out
+  }
+
   # No groups means there is nothing to summarize.
   if (!length(grouped_texts)) {
+    if (identical(failure_action, "return_decision")) {
+      return(list(status = "completed", paragraphs = list()))
+    }
+
     return(list())
   }
+
+  total_groups <- length(grouped_texts)
+  stopifnot(start_index <= total_groups + 1L)
+  paragraph_results <- normalize_existing_paragraphs(existing_paragraphs)
 
   if (!is.null(progress_secondary)) {
     # Reuse the secondary bar to show paragraph progress per group.
     progress_secondary$show()
-    progress_secondary$set_with_total(0, length(grouped_texts), "...")
+    progress_secondary$set_with_total(start_index - 1L, total_groups, "...")
     on.exit(progress_secondary$hide(), add = TRUE)
   }
 
@@ -294,32 +339,52 @@ write_grouped_paragraphs <- function(
     }
   }
 
-  purrr::imap(
-    grouped_texts,
-    function(topic_entry, topic_name) {
-      normalized_entry <- normalize_group_entry(topic_entry)
+  for (i in seq.int(start_index, total_groups)) {
+    topic_name <- names(grouped_texts)[[i]]
+    topic_entry <- grouped_texts[[i]]
+    normalized_entry <- normalize_group_entry(topic_entry)
 
-      if (!is.null(interrupter)) {
-        interrupter$execInterrupts()
-      }
+    if (!is.null(interrupter)) {
+      interrupter$execInterrupts()
+    }
 
-      if (!is.null(progress_secondary)) {
-        progress_secondary$set_with_total(
-          which(names(grouped_texts) == topic_name),
-          length(grouped_texts),
-          paste0(
-            lang$t("Schrijven over '"),
-            topic_name,
-            "'..."
-          )
+    if (!is.null(progress_secondary)) {
+      progress_secondary$set_with_total(
+        i,
+        total_groups,
+        paste0(
+          translate("Schrijven over '"),
+          topic_name,
+          "'..."
         )
-      }
+      )
+    }
 
-      if (isTRUE(streaming_enabled) && !is.null(llm_stream_async)) {
-        llm_stream_async$clear()
-      }
+    if (isTRUE(streaming_enabled) && !is.null(llm_stream_async)) {
+      llm_stream_async$clear()
+    }
 
-      # Write one paragraph for one category/topic.
+    failure_message <- NULL
+    paragraph <- if (identical(failure_action, "return_decision")) {
+      tryCatch(
+        write_paragraph(
+          texts = normalized_entry$texts,
+          analysis_unit_ids = normalized_entry$analysis_unit_ids,
+          topic = topic_name,
+          subject_kind = subject_kind,
+          research_background = research_background,
+          style_prompt = style_prompt,
+          llm_provider = llm_provider,
+          language = paragraph_language,
+          focus_on_highlighted_text = focus_on_highlighted_text,
+          stream_callback = stream_callback
+        ),
+        error = function(e) {
+          failure_message <<- conditionMessage(e)
+          NULL
+        }
+      )
+    } else {
       write_paragraph(
         texts = normalized_entry$texts,
         analysis_unit_ids = normalized_entry$analysis_unit_ids,
@@ -328,11 +393,44 @@ write_grouped_paragraphs <- function(
         research_background = research_background,
         style_prompt = style_prompt,
         llm_provider = llm_provider,
-        language = lang$get_translation_language(),
+        language = paragraph_language,
+        focus_on_highlighted_text = focus_on_highlighted_text,
         stream_callback = stream_callback
       )
     }
-  )
+
+    if (is.null(paragraph) && identical(failure_action, "return_decision")) {
+      return(list(
+        status = "decision_required",
+        resume_stage = "paragraph_generation",
+        scope_kind = "analysis_unit_group",
+        failed_index = as.integer(i),
+        total_scopes = as.integer(total_groups),
+        subject_kind = as.character(subject_kind),
+        subject_value = as.character(topic_name),
+        failed_analysis_unit_ids = normalized_entry$analysis_unit_ids,
+        failed_text = paste(
+          utils::head(normalized_entry$texts, 3L),
+          collapse = "\n\n"
+        ),
+        failure_message = failure_message %||%
+          paste0(
+            "Failed to write paragraph for '",
+            topic_name,
+            "'."
+          ),
+        paragraphs = paragraph_results
+      ))
+    }
+
+    paragraph_results[[topic_name]] <- paragraph
+  }
+
+  if (identical(failure_action, "return_decision")) {
+    return(list(status = "completed", paragraphs = paragraph_results))
+  }
+
+  paragraph_results
 }
 
 
@@ -410,12 +508,84 @@ processing_results_have_invalid_na <- function(results_df, mode) {
     return(anyNA(results_df[cols_to_validate]))
   }
 
-  if ("result" %in% names(results_df)) {
-    return(anyNA(results_df$result))
+  completed_rows <- rep(TRUE, nrow(results_df))
+  if ("response_status" %in% names(results_df)) {
+    completed_rows <- is.na(results_df$response_status) |
+      results_df$response_status %in% "completed"
   }
 
-  result_cols <- setdiff(names(results_df), "text")
-  length(result_cols) > 0 && anyNA(results_df[result_cols])
+  if ("result" %in% names(results_df)) {
+    return(any(completed_rows & is.na(results_df$result)))
+  }
+
+  result_cols <- names(results_df)[vapply(results_df, is.logical, logical(1))]
+  if (!length(result_cols)) {
+    return(FALSE)
+  }
+
+  any(vapply(
+    seq_len(nrow(results_df)),
+    function(i) {
+      isTRUE(completed_rows[[i]]) &&
+        anyNA(results_df[i, result_cols, drop = FALSE])
+    },
+    logical(1)
+  ))
+}
+
+
+#' Decide how to continue after a failed analysis unit
+#'
+#' Used by `module_core_processing` to map the configured failure-handling
+#' options onto one concrete action: ask the user, skip automatically, or fail.
+#'
+#' @param action Primary configured action, usually `"ask"` or `"skip"`.
+#' @param skip_count Number of units already skipped automatically.
+#' @param max_auto_skips Optional limit for automatic skipping.
+#' @param on_max_auto_skips Fallback once the auto-skip limit is reached.
+#'
+#' @return One of `"ask"`, `"skip"`, or `"fail"`.
+prompt_scope_failure_next_action <- function(
+  action = "ask",
+  skip_count = 0L,
+  max_auto_skips = NULL,
+  on_max_auto_skips = c("ask", "fail")
+) {
+  action <- as.character(action)[1]
+  if (is.na(action) || !action %in% c("ask", "skip")) {
+    action <- "ask"
+  }
+
+  skip_count <- as.integer(skip_count)[1]
+  if (is.na(skip_count) || skip_count < 0L) {
+    skip_count <- 0L
+  }
+
+  on_max_auto_skips <- match.arg(on_max_auto_skips)
+
+  if (!identical(action, "skip")) {
+    return("ask")
+  }
+
+  if (is.null(max_auto_skips) || is.na(max_auto_skips)) {
+    return("skip")
+  }
+
+  max_auto_skips <- as.integer(max_auto_skips)[1]
+  if (is.na(max_auto_skips) || max_auto_skips < 0L) {
+    max_auto_skips <- 0L
+  }
+
+  if (skip_count < max_auto_skips) {
+    return("skip")
+  }
+
+  on_max_auto_skips
+}
+
+
+analysis_unit_failure_next_action <- function(...) {
+  prompt_scope_failure_next_action(...)
 }
 
 

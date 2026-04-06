@@ -99,10 +99,19 @@ prompt_score <- function(
 #' @param on_progress Optional callback function(i, n, text) called after each text
 #' @param interrupter Optional object with \code{$execInterrupts()} method for
 #'   cancellation support (e.g., \code{ipc::AsyncInterruptor})
+#' @param start_index Optional 1-based start index for resuming a partially
+#'   completed run.
+#' @param existing_results Optional existing results data frame to resume from.
+#' @param failure_action Either \code{"error"} to keep legacy fail-fast
+#'   behavior, or \code{"return_decision"} to return a structured payload when
+#'   one analysis unit exhausts retries.
 #'
 #' @return A data.frame with columns \code{text} and \code{result} (numeric 0-100).
 #'   If a prompt returns \code{NA}, completed rows keep their scores and the
-#'   failing and remaining rows are returned as \code{NA}.
+#'   failing and remaining rows are returned as \code{NA}. When
+#'   \code{failure_action = "return_decision"} and one analysis unit fails, a
+#'   named list is returned with \code{status = "decision_required"}, the
+#'   partial \code{results}, failure details, and a suggested \code{skip_row}.
 #' @export
 score_texts <- function(
   texts,
@@ -113,8 +122,14 @@ score_texts <- function(
   verbose = FALSE,
   show_progress = FALSE,
   on_progress = NULL,
-  interrupter = NULL
+  interrupter = NULL,
+  start_index = 1L,
+  existing_results = NULL,
+  failure_action = c("error", "return_decision")
 ) {
+  failure_action <- match.arg(failure_action)
+  start_index <- as.integer(start_index)
+
   stopifnot(
     is.character(texts),
     length(texts) > 0,
@@ -125,16 +140,86 @@ score_texts <- function(
     is.character(research_background),
     length(research_background) == 1
   )
+  stopifnot(
+    length(start_index) == 1,
+    !is.na(start_index),
+    start_index >= 1L,
+    start_index <= length(texts) + 1L
+  )
 
   stage_options <- options(kwallm__prompt_execution_stage = "scoring")
   on.exit(options(stage_options), add = TRUE)
 
+  build_empty_results <- function() {
+    data.frame(
+      analysis_unit_id = integer(),
+      text = character(),
+      result = numeric(),
+      response_status = character(),
+      response_error_message = character(),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  normalize_existing_results <- function(df) {
+    if (is.null(df)) {
+      return(build_empty_results())
+    }
+
+    df <- as.data.frame(df, stringsAsFactors = FALSE)
+    df$analysis_unit_id <- as.integer(df$analysis_unit_id)
+    df$text <- as.character(df$text)
+    df$result <- as.numeric(df$result)
+
+    if (!"response_status" %in% names(df)) {
+      df$response_status <- rep("completed", nrow(df))
+    }
+    if (!"response_error_message" %in% names(df)) {
+      df$response_error_message <- rep(NA_character_, nrow(df))
+    }
+
+    df$response_status <- as.character(df$response_status)
+    df$response_error_message <- as.character(df$response_error_message)
+    df
+  }
+
+  build_success_row <- function(i, result) {
+    data.frame(
+      analysis_unit_id = as.integer(analysis_unit_ids[[i]]),
+      text = texts[[i]],
+      result = as.numeric(result),
+      response_status = "completed",
+      response_error_message = NA_character_,
+      stringsAsFactors = FALSE
+    )
+  }
+
+  build_skip_row <- function(i, message) {
+    data.frame(
+      analysis_unit_id = as.integer(analysis_unit_ids[[i]]),
+      text = texts[[i]],
+      result = NA_real_,
+      response_status = "skipped",
+      response_error_message = as.character(message),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  finalize_results <- function(df) {
+    if (!nrow(df)) {
+      return(df)
+    }
+
+    order_index <- match(df$analysis_unit_id, as.integer(analysis_unit_ids))
+    df[order(order_index), , drop = FALSE]
+  }
+
   llm_provider <- llm_provider$clone()
   llm_provider$verbose <- verbose
   n <- length(texts)
-  results <- vector("list", n)
+  results_df <- normalize_existing_results(existing_results)
 
-  for (i in seq_along(texts)) {
+  for (i in seq.int(start_index, n)) {
     if (!is.null(interrupter)) {
       interrupter$execInterrupts()
     }
@@ -150,31 +235,68 @@ score_texts <- function(
       scoring_characteristic = scoring_characteristic
     )
 
-    result <- send_prompt_with_retries(
-      prompt,
-      llm_provider,
-      execution_scope = list(
-        kind = "analysis_unit",
-        analysis_unit_ids = as.integer(analysis_unit_ids[[i]])
+    failure_message <- NULL
+
+    result <- if (identical(failure_action, "return_decision")) {
+      tryCatch(
+        send_prompt_with_retries(
+          prompt,
+          llm_provider,
+          execution_scope = list(
+            kind = "analysis_unit",
+            analysis_unit_ids = as.integer(analysis_unit_ids[[i]])
+          )
+        ),
+        error = function(e) {
+          failure_message <<- conditionMessage(e)
+          NA_real_
+        }
       )
-    )
-    results[[i]] <- result
+    } else {
+      send_prompt_with_retries(
+        prompt,
+        llm_provider,
+        execution_scope = list(
+          kind = "analysis_unit",
+          analysis_unit_ids = as.integer(analysis_unit_ids[[i]])
+        )
+      )
+    }
+
+    if (length(result) == 1 && is.na(result)) {
+      if (identical(failure_action, "return_decision")) {
+        failure_message <- failure_message %||%
+          "The scoring prompt did not produce a valid result after retrying."
+
+        return(list(
+          status = "decision_required",
+          results = finalize_results(results_df),
+          failed_index = as.integer(i),
+          failed_analysis_unit_id = as.integer(analysis_unit_ids[[i]]),
+          failed_text = text,
+          failure_message = failure_message,
+          skip_row = build_skip_row(i, failure_message)
+        ))
+      }
+
+      break
+    }
+
+    results_df <- rbind(results_df, build_success_row(i, result))
 
     if (!is.null(on_progress)) {
       on_progress(i, n, text)
     }
-
-    # Preserve completed rows; the current NA and later rows remain NA.
-    if (is.na(result)) break
   }
 
-  results <- purrr::map(results, ~ if (is.null(.x)) NA else .x)
-  results <- unlist(results)
+  results_df <- finalize_results(results_df)
 
-  data.frame(
-    analysis_unit_id = as.integer(analysis_unit_ids),
-    text = texts,
-    result = results,
-    stringsAsFactors = FALSE
-  )
+  if (identical(failure_action, "return_decision")) {
+    return(list(
+      status = "completed",
+      results = results_df
+    ))
+  }
+
+  results_df
 }

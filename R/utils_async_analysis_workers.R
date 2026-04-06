@@ -95,6 +95,7 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "count_tokens",
         "tiktoken_load_tokenizer"
       ),
+      write_grouped_paragraphs = "write_paragraph",
       normalize_for_dist = "normalize_with_map",
       best_literal_substring = c(
         "normalize_for_dist",
@@ -130,7 +131,8 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "normalize_for_dist",
         ".kwallm_normalize_marking_matches",
         ".kwallm_marking_clean_results",
-        ".kwallm_marking_collect_paragraph_inputs"
+        ".kwallm_marking_collect_paragraph_inputs",
+        "write_grouped_paragraphs"
       )
     ),
     stop("Unknown async analysis worker task: ", task, call. = FALSE)
@@ -308,6 +310,11 @@ analysis_async_marking_globals <- function(env = parent.frame()) {
       inherits = TRUE
     ),
     write_paragraph = get("write_paragraph", envir = env, inherits = TRUE),
+    write_grouped_paragraphs = get(
+      "write_grouped_paragraphs",
+      envir = env,
+      inherits = TRUE
+    ),
     .kwallm_empty_marking_matches = get(
       ".kwallm_empty_marking_matches",
       envir = env,

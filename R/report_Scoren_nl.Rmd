@@ -15,6 +15,14 @@ analysis_result <- params$analysis_result
 stopifnot(inherits(analysis_result, "AnalysisResult"))
 
 report_df <- .kwallm_report_results_df(analysis_result)
+report_df_completed <- if ("response_status" %in% names(report_df)) {
+  dplyr::filter(
+    report_df,
+    is.na(response_status) | response_status == "completed"
+  )
+} else {
+  report_df
+}
 group_lookup <- .kwallm_report_group_lookup(analysis_result)
 result_payload <- analysis_result@results
 reliability_summary <- if (is.null(analysis_result@reliability)) {
@@ -124,24 +132,41 @@ if (!is.null(reliability_summary)) {
 Onderstaande tabel toont statistieken van de gegeven scores.
 
 ```{r results='asis', echo=FALSE, error=TRUE}
-report_df |>
-  dplyr::summarise(
-    Gemiddelde = round(mean(result), 2),
-    Standaardafwijking = round(sd(result), 2),
-    Minimum = min(result),
-    Maximum = max(result),
-    Median = median(result)
+if (nrow(report_df_completed) == 0L) {
+  tibble::tibble(
+    N = 0L,
+    Gemiddelde = NA_real_,
+    Standaardafwijking = NA_real_,
+    Minimum = NA_real_,
+    Maximum = NA_real_,
+    Median = NA_real_
   ) |>
-  DT::datatable(
-    rownames = FALSE,
-    extensions = 'Buttons',
-    options = get_datatable_options()
-  )
+    DT::datatable(
+      rownames = FALSE,
+      extensions = 'Buttons',
+      options = get_datatable_options()
+    )
+} else {
+  report_df_completed |>
+    dplyr::summarise(
+      N = dplyr::n(),
+      Gemiddelde = round(mean(result), 2),
+      Standaardafwijking = round(sd(result), 2),
+      Minimum = min(result),
+      Maximum = max(result),
+      Median = median(result)
+    ) |>
+    DT::datatable(
+      rownames = FALSE,
+      extensions = 'Buttons',
+      options = get_datatable_options()
+    )
+}
 ```
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 # Show grouped statistics if by_column is specified
-if (!is.null(by_column_name) && !is.null(group_lookup)) {
+if (!is.null(by_column_name) && !is.null(group_lookup) && nrow(report_df_completed) > 0L) {
   cat("\n### Statistieken per groep\n\n")
   cat(paste0(
     "Onderstaande tabel toont scorestatistieken, ",
@@ -151,9 +176,9 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
 ```
 
 ```{r echo=FALSE, results='asis', error=TRUE}
-if (!is.null(by_column_name) && !is.null(group_lookup)) {
+if (!is.null(by_column_name) && !is.null(group_lookup) && nrow(report_df_completed) > 0L) {
   generate_grouped_score_table(
-    df = report_df,
+    df = report_df_completed,
     by_values = group_lookup,
     by_column_name = by_column_name,
     language = "nl"
@@ -167,8 +192,18 @@ Onderstaande tabel de scores per tekst.
 
 ```{r results='asis', echo=FALSE, error=TRUE}
 report_df |>
-  dplyr::select(result, text) |>
-  dplyr::rename(Tekst = text, Score = result) |>
+  dplyr::select(dplyr::any_of(c(
+    "result",
+    "response_status",
+    "response_error_message",
+    "text"
+  ))) |>
+  dplyr::rename(
+    Tekst = text,
+    Score = result,
+    Responsestatus = response_status,
+    `Foutmelding response` = response_error_message
+  ) |>
   dplyr::arrange(dplyr::desc(Score)) |>
   DT::datatable(
     extensions = 'Buttons',

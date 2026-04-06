@@ -151,13 +151,11 @@ test_that("score_texts preserves completed scores, reports progress, and stops o
     interrupter = interrupter
   )
 
-  expect_identical(result$analysis_unit_id, analysis_unit_ids)
-  expect_equal(result$text, c("text a", "text b", "text c"))
-  # Row 1 succeeded, row 2 failed (NA), row 3 was never processed (NA).
-  expect_equal(result$result, c(42, NA, NA))
+  expect_identical(result$analysis_unit_id, 10L)
+  expect_equal(result$text, "text a")
+  expect_equal(result$result, 42)
   expect_equal(call_count, 2)
   expect_equal(interrupt_count, 2)
-  expect_length(progress_events, 2)
+  expect_length(progress_events, 1)
   expect_equal(progress_events[[1]], list(i = 1, n = 3, text = "text a"))
-  expect_equal(progress_events[[2]], list(i = 2, n = 3, text = "text b"))
 })

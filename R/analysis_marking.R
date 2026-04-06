@@ -23,7 +23,12 @@ mark_texts <- function(
     10
   ),
   llm_stream_async = NULL,
-  streaming_enabled = getOption("paragraph_streaming", TRUE)
+  streaming_enabled = getOption("paragraph_streaming", TRUE),
+  existing_results = NULL,
+  paragraph_entries = NULL,
+  start_index = 1L,
+  resume_stage = c("marking", "paragraph_generation"),
+  failure_action = c("error", "return_decision")
 ) {
   stopifnot(
     is.character(texts),
@@ -35,6 +40,10 @@ mark_texts <- function(
     is.vector(codes),
     length(codes) > 0
   )
+  resume_stage <- match.arg(resume_stage)
+  failure_action <- match.arg(failure_action)
+  start_index <- as.integer(start_index)[1]
+  stopifnot(!is.na(start_index), start_index >= 1L)
 
   stage_options <- options(kwallm__prompt_execution_stage = "marking")
   on.exit(options(stage_options), add = TRUE)
@@ -82,203 +91,308 @@ mark_texts <- function(
     progress$hide()
   }
 
-  # Set initial progress
-  log_info("Marking Step 1: Splitting texts...", component = "analysis")
-  try(
-    progress_set_with_total(
-      progress_primary,
-      1,
-      total_steps,
-      translate("Teksten splitsen...")
-    ),
-    silent = TRUE
-  )
-
-  # Load chunker
-  chunker_name <- paste0("semchunker_", text_size_tokens)
-  if (
-    !exists(
-      chunker_name
+  empty_marking_results <- function() {
+    tibble::tibble(
+      analysis_unit_id = integer(),
+      analysis_unit_text = character(),
+      chunk_id = integer(),
+      chunk_index = integer(),
+      chunk_text = character(),
+      code = character(),
+      source_marked_text = character(),
+      marked_text = character(),
+      match_start = integer(),
+      match_end = integer(),
+      match_distance = integer(),
+      match_method = character(),
+      response_status = character()
     )
-  ) {
-    semchunker <- semchunk_load_chunker(chunk_size = text_size_tokens)
-    assign(chunker_name, semchunker, envir = .GlobalEnv)
-  } else {
-    semchunker <- get(chunker_name, envir = .GlobalEnv)
   }
 
-  # `texts` here are already unique analysis-unit texts, not source/document rows.
-  # `analysis_unit_id` identifies that LLM input, and `chunk_id` identifies the
-  # chunk rows created from it.
-  df <- tibble::tibble(
-    analysis_unit_id = as.integer(analysis_unit_ids),
-    analysis_unit_text = texts
+  build_scope_result_rows <- function(scope_row, marking_match) {
+    metadata <- tibble::tibble(
+      analysis_unit_id = as.integer(scope_row$analysis_unit_id[[1]]),
+      analysis_unit_text = as.character(scope_row$analysis_unit_text[[1]]),
+      chunk_id = as.integer(scope_row$chunk_id[[1]]),
+      chunk_index = as.integer(scope_row$chunk_index[[1]]),
+      chunk_text = as.character(scope_row$chunk_text[[1]]),
+      code = as.character(scope_row$code[[1]])
+    )
+
+    if (!nrow(marking_match)) {
+      marking_match <- .kwallm_marking_status_row(NA_character_)
+    }
+
+    dplyr::bind_cols(
+      metadata[rep(1L, nrow(marking_match)), , drop = FALSE],
+      marking_match
+    )
+  }
+
+  build_scope_status_rows <- function(scope_row, response_status) {
+    build_scope_result_rows(
+      scope_row,
+      .kwallm_marking_status_row(response_status)
+    )
+  }
+
+  final_result_columns <- c(
+    "analysis_unit_id",
+    "chunk_id",
+    "chunk_index",
+    "chunk_text",
+    "code",
+    "source_marked_text",
+    "marked_text",
+    "match_start",
+    "match_end",
+    "match_distance",
+    "match_method",
+    "response_status"
   )
 
-  # Split analysis units into semantic chunks, keeping chunk lineage explicit.
-  df <- df |>
-    dplyr::mutate(
-      chunk_text = purrr::map(analysis_unit_text, function(x) {
-        semchunker(x, overlap = overlap_size_tokens)
-      }),
-      chunk_index = purrr::map(chunk_text, seq_along)
-    ) |>
-    tidyr::unnest(c(chunk_text, chunk_index)) |>
-    dplyr::mutate(chunk_id = dplyr::row_number())
+  raw_results <- NULL
+  df_result_clean <- NULL
 
-  # Verify that longest text does not exceed token limit
-  model <- llm_provider$parameters$model
-  n_tokens_context_window <- get_context_window_size_in_tokens(model)
-  if (is.null(n_tokens_context_window)) {
-    n_tokens_context_window <- 2048
-  }
-  longest_prompt_tokens <- mark_text_prompt(
-    text = df$chunk_text[which.max(count_tokens(df$chunk_text))],
-    code = codes[which.max(count_tokens(codes))],
-    research_background = research_background
-  ) |>
-    tidyprompt::construct_prompt_text() |>
-    count_tokens()
-  if (longest_prompt_tokens > n_tokens_context_window) {
-    stop(paste0(
-      "The longest prompt (with longest text, longest code) exceeds the context window token limit of ",
-      n_tokens_context_window,
-      " tokens (the longest prompt has ",
-      longest_prompt_tokens,
-      " tokens)"
-    ))
-  }
-
-  # For each code and chunk, ask the LLM to mark relevant sections.
-  total_combinations <- nrow(df) * length(codes)
-
-  # Guard against runaway cost: the cross-product of split chunks x codes
-  # can grow very large. Default limit is generous but prevents accidents.
-  max_combinations <- getOption("marking__max_combinations", 50000)
-  if (total_combinations > max_combinations) {
-    stop(sprintf(
-      paste0(
-        "Marking would require %d LLM calls (%d text chunks x %d codes), ",
-        "which exceeds the safety limit of %d. ",
-        "Reduce the number of texts, codes, or increase the chunk size."
-      ),
-      total_combinations,
-      nrow(df),
-      length(codes),
-      max_combinations
-    ))
-  }
-
-  current_count <- 0
-  try(
-    {
-      log_info("Marking Step 2: Marking texts...", component = "analysis")
+  if (identical(resume_stage, "marking")) {
+    log_info("Marking Step 1: Splitting texts...", component = "analysis")
+    try(
       progress_set_with_total(
         progress_primary,
-        2,
+        1,
         total_steps,
-        translate(
-          "Teksten markeren..."
-        )
-      )
-      progress_show(progress_secondary)
-      progress_set_with_total(
-        progress_secondary,
-        current_count,
+        translate("Teksten splitsen...")
+      ),
+      silent = TRUE
+    )
+
+    chunker_name <- paste0("semchunker_", text_size_tokens)
+    if (!exists(chunker_name)) {
+      semchunker <- semchunk_load_chunker(chunk_size = text_size_tokens)
+      assign(chunker_name, semchunker, envir = .GlobalEnv)
+    } else {
+      semchunker <- get(chunker_name, envir = .GlobalEnv)
+    }
+
+    df <- tibble::tibble(
+      analysis_unit_id = as.integer(analysis_unit_ids),
+      analysis_unit_text = texts
+    ) |>
+      dplyr::mutate(
+        chunk_text = purrr::map(analysis_unit_text, function(x) {
+          semchunker(x, overlap = overlap_size_tokens)
+        }),
+        chunk_index = purrr::map(chunk_text, seq_along)
+      ) |>
+      tidyr::unnest(c(chunk_text, chunk_index)) |>
+      dplyr::mutate(chunk_id = dplyr::row_number())
+
+    model <- llm_provider$parameters$model
+    n_tokens_context_window <- get_context_window_size_in_tokens(model)
+    if (is.null(n_tokens_context_window)) {
+      n_tokens_context_window <- 2048
+    }
+    longest_prompt_tokens <- mark_text_prompt(
+      text = df$chunk_text[which.max(count_tokens(df$chunk_text))],
+      code = codes[which.max(count_tokens(codes))],
+      research_background = research_background
+    ) |>
+      tidyprompt::construct_prompt_text() |>
+      count_tokens()
+    if (longest_prompt_tokens > n_tokens_context_window) {
+      stop(paste0(
+        "The longest prompt (with longest text, longest code) exceeds the context window token limit of ",
+        n_tokens_context_window,
+        " tokens (the longest prompt has ",
+        longest_prompt_tokens,
+        " tokens)"
+      ))
+    }
+
+    scope_grid <- tidyr::crossing(df, code = codes)
+    total_combinations <- nrow(scope_grid)
+
+    max_combinations <- getOption("marking__max_combinations", 50000)
+    if (total_combinations > max_combinations) {
+      stop(sprintf(
+        paste0(
+          "Marking would require %d LLM calls (%d text chunks x %d codes), ",
+          "which exceeds the safety limit of %d. ",
+          "Reduce the number of texts, codes, or increase the chunk size."
+        ),
         total_combinations,
-        "..."
-      )
-    },
-    silent = TRUE
-  )
-  df_result <- df |>
-    tidyr::crossing(code = codes) |>
-    dplyr::mutate(
-      marking_match = purrr::pmap(
-        list(chunk_text, code, analysis_unit_id, chunk_id, chunk_index),
-        function(txt, cd, analysis_unit_id, chunk_id, chunk_index) {
-          current_count <<- current_count + 1
-          if (current_count == 1 || current_count %% 10 == 0) {
-            log_info(
-              sprintf(
-                "Marking progress: %d/%d",
-                current_count,
-                total_combinations
-              ),
-              component = "analysis"
+        nrow(df),
+        length(codes),
+        max_combinations
+      ))
+    }
+
+    raw_results <- if (is.null(existing_results)) {
+      empty_marking_results()
+    } else {
+      tibble::as_tibble(existing_results)
+    }
+
+    try(
+      {
+        log_info("Marking Step 2: Marking texts...", component = "analysis")
+        progress_set_with_total(
+          progress_primary,
+          2,
+          total_steps,
+          translate("Teksten markeren...")
+        )
+        progress_show(progress_secondary)
+        progress_set_with_total(
+          progress_secondary,
+          start_index - 1L,
+          total_combinations,
+          "..."
+        )
+      },
+      silent = TRUE
+    )
+
+    for (i in seq.int(start_index, total_combinations)) {
+      scope_row <- scope_grid[i, , drop = FALSE]
+      current_code <- as.character(scope_row$code[[1]])
+      current_chunk_text <- as.character(scope_row$chunk_text[[1]])
+      current_analysis_unit_id <- as.integer(scope_row$analysis_unit_id[[1]])
+      current_chunk_id <- as.integer(scope_row$chunk_id[[1]])
+      current_chunk_index <- as.integer(scope_row$chunk_index[[1]])
+
+      if (i == 1L || i %% 10L == 0L) {
+        log_info(
+          sprintf("Marking progress: %d/%d", i, total_combinations),
+          component = "analysis"
+        )
+      }
+
+      try(
+        {
+          progress_set_with_total(
+            progress_secondary,
+            i,
+            total_combinations,
+            paste0(
+              translate("Tekst markeren voor code '"),
+              current_code,
+              "'..."
             )
-          }
-          try(
-            {
-              progress_set_with_total(
-                progress_secondary,
-                current_count,
-                total_combinations,
-                paste0(
-                  translate("Tekst markeren voor code '"),
-                  cd,
-                  "'..."
-                )
-              )
-            },
-            silent = TRUE
           )
+        },
+        silent = TRUE
+      )
 
-          if (!is.null(interrupter)) {
-            interrupter$execInterrupts()
-          }
+      if (!is.null(interrupter)) {
+        interrupter$execInterrupts()
+      }
 
-          prompt <- mark_text_prompt(
-            txt,
-            cd,
-            research_background = research_background,
-            max_interactions = max_interactions
-          )
-          result <- send_prompt_with_retries(
+      prompt <- mark_text_prompt(
+        current_chunk_text,
+        current_code,
+        research_background = research_background,
+        max_interactions = max_interactions
+      )
+
+      failure_message <- NULL
+      result <- if (identical(failure_action, "return_decision")) {
+        tryCatch(
+          send_prompt_with_retries(
             prompt,
             llm_provider,
             max_interactions = max_interactions,
             execution_scope = list(
               kind = "chunk_code",
-              analysis_unit_ids = as.integer(analysis_unit_id),
-              chunk_ids = as.integer(chunk_id),
-              chunk_indexes = as.integer(chunk_index),
+              analysis_unit_ids = current_analysis_unit_id,
+              chunk_ids = current_chunk_id,
+              chunk_indexes = current_chunk_index,
               subject_kind = "code",
-              subject_value = as.character(cd)
+              subject_value = current_code
             )
+          ),
+          error = function(e) {
+            failure_message <<- conditionMessage(e)
+            NULL
+          }
+        )
+      } else {
+        send_prompt_with_retries(
+          prompt,
+          llm_provider,
+          max_interactions = max_interactions,
+          execution_scope = list(
+            kind = "chunk_code",
+            analysis_unit_ids = current_analysis_unit_id,
+            chunk_ids = current_chunk_id,
+            chunk_indexes = current_chunk_index,
+            subject_kind = "code",
+            subject_value = current_code
           )
+        )
+      }
 
-          .kwallm_normalize_marking_matches(txt, result)
-        }
-      )
-    ) |>
-    tidyr::unnest(
-      marking_match,
-      keep_empty = TRUE
-    ) # Keep chunk/code rows even when nothing was marked.
-  try(
-    {
-      progress_hide(progress_secondary)
-      progress_set_with_total(
-        progress_primary,
-        2.5,
-        total_steps,
-        translate(
-          "Resultaten opschonen..."
+      if (is.null(result) && identical(failure_action, "return_decision")) {
+        progress_hide(progress_secondary)
+        return(list(
+          status = "decision_required",
+          resume_stage = "marking",
+          scope_kind = "chunk_code",
+          failed_index = as.integer(i),
+          total_scopes = as.integer(total_combinations),
+          subject_kind = "code",
+          subject_value = current_code,
+          failed_analysis_unit_ids = current_analysis_unit_id,
+          failed_text = current_chunk_text,
+          failure_message = failure_message %||%
+            paste0(
+              "Failed to mark text for code '",
+              current_code,
+              "'."
+            ),
+          results = raw_results,
+          skip_row = build_scope_status_rows(
+            scope_row,
+            response_status = "failed_after_retries"
+          )
+        ))
+      }
+
+      raw_results <- dplyr::bind_rows(
+        raw_results,
+        build_scope_result_rows(
+          scope_row,
+          .kwallm_normalize_marking_matches(current_chunk_text, result)
         )
       )
-    },
-    silent = TRUE
+    }
+
+    try(
+      {
+        progress_hide(progress_secondary)
+        progress_set_with_total(
+          progress_primary,
+          2.5,
+          total_steps,
+          translate("Resultaten opschonen...")
+        )
+      },
+      silent = TRUE
+    )
+
+    df_result_clean <- .kwallm_marking_clean_results(raw_results)
+  } else {
+    stopifnot(!is.null(existing_results))
+    df_result_clean <- tibble::as_tibble(existing_results)
+  }
+
+  df_result_clean <- dplyr::select(
+    df_result_clean,
+    dplyr::all_of(final_result_columns)
   )
 
-  # Clean up the result. Keep distinct matched spans and only collapse overlap
-  # duplicates when the same absolute span can be resolved back into the full
-  # analysis-unit text.
-  df_result_clean <- .kwallm_marking_clean_results(df_result)
+  paragraphs <- paragraph_entries
 
-  paragraphs <- NULL
-
-  # Write paragraphs if requested
   if (write_paragraphs) {
     try(
       {
@@ -296,112 +410,71 @@ mark_texts <- function(
       silent = TRUE
     )
 
-    # Build one highlighted excerpt per matched span. This keeps paragraph
-    # evidence tied to the exact snippet the model matched instead of globally
-    # replacing every repeated string in the full analysis-unit text.
     text_list <- .kwallm_marking_collect_paragraph_inputs(df_result_clean)
-
-    # Create paragraphs for each code
-    try(
-      {
-        progress_set_with_total(
-          progress_secondary,
-          0,
-          length(text_list),
-          "..."
-        )
-        progress_show(progress_secondary)
+    paragraph_output <- write_grouped_paragraphs(
+      grouped_texts = text_list,
+      research_background = research_background,
+      style_prompt = style_prompt,
+      llm_provider = llm_provider,
+      lang = lang,
+      subject_kind = "code",
+      focus_on_highlighted_text = TRUE,
+      progress_secondary = progress_secondary,
+      interrupter = interrupter,
+      llm_stream_async = llm_stream_async,
+      streaming_enabled = streaming_enabled,
+      existing_paragraphs = if (
+        identical(resume_stage, "paragraph_generation")
+      ) {
+        paragraph_entries
+      } else {
+        NULL
       },
-      silent = TRUE
+      start_index = if (identical(resume_stage, "paragraph_generation")) {
+        start_index
+      } else {
+        1L
+      },
+      failure_action = failure_action
     )
 
-    # Create streaming callback if streaming is enabled
-    stream_callback <- NULL
-    if (streaming_enabled && !is.null(llm_stream_async)) {
-      try(llm_stream_async$show())
-      stream_callback <- function(token, meta) {
-        llm_stream_async$set(meta$partial_response %||% "")
-        invisible(TRUE)
-      }
+    if (
+      identical(failure_action, "return_decision") &&
+        identical(paragraph_output$status %||% NULL, "decision_required")
+    ) {
+      paragraph_output$results <- df_result_clean
+      return(paragraph_output)
     }
 
-    i <- -1
-    paragraphs <- purrr::imap(
-      text_list,
-      function(paragraph_input, code) {
-        i <<- i + 1
-        if (!is.null(interrupter)) {
-          interrupter$execInterrupts()
-        }
+    paragraphs <- if (identical(failure_action, "return_decision")) {
+      paragraph_output$paragraphs %||% list()
+    } else {
+      paragraph_output
+    }
 
-        try(
-          {
-            progress_set_with_total(
-              progress_secondary,
-              i,
-              length(text_list),
-              paste0(
-                translate("Schrijven over '"),
-                code,
-                "'..."
-              )
-            )
-          },
-          silent = TRUE
-        )
-
-        # Clear streaming panel before this paragraph
-        if (streaming_enabled && !is.null(llm_stream_async)) {
-          try(llm_stream_async$clear())
-        }
-
-        paragraph <- write_paragraph(
-          texts = paragraph_input$texts,
-          analysis_unit_ids = paragraph_input$analysis_unit_ids,
-          topic = code,
-          subject_kind = "code",
-          research_background = research_background,
-          style_prompt = style_prompt,
-          llm_provider = llm_provider,
-          language = paragraph_language,
-          focus_on_highlighted_text = TRUE,
-          stream_callback = stream_callback
-        )
-
-        return(paragraph)
-      }
-    )
     try(
-      {
-        progress_hide(progress_secondary)
-        progress_set_with_total(
-          progress_primary,
-          3.5,
-          total_steps,
-          translate("Afronden...")
-        )
-      },
+      progress_set_with_total(
+        progress_primary,
+        3.5,
+        total_steps,
+        translate("Afronden...")
+      ),
       silent = TRUE
     )
-
-    attr(df_result_clean, "paragraphs") <- paragraphs
+  } else {
+    paragraphs <- NULL
   }
 
-  df_result_clean |>
-    dplyr::select(
-      analysis_unit_id,
-      chunk_id,
-      chunk_index,
-      chunk_text,
-      code,
-      source_marked_text,
-      marked_text,
-      match_start,
-      match_end,
-      match_distance,
-      match_method,
-      response_status
-    )
+  if (identical(failure_action, "return_decision")) {
+    return(list(
+      status = "completed",
+      results = df_result_clean,
+      paragraphs = paragraphs
+    ))
+  }
+
+  attr(df_result_clean, "paragraphs") <- paragraphs
+  df_result_clean
 }
 
 

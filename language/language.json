@@ -1500,6 +1500,46 @@
       {
         "nl": "Sectie",
         "en": "Section"
+      },
+      {
+        "nl": "[geen tekst beschikbaar]",
+        "en": "[no text available]"
+      },
+      {
+        "nl": "Analyse-eenheid mislukt",
+        "en": "Analysis unit failed"
+      },
+      {
+        "nl": "De limiet voor automatisch overslaan is bereikt. Kies hieronder of je deze analyse-eenheid opnieuw wilt proberen of alsnog handmatig wilt overslaan.",
+        "en": "The automatic-skip limit has been reached. Choose below whether to retry this analysis unit or skip it manually."
+      },
+      {
+        "nl": "De limiet voor automatisch overslaan is bereikt. Nieuwe fouten stoppen de analyse volledig.",
+        "en": "The automatic-skip limit has been reached. New failures will stop the analysis entirely."
+      },
+      {
+        "nl": "Analyse-eenheid %d van %d kon niet worden verwerkt nadat de standaard retries zijn uitgeput.",
+        "en": "Analysis unit %d of %d could not be processed after the default retries were exhausted."
+      },
+      {
+        "nl": "Onbekende fout.",
+        "en": "Unknown error."
+      },
+      {
+        "nl": "Tekstvoorbeeld:",
+        "en": "Text preview:"
+      },
+      {
+        "nl": "Sla analyse-eenheid over",
+        "en": "Skip analysis unit"
+      },
+      {
+        "nl": "Probeer opnieuw",
+        "en": "Retry"
+      },
+      {
+        "nl": "Geen voltooide analyse-eenheden aanwezig; kan geen interrater-reliability berekenen",
+        "en": "No completed analysis units available; cannot calculate interrater reliability"
       }
   ]
 }

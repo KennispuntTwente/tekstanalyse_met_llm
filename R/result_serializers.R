@@ -101,12 +101,14 @@ analysis_result_to_metadata_list <- function(analysis_result) {
       categorization = list(
         labels = .kwallm_df_to_records(analysis_result@results@labels),
         multi_label = analysis_result@results@multi_label,
+        responses = .kwallm_df_to_records(analysis_result@results@responses),
         assignments = .kwallm_df_to_records(
           analysis_result@results@assignments
         )
       ),
       scoring = list(
         scores = .kwallm_df_to_records(analysis_result@results@scores),
+        responses = .kwallm_df_to_records(analysis_result@results@responses),
         characteristic = analysis_result@results@characteristic,
         scale_min = analysis_result@results@scale_min,
         scale_max = analysis_result@results@scale_max
@@ -134,6 +136,7 @@ analysis_result_to_metadata_list <- function(analysis_result) {
         ),
         labels = .kwallm_df_to_records(analysis_result@results@labels),
         multi_label = analysis_result@results@multi_label,
+        responses = .kwallm_df_to_records(analysis_result@results@responses),
         assignments = .kwallm_df_to_records(
           analysis_result@results@assignments
         )
@@ -252,10 +255,12 @@ analysis_result_to_export_sheets <- function(analysis_result) {
     inherits(analysis_result@results, c("CategorizationResult", "TopicResult"))
   ) {
     sheets$labels <- analysis_result@results@labels
+    sheets$responses <- analysis_result@results@responses
     sheets$assignments <- analysis_result@results@assignments
   }
 
   if (inherits(analysis_result@results, "ScoringResult")) {
+    sheets$responses <- analysis_result@results@responses
     sheets$scores <- analysis_result@results@scores
   }
 
@@ -364,23 +369,44 @@ write_analysis_result_metadata_json <- function(
   result <- analysis_result@results
   base <- .kwallm_document_unit_map(analysis_result)
   labels_lookup <- .kwallm_labels_lookup(result@labels)
+  response_df <- result@responses[
+    c("analysis_unit_id", "response_status", "response_error_message"),
+    drop = FALSE
+  ]
 
   if (!isTRUE(result@multi_label)) {
     assignments <- result@assignments
     assignments$result <- labels_lookup[as.character(assignments$label_id)]
     merged <- merge(
-      base,
+      transform(base, .row_id = seq_len(nrow(base))),
       assignments[c("analysis_unit_id", "result")],
       by = "analysis_unit_id",
       all.x = TRUE,
-      all.y = FALSE
+      all.y = FALSE,
+      sort = FALSE
     )
-    out <- merged[c("document_id", "document_text", "result")]
-    names(out) <- c("document_id", "text", "result")
+    merged <- merge(
+      merged,
+      response_df,
+      by = "analysis_unit_id",
+      all.x = TRUE,
+      all.y = FALSE,
+      sort = FALSE
+    )
+    merged <- merged[order(merged$.row_id), , drop = FALSE]
+    out <- merged[c(
+      "document_id",
+      "document_text",
+      "result",
+      "response_status",
+      "response_error_message"
+    )]
+    names(out)[1:2] <- c("document_id", "text")
     return(out)
   }
 
   out <- data.frame(
+    analysis_unit_id = base$analysis_unit_id,
     document_id = base$document_id,
     text = base$document_text,
     stringsAsFactors = FALSE
@@ -400,6 +426,32 @@ write_analysis_result_metadata_json <- function(
     out[[label_text]] <- base$analysis_unit_id %in% unit_ids
   }
 
+  out <- merge(
+    transform(out, .row_id = seq_len(nrow(out))),
+    response_df,
+    by = "analysis_unit_id",
+    all.x = TRUE,
+    all.y = FALSE,
+    sort = FALSE
+  )
+  out <- out[order(out$.row_id), , drop = FALSE]
+
+  skipped_rows <- !is.na(out$response_status) &
+    out$response_status != "completed"
+  if (any(skipped_rows)) {
+    for (label in result@labels$label_text) {
+      out[[label]][skipped_rows] <- NA
+    }
+  }
+
+  out <- out[c(
+    "document_id",
+    "text",
+    result@labels$label_text,
+    "response_status",
+    "response_error_message"
+  )]
+
   out
 }
 
@@ -408,17 +460,37 @@ write_analysis_result_metadata_json <- function(
 .kwallm_report_results_df_scoring <- function(analysis_result) {
   result <- analysis_result@results
   base <- .kwallm_document_unit_map(analysis_result)
+  response_df <- result@responses[
+    c("analysis_unit_id", "response_status", "response_error_message"),
+    drop = FALSE
+  ]
 
   merged <- merge(
-    base,
+    transform(base, .row_id = seq_len(nrow(base))),
     result@scores,
     by = "analysis_unit_id",
     all.x = TRUE,
-    all.y = FALSE
+    all.y = FALSE,
+    sort = FALSE
   )
+  merged <- merge(
+    merged,
+    response_df,
+    by = "analysis_unit_id",
+    all.x = TRUE,
+    all.y = FALSE,
+    sort = FALSE
+  )
+  merged <- merged[order(merged$.row_id), , drop = FALSE]
 
-  out <- merged[c("document_id", "document_text", "score")]
-  names(out) <- c("document_id", "text", "result")
+  out <- merged[c(
+    "document_id",
+    "document_text",
+    "score",
+    "response_status",
+    "response_error_message"
+  )]
+  names(out)[1:3] <- c("document_id", "text", "result")
   out
 }
 
@@ -628,6 +700,42 @@ write_analysis_result_metadata_json <- function(
 # This keeps the wording consistent with the exported metadata fields.
 .kwallm_report_text_count_summary <- function(analysis_result) {
   counts <- .kwallm_analysis_result_text_counts(analysis_result)
+  response_rows <- switch(
+    analysis_result@metadata@mode,
+    "Categorisatie" = analysis_result@results@responses,
+    "Scoren" = analysis_result@results@responses,
+    "Onderwerpextractie" = analysis_result@results@responses,
+    NULL
+  )
+  response_summary <- NULL
+
+  if (is.data.frame(response_rows) && nrow(response_rows) > 0) {
+    completed_count <- sum(
+      is.na(response_rows$response_status) |
+        response_rows$response_status == "completed"
+    )
+    skipped_count <- nrow(response_rows) - completed_count
+
+    if (skipped_count > 0) {
+      if (identical(analysis_result@metadata@language, "nl")) {
+        response_summary <- paste0(
+          "daarvan zijn ",
+          completed_count,
+          " analyse-eenheden voltooid en ",
+          skipped_count,
+          " overgeslagen"
+        )
+      } else {
+        response_summary <- paste0(
+          "of those, ",
+          completed_count,
+          " analysis units completed and ",
+          skipped_count,
+          " were skipped"
+        )
+      }
+    }
+  }
 
   if (identical(analysis_result@metadata@language, "nl")) {
     parts <- c(
@@ -653,6 +761,10 @@ write_analysis_result_metadata_json <- function(
       )
     )
 
+    if (!is.null(response_summary)) {
+      parts <- c(parts, response_summary)
+    }
+
     return(paste0(paste(parts, collapse = "; "), "."))
   }
 
@@ -675,6 +787,10 @@ write_analysis_result_metadata_json <- function(
     parts,
     paste0(counts$analysis_units, " unique texts were sent to the LLM")
   )
+
+  if (!is.null(response_summary)) {
+    parts <- c(parts, response_summary)
+  }
 
   paste0(paste(parts, collapse = "; "), ".")
 }

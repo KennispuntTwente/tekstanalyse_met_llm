@@ -134,6 +134,14 @@ options(
   send_prompt_with_retries__retry_delay_seconds = 3,
   send_prompt_with_retries__max_interactions = 10,
 
+  # - Behaviour when a single analysis unit still fails after default retries;
+  #   "ask" shows a retry/skip modal, while "skip" auto-skips failed units.
+  #   max_auto_skips limits auto-skips when action = "skip"; after reaching
+  #   the limit, "ask" shows the modal and "fail" aborts the full run.
+  analysis_unit_failure__action = "ask",
+  analysis_unit_failure__max_auto_skips = NULL,
+  analysis_unit_failure__on_max_auto_skips = "ask",
+
   # - Prompt/response tracing (privacy-sensitive; disabled by default)
   #   Log prompts & replies to a separate trace file (under logs/prompt_logs/)
   #   Optional: override the trace file location

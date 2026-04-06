@@ -340,6 +340,17 @@
   )
 }
 
+# Builds an empty analysis-unit response table.
+# We use this for categorization, scoring, and topic assignment status rows.
+.kwallm_empty_analysis_unit_responses <- function() {
+  data.frame(
+    analysis_unit_id = integer(),
+    response_status = character(),
+    response_error_message = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
 # Builds an empty codes table.
 # We use this as the default for marking-code metadata.
 .kwallm_empty_codes <- function() {
@@ -782,6 +793,15 @@ CategorizationResult <- S7::new_class(
       default = quote(.kwallm_empty_assignments()),
       validator = .kwallm_validate_df_columns(c("analysis_unit_id", "label_id"))
     ),
+    responses = S7::new_property(
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_analysis_unit_responses()),
+      validator = .kwallm_validate_df_columns(c(
+        "analysis_unit_id",
+        "response_status",
+        "response_error_message"
+      ))
+    ),
     multi_label = S7::new_property(
       S7::class_logical,
       default = FALSE,
@@ -801,6 +821,12 @@ CategorizationResult <- S7::new_class(
         !all(self@assignments$label_id %in% self@labels$label_id)
     ) {
       problems <- c(problems, "assignments$label_id must reference labels")
+    }
+    if (anyDuplicated(self@responses$analysis_unit_id)) {
+      problems <- c(
+        problems,
+        "responses$analysis_unit_id must contain at most one row per analysis_unit_id"
+      )
     }
     if (
       !isTRUE(self@multi_label) &&
@@ -825,6 +851,15 @@ ScoringResult <- S7::new_class(
       default = quote(.kwallm_empty_scores()),
       validator = .kwallm_validate_df_columns(c("analysis_unit_id", "score"))
     ),
+    responses = S7::new_property(
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_analysis_unit_responses()),
+      validator = .kwallm_validate_df_columns(c(
+        "analysis_unit_id",
+        "response_status",
+        "response_error_message"
+      ))
+    ),
     characteristic = S7::new_property(
       S7::class_character,
       validator = .kwallm_validate_scalar_string()
@@ -844,6 +879,12 @@ ScoringResult <- S7::new_class(
     problems <- character()
     if (anyDuplicated(self@scores$analysis_unit_id)) {
       problems <- c(problems, "scores$analysis_unit_id must be unique")
+    }
+    if (anyDuplicated(self@responses$analysis_unit_id)) {
+      problems <- c(
+        problems,
+        "responses$analysis_unit_id must contain at most one row per analysis_unit_id"
+      )
     }
     if (
       nrow(self@scores) > 0 &&
@@ -885,6 +926,15 @@ TopicResult <- S7::new_class(
       default = quote(.kwallm_empty_assignments()),
       validator = .kwallm_validate_df_columns(c("analysis_unit_id", "label_id"))
     ),
+    responses = S7::new_property(
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_analysis_unit_responses()),
+      validator = .kwallm_validate_df_columns(c(
+        "analysis_unit_id",
+        "response_status",
+        "response_error_message"
+      ))
+    ),
     multi_label = S7::new_property(
       S7::class_logical,
       default = FALSE,
@@ -905,6 +955,12 @@ TopicResult <- S7::new_class(
         !all(self@assignments$label_id %in% self@labels$label_id)
     ) {
       problems <- c(problems, "assignments$label_id must reference labels")
+    }
+    if (anyDuplicated(self@responses$analysis_unit_id)) {
+      problems <- c(
+        problems,
+        "responses$analysis_unit_id must contain at most one row per analysis_unit_id"
+      )
     }
     if (
       !isTRUE(self@multi_label) &&

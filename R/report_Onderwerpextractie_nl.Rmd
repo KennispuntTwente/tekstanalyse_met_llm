@@ -15,6 +15,14 @@ analysis_result <- params$analysis_result
 stopifnot(inherits(analysis_result, "AnalysisResult"))
 
 report_df <- .kwallm_report_results_df(analysis_result)
+report_df_completed <- if ("response_status" %in% names(report_df)) {
+  dplyr::filter(
+    report_df,
+    is.na(response_status) | response_status == "completed"
+  )
+} else {
+  report_df
+}
 group_lookup <- .kwallm_report_group_lookup(analysis_result)
 result_payload <- analysis_result@results
 assign_multiple_categories <- isTRUE(result_payload@multi_label)
@@ -138,38 +146,69 @@ deze zijn genoemd in de teksten.
 ```{r, echo=FALSE, results='asis', error=TRUE}
 
 if (!assign_multiple_categories) {
-  report_df |>
-  dplyr::group_by(result) |>
-  dplyr::summarise(
-    Aantal = dplyr::n(),
-    Percentage = round(dplyr::n() / nrow(report_df) * 100, 2)
-  ) |>
-  dplyr::arrange(dplyr::desc(Aantal)) |>
-  dplyr::rename(Onderwerp = result) |>
-  DT::datatable(
-    rownames = FALSE,
-    extensions = 'Buttons',
-    options = get_datatable_options(additional_options = list(fixedHeader = TRUE))
-  )
-} else {
-  report_df |>
-    dplyr::select(-dplyr::any_of(c("document_id", "text"))) |>
-    # For each binary category column, count the number of TRUE values
-    dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(.x, na.rm = TRUE))) |>
-    tidyr::pivot_longer(
-      cols = dplyr::everything(),
-      names_to = "Onderwerp",
-      values_to = "Aantal"
+  if (nrow(report_df_completed) == 0L) {
+    tibble::tibble(
+      Onderwerp = result_payload@labels$label_text,
+      Aantal = 0L,
+      Percentage = 0
     ) |>
-    dplyr::mutate(
-      Percentage = round(Aantal / nrow(report_df) * 100, 2)
+      DT::datatable(
+        rownames = FALSE,
+        extensions = 'Buttons',
+        options = get_datatable_options(additional_options = list(fixedHeader = TRUE))
+      )
+  } else {
+    report_df_completed |>
+    dplyr::group_by(result) |>
+    dplyr::summarise(
+      Aantal = dplyr::n(),
+      Percentage = round(dplyr::n() / nrow(report_df_completed) * 100, 2)
     ) |>
     dplyr::arrange(dplyr::desc(Aantal)) |>
+    dplyr::rename(Onderwerp = result) |>
     DT::datatable(
       rownames = FALSE,
       extensions = 'Buttons',
-      options = get_datatable_options()
+      options = get_datatable_options(additional_options = list(fixedHeader = TRUE))
     )
+  }
+} else {
+  topic_cols <- setdiff(
+    names(report_df_completed),
+    c("document_id", "text", "response_status", "response_error_message")
+  )
+
+  if (nrow(report_df_completed) == 0L) {
+    tibble::tibble(
+      Onderwerp = topic_cols,
+      Aantal = 0L,
+      Percentage = 0
+    ) |>
+      dplyr::arrange(dplyr::desc(Aantal)) |>
+      DT::datatable(
+        rownames = FALSE,
+        extensions = 'Buttons',
+        options = get_datatable_options()
+      )
+  } else {
+    report_df_completed |>
+      dplyr::select(dplyr::all_of(topic_cols)) |>
+      dplyr::summarise(dplyr::across(dplyr::everything(), ~ sum(.x, na.rm = TRUE))) |>
+      tidyr::pivot_longer(
+        cols = dplyr::everything(),
+        names_to = "Onderwerp",
+        values_to = "Aantal"
+      ) |>
+      dplyr::mutate(
+        Percentage = round(Aantal / nrow(report_df_completed) * 100, 2)
+      ) |>
+      dplyr::arrange(dplyr::desc(Aantal)) |>
+      DT::datatable(
+        rownames = FALSE,
+        extensions = 'Buttons',
+        options = get_datatable_options()
+      )
+  }
 }
 
 
@@ -177,7 +216,7 @@ if (!assign_multiple_categories) {
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 # Show grouped frequencies if by_column is specified
-if (!is.null(by_column_name) && !is.null(group_lookup)) {
+if (!is.null(by_column_name) && !is.null(group_lookup) && nrow(report_df_completed) > 0L) {
   cat("\n### Frequentie per groep\n\n")
   cat(paste0(
     "Onderstaande tabel toont hoe vaak elk onderwerp is toegewezen, ",
@@ -187,10 +226,10 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
 ```
 
 ```{r echo=FALSE, results='asis', error=TRUE}
-if (!is.null(by_column_name) && !is.null(group_lookup)) {
+if (!is.null(by_column_name) && !is.null(group_lookup) && nrow(report_df_completed) > 0L) {
   if (!assign_multiple_categories) {
     generate_grouped_topic_table_single(
-      df = report_df,
+      df = report_df_completed,
       by_values = group_lookup,
       by_column_name = by_column_name,
       categories = result_payload@labels$label_text,
@@ -198,9 +237,12 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
     )
   } else {
     # Get topic columns (excluding report identity columns)
-    topic_cols <- setdiff(names(report_df), c("document_id", "text"))
+    topic_cols <- setdiff(
+      names(report_df_completed),
+      c("document_id", "text", "response_status", "response_error_message")
+    )
     generate_grouped_topic_table_multi(
-      df = report_df,
+      df = report_df_completed,
       by_values = group_lookup,
       by_column_name = by_column_name,
       categories = topic_cols,
@@ -217,8 +259,18 @@ Onderstaande tabel toont per tekst welk onderwerp deze heeft gekregen.
 ```{r, echo=FALSE, results='asis', error=TRUE}
 if (!assign_multiple_categories) {
   report_df |>
-  dplyr::select(result, text) |>
-  dplyr::rename(Tekst = text, Onderwerp = result) |>
+  dplyr::select(dplyr::any_of(c(
+    "result",
+    "response_status",
+    "response_error_message",
+    "text"
+  ))) |>
+  dplyr::rename(
+    Tekst = text,
+    Onderwerp = result,
+    Responsestatus = response_status,
+    `Foutmelding response` = response_error_message
+  ) |>
   dplyr::arrange(dplyr::desc(Onderwerp)) |>
   DT::datatable(
     extensions = 'Buttons',
@@ -226,7 +278,11 @@ if (!assign_multiple_categories) {
   )
 } else {
   report_df |>
-    dplyr::rename(Tekst = text) |>
+    dplyr::rename(
+      Tekst = text,
+      Responsestatus = response_status,
+      `Foutmelding response` = response_error_message
+    ) |>
     dplyr::arrange(dplyr::desc(Tekst)) |>
     DT::datatable(
       options = get_datatable_options()

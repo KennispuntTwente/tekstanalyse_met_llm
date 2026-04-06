@@ -257,11 +257,20 @@ prompt_multi_category <- function(
 #' @param on_progress Optional callback function(i, n, text) called after each text
 #' @param interrupter Optional object with \code{$execInterrupts()} method for
 #'   cancellation support (e.g., \code{ipc::AsyncInterruptor})
+#' @param start_index Optional 1-based start index for resuming a partially
+#'   completed run.
+#' @param existing_results Optional existing results data frame to resume from.
+#' @param failure_action Either \code{"error"} to keep legacy fail-fast
+#'   behavior, or \code{"return_decision"} to return a structured payload when
+#'   one analysis unit exhausts retries.
 #'
 #' @return A data.frame with column \code{text}. When
 #'   \code{assign_multiple_categories = FALSE}, the result also contains a
 #'   single \code{result} column. When \code{assign_multiple_categories = TRUE},
-#'   the result contains one logical column per category.
+#'   the result contains one logical column per category. When
+#'   \code{failure_action = "return_decision"} and one analysis unit fails, a
+#'   named list is returned with \code{status = "decision_required"}, the
+#'   partial \code{results}, failure details, and a suggested \code{skip_row}.
 #' @export
 categorize_texts <- function(
   texts,
@@ -274,8 +283,14 @@ categorize_texts <- function(
   verbose = FALSE,
   show_progress = FALSE,
   on_progress = NULL,
-  interrupter = NULL
+  interrupter = NULL,
+  start_index = 1L,
+  existing_results = NULL,
+  failure_action = c("error", "return_decision")
 ) {
+  failure_action <- match.arg(failure_action)
+  start_index <- as.integer(start_index)
+
   stopifnot(
     is.character(texts),
     length(texts) > 0,
@@ -289,16 +304,127 @@ categorize_texts <- function(
   if (assign_multiple_categories) {
     stopifnot(all(exclusive_categories %in% categories))
   }
+  stopifnot(
+    length(start_index) == 1,
+    !is.na(start_index),
+    start_index >= 1L,
+    start_index <= length(texts) + 1L
+  )
 
   stage_options <- options(kwallm__prompt_execution_stage = "categorization")
   on.exit(options(stage_options), add = TRUE)
 
+  build_empty_results <- function() {
+    results_df <- data.frame(
+      analysis_unit_id = integer(),
+      text = character(),
+      stringsAsFactors = FALSE
+    )
+
+    if (assign_multiple_categories) {
+      for (category in categories) {
+        results_df[[category]] <- logical()
+      }
+    } else {
+      results_df$result <- character()
+    }
+
+    results_df$response_status <- character()
+    results_df$response_error_message <- character()
+    results_df
+  }
+
+  normalize_existing_results <- function(df) {
+    if (is.null(df)) {
+      return(build_empty_results())
+    }
+
+    df <- as.data.frame(df, stringsAsFactors = FALSE)
+    df$analysis_unit_id <- as.integer(df$analysis_unit_id)
+    df$text <- as.character(df$text)
+
+    if (assign_multiple_categories) {
+      for (category in categories) {
+        if (!category %in% names(df)) {
+          df[[category]] <- rep(NA, nrow(df))
+        }
+        df[[category]] <- as.logical(df[[category]])
+      }
+    } else {
+      if (!"result" %in% names(df)) {
+        df$result <- rep(NA_character_, nrow(df))
+      }
+      df$result <- as.character(df$result)
+    }
+
+    if (!"response_status" %in% names(df)) {
+      df$response_status <- rep("completed", nrow(df))
+    }
+    if (!"response_error_message" %in% names(df)) {
+      df$response_error_message <- rep(NA_character_, nrow(df))
+    }
+
+    df$response_status <- as.character(df$response_status)
+    df$response_error_message <- as.character(df$response_error_message)
+    df
+  }
+
+  build_success_row <- function(i, result) {
+    row <- data.frame(
+      analysis_unit_id = as.integer(analysis_unit_ids[[i]]),
+      text = texts[[i]],
+      stringsAsFactors = FALSE
+    )
+
+    if (assign_multiple_categories) {
+      selected_categories <- as.character(result)
+      for (category in categories) {
+        row[[category]] <- category %in% selected_categories
+      }
+    } else {
+      row$result <- as.character(result)
+    }
+
+    row$response_status <- "completed"
+    row$response_error_message <- NA_character_
+    row
+  }
+
+  build_skip_row <- function(i, message) {
+    row <- data.frame(
+      analysis_unit_id = as.integer(analysis_unit_ids[[i]]),
+      text = texts[[i]],
+      stringsAsFactors = FALSE
+    )
+
+    if (assign_multiple_categories) {
+      for (category in categories) {
+        row[[category]] <- NA
+      }
+    } else {
+      row$result <- NA_character_
+    }
+
+    row$response_status <- "skipped"
+    row$response_error_message <- as.character(message)
+    row
+  }
+
+  finalize_results <- function(df) {
+    if (!nrow(df)) {
+      return(df)
+    }
+
+    order_index <- match(df$analysis_unit_id, as.integer(analysis_unit_ids))
+    df[order(order_index), , drop = FALSE]
+  }
+
   llm_provider <- llm_provider$clone()
   llm_provider$verbose <- verbose
   n <- length(texts)
-  results <- vector("list", n)
+  results_df <- normalize_existing_results(existing_results)
 
-  for (i in seq_along(texts)) {
+  for (i in seq.int(start_index, n)) {
     if (!is.null(interrupter)) {
       interrupter$execInterrupts()
     }
@@ -323,54 +449,68 @@ categorize_texts <- function(
       )
     }
 
-    result <- send_prompt_with_retries(
-      prompt,
-      llm_provider,
-      execution_scope = list(
-        kind = "analysis_unit",
-        analysis_unit_ids = as.integer(analysis_unit_ids[[i]])
+    failure_message <- NULL
+
+    result <- if (identical(failure_action, "return_decision")) {
+      tryCatch(
+        send_prompt_with_retries(
+          prompt,
+          llm_provider,
+          execution_scope = list(
+            kind = "analysis_unit",
+            analysis_unit_ids = as.integer(analysis_unit_ids[[i]])
+          )
+        ),
+        error = function(e) {
+          failure_message <<- conditionMessage(e)
+          NA_character_
+        }
       )
-    )
-    results[[i]] <- result
+    } else {
+      send_prompt_with_retries(
+        prompt,
+        llm_provider,
+        execution_scope = list(
+          kind = "analysis_unit",
+          analysis_unit_ids = as.integer(analysis_unit_ids[[i]])
+        )
+      )
+    }
+
+    if (length(result) == 1 && is.na(result)) {
+      if (identical(failure_action, "return_decision")) {
+        failure_message <- failure_message %||%
+          "The categorization prompt did not produce a valid result after retrying."
+
+        return(list(
+          status = "decision_required",
+          results = finalize_results(results_df),
+          failed_index = as.integer(i),
+          failed_analysis_unit_id = as.integer(analysis_unit_ids[[i]]),
+          failed_text = text,
+          failure_message = failure_message,
+          skip_row = build_skip_row(i, failure_message)
+        ))
+      }
+
+      break
+    }
+
+    results_df <- rbind(results_df, build_success_row(i, result))
 
     if (!is.null(on_progress)) {
       on_progress(i, n, text)
     }
-
-    if (length(result) == 1 && is.na(result)) break
   }
 
-  if (assign_multiple_categories) {
-    results_df <- data.frame(
-      analysis_unit_id = as.integer(analysis_unit_ids),
-      text = texts,
-      stringsAsFactors = FALSE
-    )
-    normalized_results <- purrr::map(results, function(x) {
-      if (is.null(x) || (length(x) == 1 && is.na(x))) {
-        return(NA_character_)
-      }
+  results_df <- finalize_results(results_df)
 
-      as.character(x)
-    })
-
-    for (category in categories) {
-      results_df[[category]] <- purrr::map_lgl(
-        normalized_results,
-        ~ if (length(.x) == 1 && is.na(.x)) NA else category %in% .x
-      )
-    }
-
-    return(results_df)
+  if (identical(failure_action, "return_decision")) {
+    return(list(
+      status = "completed",
+      results = results_df
+    ))
   }
 
-  results <- purrr::map(results, ~ if (is.null(.x)) NA_character_ else .x)
-  results <- unlist(results)
-
-  data.frame(
-    analysis_unit_id = as.integer(analysis_unit_ids),
-    text = texts,
-    result = results,
-    stringsAsFactors = FALSE
-  )
+  results_df
 }
