@@ -205,6 +205,18 @@ prompt_candidate_topics <- function(
 
 ## 1.2 Topic reduction ------------------------------------------------------
 
+.kwallm_normalize_topic_labels <- function(topics) {
+  if (is.null(topics)) {
+    return(character())
+  }
+
+  normalized <- as.character(topics)
+  normalized <- normalized[!is.na(normalized)]
+  normalized <- trimws(normalized)
+
+  unique(normalized[nzchar(normalized)])
+}
+
 prompt_reduce_topics <- function(
   candidate_topics,
   research_background = "",
@@ -311,10 +323,7 @@ prompt_reduce_topics <- function(
   ) |>
     tidyprompt::prompt_wrap(
       extraction_fn = function(result) {
-        if (!is.character(result$topics)) {
-          result$topics <- as.character(result$topics)
-        }
-        result$topics <- unique(trimws(result$topics[!is.na(result$topics)]))
+        result$topics <- .kwallm_normalize_topic_labels(result$topics)
         if (length(result$topics) < 2) {
           return(tidyprompt::llm_feedback(
             "Provide an array of at least two valid topics."
@@ -452,6 +461,13 @@ reduce_topics <- function(
   stage_options <- options(kwallm__prompt_execution_stage = "topic_reduction")
   on.exit(options(stage_options), add = TRUE)
 
+  candidate_topics <- .kwallm_normalize_topic_labels(candidate_topics)
+  if (length(candidate_topics) == 0) {
+    stop(
+      "reduce_topics(): 'candidate_topics' must contain at least one non-empty topic."
+    )
+  }
+
   base_token_cost <- prompt_reduce_topics(
     candidate_topics = c(""),
     research_background = research_background,
@@ -487,10 +503,11 @@ reduce_topics <- function(
 
     stopifnot(
       is.list(result),
-      "topics" %in% names(result),
-      is.character(result$topics),
-      length(result$topics) > 0
+      "topics" %in% names(result)
     )
+
+    result$topics <- .kwallm_normalize_topic_labels(result$topics)
+    stopifnot(length(result$topics) > 0)
 
     # Return the reduced topics
     return(result$topics)
@@ -540,7 +557,7 @@ reduce_topics <- function(
   }
 
   ### iterative reduction loop ---------------------------------------------
-  current_topics <- unique(trimws(candidate_topics))
+  current_topics <- candidate_topics
   iteration <- 0
 
   repeat {
@@ -582,7 +599,11 @@ reduce_topics <- function(
         )
       }
     )
-    combined <- unique(unlist(reduced_batches))
+    combined <- .kwallm_normalize_topic_labels(unlist(reduced_batches))
+
+    if (length(combined) == 0) {
+      stop("reduce_topics(): Topic reduction returned no non-empty topics.")
+    }
 
     if (length(batches) == 1) {
       # everything fits now, we're done

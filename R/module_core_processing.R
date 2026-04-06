@@ -131,6 +131,18 @@ processing_server <- function(
         as.integer(ids)
       }
 
+      normalize_topic_labels <- function(topic_values) {
+        if (is.null(topic_values)) {
+          return(character())
+        }
+
+        normalized <- as.character(topic_values)
+        normalized <- normalized[!is.na(normalized)]
+        normalized <- trimws(normalized)
+
+        unique(normalized[nzchar(normalized)])
+      }
+
       topic_assignment_fit_info <- function(
         current_topics,
         current_exclusive_topics = exclusive_topics() %||% character()
@@ -641,11 +653,12 @@ processing_server <- function(
         bind_async_result(
           promise = promise,
           setter = function(value) {
+            normalized_topics <- normalize_topic_labels(value$topics)
             append_stage_execution_rows(value$stage_execution_rows)
             candidate_topics_generated(value$candidate_topics)
-            reduced_topics_generated(value$topics)
+            reduced_topics_generated(normalized_topics)
             topics_were_edited(FALSE)
-            topics(value$topics)
+            topics(normalized_topics)
           },
           when = "main processing (step 1-2) of topic modelling",
           debug_message = "Started async processing for topic modelling (step 1-2)",

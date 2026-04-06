@@ -251,6 +251,35 @@ test_that("assign_topics supports progress, interruption, and early NA", {
   expect_equal(progress_events[[2]], list(i = 2, n = 3, text = "text b"))
 })
 
+test_that("reduce_topics drops empty topic labels", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  captured_topic_values <- NULL
+
+  send_prompt_with_retries <- function(prompt, llm_provider, execution_scope, ...) {
+    force(prompt)
+    force(llm_provider)
+    captured_topic_values <<- execution_scope$topic_values
+
+    list(topics = c(" alpha ", "", NA_character_, "beta", "alpha"))
+  }
+
+  count_tokens <- function(...) 1L
+  get_context_window_size_in_tokens <- function(...) 1000L
+  log_info <- function(...) invisible(NULL)
+
+  result <- reduce_topics(
+    candidate_topics = c(" seed alpha ", "", NA_character_, "seed beta"),
+    research_background = "",
+    llm_provider = create_test_provider(),
+    language = "en",
+    always_add_not_applicable = FALSE
+  )
+
+  expect_identical(captured_topic_values, c("seed alpha", "seed beta"))
+  expect_identical(as.vector(result), c("Alpha", "Beta"))
+})
+
 test_that("assign_topics multi-label: early NA produces NA topic columns", {
   source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
