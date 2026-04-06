@@ -110,7 +110,7 @@ test_that("prompt_score works with empty research background", {
   expect_match(prompt_text, "clarity", fixed = TRUE)
 })
 
-test_that("score_texts supports progress, interruption, and early NA", {
+test_that("score_texts preserves completed scores, reports progress, and stops on early NA", {
   source(
     here::here("R", "analysis_deductive_scoring_characteristic.R"),
     local = TRUE
@@ -153,7 +153,8 @@ test_that("score_texts supports progress, interruption, and early NA", {
 
   expect_identical(result$analysis_unit_id, analysis_unit_ids)
   expect_equal(result$text, c("text a", "text b", "text c"))
-  expect_true(all(is.na(result$result)))
+  # Row 1 succeeded, row 2 failed (NA), row 3 was never processed (NA).
+  expect_equal(result$result, c(42, NA, NA))
   expect_equal(call_count, 2)
   expect_equal(interrupt_count, 2)
   expect_length(progress_events, 2)

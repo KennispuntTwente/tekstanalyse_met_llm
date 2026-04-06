@@ -101,6 +101,8 @@ prompt_score <- function(
 #'   cancellation support (e.g., \code{ipc::AsyncInterruptor})
 #'
 #' @return A data.frame with columns \code{text} and \code{result} (numeric 0-100).
+#'   If a prompt returns \code{NA}, completed rows keep their scores and the
+#'   failing and remaining rows are returned as \code{NA}.
 #' @export
 score_texts <- function(
   texts,
@@ -162,6 +164,7 @@ score_texts <- function(
       on_progress(i, n, text)
     }
 
+    # Preserve completed rows; the current NA and later rows remain NA.
     if (is.na(result)) break
   }
 
