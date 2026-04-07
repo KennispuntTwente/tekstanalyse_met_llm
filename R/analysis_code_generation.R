@@ -45,17 +45,7 @@ generate_codes_by_reading_texts <- function(
     type <- match.arg(type)
     if (type == "success") {
       cli::cli_alert_success(message)
-      message <- paste0(
-        cli::col_green("OK"),
-        " ",
-        message
-      )
     } else {
-      message <- paste0(
-        cli::col_blue("i"),
-        " ",
-        message
-      )
       cli::cli_alert_info(message)
     }
 
