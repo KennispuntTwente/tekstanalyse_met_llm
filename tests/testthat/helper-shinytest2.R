@@ -34,6 +34,7 @@ wait_until <- function(
 
     if (Sys.time() >= deadline) {
       testthat::fail(sprintf("Timed out waiting for %s", description))
+      return(invisible(FALSE))
     }
 
     Sys.sleep(interval / 1000)

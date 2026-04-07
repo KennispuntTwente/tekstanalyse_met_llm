@@ -129,14 +129,14 @@ text_split_server <- function(
 
     # Export test values
     shiny::exportTestValues(
-      splitting = splitting,
-      split_in_progress = split_in_progress,
-      split_document_texts = split_document_texts,
-      split_rows = split_rows,
-      source_document_texts = source_document_texts,
-      semchunk_message = semchunk_message,
-      max_tokens_val = max_tokens_val,
-      overlap_val = overlap_val
+      splitting = splitting(),
+      split_in_progress = split_in_progress(),
+      split_document_texts = split_document_texts(),
+      split_rows = split_rows(),
+      source_document_texts = source_document_texts(),
+      semchunk_message = semchunk_message(),
+      max_tokens_val = max_tokens_val(),
+      overlap_val = overlap_val()
     )
 
     # -- UI: main card -------------------------------------------

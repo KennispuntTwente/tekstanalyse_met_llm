@@ -36,11 +36,11 @@ classify_test_file <- function(file_name) {
     return("e2e-categorization")
   }
 
-  if (grepl("^test-e2e-scoring[.]R$", file_name)) {
+  if (grepl("^test-e2e-scoring.*[.]R$", file_name)) {
     return("e2e-scoring")
   }
 
-  if (grepl("^test-e2e-marking[.]R$", file_name)) {
+  if (grepl("^test-e2e-marking.*[.]R$", file_name)) {
     return("e2e-marking")
   }
 
