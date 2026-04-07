@@ -10,13 +10,12 @@ test_that("{shinytest2} upload card keeps consistent state across navigation and
   vroom::vroom_write(test_data, temp_csv, delim = ",")
   on.exit(unlink(temp_csv), add = TRUE)
 
-  app <- AppDriver$new(
+  app <- kwallm_app_driver(
     name = "upload card preserves state",
     height = 1400,
     width = 2400,
     load_timeout = 30000,
-    seed = 123,
-    options = list(kwallm.test_async = TRUE)
+    seed = 123
   )
   on.exit(app$stop(), add = TRUE)
 

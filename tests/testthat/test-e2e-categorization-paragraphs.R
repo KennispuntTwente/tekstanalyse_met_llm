@@ -5,14 +5,13 @@ test_that("{shinytest2} recording: categorization with paragraph writing", {
 
   # Previously, errors in paragraph writing were not properly caught by tests
   # because the categorization test used write_paragraphs=No.
-  app <- AppDriver$new(
+  app <- kwallm_app_driver(
     name = "categorization with paragraphs",
     height = 1400,
     width = 2400,
     load_timeout = 30000,
     seed = 123,
     options = list(
-      kwallm.test_async = TRUE,
       kwallm.test_fake_llm = TRUE
     )
   )

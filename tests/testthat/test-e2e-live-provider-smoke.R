@@ -7,13 +7,12 @@ test_that("{shinytest2} live provider smoke: categorization workflow", {
   writeLines(c("lovely product!", "bad product!"), temp_txt, useBytes = TRUE)
   on.exit(unlink(temp_txt), add = TRUE)
 
-  app <- AppDriver$new(
+  app <- kwallm_app_driver(
     name = "live provider smoke - categorization",
     height = 1400,
     width = 2400,
     load_timeout = 30000,
-    seed = 123,
-    options = list(kwallm.test_async = TRUE)
+    seed = 123
   )
   on.exit(app$stop(), add = TRUE)
 
@@ -52,13 +51,12 @@ test_that("{shinytest2} live provider smoke: marking workflow", {
   writeLines(c("lovely product!", "bad product!"), temp_txt, useBytes = TRUE)
   on.exit(unlink(temp_txt), add = TRUE)
 
-  app <- AppDriver$new(
+  app <- kwallm_app_driver(
     name = "live provider smoke - marking",
     height = 1400,
     width = 2400,
     load_timeout = 30000,
-    seed = 123,
-    options = list(kwallm.test_async = TRUE)
+    seed = 123
   )
   on.exit(app$stop(), add = TRUE)
 

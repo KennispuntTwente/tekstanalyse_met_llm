@@ -55,11 +55,21 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "initialize_python_environment"
       ),
       count_tokens = "tiktoken_load_tokenizer",
+      .kwallm_prompt_context_window_info = c(
+        "get_context_window_size_in_tokens",
+        "count_tokens"
+      ),
       write_paragraph = c(
         "send_prompt_with_retries",
         "get_context_window_size_in_tokens",
         "count_tokens",
-        "tiktoken_load_tokenizer"
+        "tiktoken_load_tokenizer",
+        "prompt_write_paragraph",
+        ".kwallm_prompt_context_window_info"
+      ),
+      write_grouped_paragraphs = c(
+        "write_paragraph",
+        "%||%"
       ),
       categorize_texts = c(
         "send_prompt_with_retries",
@@ -79,11 +89,21 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "initialize_python_environment"
       ),
       count_tokens = "tiktoken_load_tokenizer",
+      .kwallm_prompt_context_window_info = c(
+        "get_context_window_size_in_tokens",
+        "count_tokens"
+      ),
       write_paragraph = c(
         "send_prompt_with_retries",
         "get_context_window_size_in_tokens",
         "count_tokens",
-        "tiktoken_load_tokenizer"
+        "tiktoken_load_tokenizer",
+        "prompt_write_paragraph",
+        ".kwallm_prompt_context_window_info"
+      ),
+      write_grouped_paragraphs = c(
+        "write_paragraph",
+        "%||%"
       ),
       assign_topics = c(
         "send_prompt_with_retries",
@@ -101,11 +121,17 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "initialize_python_environment"
       ),
       count_tokens = "tiktoken_load_tokenizer",
+      .kwallm_prompt_context_window_info = c(
+        "get_context_window_size_in_tokens",
+        "count_tokens"
+      ),
       write_paragraph = c(
         "send_prompt_with_retries",
         "get_context_window_size_in_tokens",
         "count_tokens",
-        "tiktoken_load_tokenizer"
+        "tiktoken_load_tokenizer",
+        "prompt_write_paragraph",
+        ".kwallm_prompt_context_window_info"
       ),
       normalize_for_dist = "normalize_with_map",
       best_literal_substring = c(
@@ -142,7 +168,8 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "normalize_for_dist",
         ".kwallm_normalize_marking_matches",
         ".kwallm_marking_clean_results",
-        ".kwallm_marking_collect_paragraph_inputs"
+        ".kwallm_marking_collect_paragraph_inputs",
+        "%||%"
       )
     ),
     stop("Unknown async analysis worker task: ", task, call. = FALSE)
@@ -215,15 +242,17 @@ analysis_async_worker_setup_globals <- function(env = parent.frame()) {
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
 analysis_async_categorization_globals <- function(env = parent.frame()) {
-  list(
-    categorize_texts = get("categorize_texts", envir = env, inherits = TRUE),
-    prompt_category = get("prompt_category", envir = env, inherits = TRUE),
-    prompt_multi_category = get(
-      "prompt_multi_category",
-      envir = env,
-      inherits = TRUE
+  c(
+    list(
+      categorize_texts = get("categorize_texts", envir = env, inherits = TRUE),
+      prompt_category = get("prompt_category", envir = env, inherits = TRUE),
+      prompt_multi_category = get(
+        "prompt_multi_category",
+        envir = env,
+        inherits = TRUE
+      )
     ),
-    write_paragraph = get("write_paragraph", envir = env, inherits = TRUE)
+    analysis_async_paragraph_globals(env)
   )
 }
 
@@ -246,27 +275,54 @@ analysis_async_scoring_globals <- function(env = parent.frame()) {
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
 analysis_async_processing_globals <- function(env = parent.frame()) {
+  c(
+    list(
+      collect_grouped_texts = get(
+        "collect_grouped_texts",
+        envir = env,
+        inherits = TRUE
+      ),
+      collect_grouped_paragraph_inputs = get(
+        "collect_grouped_paragraph_inputs",
+        envir = env,
+        inherits = TRUE
+      ),
+      write_grouped_paragraphs = get(
+        "write_grouped_paragraphs",
+        envir = env,
+        inherits = TRUE
+      )
+    ),
+    analysis_async_paragraph_globals(env)
+  )
+}
+
+
+#' Globals shared by async paragraph helpers
+#'
+#' @return Named list for `mirai::mirai(..., .args = ...)`.
+analysis_async_paragraph_globals <- function(env = parent.frame()) {
+  null_coalesce <- if (exists("%||%", envir = env, inherits = TRUE)) {
+    get("%||%", envir = env, inherits = TRUE)
+  } else {
+    function(a, b) {
+      if (is.null(a)) b else a
+    }
+  }
+
   list(
-    collect_grouped_texts = get(
-      "collect_grouped_texts",
+    write_paragraph = get("write_paragraph", envir = env, inherits = TRUE),
+    prompt_write_paragraph = get(
+      "prompt_write_paragraph",
       envir = env,
       inherits = TRUE
     ),
-    collect_grouped_paragraph_inputs = get(
-      "collect_grouped_paragraph_inputs",
+    .kwallm_prompt_context_window_info = get(
+      ".kwallm_prompt_context_window_info",
       envir = env,
       inherits = TRUE
     ),
-    write_grouped_paragraphs = get(
-      "write_grouped_paragraphs",
-      envir = env,
-      inherits = TRUE
-    ),
-    write_paragraph = get(
-      "write_paragraph",
-      envir = env,
-      inherits = TRUE
-    )
+    `%||%` = null_coalesce
   )
 }
 
@@ -312,68 +368,74 @@ analysis_async_topic_reduction_globals <- function(env = parent.frame()) {
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
 analysis_async_marking_globals <- function(env = parent.frame()) {
-  list(
-    mark_texts = get("mark_texts", envir = env, inherits = TRUE),
-    mark_text_prompt = get("mark_text_prompt", envir = env, inherits = TRUE),
-    semchunk_load_chunker = get(
-      "semchunk_load_chunker",
-      envir = env,
-      inherits = TRUE
+  c(
+    list(
+      mark_texts = get("mark_texts", envir = env, inherits = TRUE),
+      mark_text_prompt = get("mark_text_prompt", envir = env, inherits = TRUE),
+      semchunk_load_chunker = get(
+        "semchunk_load_chunker",
+        envir = env,
+        inherits = TRUE
+      ),
+      .kwallm_empty_marking_matches = get(
+        ".kwallm_empty_marking_matches",
+        envir = env,
+        inherits = TRUE
+      ),
+      .kwallm_marking_status_row = get(
+        ".kwallm_marking_status_row",
+        envir = env,
+        inherits = TRUE
+      ),
+      .kwallm_marking_matches_from_find_matches = get(
+        ".kwallm_marking_matches_from_find_matches",
+        envir = env,
+        inherits = TRUE
+      ),
+      .kwallm_normalize_marking_matches = get(
+        ".kwallm_normalize_marking_matches",
+        envir = env,
+        inherits = TRUE
+      ),
+      .kwallm_marking_find_absolute_span = get(
+        ".kwallm_marking_find_absolute_span",
+        envir = env,
+        inherits = TRUE
+      ),
+      .kwallm_marking_clean_results = get(
+        ".kwallm_marking_clean_results",
+        envir = env,
+        inherits = TRUE
+      ),
+      .kwallm_marking_build_highlighted_excerpt = get(
+        ".kwallm_marking_build_highlighted_excerpt",
+        envir = env,
+        inherits = TRUE
+      ),
+      .kwallm_marking_collect_paragraph_inputs = get(
+        ".kwallm_marking_collect_paragraph_inputs",
+        envir = env,
+        inherits = TRUE
+      ),
+      find_matches = get("find_matches", envir = env, inherits = TRUE),
+      normalize_with_map = get(
+        "normalize_with_map",
+        envir = env,
+        inherits = TRUE
+      ),
+      best_literal_substring = get(
+        "best_literal_substring",
+        envir = env,
+        inherits = TRUE
+      ),
+      fuzzy_threshold = get("fuzzy_threshold", envir = env, inherits = TRUE),
+      normalize_for_dist = get(
+        "normalize_for_dist",
+        envir = env,
+        inherits = TRUE
+      )
     ),
-    write_paragraph = get("write_paragraph", envir = env, inherits = TRUE),
-    .kwallm_empty_marking_matches = get(
-      ".kwallm_empty_marking_matches",
-      envir = env,
-      inherits = TRUE
-    ),
-    .kwallm_marking_status_row = get(
-      ".kwallm_marking_status_row",
-      envir = env,
-      inherits = TRUE
-    ),
-    .kwallm_marking_matches_from_find_matches = get(
-      ".kwallm_marking_matches_from_find_matches",
-      envir = env,
-      inherits = TRUE
-    ),
-    .kwallm_normalize_marking_matches = get(
-      ".kwallm_normalize_marking_matches",
-      envir = env,
-      inherits = TRUE
-    ),
-    .kwallm_marking_find_absolute_span = get(
-      ".kwallm_marking_find_absolute_span",
-      envir = env,
-      inherits = TRUE
-    ),
-    .kwallm_marking_clean_results = get(
-      ".kwallm_marking_clean_results",
-      envir = env,
-      inherits = TRUE
-    ),
-    .kwallm_marking_build_highlighted_excerpt = get(
-      ".kwallm_marking_build_highlighted_excerpt",
-      envir = env,
-      inherits = TRUE
-    ),
-    .kwallm_marking_collect_paragraph_inputs = get(
-      ".kwallm_marking_collect_paragraph_inputs",
-      envir = env,
-      inherits = TRUE
-    ),
-    find_matches = get("find_matches", envir = env, inherits = TRUE),
-    normalize_with_map = get(
-      "normalize_with_map",
-      envir = env,
-      inherits = TRUE
-    ),
-    best_literal_substring = get(
-      "best_literal_substring",
-      envir = env,
-      inherits = TRUE
-    ),
-    fuzzy_threshold = get("fuzzy_threshold", envir = env, inherits = TRUE),
-    normalize_for_dist = get("normalize_for_dist", envir = env, inherits = TRUE)
+    analysis_async_paragraph_globals(env)
   )
 }
 

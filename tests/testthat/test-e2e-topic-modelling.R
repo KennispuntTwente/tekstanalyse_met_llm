@@ -1,14 +1,13 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: standard process - topic modelling", {
-  app <- AppDriver$new(
+  app <- kwallm_app_driver(
     name = "standard process - topic modelling",
     height = 1400,
     width = 2400,
     load_timeout = 30000,
     seed = 123,
     options = list(
-      kwallm.test_async = TRUE,
       kwallm.test_fake_llm = TRUE
     )
   )

@@ -35,7 +35,11 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
   categorization_env$tiktoken_load_tokenizer <- function(...) NULL
   categorization_env$prompt_category <- function(...) NULL
   categorization_env$prompt_multi_category <- function(...) NULL
+  categorization_env$prompt_write_paragraph <- function(...) NULL
+  categorization_env$.kwallm_prompt_context_window_info <- function(...) NULL
+  categorization_env$`%||%` <- function(a, b) if (is.null(a)) b else a
   categorization_env$write_paragraph <- function(...) NULL
+  categorization_env$write_grouped_paragraphs <- function(...) NULL
   categorization_env$categorize_texts <- function(...) NULL
 
   prepare_async_analysis_worker(
@@ -58,6 +62,22 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
   expect_true(exists(
     "send_prompt_with_retries",
     envir = environment(categorization_env$write_paragraph)
+  ))
+  expect_true(exists(
+    "prompt_write_paragraph",
+    envir = environment(categorization_env$write_paragraph)
+  ))
+  expect_true(exists(
+    ".kwallm_prompt_context_window_info",
+    envir = environment(categorization_env$write_paragraph)
+  ))
+  expect_true(exists(
+    "write_paragraph",
+    envir = environment(categorization_env$write_grouped_paragraphs)
+  ))
+  expect_true(exists(
+    "%||%",
+    envir = environment(categorization_env$write_grouped_paragraphs)
   ))
   expect_true(exists(
     "prompt_category",
@@ -89,6 +109,9 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
   marking_env$tiktoken_load_tokenizer <- function(...) NULL
   marking_env$semchunk_load_chunker <- function(...) NULL
   marking_env$mark_text_prompt <- function(...) NULL
+  marking_env$prompt_write_paragraph <- function(...) NULL
+  marking_env$.kwallm_prompt_context_window_info <- function(...) NULL
+  marking_env$`%||%` <- function(a, b) if (is.null(a)) b else a
   marking_env$write_paragraph <- function(...) NULL
   marking_env$.kwallm_empty_marking_matches <- function(...) NULL
   marking_env$.kwallm_marking_status_row <- function(...) NULL
@@ -127,6 +150,14 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
     envir = environment(marking_env$mark_texts)
   ))
   expect_true(exists(
+    "%||%",
+    envir = environment(marking_env$mark_texts)
+  ))
+  expect_true(exists(
+    "prompt_write_paragraph",
+    envir = environment(marking_env$write_paragraph)
+  ))
+  expect_true(exists(
     "find_matches",
     envir = environment(marking_env$mark_text_prompt)
   ))
@@ -161,6 +192,9 @@ test_that("analysis async globals helpers expose the expected names", {
     "mark_text_prompt",
     "semchunk_load_chunker",
     "write_paragraph",
+    "prompt_write_paragraph",
+    ".kwallm_prompt_context_window_info",
+    "%||%",
     ".kwallm_empty_marking_matches",
     ".kwallm_marking_status_row",
     ".kwallm_marking_matches_from_find_matches",
@@ -214,7 +248,10 @@ test_that("analysis async globals helpers expose the expected names", {
       "collect_grouped_texts",
       "collect_grouped_paragraph_inputs",
       "write_grouped_paragraphs",
-      "write_paragraph"
+      "write_paragraph",
+      "prompt_write_paragraph",
+      ".kwallm_prompt_context_window_info",
+      "%||%"
     )
   )
 
@@ -224,7 +261,10 @@ test_that("analysis async globals helpers expose the expected names", {
       "categorize_texts",
       "prompt_category",
       "prompt_multi_category",
-      "write_paragraph"
+      "write_paragraph",
+      "prompt_write_paragraph",
+      ".kwallm_prompt_context_window_info",
+      "%||%"
     )
   )
 
@@ -242,7 +282,6 @@ test_that("analysis async globals helpers expose the expected names", {
       "mark_texts",
       "mark_text_prompt",
       "semchunk_load_chunker",
-      "write_paragraph",
       ".kwallm_empty_marking_matches",
       ".kwallm_marking_status_row",
       ".kwallm_marking_matches_from_find_matches",
@@ -255,7 +294,11 @@ test_that("analysis async globals helpers expose the expected names", {
       "normalize_with_map",
       "best_literal_substring",
       "fuzzy_threshold",
-      "normalize_for_dist"
+      "normalize_for_dist",
+      "write_paragraph",
+      "prompt_write_paragraph",
+      ".kwallm_prompt_context_window_info",
+      "%||%"
     )
   )
 

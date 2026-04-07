@@ -3,6 +3,21 @@ js_string <- function(value) {
 }
 
 
+kwallm_app_driver <- function(..., options = list()) {
+  if (is.null(options)) {
+    options <- list()
+  }
+
+  shinytest2::AppDriver$new(
+    ...,
+    options = utils::modifyList(
+      list(kwallm.test_async = TRUE),
+      options
+    )
+  )
+}
+
+
 wait_until <- function(
   check_fn,
   timeout = 30000,

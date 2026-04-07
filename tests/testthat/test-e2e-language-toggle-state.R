@@ -1,13 +1,12 @@
 library(shinytest2)
 
 test_that("{shinytest2} language toggle preserves visible input state", {
-  app <- AppDriver$new(
+  app <- kwallm_app_driver(
     name = "language toggle preserves state",
     height = 1400,
     width = 2400,
     load_timeout = 30000,
-    seed = 123,
-    options = list(kwallm.test_async = TRUE)
+    seed = 123
   )
 
   is_disabled <- function(id) {
