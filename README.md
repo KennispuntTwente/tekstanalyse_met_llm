@@ -57,10 +57,6 @@ which may improve analysis quality and helps to avoid context window limits
 
 - App interface & results can be set to **English or Dutch**
 
-## Data handling notes
-
-- **Duplicate texts** are automatically collapsed to unique texts before LLM analysis. This is a performance optimization: the LLM only processes each distinct text once. When a by-column (grouping variable) is selected, grouped reports correctly expand counts back to all original occurrences, so frequency tables reflect the full dataset. A tooltip in the text management panel informs users about this behaviour.
-
 ## Use case & example results
 
 This app can be used to analyze open-ended responses in surveys, categorize texts like tweets or news articles, et cetera.
