@@ -964,6 +964,33 @@ processing_server <- function(
           return()
         }
 
+        # Defensive re-validation: ensure topics still fit the assignment
+        # context window before proceeding. The editor's confirm button
+        # already checks this, but a belt-and-suspenders gate here prevents
+        # any bypass from reaching start_topic_assignment().
+        fit_info <- topic_assignment_fit_info(topics())
+        if (!isTRUE(fit_info$fits)) {
+          topics_definitive(FALSE)
+          showNotification(
+            topic_assignment_overflow_notice(fit_info),
+            type = "error",
+            duration = NULL
+          )
+          log_error(
+            sprintf(
+              paste0(
+                "Topics still exceed assignment context window after editing ",
+                "(prompt_tokens=%d, context_window_tokens=%d); ",
+                "blocking assignment."
+              ),
+              fit_info$prompt_tokens,
+              fit_info$context_window_tokens
+            ),
+            component = "topics"
+          )
+          return()
+        }
+
         # Topic generation/editing ends here; assignment becomes a separate step.
         start_topic_assignment()
       })

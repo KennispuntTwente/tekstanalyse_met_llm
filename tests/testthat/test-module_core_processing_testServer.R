@@ -659,3 +659,172 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
     }
   )
 })
+
+
+# 4. Overflow re-validation gate -----------------------------------------------
+
+test_that("processing_server: topics_definitive gate blocks assignment when topics still overflow", {
+  source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
+
+  progress_bar_server <- stub_progress_bar_server
+  llm_streaming_server <- stub_llm_streaming_server
+
+  processing_texts_under_maximum <- function(...) TRUE
+  processing_split_ready <- function(...) TRUE
+  processing_anonymization_ready <- function(...) TRUE
+  processing_has_pending_gliner_anonymization <- function(...) FALSE
+
+  log_action <- function(...) invisible(NULL)
+  log_analysis_start <- function(...) invisible(NULL)
+  log_context_capture <- function(...) list()
+  log_context_apply <- function(...) invisible(NULL)
+  log_async_globals <- function(...) list()
+  log_info <- function(...) invisible(NULL)
+  log_debug <- function(...) invisible(NULL)
+  log_warn <- function(...) invisible(NULL)
+  log_error <- function(...) invisible(NULL)
+
+  handle_detailed_error <- function(...) {
+    function(err) stop(err)
+  }
+
+  app_error <- function(error, ...) stop(error)
+
+  send_prompt_with_retries_async_globals <- function(...) list()
+  analysis_async_topic_modelling_globals <- function(...) list()
+  analysis_async_tokenizer_globals <- function(...) list()
+  analysis_async_worker_setup_globals <- function(...) list()
+  analysis_async_processing_globals <- function(...) list()
+
+  .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
+  .kwallm__prompt_execution_get <- function(...) NULL
+
+  create_candidate_topics <- function(...) c("Candidate 1", "Candidate 2")
+  reduce_topics <- function(...) c("Topic A", "Topic B")
+
+  assignment_started <- FALSE
+  editor_returned_topics <- shiny::reactiveVal(NULL)
+
+  # Fit check always returns overflow
+  topic_assignment_prompt_context_window_check <- function(...) {
+    list(fits = FALSE, prompt_tokens = 500L, context_window_tokens = 100L)
+  }
+
+  # Editor stub: immediately returns whatever was set in editor_returned_topics
+  edit_topics_server <- function(...) {
+    editor_returned_topics
+  }
+
+  assign_topics <- function(...) {
+    assignment_started <<- TRUE
+    data.frame(
+      analysis_unit_id = 1:2,
+      text = c("first text", "second text"),
+      result = c("Topic A", "Topic B"),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  showNotification <- function(...) invisible(NULL)
+
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+
+  mirai_ns <- asNamespace("mirai")
+  old_mirai_fn <- get("mirai", envir = mirai_ns)
+  withr::defer({
+    if (bindingIsLocked("mirai", mirai_ns)) {
+      unlockBinding("mirai", mirai_ns)
+    }
+    assign("mirai", old_mirai_fn, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  if (bindingIsLocked("mirai", mirai_ns)) {
+    unlockBinding("mirai", mirai_ns)
+  }
+  assign("mirai", mirai_sync_stub, envir = mirai_ns)
+  lockBinding("mirai", mirai_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+
+      texts <- shiny::reactiveValues(
+        preprocessed = c("first text", "second text"),
+        analysis_units = data.frame(analysis_unit_id = c(1L, 2L)),
+        df = data.frame(
+          document_text = c("first text", "second text"),
+          stringsAsFactors = FALSE
+        )
+      )
+
+      models <- shiny::reactiveValues(
+        main = kwallm_test_llm_provider("kwallm-fake-main-1024"),
+        large = kwallm_test_llm_provider("kwallm-fake-reducer-320")
+      )
+
+      categories <- list(
+        texts = shiny::reactiveVal(character()),
+        exclusive_texts = shiny::reactiveVal(character()),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(0)
+      )
+
+      codes <- list(
+        texts = shiny::reactiveVal(character()),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(0)
+      )
+
+      context_window <- shiny::reactiveValues(
+        any_fit_problem = FALSE,
+        too_many_batches = FALSE,
+        text_batches = list(c("first text", "second text"))
+      )
+
+      processing_server(
+        id = "processing",
+        mode = shiny::reactiveVal("Onderwerpextractie"),
+        interrater_reliability_toggle = shiny::reactiveVal(FALSE),
+        texts = texts,
+        llm_provider_rv = shiny::reactiveValues(),
+        models = models,
+        categories = categories,
+        scoring_characteristic = shiny::reactiveVal(""),
+        codes = codes,
+        research_background = shiny::reactiveVal("Background"),
+        style_prompt = shiny::reactiveVal(""),
+        human_in_the_loop = shiny::reactiveVal(FALSE),
+        assign_multiple_categories = shiny::reactiveVal(TRUE),
+        write_paragraphs = shiny::reactiveVal(FALSE),
+        context_window = context_window,
+        lang = lang
+      )
+
+      list(editor_returned_topics = editor_returned_topics)
+    },
+    {
+      # Launch processing: topic generation will succeed, but topics will
+      # overflow the assignment context window → editor opens
+      session$setInputs(`processing-process` = 1)
+
+      for (i in seq_len(20)) {
+        later::run_now(timeout = 0)
+        session$flushReact()
+      }
+
+      # Simulate editor returning still-overflowing topics
+      editor_returned_topics(c("Topic A", "Topic B"))
+
+      for (i in seq_len(20)) {
+        later::run_now(timeout = 0)
+        session$flushReact()
+      }
+
+      # The re-validation gate in topics_definitive should have blocked
+      # start_topic_assignment() because the fit check still returns
+      # fits = FALSE
+      expect_false(assignment_started)
+    }
+  )
+})
