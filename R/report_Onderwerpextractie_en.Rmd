@@ -192,7 +192,11 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
   } else {
     cat("\n\n")
   }
+}
+```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
   if (!assign_multiple_categories) {
     generate_grouped_topic_prevalence_table_single(
       df = report_df,
@@ -211,7 +215,11 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
       language = "en"
     )
   }
+}
+```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
   cat("\n### Frequency per group\n\n")
   cat(paste0(
     "Below table shows the raw topic counts and within-group percentages, ",

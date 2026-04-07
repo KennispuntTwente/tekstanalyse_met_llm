@@ -78,7 +78,11 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
     htmltools::htmlEscape(by_column_name),
     "**-groep waarin die code minstens eenmaal is gemarkeerd.\n\n"
   ))
+}
+```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
   generate_grouped_marking_prevalence_table(
     df = report_df,
     by_values = group_lookup,
@@ -86,12 +90,20 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
     codes = codes,
     language = "nl"
   )
+}
+```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
   cat("\n### Teksten met gemarkeerde fragmenten per groep\n\n")
   cat(
     "Onderstaande tabel toont per groep en code hoeveel teksten minstens één gemarkeerd fragment bevatten, plus het totale aantal gemarkeerde fragmenten.\n\n"
   )
+}
+```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
   generate_grouped_marking_frequency_table(
     df = report_df,
     by_values = group_lookup,

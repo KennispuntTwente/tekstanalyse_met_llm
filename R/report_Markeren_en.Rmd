@@ -78,7 +78,11 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
     htmltools::htmlEscape(by_column_name),
     "** group where that code was marked at least once.\n\n"
   ))
+}
+```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
   generate_grouped_marking_prevalence_table(
     df = report_df,
     by_values = group_lookup,
@@ -86,13 +90,21 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
     codes = codes,
     language = "en"
   )
+}
+```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
   cat("\n### Texts with marked spans per group\n\n")
   cat(paste0(
     "Below table shows, per group and code, how many texts contained at least one marked span, ",
     "plus the total number of marked spans that were returned.\n\n"
   ))
+}
+```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
   generate_grouped_marking_frequency_table(
     df = report_df,
     by_values = group_lookup,

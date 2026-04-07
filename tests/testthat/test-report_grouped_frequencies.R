@@ -967,9 +967,23 @@ test_that("Onderwerpextractie report renders grouped topic prevalence", {
 
       if (grepl("_en\\.Rmd$", basename(report_path))) {
         expect_true(grepl("Topic prevalence by group", html_text, fixed = TRUE))
+        expect_true(grepl("Frequency per group", html_text, fixed = TRUE))
+        expect_true(grepl("Topic prevalence per ", html_text, fixed = TRUE))
+        expect_true(grepl("Frequencies per ", html_text, fixed = TRUE))
       } else {
         expect_true(grepl(
           "Onderwerpprevalentie per groep",
+          html_text,
+          fixed = TRUE
+        ))
+        expect_true(grepl("Frequentie per groep", html_text, fixed = TRUE))
+        expect_true(grepl(
+          "Onderwerpprevalentie per ",
+          html_text,
+          fixed = TRUE
+        ))
+        expect_true(grepl(
+          "Frequenties per ",
           html_text,
           fixed = TRUE
         ))
@@ -1073,8 +1087,30 @@ test_that("Markeren report renders grouped marking summaries", {
 
       if (grepl("_en\\.Rmd$", basename(report_path))) {
         expect_true(grepl("Code prevalence by group", html_text, fixed = TRUE))
+        expect_true(grepl(
+          "Texts with marked spans per group",
+          html_text,
+          fixed = TRUE
+        ))
+        expect_true(grepl("Code prevalence per ", html_text, fixed = TRUE))
+        expect_true(grepl(
+          "Texts with marked spans per ",
+          html_text,
+          fixed = TRUE
+        ))
       } else {
         expect_true(grepl("Codeprevalentie per groep", html_text, fixed = TRUE))
+        expect_true(grepl(
+          "Teksten met gemarkeerde fragmenten per groep",
+          html_text,
+          fixed = TRUE
+        ))
+        expect_true(grepl("Codeprevalentie per ", html_text, fixed = TRUE))
+        expect_true(grepl(
+          "Gemarkeerde teksten per ",
+          html_text,
+          fixed = TRUE
+        ))
       }
     }
   })
