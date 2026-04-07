@@ -53,6 +53,23 @@ wait_for_element <- function(app, selector, timeout = 30000) {
 }
 
 
+wait_for_label_text <- function(app, for_id, expected_text, timeout = 30000) {
+  selector <- sprintf("label[for=\"%s\"]", for_id)
+
+  app$wait_for_js(
+    sprintf(
+      paste(
+        "var el = document.querySelector(%s);",
+        "!!el && (el.textContent || '').includes(%s);"
+      ),
+      js_string(selector),
+      js_string(expected_text)
+    ),
+    timeout = timeout
+  )
+}
+
+
 wait_for_bound_input <- function(app, id, timeout = 30000) {
   app$wait_for_js(
     sprintf(
@@ -177,7 +194,34 @@ wait_for_processing_started <- function(app, timeout = 30000) {
 
 wait_for_topic_edit_modal_ready <- function(app, timeout = 90000) {
   wait_for_processing_started(app, timeout = timeout)
-  wait_for_modal(app, timeout = timeout)
+
+  wait_until(
+    function() {
+      export_started <- tryCatch(
+        isTRUE(app$get_value(export = "processing-edit_topics-started")),
+        error = function(e) FALSE
+      )
+
+      modal_present <- tryCatch(
+        isTRUE(app$get_js(
+          "!!document.querySelector(\"[data-kwallm-modal-id='edit_topics_modal']\")"
+        )),
+        error = function(e) FALSE
+      )
+
+      confirm_present <- tryCatch(
+        isTRUE(app$get_js(
+          "!!document.getElementById(\"processing-edit_topics-confirm_topics\")"
+        )),
+        error = function(e) FALSE
+      )
+
+      export_started || modal_present || confirm_present
+    },
+    timeout = timeout,
+    description = "topic edit modal to become available"
+  )
+
   wait_for_enabled_element(
     app,
     "processing-edit_topics-confirm_topics",

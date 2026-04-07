@@ -14,9 +14,7 @@ test_that("{shinytest2} language toggle preserves visible input state", {
   }
 
   app$set_inputs(`language-toggle` = "en")
-  app$wait_for_js(
-    "document.querySelector('label[for=\"categories-fields-field1\"]').textContent.includes('Category')"
-  )
+  wait_for_label_text(app, "categories-fields-field1", "Category")
 
   app$set_inputs(`categories-fields-field1` = "alpha")
   app$set_inputs(`categories-fields-field2` = "beta")
@@ -32,9 +30,7 @@ test_that("{shinytest2} language toggle preserves visible input state", {
   expect_equal(app$get_value(input = "write_paragraphs_toggle-toggle"), "No")
 
   app$set_inputs(`language-toggle` = "nl")
-  app$wait_for_js(
-    "document.querySelector('label[for=\"categories-fields-field1\"]').textContent.includes('Categorie')"
-  )
+  wait_for_label_text(app, "categories-fields-field1", "Categorie")
 
   expect_false(app$get_value(export = "categories-fields-isEditing"))
   expect_true(is_disabled("categories-fields-field1"))
@@ -43,9 +39,7 @@ test_that("{shinytest2} language toggle preserves visible input state", {
   expect_equal(app$get_value(input = "write_paragraphs_toggle-toggle"), "Nee")
 
   app$set_inputs(`language-toggle` = "en")
-  app$wait_for_js(
-    "document.querySelector('label[for=\"categories-fields-field1\"]').textContent.includes('Category')"
-  )
+  wait_for_label_text(app, "categories-fields-field1", "Category")
 
   expect_false(app$get_value(export = "categories-fields-isEditing"))
   expect_true(is_disabled("categories-fields-field1"))
