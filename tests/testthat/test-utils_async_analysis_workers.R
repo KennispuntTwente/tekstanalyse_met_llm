@@ -27,6 +27,7 @@ test_that("async_inject_dependencies binds worker dependencies in a child env", 
 test_that("prepare_async_analysis_worker injects the expected dependencies", {
   categorization_env <- new.env(parent = emptyenv())
 
+  categorization_env$initialize_python_environment <- function(...) NULL
   categorization_env$async_message_printer <- function(...) NULL
   categorization_env$send_prompt_with_retries <- function(...) NULL
   categorization_env$get_context_window_size_in_tokens <- function(...) 1024
@@ -44,6 +45,10 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
 
   expect_true(exists(
     "async_message_printer",
+    envir = environment(categorization_env$tiktoken_load_tokenizer)
+  ))
+  expect_true(exists(
+    "initialize_python_environment",
     envir = environment(categorization_env$tiktoken_load_tokenizer)
   ))
   expect_true(exists(
@@ -75,6 +80,7 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
   ))
 
   marking_env <- new.env(parent = emptyenv())
+  marking_env$initialize_python_environment <- function(...) NULL
   marking_env$async_message_printer <- function(...) NULL
   marking_env$log_info <- function(...) NULL
   marking_env$send_prompt_with_retries <- function(...) NULL
@@ -109,6 +115,10 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
     envir = environment(marking_env$semchunk_load_chunker)
   ))
   expect_true(exists(
+    "initialize_python_environment",
+    envir = environment(marking_env$semchunk_load_chunker)
+  ))
+  expect_true(exists(
     "semchunk_load_chunker",
     envir = environment(marking_env$mark_texts)
   ))
@@ -134,6 +144,7 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
 test_that("analysis async globals helpers expose the expected names", {
   helper_env <- environment(analysis_async_tokenizer_globals)
   stub_names <- c(
+    "initialize_python_environment",
     "get_context_window_size_in_tokens",
     "tiktoken_load_tokenizer",
     "count_tokens",
@@ -189,6 +200,7 @@ test_that("analysis async globals helpers expose the expected names", {
   expect_named(
     analysis_async_tokenizer_globals(),
     c(
+      "initialize_python_environment",
       "get_context_window_size_in_tokens",
       "tiktoken_load_tokenizer",
       "count_tokens",

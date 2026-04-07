@@ -50,7 +50,10 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
   switch(
     task,
     categorization = list(
-      tiktoken_load_tokenizer = "async_message_printer",
+      tiktoken_load_tokenizer = c(
+        "async_message_printer",
+        "initialize_python_environment"
+      ),
       count_tokens = "tiktoken_load_tokenizer",
       write_paragraph = c(
         "send_prompt_with_retries",
@@ -71,7 +74,10 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       )
     ),
     topic_assignment = list(
-      tiktoken_load_tokenizer = "async_message_printer",
+      tiktoken_load_tokenizer = c(
+        "async_message_printer",
+        "initialize_python_environment"
+      ),
       count_tokens = "tiktoken_load_tokenizer",
       write_paragraph = c(
         "send_prompt_with_retries",
@@ -86,8 +92,14 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       )
     ),
     marking = list(
-      semchunk_load_chunker = "async_message_printer",
-      tiktoken_load_tokenizer = "async_message_printer",
+      semchunk_load_chunker = c(
+        "async_message_printer",
+        "initialize_python_environment"
+      ),
+      tiktoken_load_tokenizer = c(
+        "async_message_printer",
+        "initialize_python_environment"
+      ),
       count_tokens = "tiktoken_load_tokenizer",
       write_paragraph = c(
         "send_prompt_with_retries",
@@ -160,6 +172,7 @@ prepare_async_analysis_worker <- function(task, env = parent.frame()) {
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
 analysis_async_tokenizer_globals <- function() {
   list(
+    initialize_python_environment = initialize_python_environment,
     get_context_window_size_in_tokens = get_context_window_size_in_tokens,
     tiktoken_load_tokenizer = tiktoken_load_tokenizer,
     count_tokens = count_tokens,

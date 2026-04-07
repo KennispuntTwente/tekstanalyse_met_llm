@@ -6,6 +6,7 @@ tiktoken_load_tokenizer <- function(
   encoding = "gpt-4o",
   test_tokenizer = FALSE,
   reload_if_exists = FALSE, # if TRUE, reload existing tokenizer if already in global env
+  sync_uv = FALSE,
   queue = NULL
 ) {
   ## ── Argument checks ─────────────────────────────────────────────
@@ -13,6 +14,7 @@ tiktoken_load_tokenizer <- function(
     is.character(encoding) && length(encoding) == 1,
     is.logical(test_tokenizer) && length(test_tokenizer) == 1,
     is.logical(reload_if_exists) && length(reload_if_exists) == 1,
+    is.logical(sync_uv) && length(sync_uv) == 1,
     is.null(queue) || inherits(queue, "Queue")
   )
 
@@ -33,9 +35,7 @@ tiktoken_load_tokenizer <- function(
   ## ── Load Python & tiktoken module ───────────────────────────────
   print_message("Loading Python and tiktoken module...")
 
-  Sys.unsetenv("RETICULATE_PYTHON")
-  reticulate:::uv_exec("sync")
-  reticulate::use_virtualenv("./.venv")
+  initialize_python_environment(sync_uv = sync_uv)
   tk <- reticulate::import("tiktoken")
 
   ## ── Load tokenizer ───────────────────────────────────────────────

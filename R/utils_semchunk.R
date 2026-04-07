@@ -6,6 +6,7 @@ semchunk_load_chunker <- function(
   tokenizer = "gpt-4", # name, HF repo, tiktoken encoding, or a custom Python object
   chunk_size = 64, # tokens per chunk (remember to subtract special tokens)
   test_chunker = FALSE, # run a quick round-trip on sample text?
+  sync_uv = FALSE, # optionally run `uv sync` before importing semchunk
   queue = NULL # 'ipc' queue for reactive logs
 ) {
   #### ───────── Argument checks ──────────────────────────────────────────────
@@ -13,6 +14,7 @@ semchunk_load_chunker <- function(
     is.character(tokenizer) || inherits(tokenizer, "python.builtin.object"),
     is.numeric(chunk_size) && length(chunk_size) == 1 && chunk_size > 0,
     is.logical(test_chunker) && length(test_chunker) == 1,
+    is.logical(sync_uv) && length(sync_uv) == 1,
     is.null(queue) || inherits(queue, "Queue")
   )
 
@@ -25,9 +27,7 @@ semchunk_load_chunker <- function(
   ## ── Load Python & tiktoken module ───────────────────────────────
   print_message("Loading Python and semchunk module...")
 
-  Sys.unsetenv("RETICULATE_PYTHON")
-  reticulate:::uv_exec("sync")
-  reticulate::use_virtualenv("./.venv")
+  initialize_python_environment(sync_uv = sync_uv)
   semchunk <- reticulate::import("semchunk")
 
   #### ───────── Build the chunker ────────────────────────────────

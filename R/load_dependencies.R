@@ -1,4 +1,6 @@
-#' Load Dependencies
+# Load dependencies ------------------------------------------------------------
+
+#' Load dependencies
 #'
 #' This script handles dependency loading for all execution modes:
 #' - "regular": Standard R environment with renv and reticulate
@@ -20,7 +22,7 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   cli::cli_h2("Loading dependencies")
   cli::cli_alert_info("Loading dependencies for mode {.emph {mode}}...")
 
-  # 1 Environment-specific setup ----------------------------------------------
+  # 1 Environment-specific setup -----------------------------------------------
 
   if (mode == "regular") {
     cli::cli_rule()
@@ -43,10 +45,11 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
     )
     tryCatch(
       {
-        Sys.unsetenv("RETICULATE_PYTHON")
-        reticulate:::uv_exec("python install")
-        reticulate:::uv_exec("sync")
-        suppressWarnings(reticulate::use_virtualenv("./.venv"))
+        initialize_python_environment(
+          sync_uv = TRUE,
+          install_python = TRUE,
+          force_reload = TRUE
+        )
       },
       error = function(e) {
         cli::cli_alert_danger(
@@ -136,7 +139,7 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
 
   # Docker mode: no special environment setup needed (pre-installed)
 
-  # 2 Load core packages ----------------------------------------------------
+  # 2 Load core packages -------------------------------------------------------
 
   # Note: generally functions from packages are & should be called with
   # `package::function()` for safety, but loading here for convenience
@@ -168,7 +171,7 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
 
   cli::cli_alert_success("R packages loaded")
 
-  # 3 Load R functions ------------------------------------------------------
+  # 3 Load R functions ---------------------------------------------------------
 
   cli::cli_rule()
   cli::cli_h2("Loading files in {.path R/} folder...")
@@ -190,7 +193,7 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
 
   cli::cli_alert_success("R files loaded")
 
-  # 4 Initialize logger -------------------------------------------------------
+  # 4 Initialize logger --------------------------------------------------------
 
   # Make app mode available to other modules/logging
   options(app__mode = mode)
@@ -210,7 +213,7 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
     }
   )
 
-  # 5 Done ------------------------------------------------------------------
+  # 5 Done ---------------------------------------------------------------------
 
   cli::cli_rule()
   cli::cli_h2("Dependencies loaded")
@@ -218,4 +221,91 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   cli::cli_rule()
 
   invisible(mode)
+}
+
+.python_environment_state_default <- function() {
+  list(
+    initialized = FALSE,
+    virtualenv = "./.venv",
+    install_python_ran = FALSE,
+    sync_ran = FALSE
+  )
+}
+
+
+# Helpers for Python environment -----------------------------------------------
+
+# Some helpers to keep track of whether we've already initialized the Python environment,
+# run the install_python step, or run the sync_uv step, to avoid redundant calls
+
+initialize_python_environment <- function(
+  virtualenv = "./.venv",
+  sync_uv = FALSE,
+  install_python = FALSE,
+  force_reload = FALSE
+) {
+  stopifnot(
+    is.character(virtualenv) && length(virtualenv) == 1,
+    is.logical(sync_uv) && length(sync_uv) == 1,
+    is.logical(install_python) && length(install_python) == 1,
+    is.logical(force_reload) && length(force_reload) == 1
+  )
+
+  st <- .python_environment_state_get()
+
+  if (
+    !isTRUE(force_reload) &&
+      isTRUE(st$initialized) &&
+      identical(st$virtualenv, virtualenv) &&
+      (!isTRUE(sync_uv) || isTRUE(st$sync_ran)) &&
+      (!isTRUE(install_python) || isTRUE(st$install_python_ran))
+  ) {
+    return(invisible(st))
+  }
+
+  Sys.unsetenv("RETICULATE_PYTHON")
+
+  if (isTRUE(install_python)) {
+    reticulate:::uv_exec("python install")
+  }
+
+  if (isTRUE(sync_uv)) {
+    reticulate:::uv_exec("sync")
+  }
+
+  suppressWarnings(reticulate::use_virtualenv(virtualenv))
+
+  st$initialized <- TRUE
+  st$virtualenv <- virtualenv
+  st$install_python_ran <- isTRUE(st$install_python_ran) ||
+    isTRUE(install_python)
+  st$sync_ran <- isTRUE(st$sync_ran) || isTRUE(sync_uv)
+
+  .python_environment_state_set(st)
+
+  invisible(st)
+}
+
+.python_environment_state_get <- function() {
+  st <- getOption("kwallm__python_environment_state", NULL)
+  if (is.null(st) || !is.list(st)) {
+    st <- .python_environment_state_default()
+    options(kwallm__python_environment_state = st)
+  }
+
+  defaults <- .python_environment_state_default()
+  for (nm in names(defaults)) {
+    if (is.null(st[[nm]])) st[[nm]] <- defaults[[nm]]
+  }
+
+  st
+}
+
+.python_environment_state_set <- function(st) {
+  if (is.null(st) || !is.list(st)) {
+    st <- .python_environment_state_default()
+  }
+
+  options(kwallm__python_environment_state = st)
+  invisible(NULL)
 }
