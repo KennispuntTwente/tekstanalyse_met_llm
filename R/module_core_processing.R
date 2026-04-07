@@ -564,6 +564,7 @@ processing_server <- function(
         promise <- mirai::mirai(
           {
             log_context_apply(log_context)
+            prepare_async_analysis_worker("topic_generation")
             .kwallm__prompt_execution_reset()
 
             # Step 1: Generate candidate topics
@@ -647,6 +648,7 @@ processing_server <- function(
               interrupter = interrupter
             ),
             analysis_async_topic_modelling_globals(),
+            analysis_async_worker_setup_globals(),
             analysis_async_tokenizer_globals()
           )
         )

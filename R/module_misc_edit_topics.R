@@ -389,6 +389,7 @@ edit_topics_server <- function(
         mirai::mirai(
           {
             log_context_apply(log_context)
+            prepare_async_analysis_worker("topic_reduction")
 
             reduce_topics(
               updated_topics,
@@ -405,6 +406,7 @@ edit_topics_server <- function(
               lang = lang()
             ),
             analysis_async_topic_reduction_globals(),
+            analysis_async_worker_setup_globals(),
             analysis_async_tokenizer_globals(),
             log_async_globals(log_context),
             send_prompt_with_retries_async_globals()

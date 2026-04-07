@@ -25,6 +25,49 @@ test_that("async_inject_dependencies binds worker dependencies in a child env", 
 
 
 test_that("prepare_async_analysis_worker injects the expected dependencies", {
+  split_env <- new.env(parent = emptyenv())
+  split_env$initialize_python_environment <- function(...) NULL
+  split_env$async_message_printer <- function(...) NULL
+  split_env$semchunk_load_chunker <- function(...) NULL
+  split_env$split_texts_with_semchunk <- function(...) NULL
+
+  prepare_async_analysis_worker(
+    task = "text_split",
+    env = split_env
+  )
+
+  expect_true(exists(
+    "async_message_printer",
+    envir = environment(split_env$semchunk_load_chunker)
+  ))
+  expect_true(exists(
+    "initialize_python_environment",
+    envir = environment(split_env$semchunk_load_chunker)
+  ))
+  expect_true(exists(
+    "semchunk_load_chunker",
+    envir = environment(split_env$split_texts_with_semchunk)
+  ))
+
+  gliner_env <- new.env(parent = emptyenv())
+  gliner_env$initialize_python_environment <- function(...) NULL
+  gliner_env$async_message_printer <- function(...) NULL
+  gliner_env$gliner_load_model <- function(...) NULL
+
+  prepare_async_analysis_worker(
+    task = "gliner",
+    env = gliner_env
+  )
+
+  expect_true(exists(
+    "async_message_printer",
+    envir = environment(gliner_env$gliner_load_model)
+  ))
+  expect_true(exists(
+    "initialize_python_environment",
+    envir = environment(gliner_env$gliner_load_model)
+  ))
+
   categorization_env <- new.env(parent = emptyenv())
 
   categorization_env$initialize_python_environment <- function(...) NULL
@@ -97,6 +140,107 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
   expect_true(exists(
     "prompt_score",
     envir = environment(scoring_env$score_texts)
+  ))
+
+  topic_generation_env <- new.env(parent = emptyenv())
+  topic_generation_env$initialize_python_environment <- function(...) NULL
+  topic_generation_env$async_message_printer <- function(...) NULL
+  topic_generation_env$send_prompt_with_retries <- function(...) NULL
+  topic_generation_env$get_context_window_size_in_tokens <- function(...) 1024
+  topic_generation_env$count_tokens <- function(...) 1
+  topic_generation_env$tiktoken_load_tokenizer <- function(...) NULL
+  topic_generation_env$prompt_candidate_topics <- function(...) NULL
+  topic_generation_env$prompt_reduce_topics <- function(...) NULL
+  topic_generation_env$`%||%` <- function(a, b) if (is.null(a)) b else a
+  topic_generation_env$create_candidate_topics <- function(...) NULL
+  topic_generation_env$reduce_topics <- function(...) NULL
+
+  prepare_async_analysis_worker(
+    task = "topic_generation",
+    env = topic_generation_env
+  )
+
+  expect_true(exists(
+    "send_prompt_with_retries",
+    envir = environment(topic_generation_env$create_candidate_topics)
+  ))
+  expect_true(exists(
+    "prompt_candidate_topics",
+    envir = environment(topic_generation_env$create_candidate_topics)
+  ))
+  expect_true(exists(
+    "%||%",
+    envir = environment(topic_generation_env$create_candidate_topics)
+  ))
+  expect_true(exists(
+    "count_tokens",
+    envir = environment(topic_generation_env$reduce_topics)
+  ))
+  expect_true(exists(
+    "prompt_reduce_topics",
+    envir = environment(topic_generation_env$reduce_topics)
+  ))
+
+  topic_reduction_env <- new.env(parent = emptyenv())
+  topic_reduction_env$initialize_python_environment <- function(...) NULL
+  topic_reduction_env$async_message_printer <- function(...) NULL
+  topic_reduction_env$send_prompt_with_retries <- function(...) NULL
+  topic_reduction_env$get_context_window_size_in_tokens <- function(...) 1024
+  topic_reduction_env$count_tokens <- function(...) 1
+  topic_reduction_env$tiktoken_load_tokenizer <- function(...) NULL
+  topic_reduction_env$prompt_reduce_topics <- function(...) NULL
+  topic_reduction_env$reduce_topics <- function(...) NULL
+
+  prepare_async_analysis_worker(
+    task = "topic_reduction",
+    env = topic_reduction_env
+  )
+
+  expect_true(exists(
+    "count_tokens",
+    envir = environment(topic_reduction_env$reduce_topics)
+  ))
+  expect_true(exists(
+    "prompt_reduce_topics",
+    envir = environment(topic_reduction_env$reduce_topics)
+  ))
+
+  code_generation_env <- new.env(parent = emptyenv())
+  code_generation_env$initialize_python_environment <- function(...) NULL
+  code_generation_env$async_message_printer <- function(...) NULL
+  code_generation_env$send_prompt_with_retries <- function(...) NULL
+  code_generation_env$get_context_window_size_in_tokens <- function(...) 1024
+  code_generation_env$count_tokens <- function(...) 1
+  code_generation_env$tiktoken_load_tokenizer <- function(...) NULL
+  code_generation_env$semchunk_load_chunker <- function(...) NULL
+  code_generation_env$create_text_batches <- function(...) NULL
+  code_generation_env$prompt_candidate_topics <- function(...) NULL
+  code_generation_env$prompt_reduce_topics <- function(...) NULL
+  code_generation_env$create_candidate_topics <- function(...) NULL
+  code_generation_env$reduce_topics <- function(...) NULL
+  code_generation_env$generate_codes_by_reading_texts <- function(...) NULL
+  code_generation_env$`%||%` <- function(a, b) if (is.null(a)) b else a
+
+  prepare_async_analysis_worker(
+    task = "code_generation",
+    env = code_generation_env
+  )
+
+  expect_true(exists(
+    "async_message_printer",
+    envir = environment(code_generation_env$semchunk_load_chunker)
+  ))
+  expect_true(exists(
+    "count_tokens",
+    envir = environment(code_generation_env$create_text_batches)
+  ))
+  expect_true(exists(
+    "prompt_candidate_topics",
+    envir = environment(code_generation_env$generate_codes_by_reading_texts)
+  ))
+  expect_true(exists(
+    "reduce_topics",
+    envir = environment(code_generation_env$generate_codes_by_reading_texts)
   ))
 
   marking_env <- new.env(parent = emptyenv())
@@ -176,18 +320,29 @@ test_that("analysis async globals helpers expose the expected names", {
   helper_env <- environment(analysis_async_tokenizer_globals)
   stub_names <- c(
     "initialize_python_environment",
+    ".python_environment_state_default",
+    ".python_environment_state_get",
+    ".python_environment_state_set",
     "get_context_window_size_in_tokens",
     "tiktoken_load_tokenizer",
     "count_tokens",
     "async_message_printer",
+    "split_texts_with_semchunk",
+    "gliner_load_model",
     "categorize_texts",
     "prompt_category",
     "prompt_multi_category",
+    "prompt_candidate_topics",
+    "prompt_reduce_topics",
+    "create_candidate_topics",
+    "reduce_topics",
     "score_texts",
     "prompt_score",
     "collect_grouped_texts",
     "collect_grouped_paragraph_inputs",
     "write_grouped_paragraphs",
+    "create_text_batches",
+    "generate_codes_by_reading_texts",
     "mark_texts",
     "mark_text_prompt",
     "semchunk_load_chunker",
@@ -235,9 +390,23 @@ test_that("analysis async globals helpers expose the expected names", {
     analysis_async_tokenizer_globals(),
     c(
       "initialize_python_environment",
+      ".python_environment_state_default",
+      ".python_environment_state_get",
+      ".python_environment_state_set",
       "get_context_window_size_in_tokens",
       "tiktoken_load_tokenizer",
       "count_tokens",
+      "async_message_printer"
+    )
+  )
+
+  expect_named(
+    analysis_async_python_loader_globals(),
+    c(
+      "initialize_python_environment",
+      ".python_environment_state_default",
+      ".python_environment_state_get",
+      ".python_environment_state_set",
       "async_message_printer"
     )
   )
@@ -273,6 +442,42 @@ test_that("analysis async globals helpers expose the expected names", {
     c(
       "score_texts",
       "prompt_score"
+    )
+  )
+
+  expect_named(
+    analysis_async_topic_modelling_globals(),
+    c(
+      "create_candidate_topics",
+      "prompt_candidate_topics",
+      "prompt_reduce_topics",
+      "reduce_topics",
+      "assign_topics",
+      "prompt_category",
+      "prompt_multi_category",
+      "%||%"
+    )
+  )
+
+  expect_named(
+    analysis_async_topic_reduction_globals(),
+    c(
+      "reduce_topics",
+      "prompt_reduce_topics"
+    )
+  )
+
+  expect_named(
+    analysis_async_code_generation_globals(),
+    c(
+      "generate_codes_by_reading_texts",
+      "create_text_batches",
+      "create_candidate_topics",
+      "prompt_candidate_topics",
+      "prompt_reduce_topics",
+      "reduce_topics",
+      "semchunk_load_chunker",
+      "%||%"
     )
   )
 

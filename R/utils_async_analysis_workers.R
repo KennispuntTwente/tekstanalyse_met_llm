@@ -49,7 +49,41 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
 .analysis_async_dependency_map <- function(task) {
   switch(
     task,
+    text_split = list(
+      .python_environment_state_get = ".python_environment_state_default",
+      .python_environment_state_set = ".python_environment_state_default",
+      initialize_python_environment = c(
+        ".python_environment_state_get",
+        ".python_environment_state_set",
+        ".python_environment_state_default"
+      ),
+      semchunk_load_chunker = c(
+        "async_message_printer",
+        "initialize_python_environment"
+      ),
+      split_texts_with_semchunk = "semchunk_load_chunker"
+    ),
+    gliner = list(
+      .python_environment_state_get = ".python_environment_state_default",
+      .python_environment_state_set = ".python_environment_state_default",
+      initialize_python_environment = c(
+        ".python_environment_state_get",
+        ".python_environment_state_set",
+        ".python_environment_state_default"
+      ),
+      gliner_load_model = c(
+        "async_message_printer",
+        "initialize_python_environment"
+      )
+    ),
     categorization = list(
+      .python_environment_state_get = ".python_environment_state_default",
+      .python_environment_state_set = ".python_environment_state_default",
+      initialize_python_environment = c(
+        ".python_environment_state_get",
+        ".python_environment_state_set",
+        ".python_environment_state_default"
+      ),
       tiktoken_load_tokenizer = c(
         "async_message_printer",
         "initialize_python_environment"
@@ -83,7 +117,59 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "prompt_score"
       )
     ),
+    topic_generation = list(
+      .python_environment_state_get = ".python_environment_state_default",
+      .python_environment_state_set = ".python_environment_state_default",
+      initialize_python_environment = c(
+        ".python_environment_state_get",
+        ".python_environment_state_set",
+        ".python_environment_state_default"
+      ),
+      tiktoken_load_tokenizer = c(
+        "async_message_printer",
+        "initialize_python_environment"
+      ),
+      count_tokens = "tiktoken_load_tokenizer",
+      create_candidate_topics = c(
+        "send_prompt_with_retries",
+        "prompt_candidate_topics",
+        "%||%"
+      ),
+      reduce_topics = c(
+        "send_prompt_with_retries",
+        "prompt_reduce_topics",
+        "get_context_window_size_in_tokens",
+        "count_tokens"
+      )
+    ),
+    topic_reduction = list(
+      .python_environment_state_get = ".python_environment_state_default",
+      .python_environment_state_set = ".python_environment_state_default",
+      initialize_python_environment = c(
+        ".python_environment_state_get",
+        ".python_environment_state_set",
+        ".python_environment_state_default"
+      ),
+      tiktoken_load_tokenizer = c(
+        "async_message_printer",
+        "initialize_python_environment"
+      ),
+      count_tokens = "tiktoken_load_tokenizer",
+      reduce_topics = c(
+        "send_prompt_with_retries",
+        "prompt_reduce_topics",
+        "get_context_window_size_in_tokens",
+        "count_tokens"
+      )
+    ),
     topic_assignment = list(
+      .python_environment_state_get = ".python_environment_state_default",
+      .python_environment_state_set = ".python_environment_state_default",
+      initialize_python_environment = c(
+        ".python_environment_state_get",
+        ".python_environment_state_set",
+        ".python_environment_state_default"
+      ),
       tiktoken_load_tokenizer = c(
         "async_message_printer",
         "initialize_python_environment"
@@ -111,7 +197,52 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "prompt_multi_category"
       )
     ),
+    code_generation = list(
+      .python_environment_state_get = ".python_environment_state_default",
+      .python_environment_state_set = ".python_environment_state_default",
+      initialize_python_environment = c(
+        ".python_environment_state_get",
+        ".python_environment_state_set",
+        ".python_environment_state_default"
+      ),
+      semchunk_load_chunker = c(
+        "async_message_printer",
+        "initialize_python_environment"
+      ),
+      tiktoken_load_tokenizer = c(
+        "async_message_printer",
+        "initialize_python_environment"
+      ),
+      count_tokens = "tiktoken_load_tokenizer",
+      create_text_batches = "count_tokens",
+      create_candidate_topics = c(
+        "send_prompt_with_retries",
+        "prompt_candidate_topics",
+        "%||%"
+      ),
+      reduce_topics = c(
+        "send_prompt_with_retries",
+        "prompt_reduce_topics",
+        "get_context_window_size_in_tokens",
+        "count_tokens"
+      ),
+      generate_codes_by_reading_texts = c(
+        "semchunk_load_chunker",
+        "get_context_window_size_in_tokens",
+        "create_text_batches",
+        "prompt_candidate_topics",
+        "create_candidate_topics",
+        "reduce_topics"
+      )
+    ),
     marking = list(
+      .python_environment_state_get = ".python_environment_state_default",
+      .python_environment_state_set = ".python_environment_state_default",
+      initialize_python_environment = c(
+        ".python_environment_state_get",
+        ".python_environment_state_set",
+        ".python_environment_state_default"
+      ),
       semchunk_load_chunker = c(
         "async_message_printer",
         "initialize_python_environment"
@@ -200,9 +331,26 @@ prepare_async_analysis_worker <- function(task, env = parent.frame()) {
 analysis_async_tokenizer_globals <- function() {
   list(
     initialize_python_environment = initialize_python_environment,
+    .python_environment_state_default = .python_environment_state_default,
+    .python_environment_state_get = .python_environment_state_get,
+    .python_environment_state_set = .python_environment_state_set,
     get_context_window_size_in_tokens = get_context_window_size_in_tokens,
     tiktoken_load_tokenizer = tiktoken_load_tokenizer,
     count_tokens = count_tokens,
+    async_message_printer = async_message_printer
+  )
+}
+
+
+#' Globals shared by async workers that only need Python loader bootstrap
+#'
+#' @return Named list for `mirai::mirai(..., .args = ...)`.
+analysis_async_python_loader_globals <- function() {
+  list(
+    initialize_python_environment = initialize_python_environment,
+    .python_environment_state_default = .python_environment_state_default,
+    .python_environment_state_get = .python_environment_state_get,
+    .python_environment_state_set = .python_environment_state_set,
     async_message_printer = async_message_printer
   )
 }
@@ -331,6 +479,14 @@ analysis_async_paragraph_globals <- function(env = parent.frame()) {
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
 analysis_async_topic_modelling_globals <- function(env = parent.frame()) {
+  null_coalesce <- if (exists("%||%", envir = env, inherits = TRUE)) {
+    get("%||%", envir = env, inherits = TRUE)
+  } else {
+    function(a, b) {
+      if (is.null(a)) b else a
+    }
+  }
+
   list(
     create_candidate_topics = get(
       "create_candidate_topics",
@@ -342,6 +498,11 @@ analysis_async_topic_modelling_globals <- function(env = parent.frame()) {
       envir = env,
       inherits = TRUE
     ),
+    prompt_reduce_topics = get(
+      "prompt_reduce_topics",
+      envir = env,
+      inherits = TRUE
+    ),
     reduce_topics = get("reduce_topics", envir = env, inherits = TRUE),
     assign_topics = get("assign_topics", envir = env, inherits = TRUE),
     prompt_category = get("prompt_category", envir = env, inherits = TRUE),
@@ -349,7 +510,8 @@ analysis_async_topic_modelling_globals <- function(env = parent.frame()) {
       "prompt_multi_category",
       envir = env,
       inherits = TRUE
-    )
+    ),
+    `%||%` = null_coalesce
   )
 }
 
@@ -359,7 +521,12 @@ analysis_async_topic_modelling_globals <- function(env = parent.frame()) {
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
 analysis_async_topic_reduction_globals <- function(env = parent.frame()) {
   list(
-    reduce_topics = get("reduce_topics", envir = env, inherits = TRUE)
+    reduce_topics = get("reduce_topics", envir = env, inherits = TRUE),
+    prompt_reduce_topics = get(
+      "prompt_reduce_topics",
+      envir = env,
+      inherits = TRUE
+    )
   )
 }
 
@@ -444,6 +611,14 @@ analysis_async_marking_globals <- function(env = parent.frame()) {
 #'
 #' @return Named list for `mirai::mirai(..., .args = ...)`.
 analysis_async_code_generation_globals <- function(env = parent.frame()) {
+  null_coalesce <- if (exists("%||%", envir = env, inherits = TRUE)) {
+    get("%||%", envir = env, inherits = TRUE)
+  } else {
+    function(a, b) {
+      if (is.null(a)) b else a
+    }
+  }
+
   list(
     generate_codes_by_reading_texts = get(
       "generate_codes_by_reading_texts",
@@ -465,11 +640,17 @@ analysis_async_code_generation_globals <- function(env = parent.frame()) {
       envir = env,
       inherits = TRUE
     ),
+    prompt_reduce_topics = get(
+      "prompt_reduce_topics",
+      envir = env,
+      inherits = TRUE
+    ),
     reduce_topics = get("reduce_topics", envir = env, inherits = TRUE),
     semchunk_load_chunker = get(
       "semchunk_load_chunker",
       envir = env,
       inherits = TRUE
-    )
+    ),
+    `%||%` = null_coalesce
   )
 }

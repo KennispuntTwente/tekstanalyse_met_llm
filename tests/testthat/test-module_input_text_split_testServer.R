@@ -19,6 +19,7 @@ shinyQueue <- function() {
   )
 }
 
+source(here::here("R", "utils_async_analysis_workers.R"), local = TRUE)
 source(here::here("R", "module_input_text_split.R"), local = TRUE)
 
 # Minimal stubs used by the module.
@@ -55,6 +56,7 @@ semchunk_load_chunker <- function(chunk_size = 128, queue = NULL) {
 }
 
 async_message_printer <- function(...) invisible(NULL)
+initialize_python_environment <- function(...) invisible(NULL)
 
 
 test_that("text_split_server: returns document texts when toggle is off", {
@@ -278,6 +280,85 @@ test_that("text_split_server ignores stale async split results after source text
 
       expect_identical(texts(), c("gamma"))
       expect_null(source_document_texts())
+    }
+  )
+})
+
+
+test_that("text_split_server passes worker setup globals for semchunk async work", {
+  testthat::skip_if_not_installed("mirai")
+
+  mirai_ns <- asNamespace("mirai")
+
+  old_mirai <- get("mirai", envir = mirai_ns)
+  captured <- new.env(parent = emptyenv())
+
+  withr::defer({
+    unlockBinding("mirai", mirai_ns)
+    assign("mirai", old_mirai, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  unlockBinding("mirai", mirai_ns)
+  assign(
+    "mirai",
+    function(
+      .expr,
+      ...,
+      .args = list(),
+      .timeout = NULL,
+      .compute = NULL
+    ) {
+      force(.timeout)
+      force(.compute)
+
+      captured$args <- c(list(...), .args)
+
+      promises::promise(function(resolve, reject) {
+        captured$resolve <- resolve
+        captured$reject <- reject
+      })
+    },
+    envir = mirai_ns
+  )
+  lockBinding("mirai", mirai_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      document_texts <- reactiveVal(c("alpha", "beta"))
+      processing <- reactiveVal(FALSE)
+      lang <- make_test_lang("nl")
+
+      split_result <- text_split_server(
+        id = "split",
+        document_texts = document_texts,
+        processing = processing,
+        lang = lang,
+        enabled = TRUE
+      )
+
+      list(split_result = split_result, lang = lang)
+    },
+    {
+      session$setInputs(`split-toggle` = lang()$t("Ja"))
+      session$flushReact()
+
+      session$setInputs(`split-max_tokens` = 5)
+      session$flushReact()
+
+      session$setInputs(`split-split_texts` = 1)
+      session$flushReact()
+
+      expect_true(all(
+        c(
+          "split_texts_with_semchunk",
+          "semchunk_load_chunker",
+          "prepare_async_analysis_worker",
+          "initialize_python_environment",
+          "async_message_printer"
+        ) %in%
+          names(captured$args)
+      ))
     }
   )
 })

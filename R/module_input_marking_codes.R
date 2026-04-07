@@ -220,6 +220,7 @@ marking_codes_server <- function(
         mirai::mirai(
           {
             log_context_apply(log_context)
+            prepare_async_analysis_worker("code_generation")
 
             generate_codes_by_reading_texts(
               texts = texts,
@@ -246,6 +247,7 @@ marking_codes_server <- function(
               language = lang()$get_translation_language()
             ),
             analysis_async_code_generation_globals(),
+            analysis_async_worker_setup_globals(),
             analysis_async_tokenizer_globals()
           )
         ) %...>%

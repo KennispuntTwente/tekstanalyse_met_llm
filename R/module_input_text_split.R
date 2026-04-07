@@ -305,6 +305,7 @@ text_split_server <- function(
       mirai::mirai(
         {
           log_context_apply(log_context)
+          prepare_async_analysis_worker("text_split")
 
           split_texts_with_semchunk(
             texts = input_rows$document_text,
@@ -323,9 +324,10 @@ text_split_server <- function(
             overlap = overlap_val(),
             queue = queue,
             split_texts_with_semchunk = split_texts_with_semchunk,
-            semchunk_load_chunker = semchunk_load_chunker,
-            async_message_printer = async_message_printer
-          )
+            semchunk_load_chunker = semchunk_load_chunker
+          ),
+          analysis_async_worker_setup_globals(),
+          analysis_async_python_loader_globals()
         )
       ) %...>%
         {

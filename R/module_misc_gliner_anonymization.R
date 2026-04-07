@@ -370,6 +370,7 @@ gliner_server <- function(
           mirai::mirai(
             {
               log_context_apply(log_context)
+              prepare_async_analysis_worker("gliner")
 
               if (is.null(gliner_model)) {
                 # If we are truly in async mode, we load the model here;
@@ -402,9 +403,10 @@ gliner_server <- function(
                 pii_texts = pii_texts(),
                 labels = labels,
                 progress = progress,
-                queue = queue,
-                async_message_printer = async_message_printer
-              )
+                queue = queue
+              ),
+              analysis_async_worker_setup_globals(),
+              analysis_async_python_loader_globals()
             )
           ) %...>%
             {
