@@ -434,6 +434,7 @@ test_that("analysis async globals helpers expose the expected names", {
     analysis_async_tokenizer_globals(),
     c(
       "initialize_python_environment",
+      "safe_py_import",
       ".python_environment_state_default",
       ".python_environment_state_get",
       ".python_environment_state_set",

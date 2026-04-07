@@ -492,6 +492,7 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
   analysis_async_worker_setup_globals <- function(...) list()
   analysis_async_processing_globals <- function(...) list()
   analysis_result_async_globals <- function(...) list()
+  download_async_worker_setup_globals <- function(...) list()
 
   .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
   .kwallm__prompt_execution_get <- function(...) NULL
@@ -550,6 +551,7 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
     data.frame(stringsAsFactors = FALSE)
   }
 
+  prepare_async_download_worker <- function(...) invisible(NULL)
   create_analysis_result_download_bundle <- function(...) {
     path <- tempfile(fileext = ".zip")
     file.create(path)

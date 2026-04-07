@@ -546,9 +546,125 @@ analysis_result_async_globals <- function() {
       analysis_result_to_metadata_list = analysis_result_to_metadata_list,
       analysis_result_to_export_sheets = analysis_result_to_export_sheets,
       analysis_result_report_globals = analysis_result_report_globals,
-      .kwallm_mode_display_from_id = .kwallm_mode_display_from_id
+      .kwallm_mode_display_from_id = .kwallm_mode_display_from_id,
+      # Transitive helpers called by the serializers above:
+      .kwallm_timestamp_string = .kwallm_timestamp_string,
+      .kwallm_df_to_records = .kwallm_df_to_records,
+      .kwallm_stage_records_by_stage = .kwallm_stage_records_by_stage,
+      .kwallm_excel_scalar = .kwallm_excel_scalar,
+      .kwallm_excel_df = .kwallm_excel_df,
+      .kwallm_scalar_or_null = .kwallm_scalar_or_null,
+      .kwallm_report_results_df_categorization = .kwallm_report_results_df_categorization,
+      .kwallm_report_results_df_scoring = .kwallm_report_results_df_scoring,
+      .kwallm_report_results_df_marking = .kwallm_report_results_df_marking,
+      .kwallm_document_unit_map = .kwallm_document_unit_map,
+      .kwallm_labels_lookup = .kwallm_labels_lookup,
+      .kwallm_codes_lookup = .kwallm_codes_lookup
     ),
     analysis_result_report_globals()
+  )
+}
+
+# Dependency map for the async download worker.
+# Each entry maps a function to the names it calls at runtime.
+#
+# IMPORTANT: entries must be in topological order (leaves first, root last).
+# async_inject_dependencies() processes entries sequentially; a function that
+# appears as a dependency of an earlier entry is captured *before* its own
+# dependencies are injected, causing "could not find function" errors at
+# runtime.
+.download_async_dependency_map <- function() {
+  list(
+    # --- leaf helpers (deps are plain values, not in this map) ---
+    .kwallm_df_to_records = ".kwallm_scalar_or_null",
+    .kwallm_excel_scalar = ".kwallm_scalar_or_null",
+    .kwallm_excel_df = ".kwallm_scalar_or_null",
+    .kwallm_get_stage_model_id = ".kwallm_scalar_or_null",
+    .kwallm_stage_records_by_stage = ".kwallm_df_to_records",
+    .kwallm_report_text_count_summary = ".kwallm_analysis_result_text_counts",
+    .kwallm_report_results_df_categorization = c(
+      ".kwallm_document_unit_map",
+      ".kwallm_labels_lookup"
+    ),
+    .kwallm_report_results_df_scoring = ".kwallm_document_unit_map",
+    .kwallm_report_results_df_marking = c(
+      ".kwallm_document_unit_map",
+      ".kwallm_codes_lookup"
+    ),
+    # --- mid-level helpers ---
+    .kwallm_report_results_df = c(
+      ".kwallm_report_results_df_categorization",
+      ".kwallm_report_results_df_scoring",
+      ".kwallm_report_results_df_marking"
+    ),
+    analysis_result_report_globals = c(
+      ".kwallm_report_results_df",
+      ".kwallm_report_group_lookup",
+      ".kwallm_analysis_result_text_counts",
+      ".kwallm_report_text_count_summary",
+      ".kwallm_get_stage_model_id",
+      ".kwallm_paragraph_subject_lookup",
+      ".kwallm_paragraph_supporting_texts"
+    ),
+    analysis_result_to_metadata_list = c(
+      ".kwallm_timestamp_string",
+      ".kwallm_analysis_result_text_counts",
+      ".kwallm_df_to_records",
+      ".kwallm_stage_records_by_stage"
+    ),
+    analysis_result_to_export_sheets = c(
+      ".kwallm_analysis_result_text_counts",
+      ".kwallm_timestamp_string",
+      ".kwallm_excel_scalar",
+      ".kwallm_report_results_df",
+      ".kwallm_excel_df"
+    ),
+    # --- writer functions (depend on mid-level helpers) ---
+    write_analysis_result_metadata_json = "analysis_result_to_metadata_list",
+    write_analysis_result_excel = "analysis_result_to_export_sheets",
+    write_analysis_result_report_html = c(
+      ".kwallm_mode_display_from_id",
+      "analysis_result_report_globals"
+    ),
+    # --- root (depends on all writers) ---
+    create_analysis_result_download_bundle = c(
+      "write_analysis_result_metadata_json",
+      "write_analysis_result_excel",
+      "write_analysis_result_report_html"
+    )
+  )
+}
+
+prepare_async_download_worker <- function(env = parent.frame()) {
+  async_inject_dependencies(
+    bindings = .download_async_dependency_map(),
+    env = env
+  )
+  invisible(NULL)
+}
+
+# Globals for the download worker setup helpers.
+download_async_worker_setup_globals <- function(env = parent.frame()) {
+  prepare_fn <- get(
+    "prepare_async_download_worker",
+    envir = env,
+    inherits = TRUE
+  )
+  fn_env <- new.env(parent = environment(prepare_fn))
+  fn_env$async_inject_dependencies <- get(
+    "async_inject_dependencies",
+    envir = env,
+    inherits = TRUE
+  )
+  fn_env$.download_async_dependency_map <- get(
+    ".download_async_dependency_map",
+    envir = env,
+    inherits = TRUE
+  )
+  environment(prepare_fn) <- fn_env
+
+  list(
+    prepare_async_download_worker = prepare_fn
   )
 }
 

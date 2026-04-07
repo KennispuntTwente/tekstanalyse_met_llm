@@ -61,6 +61,8 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
   source(here::here("R", "utils_async_analysis_workers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   source(here::here("R", "utils_logger.R"), local = TRUE)
   source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
 
@@ -180,6 +182,8 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
       ),
       analysis_async_topic_modelling_globals(),
       analysis_async_worker_setup_globals(),
+      analysis_async_processing_globals(),
+      analysis_async_tokenizer_globals(),
       log_async_globals(log_context),
       send_prompt_with_retries_async_globals()
     )
@@ -229,4 +233,85 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
   expect_true(as.integer(reduction_match[, 2]) >= 200)
   expect_true(as.integer(reduction_match[, 3]) <= 7)
   expect_true(as.integer(reduction_match[, 4]) >= 2)
+})
+
+
+test_that("topic reduction async integration (edit-topics path) uses production wiring", {
+  skip_on_cran()
+  skip_if_not_installed("mirai")
+  withr::local_dir(here::here())
+
+  source(here::here("R", "utils_async_message_printer.R"), local = TRUE)
+  source(here::here("R", "utils_context_window.R"), local = TRUE)
+  source(here::here("R", "utils_tokenizer.R"), local = TRUE)
+  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+  source(here::here("R", "utils_async_analysis_workers.R"), local = TRUE)
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+  source(here::here("R", "utils_logger.R"), local = TRUE)
+  source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
+
+  old_opts <- options(
+    logger__dir = file.path(tempdir(), "kwallm-topic-reduction-logs"),
+    logger__level = "INFO",
+    topic_modelling__always_add_not_applicable = TRUE,
+    tidyprompt.warn.auto.json = FALSE
+  )
+  withr::defer(options(old_opts), testthat::teardown_env())
+
+  log_init(mode = "test")
+  log_context <- log_context_capture(is_async = TRUE, mode = "test")
+
+  provider <- kwallm_test_llm_provider("kwallm-fake-reducer-320")
+
+  # Simulate topics a user might edit and re-reduce (the edit_topics path)
+  updated_topics <- c(
+    "Billing issues",
+    "Delivery speed",
+    "Product quality",
+    "Customer support responsiveness",
+    "App usability problems",
+    "Eco-friendly packaging"
+  )
+
+  tryCatch(mirai::daemons(0), error = function(e) NULL)
+  Sys.sleep(0.2)
+  mirai::daemons(2)
+  withr::defer(tryCatch(mirai::daemons(0), error = function(e) NULL))
+  Sys.sleep(0.5)
+
+  # Mirror the exact production pattern from module_misc_edit_topics.R
+  reduction_worker <- mirai::mirai(
+    {
+      log_context_apply(log_context)
+      prepare_async_analysis_worker("topic_reduction")
+
+      reduce_topics(
+        updated_topics,
+        research_background,
+        llm_provider,
+        language = "en"
+      )
+    },
+    .args = c(
+      list(
+        updated_topics = updated_topics,
+        research_background = "",
+        llm_provider = provider
+      ),
+      analysis_async_topic_reduction_globals(),
+      analysis_async_worker_setup_globals(),
+      analysis_async_tokenizer_globals(),
+      log_async_globals(log_context),
+      send_prompt_with_retries_async_globals()
+    )
+  )
+
+  result <- reduction_worker[]
+  if (mirai::is_error_value(result)) {
+    fail(paste("topic reduction worker error:", as.character(result)))
+  }
+
+  expect_true(is.character(result))
+  expect_true(length(result) >= 2)
+  expect_true("Unknown/not applicable" %in% result)
 })

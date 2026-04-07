@@ -295,6 +295,7 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         ".kwallm_marking_status_row",
         ".kwallm_marking_matches_from_find_matches"
       ),
+      .kwallm_marking_matches_from_find_matches = ".kwallm_marking_status_row",
       .kwallm_normalize_marking_matches = c(
         "find_matches",
         ".kwallm_empty_marking_matches",
@@ -350,6 +351,7 @@ prepare_async_analysis_worker <- function(task, env = parent.frame()) {
 analysis_async_tokenizer_globals <- function() {
   list(
     initialize_python_environment = initialize_python_environment,
+    safe_py_import = safe_py_import,
     .python_environment_state_default = .python_environment_state_default,
     .python_environment_state_get = .python_environment_state_get,
     .python_environment_state_set = .python_environment_state_set,

@@ -1404,6 +1404,7 @@ processing_server <- function(
 
         promise <- mirai::mirai(
           {
+            prepare_async_download_worker()
             create_analysis_result_download_bundle(
               analysis_result = analysis_result,
               temp_dir = temp_dir
@@ -1414,7 +1415,8 @@ processing_server <- function(
               analysis_result = analysis_result,
               temp_dir = tempdir()
             ),
-            analysis_result_async_globals()
+            analysis_result_async_globals(),
+            download_async_worker_setup_globals()
           )
         )
 

@@ -153,6 +153,8 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
       ),
       analysis_async_categorization_globals(),
       analysis_async_worker_setup_globals(),
+      analysis_async_processing_globals(),
+      analysis_async_tokenizer_globals(),
       log_async_globals(log_context),
       send_prompt_with_retries_async_globals()
     )
