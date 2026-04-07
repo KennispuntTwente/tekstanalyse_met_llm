@@ -18,6 +18,7 @@ test_that("{shinytest2} upload card keeps consistent state across navigation and
     seed = 123,
     options = list(kwallm.test_async = TRUE)
   )
+  on.exit(app$stop(), add = TRUE)
 
   wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
@@ -70,22 +71,4 @@ test_that("{shinytest2} upload card keeps consistent state across navigation and
     "document.body.innerText.includes('%s')",
     basename(temp_csv)
   )))
-
-  wait_for_text_upload_input(app)
-  app$upload_file(`text_upload-text_file` = temp_csv)
-  app$wait_for_value(
-    export = "text_upload-uploaded_file_name",
-    timeout = 10000
-  )
-
-  expect_equal(
-    app$get_value(export = "text_upload-uploaded_file_name"),
-    basename(temp_csv)
-  )
-  expect_true(app$get_js("!!document.getElementById('text_upload-column')"))
-  expect_true(app$get_js("!!document.getElementById('text_upload-by_column')"))
-  expect_equal(app$get_value(input = "text_upload-column"), "text")
-  expect_equal(app$get_value(input = "text_upload-by_column"), "group")
-
-  app$stop()
 })

@@ -406,6 +406,89 @@ test_that("text_upload_server: reuploading the same xlsx file refreshes sheet-ba
 })
 
 
+test_that("text_upload_server: reuploading the same csv file preserves selected state", {
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("en")
+      processing <- reactiveVal(FALSE)
+
+      upload_result <- text_upload_server(
+        id = "text_upload",
+        processing = processing,
+        lang = lang
+      )
+
+      raw_texts <- upload_result$texts
+      by_col_name <- upload_result$by_column_name
+      by_col_values <- upload_result$by_column_values
+      by_col_lookup <- upload_result$by_column_lookup
+
+      list(
+        raw_texts = raw_texts,
+        by_col_name = by_col_name,
+        by_col_values = by_col_values,
+        by_col_lookup = by_col_lookup
+      )
+    },
+    {
+      first_path <- withr::local_tempfile(fileext = ".csv")
+      second_path <- withr::local_tempfile(fileext = ".csv")
+      first_data <- data.frame(
+        text = c("Alpha", "Beta"),
+        group = c("G1", "G2"),
+        stringsAsFactors = FALSE
+      )
+      second_data <- data.frame(
+        text = c("Delta", "Epsilon", "Zeta"),
+        group = c("H1", "H1", "H2"),
+        stringsAsFactors = FALSE
+      )
+
+      vroom::vroom_write(first_data, first_path, delim = ",")
+      vroom::vroom_write(second_data, second_path, delim = ",")
+
+      session$setInputs(
+        `text_upload-text_file` = make_fileinput_df(
+          first_path,
+          "data.csv",
+          "text/csv"
+        )
+      )
+      session$flushReact()
+      session$setInputs(`text_upload-column` = "text")
+      session$flushReact()
+      session$setInputs(`text_upload-by_column` = "group")
+      session$flushReact()
+
+      expect_equal(sort(raw_texts()), sort(first_data$text))
+      expect_equal(by_col_name(), "group")
+      expect_equal(by_col_values(), first_data$group)
+      expect_equal(
+        by_col_lookup(),
+        expected_lookup(first_data$text, first_data$group)
+      )
+
+      session$setInputs(
+        `text_upload-text_file` = make_fileinput_df(
+          second_path,
+          "data.csv",
+          "text/csv"
+        )
+      )
+      session$flushReact()
+
+      expect_equal(sort(raw_texts()), sort(second_data$text))
+      expect_equal(by_col_name(), "group")
+      expect_equal(by_col_values(), second_data$group)
+      expect_equal(
+        by_col_lookup(),
+        expected_lookup(second_data$text, second_data$group)
+      )
+    }
+  )
+})
+
+
 test_that("text_upload_server: duplicate texts preserve row-aligned group values", {
   shiny::testServer(
     function(input, output, session) {

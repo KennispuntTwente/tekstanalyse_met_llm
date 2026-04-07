@@ -30,20 +30,8 @@ test_that("{shinytest2} reuploading the same file refreshes upload state", {
   app$upload_file(`text_upload-text_file` = temp_csv)
   wait_for_select_option(app, "text_upload-column", "text")
   app$set_inputs(`text_upload-column` = "text")
-  app$wait_for_value(
-    export = "text_management-texts__document_text",
-    timeout = 10000,
-    ignore = c(NULL)
-  )
   wait_for_bound_input(app, "text_upload-by_column")
   app$set_inputs(`text_upload-by_column` = "group")
-
-  expect_equal(
-    sort(app$get_value(export = "text_management-texts__document_text")),
-    sort(first_data$text)
-  )
-  expect_true(app$get_js("!!document.getElementById('text_upload-by_column')"))
-  expect_equal(app$get_value(input = "text_upload-by_column"), "group")
 
   vroom::vroom_write(second_data, temp_csv, delim = ",")
   wait_for_text_upload_input(app)
@@ -64,8 +52,6 @@ test_that("{shinytest2} reuploading the same file refreshes upload state", {
     app$get_value(export = "text_upload-uploaded_file_name"),
     basename(temp_csv)
   )
-  expect_true(app$get_js("!!document.getElementById('text_upload-column')"))
-  expect_true(app$get_js("!!document.getElementById('text_upload-by_column')"))
   expect_equal(app$get_value(input = "text_upload-column"), "text")
   expect_equal(app$get_value(input = "text_upload-by_column"), "group")
 })
