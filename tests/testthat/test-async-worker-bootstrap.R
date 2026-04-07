@@ -87,6 +87,7 @@ test_that("kwallm_worker_bootstrap loads app functions and worker options in a r
           "generate_codes_by_reading_texts",
           "gliner_load_model",
           "create_analysis_result_download_bundle",
+          "run_model_provider_test",
           "send_prompt_with_retries",
           "log_context_apply"
         ),

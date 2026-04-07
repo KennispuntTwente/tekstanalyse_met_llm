@@ -209,7 +209,7 @@ processing_server <- function(
         log_analysis_start(
           mode = mode(),
           n_texts = n_preprocessed_texts,
-          model = models$main$parameters$model %||% "unknown"
+          model = processing_model_name(models$main)
         )
 
         if (isTRUE(set_initial_progress)) {
@@ -218,11 +218,6 @@ processing_server <- function(
 
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
-
-        log_context_capture(
-          is_async = TRUE,
-          mode = getOption("app__mode", "unknown")
-        )
       }
 
       # Connects a `mirai` promise to a reactive setter plus shared error
@@ -1155,6 +1150,19 @@ processing_server <- function(
           return()
         }
 
+        missing_models <- processing_missing_models(models, mode())
+        if (length(missing_models) > 0L) {
+          log_action(
+            "analysis_process_blocked_missing_model",
+            details = sprintf(
+              "mode=%s missing=%s",
+              mode() %||% "unknown",
+              paste(missing_models, collapse = ",")
+            )
+          )
+          return()
+        }
+
         log_action(
           "analysis_process_clicked",
           details = sprintf(
@@ -1823,6 +1831,7 @@ processing_server <- function(
 
         # Disable if no texts OR if there is a context-window fit problem
         disable_flag <- (n_pre == 0) ||
+          !processing_models_ready(models, mode()) ||
           isTRUE(context_window$any_fit_problem) ||
           isTRUE(context_window$too_many_batches) ||
           isTRUE(processing_has_pending_gliner_anonymization(texts)) ||

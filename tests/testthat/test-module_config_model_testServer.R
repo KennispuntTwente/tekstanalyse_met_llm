@@ -4,6 +4,42 @@ library(shinyjs)
 
 testthat::skip_if_not_installed("tidyprompt")
 
+test_that("run_model_provider_test uses send_prompt_with_retries for both modes", {
+  captured_calls <- list()
+
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
+    captured_calls <<- c(
+      captured_calls,
+      list(list(
+        prompt = prompt,
+        llm_provider = llm_provider
+      ))
+    )
+
+    if (length(captured_calls) == 1L) {
+      return("pong")
+    }
+
+    list(
+      steps = c("one", "two"),
+      final_answer = "pong"
+    )
+  }
+
+  source(here::here("R", "module_config_model.R"), local = TRUE)
+
+  provider <- list(parameters = list(model = "test-model"))
+
+  regular_result <- run_model_provider_test(provider, use_json = FALSE)
+  json_result <- run_model_provider_test(provider, use_json = TRUE)
+
+  expect_identical(regular_result, "pong")
+  expect_match(json_result, '"final_answer": "pong"')
+  expect_length(captured_calls, 2L)
+  expect_identical(captured_calls[[1]]$llm_provider, provider)
+  expect_identical(captured_calls[[2]]$llm_provider, provider)
+})
+
 test_that("model_server: selects preconfigured vs configured-provider models", {
   source(here::here("R", "module_config_model.R"), local = TRUE)
 

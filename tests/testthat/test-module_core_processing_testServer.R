@@ -7,6 +7,8 @@ testthat::skip_if_not_installed("tidyprompt")
 testthat::skip_if_not_installed("mirai")
 testthat::skip_if_not_installed("later")
 
+source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+
 mirai_sync_stub <- function(
   .expr,
   ...,
@@ -851,6 +853,146 @@ test_that("processing_server: topics_definitive gate blocks assignment when topi
       # start_topic_assignment() because the fit check still returns
       # fits = FALSE
       expect_false(assignment_started)
+    }
+  )
+})
+
+
+test_that("processing_server: process click is ignored when required models are missing", {
+  progress_bar_server <- stub_progress_bar_server
+  llm_streaming_server <- stub_llm_streaming_server
+
+  processing_texts_under_maximum <- function(...) TRUE
+  processing_split_ready <- function(...) TRUE
+  processing_anonymization_ready <- function(...) TRUE
+  processing_has_pending_gliner_anonymization <- function(...) FALSE
+
+  log_events <- list()
+  log_action <- function(event, details = NULL, ...) {
+    log_events <<- c(log_events, list(list(event = event, details = details)))
+    invisible(NULL)
+  }
+  log_analysis_start <- function(...) invisible(NULL)
+  log_context_capture <- function(...) list()
+  log_context_apply <- function(...) invisible(NULL)
+  log_info <- function(...) invisible(NULL)
+  log_debug <- function(...) invisible(NULL)
+  log_warn <- function(...) invisible(NULL)
+
+  handle_detailed_error <- function(...) {
+    function(err) stop(err)
+  }
+
+  app_error <- function(error, ...) stop(error)
+
+  .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
+  .kwallm__prompt_execution_get <- function(...) NULL
+
+  worker_started <- FALSE
+  kwallm_worker_bootstrap <- function(...) {
+    worker_started <<- TRUE
+    invisible(NULL)
+  }
+  kwallm_worker_bootstrap_globals <- function(...) {
+    list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+  }
+
+  showNotification <- function(...) invisible(NULL)
+
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+
+  mirai_ns <- asNamespace("mirai")
+  old_mirai_fn <- get("mirai", envir = mirai_ns)
+  withr::defer({
+    if (bindingIsLocked("mirai", mirai_ns)) {
+      unlockBinding("mirai", mirai_ns)
+    }
+    assign("mirai", old_mirai_fn, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  if (bindingIsLocked("mirai", mirai_ns)) {
+    unlockBinding("mirai", mirai_ns)
+  }
+  assign("mirai", mirai_sync_stub, envir = mirai_ns)
+  lockBinding("mirai", mirai_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+
+      texts <- shiny::reactiveValues(
+        preprocessed = c("first text", "second text"),
+        analysis_units = data.frame(analysis_unit_id = c(1L, 2L)),
+        df = data.frame(
+          document_text = c("first text", "second text"),
+          stringsAsFactors = FALSE
+        )
+      )
+
+      models <- shiny::reactiveValues(
+        main = NULL,
+        large = NULL
+      )
+
+      categories <- list(
+        texts = shiny::reactiveVal(c("A", "B")),
+        exclusive_texts = shiny::reactiveVal(character()),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(2)
+      )
+
+      codes <- list(
+        texts = shiny::reactiveVal(character()),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(0)
+      )
+
+      context_window <- shiny::reactiveValues(
+        any_fit_problem = FALSE,
+        too_many_batches = FALSE,
+        text_batches = list(c("first text", "second text"))
+      )
+
+      processing_server(
+        id = "processing",
+        mode = shiny::reactiveVal("Categorisatie"),
+        interrater_reliability_toggle = shiny::reactiveVal(FALSE),
+        texts = texts,
+        llm_provider_rv = shiny::reactiveValues(),
+        models = models,
+        categories = categories,
+        scoring_characteristic = shiny::reactiveVal(""),
+        codes = codes,
+        research_background = shiny::reactiveVal("Background"),
+        style_prompt = shiny::reactiveVal(""),
+        human_in_the_loop = shiny::reactiveVal(FALSE),
+        assign_multiple_categories = shiny::reactiveVal(FALSE),
+        write_paragraphs = shiny::reactiveVal(FALSE),
+        context_window = context_window,
+        lang = lang
+      )
+
+      NULL
+    },
+    {
+      expect_no_error({
+        session$setInputs(`processing-process` = 1)
+
+        for (i in seq_len(10)) {
+          later::run_now(timeout = 0)
+          session$flushReact()
+        }
+      })
+
+      expect_false(worker_started)
+      expect_true(any(vapply(
+        log_events,
+        function(entry) {
+          identical(entry$event, "analysis_process_blocked_missing_model")
+        },
+        logical(1)
+      )))
     }
   )
 })

@@ -23,6 +23,49 @@ model_ui <- function(
 
 # 2 Server ---------------------------------------------------------
 
+#' Run a lightweight provider test through the standard retry path
+#'
+#' @param provider LLM provider object to test.
+#' @param use_json Logical; whether to request structured JSON output.
+#'
+#' @return Character scalar with the provider response, or pretty-printed JSON.
+run_model_provider_test <- function(provider, use_json = FALSE) {
+  stopifnot(is.logical(use_json), length(use_json) == 1)
+
+  prompt <- tidyprompt::tidyprompt(if (isTRUE(use_json)) "Hi!?" else "Hi!")
+
+  if (isTRUE(use_json)) {
+    json_schema <- list(
+      name = "thought_steps",
+      description = NULL,
+      schema = list(
+        type = "object",
+        properties = list(
+          steps = list(type = "array", items = list(type = "string")),
+          final_answer = list(type = "string")
+        ),
+        required = c("steps", "final_answer"),
+        additionalProperties = FALSE
+      )
+    )
+
+    prompt <- prompt |>
+      tidyprompt::answer_as_json(
+        schema = json_schema,
+        type = "auto"
+      )
+
+    return(jsonlite::toJSON(
+      send_prompt_with_retries(prompt, provider),
+      auto_unbox = TRUE,
+      pretty = TRUE
+    ))
+  }
+
+  response <- send_prompt_with_retries(prompt, provider)
+  as.character(response %||% "")[1]
+}
+
 #' Model selector + configuration UI.
 #'
 #' @param preconfigured_llm_provider_model_main Named list of tidyprompt providers (main model choices).
@@ -780,34 +823,7 @@ model_server <- function(
               log_context = log_context
             )
 
-            if (use_json) {
-              json_schema <- list(
-                name = "thought_steps",
-                description = NULL,
-                schema = list(
-                  type = "object",
-                  properties = list(
-                    steps = list(type = "array", items = list(type = "string")),
-                    final_answer = list(type = "string")
-                  ),
-                  required = c("steps", "final_answer"),
-                  additionalProperties = FALSE
-                )
-              )
-
-              "Hi!?" %>%
-                tidyprompt::answer_as_json(
-                  schema = json_schema,
-                  type = "auto"
-                ) %>%
-                tidyprompt::send_prompt(provider) %>%
-                jsonlite::toJSON(auto_unbox = TRUE, pretty = TRUE)
-            } else {
-              provider$complete_chat("Hi!") %>%
-                .$completed %>%
-                dplyr::slice_tail(n = 1) %>%
-                dplyr::pull(content)
-            }
+            run_model_provider_test(provider, use_json = use_json)
           },
           .args = c(
             list(

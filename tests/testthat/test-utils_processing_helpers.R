@@ -164,6 +164,41 @@ test_that("processing_split_ready blocks launches while splitting is active", {
 })
 
 
+test_that("processing_missing_models is mode-aware", {
+  models <- list(main = NULL, large = NULL)
+
+  expect_identical(
+    processing_missing_models(models, "Categorisatie"),
+    "main"
+  )
+  expect_identical(
+    processing_missing_models(models, "Onderwerpextractie"),
+    c("main", "large")
+  )
+
+  models$main <- list(parameters = list(model = "main-model"))
+  expect_true(processing_models_ready(models, "Categorisatie"))
+  expect_false(processing_models_ready(models, "Onderwerpextractie"))
+
+  models$large <- list(parameters = list(model = "large-model"))
+  expect_true(processing_models_ready(models, "Onderwerpextractie"))
+})
+
+
+test_that("processing_model_name safely falls back to a default", {
+  expect_identical(processing_model_name(NULL), "unknown")
+  expect_identical(
+    processing_model_name(list(parameters = list(model = "main-model"))),
+    "main-model"
+  )
+  expect_identical(
+    processing_model_name(list(parameters = list(model = NA_character_))),
+    "unknown"
+  )
+  expect_identical(processing_model_name(list()), "unknown")
+})
+
+
 test_that("processing_normalize_reduced_topics preserves reduction_summary", {
   reduced_topics <- c(" Topic A ", "", "Topic B", "Topic A")
   attr(reduced_topics, "reduction_summary") <- list(

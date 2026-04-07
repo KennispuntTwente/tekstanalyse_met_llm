@@ -112,6 +112,84 @@ processing_split_ready <- function(
 }
 
 
+#' Identify which required model roles are currently missing
+#'
+#' Used by `module_core_processing` to block launches until the required model
+#' selections are present. All modes require a main model; topic extraction also
+#' requires a large model for reduction and topic editing.
+#'
+#' @param models Reactive-values-like object with `main` and `large` entries.
+#' @param mode Current processing mode name.
+#'
+#' @return Character vector of missing model roles.
+processing_missing_models <- function(models, mode = NULL) {
+  mode_value <- mode %||% NULL
+  if (!is.null(mode_value)) {
+    mode_value <- as.character(mode_value)[1]
+    if (!length(mode_value) || is.na(mode_value)) {
+      mode_value <- NULL
+    }
+  }
+
+  missing_models <- character()
+
+  main_model <- tryCatch(models$main %||% NULL, error = function(e) NULL)
+  if (is.null(main_model)) {
+    missing_models <- c(missing_models, "main")
+  }
+
+  if (identical(mode_value, "Onderwerpextractie")) {
+    large_model <- tryCatch(models$large %||% NULL, error = function(e) NULL)
+    if (is.null(large_model)) {
+      missing_models <- c(missing_models, "large")
+    }
+  }
+
+  missing_models
+}
+
+
+#' Check whether the required models are present for the selected mode
+#'
+#' @param models Reactive-values-like object with `main` and `large` entries.
+#' @param mode Current processing mode name.
+#'
+#' @return `TRUE` when all required model roles are present, otherwise `FALSE`.
+processing_models_ready <- function(models, mode = NULL) {
+  length(processing_missing_models(models, mode)) == 0L
+}
+
+
+#' Safely read the model id for logging and diagnostics
+#'
+#' @param model Provider object or `NULL`.
+#' @param default Fallback model id.
+#'
+#' @return Character scalar with the model id or `default`.
+processing_model_name <- function(model, default = "unknown") {
+  stopifnot(is.character(default), length(default) == 1)
+
+  if (is.null(model)) {
+    return(default)
+  }
+
+  tryCatch(
+    {
+      model_name <- model$parameters$model %||% default
+      model_name <- as.character(model_name)[1]
+      if (
+        !length(model_name) || is.na(model_name) || !nzchar(trimws(model_name))
+      ) {
+        return(default)
+      }
+
+      model_name
+    },
+    error = function(e) default
+  )
+}
+
+
 #' Normalize stored reduced topics while preserving reduction metadata
 #'
 #' Topic extraction stores the reduced topic list separately from the final

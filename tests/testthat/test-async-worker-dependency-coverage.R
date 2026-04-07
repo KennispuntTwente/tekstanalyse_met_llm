@@ -31,7 +31,11 @@ async_worker_task_entry_points <- list(
     "send_prompt_with_retries"
   ),
   download_bundle = c("create_analysis_result_download_bundle"),
-  model_provider_test = c("send_prompt_with_retries", "log_context_apply"),
+  model_provider_test = c(
+    "run_model_provider_test",
+    "send_prompt_with_retries",
+    "log_context_apply"
+  ),
   llm_provider_models_fetch = c("log_context_apply")
 )
 
