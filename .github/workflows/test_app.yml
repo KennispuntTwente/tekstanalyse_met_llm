@@ -49,14 +49,13 @@ jobs:
       fail-fast: false
       matrix:
         shard:
-          - {id: unit, label: "Unit / modules / utils"}
+          - {id: unit, label: "Unit"}
           - {id: integration, label: "Integration"}
-          - {id: integration-high-volume, label: "Integration high volume"}
           - {id: e2e-categorization, label: "E2E categorization"}
           - {id: e2e-scoring, label: "E2E scoring"}
           - {id: e2e-marking, label: "E2E marking"}
           - {id: e2e-topic, label: "E2E topic modelling"}
-          - {id: e2e-state-live, label: "E2E state and live provider"}
+          - {id: e2e-misc, label: "E2E misc"}
 
     env:
       GITHUB_PAT:        ${{ secrets.GITHUB_TOKEN }}

@@ -12,12 +12,11 @@ if (length(script_file_arg) == 1) {
 shard_ids <- c(
   "unit",
   "integration",
-  "integration-high-volume",
   "e2e-categorization",
   "e2e-scoring",
   "e2e-marking",
   "e2e-topic",
-  "e2e-state-live"
+  "e2e-misc"
 )
 
 usage <- paste(
@@ -29,15 +28,6 @@ usage <- paste(
 )
 
 classify_test_file <- function(file_name) {
-  if (
-    grepl(
-      "^test-integration-(high-volume|topic-modelling-large-volume)-async[.]R$",
-      file_name
-    )
-  ) {
-    return("integration-high-volume")
-  }
-
   if (grepl("^test-integration-.*[.]R$", file_name)) {
     return("integration")
   }
@@ -58,27 +48,8 @@ classify_test_file <- function(file_name) {
     return("e2e-topic")
   }
 
-  if (
-    grepl(
-      paste(
-        "^test-e2e-(language-toggle-state|live-provider-smoke|",
-        "upload-reupload-same-file|upload-state)[.]R$",
-        sep = ""
-      ),
-      file_name
-    )
-  ) {
-    return("e2e-state-live")
-  }
-
   if (grepl("^test-e2e-", file_name)) {
-    stop(
-      sprintf(
-        "Unclassified e2e test file: %s. Add a rule in classify_test_file().",
-        file_name
-      ),
-      call. = FALSE
-    )
+    return("e2e-misc")
   }
 
   "unit"
