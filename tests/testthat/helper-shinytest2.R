@@ -163,6 +163,28 @@ wait_for_nonempty_export <- function(app, export, timeout = 30000) {
 }
 
 
+wait_for_processing_started <- function(app, timeout = 30000) {
+  wait_for_export(
+    app,
+    export = "processing-processing",
+    predicate = isTRUE,
+    timeout = timeout,
+    description = "processing to start"
+  )
+}
+
+
+wait_for_topic_edit_modal_ready <- function(app, timeout = 90000) {
+  wait_for_processing_started(app, timeout = timeout)
+  wait_for_modal(app, timeout = timeout)
+  wait_for_enabled_element(
+    app,
+    "processing-edit_topics-confirm_topics",
+    timeout = timeout
+  )
+}
+
+
 pick_live_openai_model <- function(
   models,
   preferred = c(

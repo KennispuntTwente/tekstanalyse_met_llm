@@ -90,12 +90,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
 
   # Start processing
   app$click("processing-process")
-  app$wait_for_value(
-    export = "processing-edit_topics-started",
-    timeout = 60000
-  )
-  wait_for_modal(app, timeout = 30000)
-  wait_for_enabled_element(app, "processing-edit_topics-confirm_topics")
+  wait_for_topic_edit_modal_ready(app)
   app$click("processing-edit_topics-confirm_topics")
   app$wait_for_value(
     export = "processing-success",
