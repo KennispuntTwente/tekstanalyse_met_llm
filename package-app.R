@@ -26,22 +26,25 @@ test_async <- isTRUE(getOption("kwallm.test_async", FALSE)) ||
   tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in% c("true", "1", "yes")
 
 if (!test_mode || test_async) {
-  if (!mirai::daemons_set()) {
-    max_cores <- parallel::detectCores()
-    n_workers <- min(
-      max_cores,
-      max(1L, as.integer(Sys.getenv("KWALLM_N_ASYNC_WORKERS", unset = "2")))
-    )
-    mirai::daemons(n_workers)
-  }
+  daemon_status <- kwallm_ensure_mirai_daemons()
 
-  log_info(
-    sprintf(
-      "Using %s async workers (mirai daemons)",
-      mirai::status()$connections
-    ),
-    component = "startup"
-  )
+  if (isTRUE(daemon_status$recycled_pool)) {
+    log_warn(
+      sprintf(
+        "Recycled stale mirai daemons; using %s async workers",
+        daemon_status$status$connections
+      ),
+      component = "startup"
+    )
+  } else {
+    log_info(
+      sprintf(
+        "Using %s async workers (mirai daemons)",
+        daemon_status$status$connections
+      ),
+      component = "startup"
+    )
+  }
 } else {
   log_info(
     paste0(
