@@ -1,9 +1,10 @@
 name: (0) Test app
 
 # This workflow runs the full testthat suite in parallel shards.
+# A setup job installs all dependencies once and warms the renv & uv caches;
+# shard jobs restore from those caches so R packages are never compiled 8×.
 # Shard membership is defined centrally in tests/run_test_shard.R so new
 # test files are still picked up automatically instead of being forgotten.
-# Workflow derived from https://github.com/rstudio/shinytest2/tree/main/actions/test-app/example-test-app-description.yaml
 
 on:
   push:
@@ -12,15 +13,41 @@ on:
     branches: [main, master]
 
 jobs:
-  test-app:
-    runs-on: ${{ matrix.config.os }}
-    name: ${{ matrix.config.os }} (${{ matrix.config.r }}) / ${{ matrix.shard.label }}
+  # ── Setup: install & cache dependencies once ────────────────────────
+  setup:
+    runs-on: ubuntu-latest
+    name: Setup
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+      - run: uv sync
+
+      - name: Install system dependencies for R packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libpng-dev \
+          libx11-dev libnode-dev libwebp-dev
+
+      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.5.1"
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-renv@v2
+
+  # ── Test shards: run in parallel, restore cached deps ───────────────
+  test-shard:
+    needs: setup
+    runs-on: ubuntu-latest
+    name: Test / ${{ matrix.shard.label }}
 
     strategy:
       fail-fast: false
       matrix:
-        config:
-          - {os: ubuntu-latest, r: "4.5.1"}
         shard:
           - {id: unit, label: "Unit / modules / utils"}
           - {id: integration, label: "Integration"}
@@ -31,54 +58,52 @@ jobs:
           - {id: e2e-topic, label: "E2E topic modelling"}
           - {id: e2e-state-live, label: "E2E state and live provider"}
 
-    # ── Environment ─────────────────────────────────────────────────────
     env:
       GITHUB_PAT:        ${{ secrets.GITHUB_TOKEN }}
       OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
       R_KEEP_PKG_SOURCE: yes
-      # Enable true async processing in tests to catch async-related bugs
-      # (e.g., objects not properly passed to future workers)
       KWALLM_TEST_ASYNC: "true"
-      # Enable prompt/response tracing for debugging test runs
       KWALLM_LOG_PROMPTS_TO_FILE: "true"
 
     steps:
-      # 1 source code ---------------------------------------------------
       - uses: actions/checkout@v6
 
-      # 2 uv ------------------------------------------------------------
+      # Python deps (restored from cache warmed by setup job)
       - name: Install uv
         uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+      - run: uv sync
 
-      - name: Install python modules with uv
-        run: uv sync
-
-      # 2 system deps for R packages -----------------------------------
+      # System deps (no chromium — Chrome is installed separately for e2e)
       - name: Install system dependencies for R packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y chromium-browser libfontconfig1-dev libpng-dev \
+          sudo apt-get install -y libfontconfig1-dev libpng-dev \
           libx11-dev libnode-dev libwebp-dev
 
-      # 4 R toolchain ---------------------------------------------------
+      # R toolchain (renv restored from cache warmed by setup job)
       - uses: r-lib/actions/setup-pandoc@v2
       - uses: r-lib/actions/setup-r@v2
         with:
-          r-version: ${{ matrix.config.r }}
+          r-version: "4.5.1"
           use-public-rspm: true
       - uses: r-lib/actions/setup-renv@v2
 
-      # 5 run the tests -------------------------------------------------
+      # Chrome — only needed for shinytest2 e2e shards, avoids flaky snap
+      - name: Install Chrome for E2E tests
+        if: startsWith(matrix.shard.id, 'e2e')
+        uses: browser-actions/setup-chrome@v2
+
+      # Run the shard
       - name: Run test shard
         id: run-tests
         run: Rscript tests/run_test_shard.R "${{ matrix.shard.id }}"
 
-      # 6 upload snapshots and logs -------------------------------------
+      # Artifacts
       - name: Upload test snapshots and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.config.os }}-r${{ matrix.config.r }}-${{ matrix.shard.id }}-test-artifacts
+          name: test-${{ matrix.shard.id }}-artifacts
           path: |
             tests/testthat/_snaps
             logs
