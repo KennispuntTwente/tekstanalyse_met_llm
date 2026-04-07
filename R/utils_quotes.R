@@ -18,6 +18,303 @@ sub_fixed <- function(pattern, replacement, text) {
   )
 }
 
+# Helper predicates for delimiter-aware quote scanning.
+.quote_prev_char <- function(chars, i) {
+  if (i <= 1L) "" else chars[i - 1L]
+}
+
+.quote_next_char <- function(chars, i) {
+  if (i >= length(chars)) "" else chars[i + 1L]
+}
+
+.quote_prev_nonspace_char <- function(chars, i) {
+  if (i <= 1L) {
+    return("")
+  }
+
+  j <- i - 1L
+  while (j >= 1L && .quote_is_space_char(chars[j])) {
+    j <- j - 1L
+  }
+
+  if (j >= 1L) chars[j] else ""
+}
+
+.quote_next_nonspace_char <- function(chars, i) {
+  if (i >= length(chars)) {
+    return("")
+  }
+
+  j <- i + 1L
+  while (j <= length(chars) && .quote_is_space_char(chars[j])) {
+    j <- j + 1L
+  }
+
+  if (j <= length(chars)) chars[j] else ""
+}
+
+.quote_is_word_char <- function(ch) {
+  is.character(ch) &&
+    length(ch) == 1L &&
+    nzchar(ch) &&
+    isTRUE(stringr::str_detect(ch, "^[\\p{L}\\p{N}\\p{M}]$"))
+}
+
+.quote_is_space_char <- function(ch) {
+  is.character(ch) &&
+    length(ch) == 1L &&
+    nzchar(ch) &&
+    isTRUE(stringr::str_detect(ch, "^\\p{White_Space}$"))
+}
+
+.quote_is_embedded_apostrophe <- function(chars, i) {
+  .quote_is_word_char(.quote_prev_char(chars, i)) &&
+    .quote_is_word_char(.quote_next_char(chars, i))
+}
+
+.quote_can_open_symmetric <- function(chars, i, apostrophe_sensitive = FALSE) {
+  prev <- .quote_prev_char(chars, i)
+  next_sig <- .quote_next_nonspace_char(chars, i)
+
+  if (!nzchar(next_sig)) {
+    return(FALSE)
+  }
+  if (apostrophe_sensitive && .quote_is_embedded_apostrophe(chars, i)) {
+    return(FALSE)
+  }
+
+  !nzchar(prev) || !.quote_is_word_char(prev)
+}
+
+.quote_can_close_symmetric <- function(chars, i, apostrophe_sensitive = FALSE) {
+  prev_sig <- .quote_prev_nonspace_char(chars, i)
+  next_ch <- .quote_next_char(chars, i)
+
+  if (!nzchar(prev_sig)) {
+    return(FALSE)
+  }
+  if (apostrophe_sensitive && .quote_is_embedded_apostrophe(chars, i)) {
+    return(FALSE)
+  }
+
+  !nzchar(next_ch) || !.quote_is_word_char(next_ch)
+}
+
+.quote_can_open_asymmetric <- function(chars, i) {
+  next_sig <- .quote_next_nonspace_char(chars, i)
+
+  nzchar(next_sig)
+}
+
+.quote_can_close_asymmetric <- function(
+  chars,
+  i,
+  apostrophe_sensitive = FALSE
+) {
+  prev_sig <- .quote_prev_nonspace_char(chars, i)
+
+  if (!nzchar(prev_sig)) {
+    return(FALSE)
+  }
+  if (apostrophe_sensitive && .quote_is_embedded_apostrophe(chars, i)) {
+    return(FALSE)
+  }
+
+  TRUE
+}
+
+.quote_specs <- function() {
+  list(
+    list(
+      open = "\"",
+      close = "\"",
+      symmetric = TRUE,
+      apostrophe_sensitive = FALSE
+    ),
+    list(
+      open = "'",
+      close = "'",
+      symmetric = TRUE,
+      apostrophe_sensitive = TRUE
+    ),
+    list(
+      open = "\uFF02",
+      close = "\uFF02",
+      symmetric = TRUE,
+      apostrophe_sensitive = FALSE
+    ),
+    list(
+      open = "\uFF07",
+      close = "\uFF07",
+      symmetric = TRUE,
+      apostrophe_sensitive = TRUE
+    ),
+    list(
+      open = "\u201C",
+      close = "\u201D",
+      symmetric = FALSE,
+      apostrophe_sensitive = FALSE
+    ),
+    list(
+      open = "\u201E",
+      close = "\u201C",
+      symmetric = FALSE,
+      apostrophe_sensitive = FALSE
+    ),
+    list(
+      open = "\u00AB",
+      close = "\u00BB",
+      symmetric = FALSE,
+      apostrophe_sensitive = FALSE
+    ),
+    list(
+      open = "\u2039",
+      close = "\u203A",
+      symmetric = FALSE,
+      apostrophe_sensitive = TRUE
+    ),
+    list(
+      open = "\u2018",
+      close = "\u2019",
+      symmetric = FALSE,
+      apostrophe_sensitive = TRUE
+    ),
+    list(
+      open = "\u201A",
+      close = "\u2018",
+      symmetric = FALSE,
+      apostrophe_sensitive = TRUE
+    ),
+    list(
+      open = "\u300C",
+      close = "\u300D",
+      symmetric = FALSE,
+      apostrophe_sensitive = FALSE
+    ),
+    list(
+      open = "\u300E",
+      close = "\u300F",
+      symmetric = FALSE,
+      apostrophe_sensitive = FALSE
+    ),
+    list(
+      open = "\uFF62",
+      close = "\uFF63",
+      symmetric = FALSE,
+      apostrophe_sensitive = FALSE
+    )
+  )
+}
+
+.quote_find_open_spec <- function(chars, i) {
+  ch <- chars[i]
+
+  for (spec in .quote_specs()) {
+    if (!identical(ch, spec$open)) {
+      next
+    }
+
+    can_open <- if (isTRUE(spec$symmetric)) {
+      .quote_can_open_symmetric(
+        chars,
+        i,
+        apostrophe_sensitive = spec$apostrophe_sensitive
+      )
+    } else {
+      .quote_can_open_asymmetric(chars, i)
+    }
+
+    if (isTRUE(can_open)) {
+      return(spec)
+    }
+  }
+
+  NULL
+}
+
+.quote_find_close_index <- function(chars, open_idx, spec) {
+  if (open_idx >= length(chars)) {
+    return(NA_integer_)
+  }
+
+  for (j in seq.int(open_idx + 1L, length(chars))) {
+    ch <- chars[j]
+
+    if (ch %in% c("\r", "\n")) {
+      return(NA_integer_)
+    }
+    if (!identical(ch, spec$close)) {
+      next
+    }
+
+    if (
+      isTRUE(spec$symmetric) &&
+        isTRUE(spec$apostrophe_sensitive) &&
+        .quote_can_open_symmetric(
+          chars,
+          j,
+          apostrophe_sensitive = spec$apostrophe_sensitive
+        )
+    ) {
+      return(NA_integer_)
+    }
+
+    can_close <- if (isTRUE(spec$symmetric)) {
+      .quote_can_close_symmetric(
+        chars,
+        j,
+        apostrophe_sensitive = spec$apostrophe_sensitive
+      )
+    } else {
+      .quote_can_close_asymmetric(
+        chars,
+        j,
+        apostrophe_sensitive = spec$apostrophe_sensitive
+      )
+    }
+
+    if (isTRUE(can_close)) {
+      return(as.integer(j))
+    }
+  }
+
+  NA_integer_
+}
+
+normalize_quote_verification_text <- function(text) {
+  if (!is.character(text)) {
+    text <- as.character(text)
+  }
+
+  text <- stringi::stri_trans_nfc(enc2utf8(text))
+
+  stringr::str_replace_all(
+    text,
+    c(
+      "\u2018" = "'",
+      "\u2019" = "'",
+      "\u201A" = "'",
+      "\u2039" = "'",
+      "\u203A" = "'",
+      "\uFF07" = "'",
+      "\u201C" = "\"",
+      "\u201D" = "\"",
+      "\u201E" = "\"",
+      "\u00AB" = "\"",
+      "\u00BB" = "\"",
+      "\u300C" = "\"",
+      "\u300D" = "\"",
+      "\u300E" = "\"",
+      "\u300F" = "\"",
+      "\uFF02" = "\"",
+      "\uFF62" = "\"",
+      "\uFF63" = "\"",
+      "\u2013" = "-",
+      "\u2014" = "-"
+    )
+  )
+}
+
 # Extract quotes from a single string, returning a two-column character matrix
 # Columns: "Full Match" (including quotes), "Content" (inside quotes)
 extract_quotes_matrix <- function(text) {
@@ -32,37 +329,51 @@ extract_quotes_matrix <- function(text) {
     return(result_matrix)
   }
 
-  # Support common quote pairs via alternation (straight, curly, guillemets, German style)
-  # This avoids relying on \p escapes in R strings and handles asymmetric pairs like “ ... ”.
-  quote_regex <- paste(
-    '"([^"\r\n]+)"', # 1: straight double
-    "'([^'\r\n]+)'", # 2: straight single
-    '“([^”\r\n]+)”', # 3: curly double
-    '‘([^’\r\n]+)’', # 4: curly single
-    '«([^»\r\n]+)»', # 5: guillemets
-    '„([^“\r\n]+)“', # 6: German low-high
-    sep = "|"
-  )
-
-  all_groups_list <- stringr::str_match_all(text, quote_regex)
-  all_groups_matrix <- all_groups_list[[1]]
-
-  if (is.null(all_groups_matrix) || nrow(all_groups_matrix) == 0) {
+  if (is.na(text) || !nzchar(text)) {
     result_matrix <- matrix(character(0), ncol = 2, nrow = 0)
     colnames(result_matrix) <- c("Full Match", "Content")
     return(result_matrix)
   }
 
-  # Column 1 is the overall match; content is in columns 2,4,6,8,10,12 (pick first non-NA per row)
-  full <- all_groups_matrix[, 1]
-  # Safely coalesce across possible capture positions
-  content_cols <- all_groups_matrix[, -1, drop = FALSE]
-  content <- apply(content_cols, 1, function(row) {
-    first <- which(!is.na(row))[1]
-    if (length(first)) row[first] else NA_character_
-  })
+  text <- enc2utf8(text)
+  chars <- strsplit(text, "", fixed = TRUE)[[1]]
+  matches <- list()
+  i <- 1L
 
-  result_matrix <- cbind(`Full Match` = full, Content = content)
+  while (i <= length(chars)) {
+    spec <- .quote_find_open_spec(chars, i)
+    if (is.null(spec)) {
+      i <- i + 1L
+      next
+    }
+
+    close_idx <- .quote_find_close_index(chars, i, spec)
+    if (is.na(close_idx) || close_idx <= i + 1L) {
+      i <- i + 1L
+      next
+    }
+
+    content <- paste0(chars[seq.int(i + 1L, close_idx - 1L)], collapse = "")
+    if (!nzchar(stringr::str_trim(content))) {
+      i <- close_idx + 1L
+      next
+    }
+
+    matches[[length(matches) + 1L]] <- c(
+      paste0(chars[seq.int(i, close_idx)], collapse = ""),
+      content
+    )
+    i <- close_idx + 1L
+  }
+
+  if (!length(matches)) {
+    result_matrix <- matrix(character(0), ncol = 2, nrow = 0)
+    colnames(result_matrix) <- c("Full Match", "Content")
+    return(result_matrix)
+  }
+
+  result_matrix <- do.call(rbind, matches)
+  colnames(result_matrix) <- c("Full Match", "Content")
   return(result_matrix)
 }
 
@@ -80,12 +391,18 @@ verify_and_decorate_quotes <- function(
 ) {
   lang <- match.arg(lang)
 
+  if (is.character(paragraph_text)) {
+    paragraph_text <- enc2utf8(paragraph_text)
+  }
+
   if (!is.character(supporting_texts)) {
     supporting_texts <- as.character(supporting_texts)
   }
 
+  supporting_texts <- enc2utf8(supporting_texts)
   supporting_texts <- supporting_texts[!is.na(supporting_texts)]
   supporting_texts <- supporting_texts[nzchar(supporting_texts)]
+  supporting_texts_norm <- normalize_quote_verification_text(supporting_texts)
 
   quote_present_in_supporting_texts <- function(query, texts) {
     if (
@@ -98,12 +415,14 @@ verify_and_decorate_quotes <- function(
       return(FALSE)
     }
 
+    query_norm <- normalize_quote_verification_text(query)
+
     any(vapply(
       texts,
       function(txt) {
         isTRUE(stringr::str_detect(
           txt,
-          stringr::fixed(query, ignore_case = TRUE)
+          stringr::fixed(query_norm, ignore_case = TRUE)
         ))
       },
       logical(1)
@@ -128,7 +447,7 @@ verify_and_decorate_quotes <- function(
       q <- quote_matches[j, 2]
       # Remove trailing punctuation/symbols (e.g., .,;:!?), quotes stuck to parentheses, etc.
       q_clean <- stringr::str_remove(q, "[\\u2000-\\u206F\\p{P}\\p{S}]+$")
-      q_clean <- trimws(q_clean)
+      q_clean <- stringr::str_trim(q_clean)
       placeholder <- paste0("___QUOTEPLACEHOLDER", j, "___")
 
       has_query <- is.character(q_clean) &&
@@ -139,7 +458,7 @@ verify_and_decorate_quotes <- function(
       if (has_query) {
         is_present <- quote_present_in_supporting_texts(
           q_clean,
-          supporting_texts
+          supporting_texts_norm
         )
       }
 
