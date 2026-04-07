@@ -106,6 +106,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
   generation_worker <- mirai::mirai(
     {
       log_context_apply(log_context)
+      prepare_async_analysis_worker("topic_generation")
 
       candidate_topics <- create_candidate_topics(
         text_batches = text_batches,
@@ -135,6 +136,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
         llm_provider_large = large_provider
       ),
       analysis_async_topic_modelling_globals(),
+      analysis_async_worker_setup_globals(),
       analysis_async_tokenizer_globals(),
       log_async_globals(log_context),
       send_prompt_with_retries_async_globals()

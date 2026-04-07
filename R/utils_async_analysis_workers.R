@@ -139,9 +139,12 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "prompt_candidate_topics",
         "%||%"
       ),
+      prompt_reduce_topics = ".kwallm_normalize_topic_labels",
       reduce_topics = c(
         "send_prompt_with_retries",
         "prompt_reduce_topics",
+        "prompt_topic_not_applicable_check",
+        ".kwallm_normalize_topic_labels",
         "get_context_window_size_in_tokens",
         "count_tokens"
       )
@@ -160,9 +163,12 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "safe_py_import"
       ),
       count_tokens = "tiktoken_load_tokenizer",
+      prompt_reduce_topics = ".kwallm_normalize_topic_labels",
       reduce_topics = c(
         "send_prompt_with_retries",
         "prompt_reduce_topics",
+        "prompt_topic_not_applicable_check",
+        ".kwallm_normalize_topic_labels",
         "get_context_window_size_in_tokens",
         "count_tokens"
       )
@@ -228,9 +234,12 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
         "prompt_candidate_topics",
         "%||%"
       ),
+      prompt_reduce_topics = ".kwallm_normalize_topic_labels",
       reduce_topics = c(
         "send_prompt_with_retries",
         "prompt_reduce_topics",
+        "prompt_topic_not_applicable_check",
+        ".kwallm_normalize_topic_labels",
         "get_context_window_size_in_tokens",
         "count_tokens"
       ),
@@ -514,6 +523,16 @@ analysis_async_topic_modelling_globals <- function(env = parent.frame()) {
       envir = env,
       inherits = TRUE
     ),
+    .kwallm_normalize_topic_labels = get(
+      ".kwallm_normalize_topic_labels",
+      envir = env,
+      inherits = TRUE
+    ),
+    prompt_topic_not_applicable_check = get(
+      "prompt_topic_not_applicable_check",
+      envir = env,
+      inherits = TRUE
+    ),
     reduce_topics = get("reduce_topics", envir = env, inherits = TRUE),
     assign_topics = get("assign_topics", envir = env, inherits = TRUE),
     prompt_category = get("prompt_category", envir = env, inherits = TRUE),
@@ -535,6 +554,16 @@ analysis_async_topic_reduction_globals <- function(env = parent.frame()) {
     reduce_topics = get("reduce_topics", envir = env, inherits = TRUE),
     prompt_reduce_topics = get(
       "prompt_reduce_topics",
+      envir = env,
+      inherits = TRUE
+    ),
+    .kwallm_normalize_topic_labels = get(
+      ".kwallm_normalize_topic_labels",
+      envir = env,
+      inherits = TRUE
+    ),
+    prompt_topic_not_applicable_check = get(
+      "prompt_topic_not_applicable_check",
       envir = env,
       inherits = TRUE
     )
@@ -653,6 +682,16 @@ analysis_async_code_generation_globals <- function(env = parent.frame()) {
     ),
     prompt_reduce_topics = get(
       "prompt_reduce_topics",
+      envir = env,
+      inherits = TRUE
+    ),
+    .kwallm_normalize_topic_labels = get(
+      ".kwallm_normalize_topic_labels",
+      envir = env,
+      inherits = TRUE
+    ),
+    prompt_topic_not_applicable_check = get(
+      "prompt_topic_not_applicable_check",
       envir = env,
       inherits = TRUE
     ),

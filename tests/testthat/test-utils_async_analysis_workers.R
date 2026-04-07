@@ -151,6 +151,8 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
   topic_generation_env$tiktoken_load_tokenizer <- function(...) NULL
   topic_generation_env$prompt_candidate_topics <- function(...) NULL
   topic_generation_env$prompt_reduce_topics <- function(...) NULL
+  topic_generation_env$.kwallm_normalize_topic_labels <- function(...) NULL
+  topic_generation_env$prompt_topic_not_applicable_check <- function(...) NULL
   topic_generation_env$`%||%` <- function(a, b) if (is.null(a)) b else a
   topic_generation_env$create_candidate_topics <- function(...) NULL
   topic_generation_env$reduce_topics <- function(...) NULL
@@ -180,6 +182,18 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
     "prompt_reduce_topics",
     envir = environment(topic_generation_env$reduce_topics)
   ))
+  expect_true(exists(
+    ".kwallm_normalize_topic_labels",
+    envir = environment(topic_generation_env$reduce_topics)
+  ))
+  expect_true(exists(
+    "prompt_topic_not_applicable_check",
+    envir = environment(topic_generation_env$reduce_topics)
+  ))
+  expect_true(exists(
+    ".kwallm_normalize_topic_labels",
+    envir = environment(topic_generation_env$prompt_reduce_topics)
+  ))
 
   topic_reduction_env <- new.env(parent = emptyenv())
   topic_reduction_env$initialize_python_environment <- function(...) NULL
@@ -189,6 +203,8 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
   topic_reduction_env$count_tokens <- function(...) 1
   topic_reduction_env$tiktoken_load_tokenizer <- function(...) NULL
   topic_reduction_env$prompt_reduce_topics <- function(...) NULL
+  topic_reduction_env$.kwallm_normalize_topic_labels <- function(...) NULL
+  topic_reduction_env$prompt_topic_not_applicable_check <- function(...) NULL
   topic_reduction_env$reduce_topics <- function(...) NULL
 
   prepare_async_analysis_worker(
@@ -204,6 +220,18 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
     "prompt_reduce_topics",
     envir = environment(topic_reduction_env$reduce_topics)
   ))
+  expect_true(exists(
+    ".kwallm_normalize_topic_labels",
+    envir = environment(topic_reduction_env$reduce_topics)
+  ))
+  expect_true(exists(
+    "prompt_topic_not_applicable_check",
+    envir = environment(topic_reduction_env$reduce_topics)
+  ))
+  expect_true(exists(
+    ".kwallm_normalize_topic_labels",
+    envir = environment(topic_reduction_env$prompt_reduce_topics)
+  ))
 
   code_generation_env <- new.env(parent = emptyenv())
   code_generation_env$initialize_python_environment <- function(...) NULL
@@ -216,6 +244,8 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
   code_generation_env$create_text_batches <- function(...) NULL
   code_generation_env$prompt_candidate_topics <- function(...) NULL
   code_generation_env$prompt_reduce_topics <- function(...) NULL
+  code_generation_env$.kwallm_normalize_topic_labels <- function(...) NULL
+  code_generation_env$prompt_topic_not_applicable_check <- function(...) NULL
   code_generation_env$create_candidate_topics <- function(...) NULL
   code_generation_env$reduce_topics <- function(...) NULL
   code_generation_env$generate_codes_by_reading_texts <- function(...) NULL
@@ -241,6 +271,18 @@ test_that("prepare_async_analysis_worker injects the expected dependencies", {
   expect_true(exists(
     "reduce_topics",
     envir = environment(code_generation_env$generate_codes_by_reading_texts)
+  ))
+  expect_true(exists(
+    ".kwallm_normalize_topic_labels",
+    envir = environment(code_generation_env$reduce_topics)
+  ))
+  expect_true(exists(
+    "prompt_topic_not_applicable_check",
+    envir = environment(code_generation_env$reduce_topics)
+  ))
+  expect_true(exists(
+    ".kwallm_normalize_topic_labels",
+    envir = environment(code_generation_env$prompt_reduce_topics)
   ))
 
   marking_env <- new.env(parent = emptyenv())
@@ -334,6 +376,8 @@ test_that("analysis async globals helpers expose the expected names", {
     "prompt_multi_category",
     "prompt_candidate_topics",
     "prompt_reduce_topics",
+    ".kwallm_normalize_topic_labels",
+    "prompt_topic_not_applicable_check",
     "create_candidate_topics",
     "reduce_topics",
     "score_texts",
@@ -452,6 +496,8 @@ test_that("analysis async globals helpers expose the expected names", {
       "create_candidate_topics",
       "prompt_candidate_topics",
       "prompt_reduce_topics",
+      ".kwallm_normalize_topic_labels",
+      "prompt_topic_not_applicable_check",
       "reduce_topics",
       "assign_topics",
       "prompt_category",
@@ -464,7 +510,9 @@ test_that("analysis async globals helpers expose the expected names", {
     analysis_async_topic_reduction_globals(),
     c(
       "reduce_topics",
-      "prompt_reduce_topics"
+      "prompt_reduce_topics",
+      ".kwallm_normalize_topic_labels",
+      "prompt_topic_not_applicable_check"
     )
   )
 
@@ -476,6 +524,8 @@ test_that("analysis async globals helpers expose the expected names", {
       "create_candidate_topics",
       "prompt_candidate_topics",
       "prompt_reduce_topics",
+      ".kwallm_normalize_topic_labels",
+      "prompt_topic_not_applicable_check",
       "reduce_topics",
       "semchunk_load_chunker",
       "%||%"
