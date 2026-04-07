@@ -156,6 +156,41 @@ source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
   )
 }
 
+.build_grouped_marking_result <- function(
+  report_path,
+  results_table,
+  by_column_lookup,
+  texts_df = NULL,
+  codes = c("Code 1", "Code 2")
+) {
+  if (is.null(texts_df)) {
+    document_text <- unique(as.character(results_table$text))
+    if (!length(document_text)) {
+      document_text <- "Text 1"
+    }
+    texts_df <- .make_grouped_texts_df(document_text = document_text)
+  }
+
+  build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = paste0("grouped-", basename(report_path)),
+    mode = "Markeren",
+    research_background = "",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = .grouped_language_from_path(report_path),
+    by_column_name = "group",
+    by_column_lookup = by_column_lookup,
+    models = .grouped_report_models(),
+    codes = codes,
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(marking = "prompt")
+  )
+}
+
 # -- Unit tests for .join_by_group and grouped helpers -------------------------
 
 test_that(".join_by_group works with data frame by_values", {
@@ -406,6 +441,91 @@ test_that("generate_grouped_topic_prevalence_table_multi shows overall and group
   expect_equal(tbl$x$data$Overall, c(75, 50))
   expect_equal(tbl$x$data$G1, c(50, 50))
   expect_equal(tbl$x$data$G2, c(100, 50))
+})
+
+test_that("generate_grouped_marking_prevalence_table shows document-level code prevalence", {
+  df <- data.frame(
+    document_id = c(1L, 1L, 2L, 2L, 2L),
+    text = c("Text 1", "Text 1", "Text 2", "Text 2", "Text 2"),
+    chunk_text = c("Chunk 1A", "Chunk 1B", "Chunk 2A", "Chunk 2A", "Chunk 2B"),
+    code = c("Code 1", "Code 1", "Code 1", "Code 2", "Code 2"),
+    marked_text = c("alpha", NA, NA, "beta", NA),
+    response_status = c(
+      "matched_all",
+      "completed",
+      "completed",
+      "matched_all",
+      "completed"
+    ),
+    stringsAsFactors = FALSE
+  )
+  by_vals <- data.frame(
+    document_id = c(1L, 2L),
+    text = c("Text 1", "Text 2"),
+    by_value = c("G1", "G2"),
+    stringsAsFactors = FALSE
+  )
+
+  tbl <- generate_grouped_marking_prevalence_table(
+    df = df,
+    by_values = by_vals,
+    by_column_name = "group",
+    codes = c("Code 1", "Code 2"),
+    language = "en"
+  )
+
+  expect_s3_class(tbl, "datatables")
+  expect_equal(tbl$x$data$Code, c("Code 1", "Code 2"))
+  expect_equal(tbl$x$data$Overall, c(50, 50))
+  expect_equal(tbl$x$data$G1, c(100, 0))
+  expect_equal(tbl$x$data$G2, c(0, 100))
+})
+
+test_that("generate_grouped_marking_frequency_table counts texts and spans by group", {
+  df <- data.frame(
+    document_id = c(1L, 1L, 1L, 2L, 2L, 2L),
+    text = c("Text 1", "Text 1", "Text 1", "Text 2", "Text 2", "Text 2"),
+    chunk_text = c(
+      "Chunk 1A",
+      "Chunk 1A",
+      "Chunk 1B",
+      "Chunk 2A",
+      "Chunk 2A",
+      "Chunk 2B"
+    ),
+    code = c("Code 1", "Code 1", "Code 2", "Code 1", "Code 2", "Code 2"),
+    marked_text = c("alpha", "gamma", NA, NA, "beta", "delta"),
+    response_status = c(
+      "matched_all",
+      "matched_all",
+      "completed",
+      "completed",
+      "matched_all",
+      "matched_all"
+    ),
+    stringsAsFactors = FALSE
+  )
+  by_vals <- data.frame(
+    document_id = c(1L, 2L),
+    text = c("Text 1", "Text 2"),
+    by_value = c("G1", "G2"),
+    stringsAsFactors = FALSE
+  )
+
+  tbl <- generate_grouped_marking_frequency_table(
+    df = df,
+    by_values = by_vals,
+    by_column_name = "group",
+    codes = c("Code 1", "Code 2"),
+    language = "en"
+  )
+
+  expect_s3_class(tbl, "datatables")
+  expect_equal(tbl$x$data$Group, c("G1", "G1", "G2", "G2"))
+  expect_equal(tbl$x$data$Code, c("Code 1", "Code 2", "Code 1", "Code 2"))
+  expect_equal(tbl$x$data$Number, c(1, 0, 0, 1))
+  expect_equal(tbl$x$data$Percentage, c(100, 0, 0, 100))
+  expect_equal(tbl$x$data$`Marked spans`, c(2, 0, 0, 2))
 })
 
 
@@ -853,6 +973,108 @@ test_that("Onderwerpextractie report renders grouped topic prevalence", {
           html_text,
           fixed = TRUE
         ))
+      }
+    }
+  })
+})
+
+test_that("Markeren report renders grouped marking summaries", {
+  testthat::skip_if_not_installed("rmarkdown")
+  testthat::skip_if_not_installed("knitr")
+  testthat::skip_if_not_installed("here")
+  testthat::skip_if_not_installed("htmltools")
+  testthat::skip_if_not_installed("bslib")
+  testthat::skip_if_not_installed("DT")
+  testthat::skip_if_not_installed("dplyr")
+  testthat::skip_if_not_installed("tidyr")
+  testthat::skip_if_not_installed("stringr")
+  testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+
+  out_dir <- withr::local_tempdir()
+
+  report_paths <- list.files(
+    here::here("R"),
+    pattern = "^report_Markeren_.*\\.Rmd$",
+    full.names = TRUE
+  )
+  expect_true(length(report_paths) > 0)
+
+  withr::with_dir(here::here(), {
+    for (report_path in report_paths) {
+      out_file <- file.path(
+        out_dir,
+        paste0(
+          tools::file_path_sans_ext(basename(report_path)),
+          "_grouped.html"
+        )
+      )
+
+      results_table <- data.frame(
+        analysis_unit_id = c(1L, 1L, 2L, 2L),
+        chunk_id = c(1L, 1L, 2L, 2L),
+        chunk_index = c(1L, 1L, 1L, 1L),
+        text = c("Text 1", "Text 1", "Text 2", "Text 2"),
+        chunk_text = c(
+          "Text 1 chunk",
+          "Text 1 chunk",
+          "Text 2 chunk",
+          "Text 2 chunk"
+        ),
+        code = c("Code 1", "Code 2", "Code 1", "Code 2"),
+        marked_text = c("alpha", NA, NA, "beta"),
+        response_status = c(
+          "matched_all",
+          "completed",
+          "completed",
+          "matched_all"
+        ),
+        stringsAsFactors = FALSE
+      )
+
+      res <- try(
+        rmarkdown::render(
+          input = report_path,
+          output_file = out_file,
+          params = list(
+            analysis_result = .build_grouped_marking_result(
+              report_path = report_path,
+              results_table = results_table,
+              by_column_lookup = data.frame(
+                source_document_id = c(1L, 2L),
+                by_value = c("G1", "G2"),
+                stringsAsFactors = FALSE
+              ),
+              texts_df = .make_grouped_texts_df(
+                document_text = c("Text 1", "Text 2")
+              )
+            )
+          ),
+          quiet = TRUE,
+          envir = .grouped_render_env(environment())
+        ),
+        silent = TRUE
+      )
+
+      if (inherits(res, "try-error")) {
+        stop(paste0(
+          "Render with grouped marking summaries failed for ",
+          basename(report_path),
+          ": ",
+          as.character(res)
+        ))
+      }
+
+      expect_true(file.exists(out_file))
+      html_content <- readLines(out_file, warn = FALSE)
+      html_text <- paste(html_content, collapse = "\n")
+      expect_false(grepl("must be size", html_text, fixed = TRUE))
+      expect_true(grepl("G1", html_text, fixed = TRUE))
+      expect_true(grepl("G2", html_text, fixed = TRUE))
+
+      if (grepl("_en\\.Rmd$", basename(report_path))) {
+        expect_true(grepl("Code prevalence by group", html_text, fixed = TRUE))
+      } else {
+        expect_true(grepl("Codeprevalentie per groep", html_text, fixed = TRUE))
       }
     }
   })

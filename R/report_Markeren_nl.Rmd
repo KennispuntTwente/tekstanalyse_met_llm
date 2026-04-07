@@ -14,6 +14,7 @@ analysis_result <- params$analysis_result
 stopifnot(inherits(analysis_result, "AnalysisResult"))
 
 report_df <- .kwallm_report_results_df(analysis_result)
+group_lookup <- .kwallm_report_group_lookup(analysis_result)
 result_payload <- analysis_result@results
 codes <- result_payload@codes$code_text
 paragraphs_df <- analysis_result@paragraphs@paragraphs
@@ -23,9 +24,11 @@ paragraph_subject_lookup <- .kwallm_paragraph_subject_lookup(
 )
 main_model <- .kwallm_get_stage_model_id(analysis_result, "marking")
 research_background <- analysis_result@metadata@research_background
+by_column_name <- analysis_result@input@grouping_column
 
 source(here::here("R", "style_datatable_config.R"), local = TRUE)
 source(here::here("R", "utils_quotes.R"), local = TRUE)
+source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ```
 
 ## Methode
@@ -66,6 +69,38 @@ if (
 ```
 
 ## Resultaten
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
+  cat("### Codeprevalentie per groep\n\n")
+  cat(paste0(
+    "Onderstaande tabel toont per code het percentage teksten binnen elke **",
+    htmltools::htmlEscape(by_column_name),
+    "**-groep waarin die code minstens eenmaal is gemarkeerd.\n\n"
+  ))
+
+  generate_grouped_marking_prevalence_table(
+    df = report_df,
+    by_values = group_lookup,
+    by_column_name = by_column_name,
+    codes = codes,
+    language = "nl"
+  )
+
+  cat("\n### Teksten met gemarkeerde fragmenten per groep\n\n")
+  cat(
+    "Onderstaande tabel toont per groep en code hoeveel teksten minstens één gemarkeerd fragment bevatten, plus het totale aantal gemarkeerde fragmenten.\n\n"
+  )
+
+  generate_grouped_marking_frequency_table(
+    df = report_df,
+    by_values = group_lookup,
+    by_column_name = by_column_name,
+    codes = codes,
+    language = "nl"
+  )
+}
+```
 
 ### Gemarkeerde teksten
 

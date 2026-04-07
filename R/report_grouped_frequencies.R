@@ -468,6 +468,229 @@ generate_grouped_topic_prevalence_table_multi <- function(
   )
 }
 
+# Build one row per document/code indicating whether that code was marked at
+# least once in the document. Marking reports are chunk-based, but grouped
+# summaries should stay document-based so percentages remain interpretable.
+.grouped_marking_document_code_summary <- function(df, by_values, codes) {
+  required_cols <- c("document_id", "text", "code", "marked_text")
+  missing_cols <- setdiff(required_cols, names(df))
+  if (length(missing_cols)) {
+    stop(
+      paste(
+        "marking grouped summaries require columns:",
+        paste(missing_cols, collapse = ", ")
+      )
+    )
+  }
+
+  doc_groups <- .join_by_group(
+    unique(df[c("document_id", "text")]),
+    by_values
+  ) |>
+    dplyr::select(document_id, .by_group)
+
+  document_code <- df |>
+    dplyr::group_by(document_id, code) |>
+    dplyr::summarise(
+      has_mark = any(!is.na(marked_text) & nzchar(marked_text)),
+      marked_spans = sum(!is.na(marked_text) & nzchar(marked_text)),
+      .groups = "drop"
+    )
+
+  document_grid <- tidyr::expand_grid(
+    document_id = unique(doc_groups$document_id),
+    code = codes
+  )
+
+  document_grid |>
+    dplyr::left_join(document_code, by = c("document_id", "code")) |>
+    dplyr::left_join(doc_groups, by = "document_id") |>
+    dplyr::mutate(
+      has_mark = dplyr::coalesce(has_mark, FALSE),
+      marked_spans = dplyr::coalesce(marked_spans, 0L)
+    )
+}
+
+.grouped_marking_prevalence_df <- function(df, by_values, codes) {
+  document_summary <- .grouped_marking_document_code_summary(
+    df = df,
+    by_values = by_values,
+    codes = codes
+  )
+
+  prevalence_wide <- document_summary |>
+    dplyr::group_by(.by_group, code) |>
+    dplyr::summarise(
+      Number = sum(has_mark),
+      Group_Total = dplyr::n(),
+      Prevalence = dplyr::if_else(
+        Group_Total > 0,
+        round(Number / Group_Total * 100, 2),
+        0
+      ),
+      .groups = "drop"
+    ) |>
+    dplyr::select(.by_group, Code = code, Prevalence) |>
+    tidyr::pivot_wider(
+      names_from = .by_group,
+      values_from = Prevalence,
+      values_fill = 0
+    )
+
+  overall <- document_summary |>
+    dplyr::group_by(code) |>
+    dplyr::summarise(
+      Overall = dplyr::if_else(
+        dplyr::n() > 0,
+        round(sum(has_mark) / dplyr::n() * 100, 2),
+        0
+      ),
+      .groups = "drop"
+    ) |>
+    dplyr::rename(Code = code)
+
+  out <- data.frame(Code = codes, stringsAsFactors = FALSE) |>
+    dplyr::left_join(overall, by = "Code") |>
+    dplyr::left_join(prevalence_wide, by = "Code") |>
+    dplyr::mutate(Overall = dplyr::coalesce(Overall, 0))
+
+  group_cols <- setdiff(names(out), c("Code", "Overall"))
+  out[c("Code", "Overall", group_cols)]
+}
+
+.grouped_marking_frequency_df <- function(df, by_values, codes) {
+  document_summary <- .grouped_marking_document_code_summary(
+    df = df,
+    by_values = by_values,
+    codes = codes
+  )
+
+  summary <- document_summary |>
+    dplyr::group_by(.by_group, code) |>
+    dplyr::summarise(
+      Number = sum(has_mark),
+      Group_Total = dplyr::n(),
+      Percentage = dplyr::if_else(
+        Group_Total > 0,
+        round(Number / Group_Total * 100, 2),
+        0
+      ),
+      Marked_Spans = sum(marked_spans),
+      .groups = "drop"
+    ) |>
+    tidyr::complete(
+      .by_group = unique(document_summary$.by_group),
+      code = codes,
+      fill = list(
+        Number = 0,
+        Group_Total = 0L,
+        Percentage = 0,
+        Marked_Spans = 0L
+      )
+    )
+
+  summary
+}
+
+#' Generate marking code prevalence table by group
+#' @param df marking report data frame
+#' @param by_values grouped-report lookup data frame
+#' @param by_column_name name of the grouping column for display
+#' @param codes vector of all code labels
+#' @param language "en" or "nl"
+#' @return DT::datatable with code prevalence percentages per group
+generate_grouped_marking_prevalence_table <- function(
+  df,
+  by_values,
+  by_column_name,
+  codes,
+  language = "en"
+) {
+  prevalence_table <- .grouped_marking_prevalence_df(
+    df = df,
+    by_values = by_values,
+    codes = codes
+  )
+
+  if (language == "nl") {
+    names(prevalence_table)[names(prevalence_table) == "Code"] <- "Code"
+    names(prevalence_table)[names(prevalence_table) == "Overall"] <- "Totaal"
+
+    return(DT::datatable(
+      prevalence_table,
+      rownames = FALSE,
+      extensions = 'Buttons',
+      options = get_datatable_options(),
+      caption = paste0("Codeprevalentie per ", by_column_name)
+    ))
+  }
+
+  DT::datatable(
+    prevalence_table,
+    rownames = FALSE,
+    extensions = 'Buttons',
+    options = get_datatable_options_en(),
+    caption = paste0("Code prevalence per ", by_column_name)
+  )
+}
+
+#' Generate grouped marking frequency table
+#' @param df marking report data frame
+#' @param by_values grouped-report lookup data frame
+#' @param by_column_name name of the grouping column for display
+#' @param codes vector of all code labels
+#' @param language "en" or "nl"
+#' @return DT::datatable with grouped marking counts and percentages
+generate_grouped_marking_frequency_table <- function(
+  df,
+  by_values,
+  by_column_name,
+  codes,
+  language = "en"
+) {
+  freq_table <- .grouped_marking_frequency_df(
+    df = df,
+    by_values = by_values,
+    codes = codes
+  )
+
+  if (language == "nl") {
+    freq_table <- freq_table |>
+      dplyr::rename(
+        Groep = .by_group,
+        Code = code,
+        Aantal = Number,
+        Percentage = Percentage,
+        Gemarkeerde_fragmenten = Marked_Spans
+      )
+
+    return(DT::datatable(
+      freq_table,
+      rownames = FALSE,
+      extensions = 'Buttons',
+      options = get_datatable_options(),
+      caption = paste0("Gemarkeerde teksten per ", by_column_name)
+    ))
+  }
+
+  freq_table <- freq_table |>
+    dplyr::rename(
+      Group = .by_group,
+      Code = code,
+      Number = Number,
+      Percentage = Percentage,
+      `Marked spans` = Marked_Spans
+    )
+
+  DT::datatable(
+    freq_table,
+    rownames = FALSE,
+    extensions = 'Buttons',
+    options = get_datatable_options_en(),
+    caption = paste0("Texts with marked spans per ", by_column_name)
+  )
+}
+
 #' Generate grouped frequency table for topic extraction results
 #' Same logic as categorization
 generate_grouped_topic_table_single <- generate_grouped_freq_table_single
