@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: categorization with paragraph writing", {
+  skip_if_bundle_validation_unavailable()
+
   # This test verifies that categorization with write_paragraphs=Yes works correctly.
 
   # Previously, errors in paragraph writing were not properly caught by tests
@@ -15,6 +17,7 @@ test_that("{shinytest2} recording: categorization with paragraph writing", {
       kwallm.test_fake_llm = TRUE
     )
   )
+  on.exit(app$stop(), add = TRUE)
 
   # Upload texts
   wait_for_text_upload_input(app)
@@ -100,5 +103,37 @@ test_that("{shinytest2} recording: categorization with paragraph writing", {
     length(paragraphs[[1]]$texts)
   )
 
-  app$stop()
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "categorization",
+    expected_sheet_names = c(
+      "metadata",
+      "results",
+      "labels",
+      "assignments",
+      "paragraphs",
+      "paragraph_sources"
+    ),
+    expected_results_columns = c(
+      "text",
+      "Positive feedback",
+      "Negative feedback"
+    ),
+    expected_result_rows = nrow(results),
+    expected_texts = texts,
+    expected_text_count = length(texts)
+  )
+
+  expect_true(isTRUE(bundle$metadata$mode_config$write_paragraphs))
+
+  bundle_paragraphs <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "paragraphs"
+  )
+  bundle_paragraph_sources <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "paragraph_sources"
+  )
+  expect_gt(nrow(bundle_paragraphs), 0)
+  expect_gt(nrow(bundle_paragraph_sources), 0)
 })

@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: categorization with paragraphs under regex anonymization", {
+  skip_if_bundle_validation_unavailable()
+
   app <- kwallm_app_driver(
     name = "categorization with paragraphs anonymized",
     height = 1400,
@@ -11,6 +13,7 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
       kwallm.test_fake_llm = TRUE
     )
   )
+  on.exit(app$stop(), add = TRUE)
 
   wait_for_text_upload_input(app)
   app$upload_file(
@@ -92,5 +95,34 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
     length(paragraphs[[1]]$texts)
   )
 
-  app$stop()
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "categorization",
+    expected_sheet_names = c(
+      "metadata",
+      "results",
+      "labels",
+      "assignments",
+      "paragraphs",
+      "paragraph_sources"
+    ),
+    expected_results_columns = c("text"),
+    expected_result_rows = nrow(results),
+    expected_texts = texts,
+    expected_text_count = length(texts)
+  )
+
+  expect_identical(bundle$metadata$input$anonymization_applied_mode, "regex")
+  expect_true(isTRUE(bundle$metadata$mode_config$write_paragraphs))
+
+  bundle_paragraphs <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "paragraphs"
+  )
+  bundle_paragraph_sources <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "paragraph_sources"
+  )
+  expect_gt(nrow(bundle_paragraphs), 0)
+  expect_gt(nrow(bundle_paragraph_sources), 0)
 })

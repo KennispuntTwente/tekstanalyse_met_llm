@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: categorization with split texts and by_column", {
+  skip_if_bundle_validation_unavailable()
+
   temp_csv <- tempfile(fileext = ".csv")
   test_data <- data.frame(
     text = c(
@@ -112,4 +114,38 @@ test_that("{shinytest2} recording: categorization with split texts and by_column
     unique(as.character(results$result[results$source_document_id == 2L])),
     "Negative feedback"
   )
+
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "categorization",
+    expected_sheet_names = c(
+      "metadata",
+      "results",
+      "labels",
+      "assignments",
+      "document_groups"
+    ),
+    expected_results_columns = c("text", "result"),
+    expected_result_rows = nrow(results),
+    timeout = 120000
+  )
+
+  expect_identical(bundle$metadata$input$grouping_column, "group")
+  expect_true(isTRUE(bundle$metadata$input$split_enabled))
+  expect_identical(as.integer(bundle$metadata$text_counts$source_documents), 2L)
+  expect_gt(
+    as.integer(bundle$metadata$text_counts$documents),
+    as.integer(bundle$metadata$text_counts$source_documents)
+  )
+  expect_gt(
+    as.integer(bundle$metadata$text_counts$analysis_units),
+    as.integer(bundle$metadata$text_counts$source_documents)
+  )
+
+  bundle_document_groups <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "document_groups"
+  )
+  expect_identical(nrow(bundle_document_groups), nrow(test_data))
+  expect_setequal(bundle_document_groups$group_value, unique(test_data$group))
 })

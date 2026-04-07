@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: scoring with inter-rater reliability", {
+  skip_if_bundle_validation_unavailable()
+
   temp_txt <- tempfile(fileext = ".txt")
   texts <- c("Routine note one.", "Routine note two.")
   writeLines(texts, temp_txt, useBytes = TRUE)
@@ -75,4 +77,34 @@ test_that("{shinytest2} recording: scoring with inter-rater reliability", {
   expect_false(isTRUE(app$get_js(
     "!!document.querySelector(\"[data-kwallm-modal-id='interrater_modal']\")"
   )))
+
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "scoring",
+    expected_sheet_names = c("metadata", "results", "scores", "reliability"),
+    expected_results_columns = c("text", "result"),
+    expected_result_rows = nrow(results),
+    expected_texts = texts,
+    expected_text_count = length(texts)
+  )
+
+  expect_identical(
+    bundle$metadata$mode_config$scoring_characteristic,
+    "Positive sentiment"
+  )
+  expect_false(is.null(bundle$metadata$reliability))
+  expect_equal(
+    vapply(
+      bundle$metadata$results$scores,
+      function(score_row) as.numeric(score_row$score),
+      numeric(1)
+    ),
+    c(50, 50)
+  )
+
+  bundle_reliability <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "reliability"
+  )
+  expect_gt(nrow(bundle_reliability), 0)
 })

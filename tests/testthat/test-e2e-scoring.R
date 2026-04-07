@@ -94,4 +94,21 @@ test_that("{shinytest2} recording: standard process - scoring", {
   )
   expect_identical(bundle$metadata$results$characteristic, "Positive sentiment")
   expect_length(bundle$metadata$results$scores, length(texts))
+
+  bundle_scores <- readxl::read_xlsx(bundle$results_path, sheet = "scores")
+  bundle_results_by_text <- bundle$results_sheet[
+    match(texts, bundle$results_sheet$text),
+    ,
+    drop = FALSE
+  ]
+
+  expect_identical(nrow(bundle_scores), length(texts))
+  expect_equal(
+    as.numeric(bundle_results_by_text$result),
+    results_by_text$result
+  )
+  expect_equal(
+    sort(as.numeric(bundle_scores$score)),
+    sort(results_by_text$result)
+  )
 })

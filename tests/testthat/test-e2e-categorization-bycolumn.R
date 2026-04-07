@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: categorization with by_column grouping variable", {
+  skip_if_bundle_validation_unavailable()
+
   # Create a temporary CSV file with grouping variable
   # Use vroom::vroom_write to ensure delimiter detection works correctly
   temp_csv <- tempfile(fileext = ".csv")
@@ -122,4 +124,37 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
   expect_identical(results_by_text$Positive, test_data$group == "Positive")
   expect_identical(results_by_text$Negative, test_data$group == "Negative")
   expect_true(all(rowSums(results[c("Positive", "Negative")]) == 1))
+
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "categorization",
+    expected_sheet_names = c(
+      "metadata",
+      "results",
+      "labels",
+      "assignments",
+      "document_groups"
+    ),
+    expected_results_columns = c("text", "Positive", "Negative"),
+    expected_result_rows = nrow(results),
+    expected_texts = test_data$text,
+    expected_text_count = nrow(test_data)
+  )
+
+  expect_identical(bundle$metadata$input$grouping_column, "group")
+  expect_setequal(
+    vapply(
+      bundle$metadata$text_lineage$document_groups,
+      function(group) group$group_value,
+      character(1)
+    ),
+    unique(test_data$group)
+  )
+
+  bundle_document_groups <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "document_groups"
+  )
+  expect_gt(nrow(bundle_document_groups), 0)
+  expect_setequal(bundle_document_groups$group_value, unique(test_data$group))
 })

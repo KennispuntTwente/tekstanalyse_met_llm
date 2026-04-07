@@ -100,4 +100,20 @@ test_that("{shinytest2} recording: standard process - categorization", {
     ),
     c("Positive", "Negative")
   )
+
+  bundle_labels <- readxl::read_xlsx(bundle$results_path, sheet = "labels")
+  bundle_assignments <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "assignments"
+  )
+  bundle_results_by_text <- bundle$results_sheet[
+    match(texts, bundle$results_sheet$text),
+    ,
+    drop = FALSE
+  ]
+
+  expect_gt(nrow(bundle_assignments), 0)
+  expect_true(all(bundle_assignments$label_id %in% bundle_labels$label_id))
+  expect_equal(bundle_results_by_text$Positive, results_by_text$Positive)
+  expect_equal(bundle_results_by_text$Negative, results_by_text$Negative)
 })

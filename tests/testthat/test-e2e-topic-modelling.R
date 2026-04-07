@@ -147,5 +147,15 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     bundle$results_path,
     sheet = "paragraphs"
   )
+  bundle_assignments <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "assignments"
+  )
+  bundle_settings <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "topic_generation_settings"
+  )
+  expect_gt(nrow(bundle_assignments), 0)
+  expect_gt(nrow(bundle_settings), 0)
   expect_gt(nrow(bundle_paragraphs), 0)
 })

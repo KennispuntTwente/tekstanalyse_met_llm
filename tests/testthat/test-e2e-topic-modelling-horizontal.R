@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: topic modelling - horizontal mode", {
+  skip_if_bundle_validation_unavailable()
+
   app <- kwallm_app_driver(
     name = "topic modelling - horizontal mode",
     height = 1400,
@@ -138,4 +140,41 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
     length(paragraphs[[1]]$analysis_unit_ids),
     length(paragraphs[[1]]$texts)
   )
+
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "topic_extraction",
+    expected_sheet_names = c(
+      "metadata",
+      "results",
+      "labels",
+      "assignments",
+      "topic_generation_settings",
+      "paragraphs",
+      "paragraph_sources"
+    ),
+    expected_results_columns = c("text"),
+    expected_result_rows = nrow(results),
+    expected_texts = texts,
+    expected_text_count = length(texts)
+  )
+
+  expect_true(isTRUE(bundle$metadata$mode_config$write_paragraphs))
+  expect_true(length(bundle$metadata$results$labels) > 0)
+
+  bundle_assignments <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "assignments"
+  )
+  bundle_settings <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "topic_generation_settings"
+  )
+  bundle_paragraphs <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "paragraphs"
+  )
+  expect_gt(nrow(bundle_assignments), 0)
+  expect_gt(nrow(bundle_settings), 0)
+  expect_gt(nrow(bundle_paragraphs), 0)
 })

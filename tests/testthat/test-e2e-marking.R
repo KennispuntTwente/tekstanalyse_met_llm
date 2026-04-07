@@ -120,4 +120,16 @@ test_that("{shinytest2} recording: standard process - marking", {
   expect_true(length(bundle$metadata$results$codes) > 0)
   expect_true(length(bundle$metadata$results$chunks) > 0)
   expect_true(length(bundle$metadata$results$markings) > 0)
+
+  bundle_chunks <- readxl::read_xlsx(bundle$results_path, sheet = "chunks")
+  bundle_markings <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "markings"
+  )
+  expect_gt(nrow(bundle_chunks), 0)
+  expect_gt(nrow(bundle_markings), 0)
+  expect_true("marked_text" %in% names(bundle_markings))
+  expect_true(any(
+    !is.na(bundle_markings$marked_text) & nzchar(bundle_markings$marked_text)
+  ))
 })
