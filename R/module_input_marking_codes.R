@@ -104,9 +104,9 @@ marking_codes_server <- function(
     ## Auto-generate codes by reading texts ---------------------------------
 
     # Interrupter can stop async processing if user quits
-    interrupter <- ipc::AsyncInterruptor$new()
+    interrupter <- AsyncInterruptor$new()
     # Queue to communicate between async/main process
-    queue <- ipc::shinyQueue()
+    queue <- shinyQueue()
 
     # Helper to check if number of texts is under maximum
     number_of_texts_under_maximum <- function(

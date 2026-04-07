@@ -256,7 +256,7 @@ prompt_multi_category <- function(
 #' @param show_progress If TRUE, print progress to console
 #' @param on_progress Optional callback function(i, n, text) called after each text
 #' @param interrupter Optional object with \code{$execInterrupts()} method for
-#'   cancellation support (e.g., \code{ipc::AsyncInterruptor})
+#'   cancellation support (e.g., \code{AsyncInterruptor})
 #'
 #' @return A data.frame with column \code{text}. When
 #'   \code{assign_multiple_categories = FALSE}, the result also contains a

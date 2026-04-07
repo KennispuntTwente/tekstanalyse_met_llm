@@ -106,7 +106,7 @@ text_split_server <- function(
     source_document_texts <- reactiveVal(NULL)
 
     # Reactive value which holds text message about the splitting progress
-    #   (set from async process via 'ipc' package, queue object)
+    #   (set from async process via the local queue object)
     semchunk_message <- reactiveVal("...")
     output$semchunk_message_ui <- renderUI({
       req(semchunk_message())
@@ -119,7 +119,7 @@ text_split_server <- function(
     })
 
     # Queue object to talk to the main process when loading model from async
-    queue <- ipc::shinyQueue()
+    queue <- shinyQueue()
 
     # Reactive value to hold the maximum token size for splitting
     max_tokens_val <- reactiveVal(128)

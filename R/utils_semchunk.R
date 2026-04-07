@@ -7,7 +7,7 @@ semchunk_load_chunker <- function(
   chunk_size = 64, # tokens per chunk (remember to subtract special tokens)
   test_chunker = FALSE, # run a quick round-trip on sample text?
   sync_uv = FALSE, # optionally run `uv sync` before importing semchunk
-  queue = NULL # 'ipc' queue for reactive logs
+  queue = NULL # queue for reactive logs
 ) {
   #### ───────── Argument checks ──────────────────────────────────────────────
   stopifnot(

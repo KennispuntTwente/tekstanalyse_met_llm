@@ -74,7 +74,7 @@ gliner_server <- function(
       }
 
       # Queue object to talk to the main process when loading model from async
-      queue <- ipc::shinyQueue()
+      queue <- shinyQueue()
 
       # Make available to the main server:
       #   start function; done status; result (will be the anonymized texts)
@@ -352,7 +352,7 @@ gliner_server <- function(
 
           ## 3 Build a progress bar that the worker can update
           n_txt <- length(pii_texts())
-          progress <- ipc::AsyncProgress$new(
+          progress <- AsyncProgress$new(
             message = lang()$t("Detectie van entiteiten…"),
             detail = sprintf(lang()$t("0 van %d teksten"), n_txt)
           )
@@ -870,8 +870,6 @@ if (FALSE) {
   library(mirai)
   library(promises)
   library(DT)
-  library(ipc)
-
   # Load components in R/-folder
   r_files <- list.files(
     path = "R",

@@ -1787,7 +1787,7 @@ processing_server <- function(
       # This makes sure async work can be stopped cleanly when needed.
 
       # Shared interrupter for cancellation and session shutdown.
-      interrupter <- ipc::AsyncInterruptor$new()
+      interrupter <- AsyncInterruptor$new()
 
       shiny::onStop(function() {
         try(

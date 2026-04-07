@@ -4,6 +4,21 @@ suppressWarnings(library(promises))
 
 # Keep these tests deterministic and avoid requiring the full app wiring.
 
+shinyQueue <- function() {
+  structure(
+    list(
+      consumer = list(
+        start = function(millis = 50) invisible(millis),
+        stop = function() invisible(NULL)
+      ),
+      producer = list(
+        fireAssignReactive = function(...) invisible(NULL)
+      )
+    ),
+    class = "Queue"
+  )
+}
+
 source(here::here("R", "module_input_text_split.R"), local = TRUE)
 
 # Minimal stubs used by the module.
@@ -82,45 +97,17 @@ test_that("text_split_server: returns document texts when toggle is off", {
 
 
 test_that("text_split_server: clicking split produces split texts (sync-mocked mirai)", {
-  testthat::skip_if_not_installed("ipc")
   testthat::skip_if_not_installed("mirai")
 
-  # Monkeypatch namespaced calls (ipc::shinyQueue, mirai::mirai)
-  # without requiring pkgload/devtools.
-  ipc_ns <- asNamespace("ipc")
   mirai_ns <- asNamespace("mirai")
 
-  old_shinyQueue <- get("shinyQueue", envir = ipc_ns)
   old_mirai <- get("mirai", envir = mirai_ns)
 
   withr::defer({
-    unlockBinding("shinyQueue", ipc_ns)
-    assign("shinyQueue", old_shinyQueue, envir = ipc_ns)
-    lockBinding("shinyQueue", ipc_ns)
-
     unlockBinding("mirai", mirai_ns)
     assign("mirai", old_mirai, envir = mirai_ns)
     lockBinding("mirai", mirai_ns)
   })
-
-  # Stub ipc queue so we don't need the real async queue internals.
-  unlockBinding("shinyQueue", ipc_ns)
-  assign(
-    "shinyQueue",
-    function() {
-      list(
-        consumer = list(
-          start = function(millis = 50) invisible(millis),
-          stop = function() invisible(NULL)
-        ),
-        producer = list(
-          fireAssignReactive = function(...) invisible(NULL)
-        )
-      )
-    },
-    envir = ipc_ns
-  )
-  lockBinding("shinyQueue", ipc_ns)
 
   # Make mirai run synchronously while still returning a promise.
   unlockBinding("mirai", mirai_ns)
@@ -207,43 +194,18 @@ test_that("text_split_server: clicking split produces split texts (sync-mocked m
 
 
 test_that("text_split_server ignores stale async split results after source text changes", {
-  testthat::skip_if_not_installed("ipc")
   testthat::skip_if_not_installed("mirai")
 
-  ipc_ns <- asNamespace("ipc")
   mirai_ns <- asNamespace("mirai")
 
-  old_shinyQueue <- get("shinyQueue", envir = ipc_ns)
   old_mirai <- get("mirai", envir = mirai_ns)
   deferred <- new.env(parent = emptyenv())
 
   withr::defer({
-    unlockBinding("shinyQueue", ipc_ns)
-    assign("shinyQueue", old_shinyQueue, envir = ipc_ns)
-    lockBinding("shinyQueue", ipc_ns)
-
     unlockBinding("mirai", mirai_ns)
     assign("mirai", old_mirai, envir = mirai_ns)
     lockBinding("mirai", mirai_ns)
   })
-
-  unlockBinding("shinyQueue", ipc_ns)
-  assign(
-    "shinyQueue",
-    function() {
-      list(
-        consumer = list(
-          start = function(millis = 50) invisible(millis),
-          stop = function() invisible(NULL)
-        ),
-        producer = list(
-          fireAssignReactive = function(...) invisible(NULL)
-        )
-      )
-    },
-    envir = ipc_ns
-  )
-  lockBinding("shinyQueue", ipc_ns)
 
   unlockBinding("mirai", mirai_ns)
   assign(

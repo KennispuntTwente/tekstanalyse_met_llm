@@ -1,7 +1,7 @@
 # LLM Streaming Module
 # This module provides a UI component and server logic for displaying real-time
 # LLM streaming output in the Shiny app. It follows the same pattern as
-# component_progress_bar.R, using ipc::shinyQueue() for async communication.
+# component_progress_bar.R, using the local async queue for worker updates.
 
 # 1 UI --------------------------------------------------------------------
 
@@ -113,7 +113,7 @@ llm_streaming_server <- function(
 
     # Async controller -------------------------------------------------------
 
-    queue <- ipc::shinyQueue()
+    queue <- shinyQueue()
     queue$consumer$start(millis = 100)
 
     async <- AsyncStreamController$new(queue)
@@ -154,7 +154,7 @@ llm_streaming_server <- function(
 #' AsyncStreamController
 #'
 #' R6 class for controlling the stream output from an async context.
-#' Uses ipc::shinyQueue() to send updates to the main Shiny process.
+#' Uses the local async queue to send updates to the main Shiny process.
 #' Follows the same pattern as AsyncProgressBarController in component_progress_bar.R.
 #'
 #' @export
@@ -203,8 +203,6 @@ if (FALSE) {
   library(tidyprompt)
   library(mirai)
   library(promises)
-  library(ipc)
-
   mirai::daemons(2)
 
   ui <- bslib::page(

@@ -4,6 +4,34 @@ library(shinyjs)
 library(shinyWidgets)
 library(bslib)
 
+shinyQueue <- function() {
+  structure(
+    list(
+      consumer = list(
+        start = function(millis = 50) invisible(millis),
+        stop = function() invisible(NULL)
+      ),
+      producer = list(
+        fireAssignReactive = function(...) invisible(NULL)
+      )
+    ),
+    class = "Queue"
+  )
+}
+
+AsyncInterruptor <- list(
+  new = function() {
+    structure(
+      list(
+        interrupt = function(...) invisible(NULL),
+        execInterrupts = function() invisible(NULL),
+        destroy = function() invisible(NULL)
+      ),
+      class = "AsyncInterruptor"
+    )
+  }
+)
+
 source(here::here("R", "component_editable_field_list.R"))
 source(here::here("R", "component_card_header_with_tooltip.R"))
 source(here::here("R", "analysis_code_generation.R"))
@@ -25,8 +53,6 @@ test_that(".kwallm_marking_code_generation_chunk_settings uses current context w
 
 
 test_that("marking_codes_server: save/edit cycle returns trimmed unique codes", {
-  testthat::skip_if_not_installed("ipc")
-
   shiny::testServer(
     function(input, output, session) {
       lang <- make_test_lang("nl")
@@ -98,8 +124,6 @@ test_that("marking_codes_server: save/edit cycle returns trimmed unique codes", 
 
 
 test_that("marking_codes_server: mode other than Markeren does not error", {
-  testthat::skip_if_not_installed("ipc")
-
   shiny::testServer(
     function(input, output, session) {
       lang <- make_test_lang("nl")

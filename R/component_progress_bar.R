@@ -128,7 +128,7 @@ progress_bar_server <- function(
 
     # Async controller ---------------------------------------------------------
 
-    queue <- ipc::shinyQueue()
+    queue <- shinyQueue()
     queue$consumer$start(millis = 250)
 
     async <- AsyncProgressBarController$new(queue)

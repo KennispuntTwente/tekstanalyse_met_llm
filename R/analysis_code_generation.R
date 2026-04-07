@@ -5,7 +5,7 @@
 #' @param overlap_size_tokens Overlap used for semantic sub-text splitting.
 #' @param research_background Optional research background string.
 #' @param llm_provider LLM provider object.
-#' @param queue Optional IPC queue used by the app to surface progress messages.
+#' @param queue Optional async queue used by the app to surface progress messages.
 #' @param interrupter Optional object with \code{$execInterrupts()} method for
 #'   cancellation support.
 #' @param language Output language for generated codes.

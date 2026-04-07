@@ -3,7 +3,7 @@
 # This is used in most functions where we load Python modules or models,
 #   e.g., load_gliner_model(). By using the function we can show
 #   progress in the Shiny app about the loading process
-# Function factory takes a ipc::shinyQueue object & a reactive value name,
+# Function factory takes a queue object & a reactive value name,
 #   which will be used to send messages to the Shiny app
 # Message is also printed to console
 
