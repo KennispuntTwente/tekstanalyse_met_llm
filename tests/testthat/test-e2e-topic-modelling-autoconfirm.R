@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: topic modelling auto-confirms in single-label mode", {
+  skip_if_bundle_validation_unavailable()
+
   temp_txt <- tempfile(fileext = ".txt")
   texts <- c(
     "Invoice refund issue remained unresolved.",
@@ -61,4 +63,24 @@ test_that("{shinytest2} recording: topic modelling auto-confirms in single-label
   expect_false(isTRUE(app$get_js(
     "!!document.querySelector(\"[data-kwallm-modal-id='edit_topics_modal']\")"
   )))
+
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "topic_extraction",
+    expected_sheet_names = c(
+      "metadata",
+      "results",
+      "labels",
+      "assignments",
+      "topic_generation_settings"
+    ),
+    expected_results_columns = c("text", "result"),
+    expected_result_rows = nrow(results),
+    expected_texts = texts,
+    expected_text_count = length(texts)
+  )
+
+  expect_false(isTRUE(bundle$metadata$mode_config$human_in_the_loop))
+  expect_false(isTRUE(bundle$metadata$results$multi_label))
+  expect_true(length(bundle$metadata$results$labels) > 0)
 })

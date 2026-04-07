@@ -174,6 +174,7 @@ processing_server <- function(
         processing = processing(),
         started = started(),
         success = success(),
+        zip_file = zip_file(),
         paragraph_entries = paragraph_entries_generated(),
         results_table = results_table()
       )

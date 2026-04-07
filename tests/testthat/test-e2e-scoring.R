@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: standard process - scoring", {
+  skip_if_bundle_validation_unavailable()
+
   app <- kwallm_app_driver(
     name = "standard process - scoring",
     height = 1400,
@@ -75,4 +77,21 @@ test_that("{shinytest2} recording: standard process - scoring", {
     app$get_value(export = "text_management-texts__preprocessed"),
     texts
   )
+
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "scoring",
+    expected_sheet_names = c("metadata", "results", "scores"),
+    expected_results_columns = c("text", "result"),
+    expected_result_rows = nrow(results),
+    expected_texts = texts,
+    expected_text_count = length(texts)
+  )
+
+  expect_identical(
+    bundle$metadata$mode_config$scoring_characteristic,
+    "Positive sentiment"
+  )
+  expect_identical(bundle$metadata$results$characteristic, "Positive sentiment")
+  expect_length(bundle$metadata$results$scores, length(texts))
 })

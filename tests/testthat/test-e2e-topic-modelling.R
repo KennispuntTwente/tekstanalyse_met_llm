@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: standard process - topic modelling", {
+  skip_if_bundle_validation_unavailable()
+
   app <- kwallm_app_driver(
     name = "standard process - topic modelling",
     height = 1400,
@@ -110,4 +112,40 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     length(paragraphs[[1]]$analysis_unit_ids),
     length(paragraphs[[1]]$texts)
   )
+
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "topic_extraction",
+    expected_sheet_names = c(
+      "metadata",
+      "results",
+      "labels",
+      "assignments",
+      "topic_generation_settings",
+      "paragraphs",
+      "paragraph_sources"
+    ),
+    expected_results_columns = c("text"),
+    expected_result_rows = nrow(results),
+    expected_texts = texts,
+    expected_text_count = length(texts)
+  )
+
+  expect_true(isTRUE(bundle$metadata$mode_config$write_paragraphs))
+  expect_true(length(bundle$metadata$results$labels) > 0)
+  expect_true(length(bundle$metadata$results$topic_provenance$final_topics) > 0)
+  expect_true(all(
+    vapply(
+      bundle$metadata$results$labels,
+      function(label) label$label_text,
+      character(1)
+    ) %in%
+      names(bundle$results_sheet)
+  ))
+
+  bundle_paragraphs <- readxl::read_xlsx(
+    bundle$results_path,
+    sheet = "paragraphs"
+  )
+  expect_gt(nrow(bundle_paragraphs), 0)
 })

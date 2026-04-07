@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: standard process - categorization", {
+  skip_if_bundle_validation_unavailable()
+
   app <- kwallm_app_driver(
     name = "standard process - categorization",
     height = 1400,
@@ -77,4 +79,25 @@ test_that("{shinytest2} recording: standard process - categorization", {
     c(FALSE, TRUE, FALSE, FALSE, FALSE)
   )
   expect_true(all(rowSums(results[c("Positive", "Negative")]) > 0))
+
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "categorization",
+    expected_sheet_names = c("metadata", "results", "labels", "assignments"),
+    expected_results_columns = c("text", "Positive", "Negative"),
+    expected_result_rows = nrow(results),
+    expected_texts = texts,
+    expected_text_count = length(texts)
+  )
+
+  expect_identical(bundle$metadata$research_background, "no clue!")
+  expect_length(bundle$metadata$results$labels, 2L)
+  expect_setequal(
+    vapply(
+      bundle$metadata$results$labels,
+      function(label) label$label_text,
+      character(1)
+    ),
+    c("Positive", "Negative")
+  )
 })

@@ -1,6 +1,8 @@
 library(shinytest2)
 
 test_that("{shinytest2} recording: standard process - marking", {
+  skip_if_bundle_validation_unavailable()
+
   app <- kwallm_app_driver(
     name = "standard process - marking",
     height = 1400,
@@ -98,4 +100,24 @@ test_that("{shinytest2} recording: standard process - marking", {
   #   txt_in_fields of marking_codes
   codes <- c(app$get_value(export = "marking_codes-txt_in_fields"), NA)
   expect_true(all(unique(results$code) %in% codes))
+
+  bundle <- expect_download_bundle(
+    app,
+    expected_mode_id = "marking",
+    expected_sheet_names = c(
+      "metadata",
+      "results",
+      "codes",
+      "chunks",
+      "marking_responses",
+      "markings"
+    ),
+    expected_results_columns = c("text", "chunk_text", "code", "marked_text"),
+    expected_texts = texts,
+    expected_text_count = length(texts)
+  )
+
+  expect_true(length(bundle$metadata$results$codes) > 0)
+  expect_true(length(bundle$metadata$results$chunks) > 0)
+  expect_true(length(bundle$metadata$results$markings) > 0)
 })

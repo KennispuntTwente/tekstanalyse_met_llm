@@ -181,6 +181,165 @@ wait_for_nonempty_export <- function(app, export, timeout = 30000) {
 }
 
 
+skip_if_bundle_validation_unavailable <- function() {
+  testthat::skip_if_not_installed("rmarkdown")
+  testthat::skip_if_not_installed("zip")
+  testthat::skip_if_not_installed("readxl")
+  testthat::skip_if_not(
+    isTRUE(rmarkdown::pandoc_available()),
+    "download bundle validation requires pandoc"
+  )
+}
+
+
+wait_for_download_bundle <- function(app, timeout = 60000) {
+  wait_for_export(
+    app,
+    export = "processing-zip_file",
+    predicate = function(x) {
+      is.character(x) &&
+        length(x) == 1L &&
+        nzchar(x) &&
+        file.exists(x)
+    },
+    timeout = timeout,
+    description = "download bundle to become available"
+  )
+}
+
+
+read_download_bundle <- function(zip_path) {
+  bundle_dir <- tempfile("kwallm_bundle_")
+  dir.create(bundle_dir, recursive = TRUE, showWarnings = FALSE)
+
+  utils::unzip(zipfile = zip_path, exdir = bundle_dir)
+
+  metadata_path <- file.path(bundle_dir, "metadata.json")
+  results_path <- file.path(bundle_dir, "results.xlsx")
+  report_path <- file.path(bundle_dir, "report.html")
+  metadata_json <- paste(
+    readLines(metadata_path, warn = FALSE),
+    collapse = "\n"
+  )
+  metadata <- jsonlite::fromJSON(metadata_json, simplifyVector = FALSE)
+  sheet_names <- readxl::excel_sheets(results_path)
+  metadata_sheet <- readxl::read_xlsx(results_path, sheet = "metadata")
+  results_sheet <- readxl::read_xlsx(results_path, sheet = "results")
+  report_html <- paste(readLines(report_path, warn = FALSE), collapse = "\n")
+  metadata_values <- stats::setNames(
+    as.character(metadata_sheet$value),
+    metadata_sheet$field
+  )
+
+  list(
+    zip_path = zip_path,
+    files = zip::zip_list(zip_path)$filename,
+    bundle_dir = bundle_dir,
+    metadata_path = metadata_path,
+    results_path = results_path,
+    report_path = report_path,
+    metadata = metadata,
+    sheet_names = sheet_names,
+    metadata_sheet = metadata_sheet,
+    metadata_values = metadata_values,
+    results_sheet = results_sheet,
+    report_html = report_html,
+    report_size = unname(file.info(report_path)$size)
+  )
+}
+
+
+expect_download_bundle <- function(
+  app,
+  expected_mode_id,
+  expected_sheet_names,
+  expected_results_columns,
+  expected_result_rows = NULL,
+  expected_texts = NULL,
+  expected_text_count = NULL,
+  timeout = 60000
+) {
+  skip_if_bundle_validation_unavailable()
+
+  bundle <- read_download_bundle(wait_for_download_bundle(
+    app,
+    timeout = timeout
+  ))
+
+  testthat::expect_true(file.exists(bundle$zip_path))
+  testthat::expect_setequal(
+    bundle$files,
+    c("metadata.json", "results.xlsx", "report.html")
+  )
+
+  testthat::expect_identical(bundle$metadata$mode_id, expected_mode_id)
+  testthat::expect_length(bundle$metadata$schema_version, 1L)
+  testthat::expect_true(
+    is.character(bundle$metadata$run_id) &&
+      length(bundle$metadata$run_id) == 1L &&
+      nzchar(bundle$metadata$run_id)
+  )
+  testthat::expect_true(
+    is.character(bundle$metadata$timestamp) &&
+      length(bundle$metadata$timestamp) == 1L &&
+      nzchar(bundle$metadata$timestamp)
+  )
+
+  if (!is.null(expected_text_count)) {
+    testthat::expect_identical(
+      as.integer(bundle$metadata$text_counts$source_documents),
+      as.integer(expected_text_count)
+    )
+    testthat::expect_identical(
+      as.integer(bundle$metadata$text_counts$documents),
+      as.integer(expected_text_count)
+    )
+    testthat::expect_identical(
+      as.integer(bundle$metadata$text_counts$analysis_units),
+      as.integer(expected_text_count)
+    )
+  }
+
+  testthat::expect_true(all(expected_sheet_names %in% bundle$sheet_names))
+  testthat::expect_identical(
+    bundle$metadata_values[["mode_id"]],
+    expected_mode_id
+  )
+
+  if (!is.null(expected_text_count)) {
+    testthat::expect_identical(
+      bundle$metadata_values[["source_documents"]],
+      as.character(expected_text_count)
+    )
+    testthat::expect_identical(
+      bundle$metadata_values[["documents"]],
+      as.character(expected_text_count)
+    )
+    testthat::expect_identical(
+      bundle$metadata_values[["analysis_units"]],
+      as.character(expected_text_count)
+    )
+  }
+
+  testthat::expect_true(
+    all(expected_results_columns %in% names(bundle$results_sheet))
+  )
+
+  if (!is.null(expected_result_rows)) {
+    testthat::expect_identical(nrow(bundle$results_sheet), expected_result_rows)
+  }
+
+  if (!is.null(expected_texts) && "text" %in% names(bundle$results_sheet)) {
+    testthat::expect_true(all(expected_texts %in% bundle$results_sheet$text))
+  }
+
+  testthat::expect_gt(bundle$report_size, 1024)
+  testthat::expect_match(bundle$report_html, "<html", ignore.case = TRUE)
+
+  bundle
+}
+
+
 wait_for_processing_started <- function(app, timeout = 30000) {
   wait_for_export(
     app,
