@@ -178,9 +178,43 @@ if (!assign_multiple_categories) {
 ```{r echo=FALSE, results='asis', error=TRUE}
 # Show grouped frequencies if by_column is specified
 if (!is.null(by_column_name) && !is.null(group_lookup)) {
+  cat("\n### Topic prevalence by group\n\n")
+  cat(paste0(
+    "Below table shows, for each topic, the percentage of texts within each **",
+    htmltools::htmlEscape(by_column_name),
+    "** group to which that topic was assigned."
+  ))
+
+  if (assign_multiple_categories) {
+    cat(
+      " Because multiple topics can be assigned to one text, percentages across topics can sum to more than 100% within a group.\n\n"
+    )
+  } else {
+    cat("\n\n")
+  }
+
+  if (!assign_multiple_categories) {
+    generate_grouped_topic_prevalence_table_single(
+      df = report_df,
+      by_values = group_lookup,
+      by_column_name = by_column_name,
+      topics = result_payload@labels$label_text,
+      language = "en"
+    )
+  } else {
+    topic_cols <- setdiff(names(report_df), c("document_id", "text"))
+    generate_grouped_topic_prevalence_table_multi(
+      df = report_df,
+      by_values = group_lookup,
+      by_column_name = by_column_name,
+      topics = topic_cols,
+      language = "en"
+    )
+  }
+
   cat("\n### Frequency per group\n\n")
   cat(paste0(
-    "Below table shows how often each topic was assigned, ",
+    "Below table shows the raw topic counts and within-group percentages, ",
     "broken down by **", htmltools::htmlEscape(by_column_name), "**.\n\n"
   ))
 }

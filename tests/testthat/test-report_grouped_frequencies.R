@@ -112,6 +112,50 @@ source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
   )
 }
 
+.build_grouped_topic_result <- function(
+  report_path,
+  results_table,
+  by_column_lookup,
+  texts_df = NULL,
+  topics = c("Topic A", "Topic B"),
+  assign_multiple_categories = FALSE
+) {
+  texts_df <- texts_df %||% .make_grouped_texts_df(results_table$text)
+
+  build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = paste0("grouped-", basename(report_path)),
+    mode = "Onderwerpextractie",
+    research_background = "",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = .grouped_language_from_path(report_path),
+    by_column_name = "group",
+    by_column_lookup = by_column_lookup,
+    models = .grouped_report_models(),
+    topics = topics,
+    exclusive_topics = character(),
+    assign_multiple_categories = assign_multiple_categories,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    context_window = list(
+      batch_size = 5,
+      draws = 2,
+      n_batches = 2,
+      n_tokens_context_window = 1000
+    ),
+    stage_prompt_previews = list(
+      topic_candidate_generation = "candidate prompt",
+      topic_reduction = "reduction prompt",
+      topic_assignment = "assignment prompt"
+    ),
+    candidate_topics = topics,
+    reduced_topics = topics,
+    topics_were_edited = FALSE
+  )
+}
+
 # -- Unit tests for .join_by_group and grouped helpers -------------------------
 
 test_that(".join_by_group works with data frame by_values", {
@@ -308,6 +352,62 @@ test_that("generate_grouped_score_table works with dedup data frame", {
   expect_s3_class(tbl, "datatables")
 })
 
+test_that("generate_grouped_topic_prevalence_table_single shows overall and group prevalence", {
+  df <- data.frame(
+    text = c("Text 1", "Text 2", "Text 3"),
+    result = c("Topic A", "Topic A", "Topic B"),
+    stringsAsFactors = FALSE
+  )
+  by_vals <- data.frame(
+    text = c("Text 1", "Text 2", "Text 3"),
+    by_value = c("G1", "G1", "G2"),
+    stringsAsFactors = FALSE
+  )
+
+  tbl <- generate_grouped_topic_prevalence_table_single(
+    df = df,
+    by_values = by_vals,
+    by_column_name = "group",
+    topics = c("Topic A", "Topic B"),
+    language = "en"
+  )
+
+  expect_s3_class(tbl, "datatables")
+  expect_equal(tbl$x$data$Topic, c("Topic A", "Topic B"))
+  expect_equal(tbl$x$data$Overall, c(66.67, 33.33))
+  expect_equal(tbl$x$data$G1, c(100, 0))
+  expect_equal(tbl$x$data$G2, c(0, 100))
+})
+
+test_that("generate_grouped_topic_prevalence_table_multi shows overall and group prevalence", {
+  df <- data.frame(
+    text = c("Text 1", "Text 2", "Text 3", "Text 4"),
+    `Topic A` = c(TRUE, FALSE, TRUE, TRUE),
+    `Topic B` = c(FALSE, TRUE, FALSE, TRUE),
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+  by_vals <- data.frame(
+    text = c("Text 1", "Text 2", "Text 3", "Text 4"),
+    by_value = c("G1", "G1", "G2", "G2"),
+    stringsAsFactors = FALSE
+  )
+
+  tbl <- generate_grouped_topic_prevalence_table_multi(
+    df = df,
+    by_values = by_vals,
+    by_column_name = "group",
+    topics = c("Topic A", "Topic B"),
+    language = "en"
+  )
+
+  expect_s3_class(tbl, "datatables")
+  expect_equal(tbl$x$data$Topic, c("Topic A", "Topic B"))
+  expect_equal(tbl$x$data$Overall, c(75, 50))
+  expect_equal(tbl$x$data$G1, c(50, 50))
+  expect_equal(tbl$x$data$G2, c(100, 50))
+})
+
 
 # -- Render smoke test: dedup scenario (was the original bug) ------------------
 
@@ -479,6 +579,95 @@ test_that("Scoren report renders with deduped by_column_values (no error text)",
 })
 
 
+test_that("Scoren report renders correctly with split-chunk by_column_lookup", {
+  testthat::skip_if_not_installed("rmarkdown")
+  testthat::skip_if_not_installed("knitr")
+  testthat::skip_if_not_installed("here")
+  testthat::skip_if_not_installed("htmltools")
+  testthat::skip_if_not_installed("bslib")
+  testthat::skip_if_not_installed("DT")
+  testthat::skip_if_not_installed("dplyr")
+  testthat::skip_if_not_installed("tidyr")
+  testthat::skip_if_not_installed("stringr")
+  testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+
+  out_dir <- withr::local_tempdir()
+
+  report_paths <- list.files(
+    here::here("R"),
+    pattern = "^report_Scoren_.*\\.Rmd$",
+    full.names = TRUE
+  )
+  expect_true(length(report_paths) > 0)
+
+  withr::with_dir(here::here(), {
+    for (report_path in report_paths) {
+      out_file <- file.path(
+        out_dir,
+        paste0(tools::file_path_sans_ext(basename(report_path)), "_split.html")
+      )
+
+      res <- try(
+        rmarkdown::render(
+          input = report_path,
+          output_file = out_file,
+          params = list(
+            analysis_result = .build_grouped_scoring_result(
+              report_path = report_path,
+              results_table = data.frame(
+                text = c("Text 1 chunk A", "Text 1 chunk B", "Text 2 chunk A"),
+                result = c(10, 12, 20),
+                stringsAsFactors = FALSE
+              ),
+              texts_df = .make_grouped_texts_df(
+                document_text = c(
+                  "Text 1 chunk A",
+                  "Text 1 chunk B",
+                  "Text 2 chunk A"
+                ),
+                source_document_id = c(1L, 1L, 2L),
+                source_document_text = c("Text 1", "Text 1", "Text 2")
+              ),
+              by_column_lookup = data.frame(
+                source_document_id = c(1L, 2L),
+                by_value = c("G1", "G2"),
+                stringsAsFactors = FALSE
+              )
+            )
+          ),
+          quiet = TRUE,
+          envir = .grouped_render_env(environment())
+        ),
+        silent = TRUE
+      )
+
+      if (inherits(res, "try-error")) {
+        stop(paste0(
+          "Render with split-chunk by_column failed for ",
+          basename(report_path),
+          ": ",
+          as.character(res)
+        ))
+      }
+
+      expect_true(file.exists(out_file))
+      expect_true(file.info(out_file)$size > 0)
+
+      html_content <- readLines(out_file, warn = FALSE)
+      html_text <- paste(html_content, collapse = "\n")
+      expect_false(
+        grepl("must be size", html_text, fixed = TRUE),
+        info = paste0(
+          "Report ",
+          basename(report_path),
+          " contains error text from grouped score chunk"
+        )
+      )
+    }
+  })
+})
+
+
 # -- Integration: split texts + by-column grouped report -----------------------
 
 test_that("Categorisatie report renders correctly with split-chunk by_column_lookup", {
@@ -579,6 +768,92 @@ test_that("Categorisatie report renders correctly with split-chunk by_column_loo
           " missing expected groups G1/G2 in split scenario"
         )
       )
+    }
+  })
+})
+
+test_that("Onderwerpextractie report renders grouped topic prevalence", {
+  testthat::skip_if_not_installed("rmarkdown")
+  testthat::skip_if_not_installed("knitr")
+  testthat::skip_if_not_installed("here")
+  testthat::skip_if_not_installed("htmltools")
+  testthat::skip_if_not_installed("bslib")
+  testthat::skip_if_not_installed("DT")
+  testthat::skip_if_not_installed("dplyr")
+  testthat::skip_if_not_installed("tidyr")
+  testthat::skip_if_not_installed("stringr")
+  testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+
+  out_dir <- withr::local_tempdir()
+
+  report_paths <- list.files(
+    here::here("R"),
+    pattern = "^report_Onderwerpextractie_.*\\.Rmd$",
+    full.names = TRUE
+  )
+  expect_true(length(report_paths) > 0)
+
+  withr::with_dir(here::here(), {
+    for (report_path in report_paths) {
+      out_file <- file.path(
+        out_dir,
+        paste0(
+          tools::file_path_sans_ext(basename(report_path)),
+          "_grouped.html"
+        )
+      )
+
+      res <- try(
+        rmarkdown::render(
+          input = report_path,
+          output_file = out_file,
+          params = list(
+            analysis_result = .build_grouped_topic_result(
+              report_path = report_path,
+              results_table = data.frame(
+                text = c("Text 1", "Text 2", "Text 3"),
+                result = c("Topic A", "Topic A", "Topic B"),
+                stringsAsFactors = FALSE
+              ),
+              by_column_lookup = data.frame(
+                source_document_id = c(1L, 2L, 3L),
+                by_value = c("G1", "G1", "G2"),
+                stringsAsFactors = FALSE
+              )
+            )
+          ),
+          quiet = TRUE,
+          envir = .grouped_render_env(environment())
+        ),
+        silent = TRUE
+      )
+
+      if (inherits(res, "try-error")) {
+        stop(paste0(
+          "Render with grouped topic prevalence failed for ",
+          basename(report_path),
+          ": ",
+          as.character(res)
+        ))
+      }
+
+      expect_true(file.exists(out_file))
+
+      html_content <- readLines(out_file, warn = FALSE)
+      html_text <- paste(html_content, collapse = "\n")
+      expect_false(grepl("must be size", html_text, fixed = TRUE))
+      expect_true(grepl("G1", html_text, fixed = TRUE))
+      expect_true(grepl("G2", html_text, fixed = TRUE))
+
+      if (grepl("_en\\.Rmd$", basename(report_path))) {
+        expect_true(grepl("Topic prevalence by group", html_text, fixed = TRUE))
+      } else {
+        expect_true(grepl(
+          "Onderwerpprevalentie per groep",
+          html_text,
+          fixed = TRUE
+        ))
+      }
     }
   })
 })

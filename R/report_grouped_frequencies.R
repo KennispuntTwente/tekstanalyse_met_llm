@@ -273,6 +273,201 @@ generate_grouped_score_table <- function(
   }
 }
 
+# Build a topic-by-group prevalence matrix for single-label topic results.
+.grouped_topic_prevalence_df_single <- function(df, by_values, topics) {
+  df_grouped <- .join_by_group(df, by_values)
+
+  prevalence_long <- df_grouped |>
+    dplyr::count(.by_group, result, name = "Number") |>
+    tidyr::complete(
+      .by_group = unique(df_grouped$.by_group),
+      result = topics,
+      fill = list(Number = 0)
+    )
+
+  group_totals <- df_grouped |>
+    dplyr::count(.by_group, name = "Group_Total")
+
+  prevalence_wide <- prevalence_long |>
+    dplyr::left_join(group_totals, by = ".by_group") |>
+    dplyr::mutate(
+      Group_Total = dplyr::coalesce(Group_Total, 0L),
+      Prevalence = dplyr::if_else(
+        Group_Total > 0,
+        round(Number / Group_Total * 100, 2),
+        0
+      )
+    ) |>
+    dplyr::select(.by_group, Topic = result, Prevalence) |>
+    tidyr::pivot_wider(
+      names_from = .by_group,
+      values_from = Prevalence,
+      values_fill = 0
+    )
+
+  overall <- df |>
+    dplyr::count(result, name = "Number") |>
+    tidyr::complete(result = topics, fill = list(Number = 0))
+
+  if (nrow(df) > 0) {
+    overall <- overall |>
+      dplyr::mutate(Overall = round(Number / nrow(df) * 100, 2))
+  } else {
+    overall <- overall |>
+      dplyr::mutate(Overall = 0)
+  }
+
+  overall <- overall |>
+    dplyr::select(Topic = result, Overall)
+
+  out <- overall |>
+    dplyr::left_join(prevalence_wide, by = "Topic")
+
+  group_cols <- setdiff(names(out), c("Topic", "Overall"))
+  out <- out[c("Topic", "Overall", group_cols)]
+  out <- out[match(topics, out$Topic), , drop = FALSE]
+  rownames(out) <- NULL
+  out
+}
+
+# Build a topic-by-group prevalence matrix for multi-label topic results.
+.grouped_topic_prevalence_df_multi <- function(df, by_values, topics) {
+  df_grouped <- .join_by_group(df, by_values)
+
+  prevalence_wide <- df_grouped |>
+    dplyr::group_by(.by_group) |>
+    dplyr::summarise(
+      dplyr::across(
+        dplyr::all_of(topics),
+        ~ round(sum(.x, na.rm = TRUE) / dplyr::n() * 100, 2)
+      ),
+      .groups = "drop"
+    ) |>
+    tidyr::pivot_longer(
+      cols = dplyr::all_of(topics),
+      names_to = "Topic",
+      values_to = "Prevalence"
+    ) |>
+    tidyr::pivot_wider(
+      names_from = .by_group,
+      values_from = Prevalence,
+      values_fill = 0
+    )
+
+  overall_values <- vapply(
+    topics,
+    function(topic) {
+      if (!nrow(df)) {
+        return(0)
+      }
+
+      round(sum(df[[topic]], na.rm = TRUE) / nrow(df) * 100, 2)
+    },
+    numeric(1)
+  )
+
+  overall <- data.frame(
+    Topic = topics,
+    Overall = overall_values,
+    stringsAsFactors = FALSE
+  )
+
+  out <- overall |>
+    dplyr::left_join(prevalence_wide, by = "Topic")
+
+  group_cols <- setdiff(names(out), c("Topic", "Overall"))
+  out <- out[c("Topic", "Overall", group_cols)]
+  out <- out[match(topics, out$Topic), , drop = FALSE]
+  rownames(out) <- NULL
+  out
+}
+
+#' Generate topic prevalence table by group for single-label topic results
+#' @param df data frame with 'result' column containing topic assignments
+#' @param by_values grouped-report lookup data frame
+#' @param by_column_name name of the grouping column for display
+#' @param topics vector of all topic labels
+#' @param language "en" or "nl"
+#' @return DT::datatable with topic prevalence percentages per group
+generate_grouped_topic_prevalence_table_single <- function(
+  df,
+  by_values,
+  by_column_name,
+  topics,
+  language = "en"
+) {
+  prevalence_table <- .grouped_topic_prevalence_df_single(
+    df = df,
+    by_values = by_values,
+    topics = topics
+  )
+
+  if (language == "nl") {
+    names(prevalence_table)[names(prevalence_table) == "Topic"] <- "Onderwerp"
+    names(prevalence_table)[names(prevalence_table) == "Overall"] <- "Totaal"
+
+    return(DT::datatable(
+      prevalence_table,
+      rownames = FALSE,
+      extensions = 'Buttons',
+      options = get_datatable_options(),
+      caption = paste0("Onderwerpprevalentie per ", by_column_name)
+    ))
+  }
+
+  names(prevalence_table)[names(prevalence_table) == "Overall"] <- "Overall"
+
+  DT::datatable(
+    prevalence_table,
+    rownames = FALSE,
+    extensions = 'Buttons',
+    options = get_datatable_options_en(),
+    caption = paste0("Topic prevalence per ", by_column_name)
+  )
+}
+
+#' Generate topic prevalence table by group for multi-label topic results
+#' @param df data frame with one logical column per topic
+#' @param by_values grouped-report lookup data frame
+#' @param by_column_name name of the grouping column for display
+#' @param topics vector of topic column names
+#' @param language "en" or "nl"
+#' @return DT::datatable with topic prevalence percentages per group
+generate_grouped_topic_prevalence_table_multi <- function(
+  df,
+  by_values,
+  by_column_name,
+  topics,
+  language = "en"
+) {
+  prevalence_table <- .grouped_topic_prevalence_df_multi(
+    df = df,
+    by_values = by_values,
+    topics = topics
+  )
+
+  if (language == "nl") {
+    names(prevalence_table)[names(prevalence_table) == "Topic"] <- "Onderwerp"
+    names(prevalence_table)[names(prevalence_table) == "Overall"] <- "Totaal"
+
+    return(DT::datatable(
+      prevalence_table,
+      rownames = FALSE,
+      extensions = 'Buttons',
+      options = get_datatable_options(),
+      caption = paste0("Onderwerpprevalentie per ", by_column_name)
+    ))
+  }
+
+  DT::datatable(
+    prevalence_table,
+    rownames = FALSE,
+    extensions = 'Buttons',
+    options = get_datatable_options_en(),
+    caption = paste0("Topic prevalence per ", by_column_name)
+  )
+}
+
 #' Generate grouped frequency table for topic extraction results
 #' Same logic as categorization
 generate_grouped_topic_table_single <- generate_grouped_freq_table_single

@@ -178,9 +178,43 @@ if (!assign_multiple_categories) {
 ```{r echo=FALSE, results='asis', error=TRUE}
 # Show grouped frequencies if by_column is specified
 if (!is.null(by_column_name) && !is.null(group_lookup)) {
+  cat("\n### Onderwerpprevalentie per groep\n\n")
+  cat(paste0(
+    "Onderstaande tabel toont per onderwerp het percentage teksten binnen elke **",
+    htmltools::htmlEscape(by_column_name),
+    "**-groep waaraan dat onderwerp is toegewezen."
+  ))
+
+  if (assign_multiple_categories) {
+    cat(
+      " Omdat meerdere onderwerpen aan een tekst kunnen worden toegewezen, kunnen percentages over onderwerpen heen binnen een groep optellen tot meer dan 100%.\n\n"
+    )
+  } else {
+    cat("\n\n")
+  }
+
+  if (!assign_multiple_categories) {
+    generate_grouped_topic_prevalence_table_single(
+      df = report_df,
+      by_values = group_lookup,
+      by_column_name = by_column_name,
+      topics = result_payload@labels$label_text,
+      language = "nl"
+    )
+  } else {
+    topic_cols <- setdiff(names(report_df), c("document_id", "text"))
+    generate_grouped_topic_prevalence_table_multi(
+      df = report_df,
+      by_values = group_lookup,
+      by_column_name = by_column_name,
+      topics = topic_cols,
+      language = "nl"
+    )
+  }
+
   cat("\n### Frequentie per groep\n\n")
   cat(paste0(
-    "Onderstaande tabel toont hoe vaak elk onderwerp is toegewezen, ",
+    "Onderstaande tabel toont de ruwe aantallen en percentages binnen de groep, ",
     "uitgesplitst naar **", htmltools::htmlEscape(by_column_name), "**.\n\n"
   ))
 }
