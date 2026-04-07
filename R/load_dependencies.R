@@ -283,21 +283,31 @@ initialize_python_environment <- function(
 
   suppressWarnings(reticulate::use_virtualenv(virtualenv))
 
-  # Patch codecs.lookup() to coerce integer code-page numbers to strings.
-  # On Windows, some import chains pass a raw code page int (e.g. 1252)
-  # instead of the string "cp1252", crashing with:
+  # Patch codecs.lookup(), codecs.encode(), and codecs.decode() to coerce
+  # integer code-page numbers to strings. On Windows, some import chains pass
+  # a raw code page int (e.g. 1252) instead of the string "cp1252", crashing
+  # with either:
   #   TypeError: lookup() argument must be str, not int
+  #   TypeError: encode() argument 'encoding' must be str, not int
   if (.Platform$OS.type == "windows") {
     tryCatch(
       reticulate::py_run_string(paste0(
         "import codecs as _codecs\n",
         "if not hasattr(_codecs, '_kwallm_patched'):\n",
+        "    def _coerce_encoding(encoding):\n",
+        "        return ('cp' + str(encoding)) if isinstance(encoding, int) else encoding\n",
         "    _orig_lookup = _codecs.lookup\n",
         "    def _safe_lookup(encoding):\n",
-        "        if isinstance(encoding, int):\n",
-        "            encoding = 'cp' + str(encoding)\n",
-        "        return _orig_lookup(encoding)\n",
+        "        return _orig_lookup(_coerce_encoding(encoding))\n",
         "    _codecs.lookup = _safe_lookup\n",
+        "    _orig_encode = _codecs.encode\n",
+        "    def _safe_encode(obj, encoding='utf-8', errors='strict'):\n",
+        "        return _orig_encode(obj, _coerce_encoding(encoding), errors)\n",
+        "    _codecs.encode = _safe_encode\n",
+        "    _orig_decode = _codecs.decode\n",
+        "    def _safe_decode(obj, encoding='utf-8', errors='strict'):\n",
+        "        return _orig_decode(obj, _coerce_encoding(encoding), errors)\n",
+        "    _codecs.decode = _safe_decode\n",
         "    _codecs._kwallm_patched = True\n"
       )),
       error = function(e) {
@@ -324,9 +334,10 @@ initialize_python_environment <- function(
 
 #' Import a Python module with a safety net for the Windows codecs bug.
 #'
-#' On Windows, `codecs.lookup()` sometimes receives an integer code-page
-#' number instead of a string, crashing with
-#' `TypeError: lookup() argument must be str, not int`.
+#' On Windows, `codecs.lookup()` / `codecs.encode()` sometimes receive an
+#' integer code-page number instead of a string, crashing with
+#' `TypeError: lookup() argument must be str, not int` or
+#' `TypeError: encode() argument 'encoding' must be str, not int`.
 #' This wrapper catches that specific error, (re-)applies the codecs
 #' monkey-patch, and retries once.
 #'
@@ -338,7 +349,7 @@ safe_py_import <- function(module, ...) {
     reticulate::import(module, ...),
     error = function(first_err) {
       is_codecs_bug <- grepl(
-        "lookup.*must be str.*not int",
+        "(lookup|encode|decode).*must be str.*not int",
         first_err$message,
         ignore.case = TRUE
       )
@@ -350,12 +361,20 @@ safe_py_import <- function(module, ...) {
       tryCatch(
         reticulate::py_run_string(paste0(
           "import codecs as _codecs\n",
+          "def _coerce_encoding(encoding):\n",
+          "    return ('cp' + str(encoding)) if isinstance(encoding, int) else encoding\n",
           "_orig_lookup = getattr(_codecs, '_orig_lookup', _codecs.lookup)\n",
           "def _safe_lookup(encoding):\n",
-          "    if isinstance(encoding, int):\n",
-          "        encoding = 'cp' + str(encoding)\n",
-          "    return _orig_lookup(encoding)\n",
+          "    return _orig_lookup(_coerce_encoding(encoding))\n",
           "_codecs.lookup = _safe_lookup\n",
+          "_orig_encode = getattr(_codecs, '_orig_encode', _codecs.encode)\n",
+          "def _safe_encode(obj, encoding='utf-8', errors='strict'):\n",
+          "    return _orig_encode(obj, _coerce_encoding(encoding), errors)\n",
+          "_codecs.encode = _safe_encode\n",
+          "_orig_decode = getattr(_codecs, '_orig_decode', _codecs.decode)\n",
+          "def _safe_decode(obj, encoding='utf-8', errors='strict'):\n",
+          "    return _orig_decode(obj, _coerce_encoding(encoding), errors)\n",
+          "_codecs.decode = _safe_decode\n",
           "_codecs._kwallm_patched = True\n"
         )),
         error = function(e) NULL
