@@ -35,7 +35,7 @@ COPY --chown=appuser:appuser LICENSE.md LICENSE.md
 COPY --chown=appuser:appuser package.json package.json
 COPY --chown=appuser:appuser pyproject.toml pyproject.toml
 COPY --chown=appuser:appuser uv.lock uv.lock
-COPY --chown=appuser:appuser tekstanalyse_met_llm.Rproj tekstanalyse_met_llm.Rproj
+COPY --chown=appuser:appuser KWALLM.Rproj KWALLM.Rproj
 
 # Switch to non-root user
 RUN chown -R appuser:appuser /home/appuser/app && \

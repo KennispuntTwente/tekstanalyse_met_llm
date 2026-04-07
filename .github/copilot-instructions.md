@@ -32,7 +32,7 @@ This repo is a Shiny app (R) with an Electron desktop wrapper and Docker image. 
 - GLiNER & semchunk: Used for anonymization and semantic chunking (see `R/gliner_*`, `R/semchunk_load.R`). Docker and desktop builds warm relevant caches; when changing models, adjust these loaders rather than calling Python directly elsewhere.
 
 ## Build & run workflows
-- R dev: Open `tekstanalyse_met_llm.Rproj`, run `renv::restore()` to install R packages, then run the app via `app.R`.
+- R dev: Open `KWALLM.Rproj`, run `renv::restore()` to install R packages, then run the app via `app.R`.
 - Electron desktop: Scripts in `scripts/` provision portable R/Pandoc; `package-main.js` spawns `package-app.R` and opens the Shiny URL in an Electron window.
 - Docker: `Dockerfile` uses a rocker build stage to restore `renv`, then copies the app into an Ubuntu runtime and runs `shiny::runApp` on port `3838`.
 
