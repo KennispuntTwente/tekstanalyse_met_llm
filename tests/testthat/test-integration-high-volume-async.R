@@ -122,8 +122,12 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
 
   worker <- mirai::mirai(
     {
-      log_context_apply(log_context)
-      prepare_async_analysis_worker("categorization")
+      kwallm_worker_bootstrap(
+        task = "categorization",
+        app_root = app_root,
+        worker_options = worker_options,
+        log_context = log_context
+      )
 
       categorize_texts(
         texts = texts,
@@ -145,18 +149,16 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
     },
     .args = c(
       list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options(),
+        log_context = log_context,
         texts = texts,
         analysis_unit_ids = seq_along(texts),
         categories = categories,
         research_background = "",
         llm_provider = provider
       ),
-      analysis_async_categorization_globals(),
-      analysis_async_worker_setup_globals(),
-      analysis_async_processing_globals(),
-      analysis_async_tokenizer_globals(),
-      log_async_globals(log_context),
-      send_prompt_with_retries_async_globals()
+      kwallm_worker_bootstrap_globals()
     )
   )
 
@@ -230,8 +232,12 @@ test_that("scoring async integration handles 3000 texts with fake LLM", {
 
   worker <- mirai::mirai(
     {
-      log_context_apply(log_context)
-      prepare_async_analysis_worker("scoring")
+      kwallm_worker_bootstrap(
+        task = "scoring",
+        app_root = app_root,
+        worker_options = worker_options,
+        log_context = log_context
+      )
 
       score_texts(
         texts = texts,
@@ -251,16 +257,16 @@ test_that("scoring async integration handles 3000 texts with fake LLM", {
     },
     .args = c(
       list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options(),
+        log_context = log_context,
         texts = texts,
         analysis_unit_ids = seq_along(texts),
         scoring_characteristic = "Customer satisfaction",
         research_background = "",
         llm_provider = provider
       ),
-      analysis_async_scoring_globals(),
-      analysis_async_worker_setup_globals(),
-      log_async_globals(log_context),
-      send_prompt_with_retries_async_globals()
+      kwallm_worker_bootstrap_globals()
     )
   )
 
@@ -331,8 +337,12 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
 
   worker <- mirai::mirai(
     {
-      log_context_apply(log_context)
-      prepare_async_analysis_worker("marking")
+      kwallm_worker_bootstrap(
+        task = "marking",
+        app_root = app_root,
+        worker_options = worker_options,
+        log_context = log_context
+      )
 
       mark_texts(
         texts = texts,
@@ -348,6 +358,9 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
     },
     .args = c(
       list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options(),
+        log_context = log_context,
         texts = texts,
         analysis_unit_ids = seq_along(texts),
         codes = codes,
@@ -356,11 +369,7 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
         research_background = "",
         llm_provider = provider
       ),
-      analysis_async_marking_globals(),
-      analysis_async_worker_setup_globals(),
-      analysis_async_tokenizer_globals(),
-      log_async_globals(log_context),
-      send_prompt_with_retries_async_globals()
+      kwallm_worker_bootstrap_globals()
     )
   )
 

@@ -219,8 +219,12 @@ marking_codes_server <- function(
 
         mirai::mirai(
           {
-            log_context_apply(log_context)
-            prepare_async_analysis_worker("code_generation")
+            kwallm_worker_bootstrap(
+              task = "code_generation",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
 
             generate_codes_by_reading_texts(
               texts = texts,
@@ -234,9 +238,10 @@ marking_codes_server <- function(
             )
           },
           .args = c(
-            log_async_globals(log_context),
-            send_prompt_with_retries_async_globals(),
             list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
               texts = texts$preprocessed,
               text_size_tokens = chunk_settings$text_size_tokens,
               overlap_size_tokens = chunk_settings$overlap_size_tokens,
@@ -246,9 +251,7 @@ marking_codes_server <- function(
               interrupter = interrupter,
               language = lang()$get_translation_language()
             ),
-            analysis_async_code_generation_globals(),
-            analysis_async_worker_setup_globals(),
-            analysis_async_tokenizer_globals()
+            kwallm_worker_bootstrap_globals()
           )
         ) %...>%
           {

@@ -1,38 +1,118 @@
 library(testthat)
 
+async_worker_task_entry_points <- list(
+  text_split = c("split_texts_with_semchunk", "semchunk_load_chunker"),
+  gliner = c("gliner_load_model", "initialize_python_environment"),
+  categorization = c(
+    "categorize_texts",
+    "write_grouped_paragraphs",
+    "send_prompt_with_retries"
+  ),
+  scoring = c("score_texts", "send_prompt_with_retries"),
+  topic_generation = c(
+    "create_candidate_topics",
+    "reduce_topics",
+    "send_prompt_with_retries"
+  ),
+  topic_reduction = c("reduce_topics", "send_prompt_with_retries"),
+  topic_assignment = c(
+    "assign_topics",
+    "write_grouped_paragraphs",
+    "send_prompt_with_retries"
+  ),
+  code_generation = c(
+    "generate_codes_by_reading_texts",
+    "create_text_batches",
+    "send_prompt_with_retries"
+  ),
+  marking = c(
+    "mark_texts",
+    ".kwallm_marking_matches_from_find_matches",
+    "send_prompt_with_retries"
+  ),
+  download_bundle = c("create_analysis_result_download_bundle"),
+  model_provider_test = c("send_prompt_with_retries", "log_context_apply"),
+  llm_provider_models_fetch = c("log_context_apply")
+)
 
-analysis_async_is_app_function <- function(name, env) {
-  if (!exists(name, envir = env, inherits = TRUE)) {
-    return(FALSE)
+test_that("bootstrap exposes task entry points in a real mirai worker", {
+  skip_if_not_installed("mirai")
+  withr::local_dir(here::here())
+
+  tryCatch(mirai::daemons(0), error = function(e) NULL)
+  Sys.sleep(0.2)
+
+  can_start_daemons <- TRUE
+  tryCatch(
+    {
+      mirai::daemons(1)
+      on.exit(tryCatch(mirai::daemons(0), error = function(e) NULL), add = TRUE)
+    },
+    error = function(e) {
+      can_start_daemons <<- FALSE
+    }
+  )
+  if (!isTRUE(can_start_daemons)) {
+    skip("mirai daemons not available in this environment")
   }
 
-  obj <- get(name, envir = env, inherits = TRUE)
-  is.function(obj) && identical(environment(obj), env)
-}
+  Sys.sleep(0.5)
 
+  for (task in names(async_worker_task_entry_points)) {
+    worker <- mirai::mirai(
+      {
+        kwallm_worker_bootstrap(
+          task = task,
+          app_root = app_root,
+          worker_options = worker_options
+        )
 
-analysis_async_direct_app_dependencies <- function(fn_name, env) {
-  fn <- get(fn_name, envir = env, inherits = TRUE)
+        list(
+          task = getOption("kwallm__worker_task"),
+          functions_present = vapply(
+            required_functions,
+            exists,
+            logical(1),
+            envir = environment(),
+            inherits = TRUE
+          )
+        )
+      },
+      .args = c(
+        list(
+          task = task,
+          required_functions = async_worker_task_entry_points[[task]],
+          app_root = kwallm_worker_app_root(),
+          worker_options = kwallm_worker_capture_options()
+        ),
+        kwallm_worker_bootstrap_globals()
+      )
+    )
 
-  globals <- codetools::findGlobals(fn, merge = FALSE)$functions
-  globals <- unlist(globals, use.names = FALSE)
-  globals <- unique(globals[vapply(
-    globals,
-    function(x) is.character(x) && length(x) == 1 && nzchar(x),
-    logical(1)
-  )])
+    result <- worker[]
 
-  sort(unique(globals[vapply(
-    globals,
-    analysis_async_is_app_function,
-    logical(1),
-    env = env
-  )]))
-}
+    if (mirai::is_error_value(result)) {
+      fail(paste("mirai worker error:", as.character(result)))
+    }
 
+    expect_identical(result$task, task)
+    expect_true(
+      all(result$functions_present),
+      info = sprintf(
+        "Task '%s' is missing [%s] after bootstrap",
+        task,
+        paste(
+          names(result$functions_present)[!result$functions_present],
+          collapse = ", "
+        )
+      )
+    )
+  }
+})
 
-test_that("marking helper empty-match path works in a real mirai worker", {
+test_that("marking helper empty-match path works in a bootstrap worker", {
   skip_if_not_installed("mirai")
+  withr::local_dir(here::here())
 
   tryCatch(mirai::daemons(0), error = function(e) NULL)
   Sys.sleep(0.2)
@@ -55,7 +135,11 @@ test_that("marking helper empty-match path works in a real mirai worker", {
 
   worker <- mirai::mirai(
     {
-      prepare_async_analysis_worker("marking")
+      kwallm_worker_bootstrap(
+        task = "marking",
+        app_root = app_root,
+        worker_options = worker_options
+      )
 
       .kwallm_marking_matches_from_find_matches(
         tibble::tibble(
@@ -69,10 +153,11 @@ test_that("marking helper empty-match path works in a real mirai worker", {
       )
     },
     .args = c(
-      analysis_async_marking_globals(),
-      analysis_async_worker_setup_globals(),
-      analysis_async_tokenizer_globals(),
-      send_prompt_with_retries_async_globals()
+      list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options()
+      ),
+      kwallm_worker_bootstrap_globals()
     )
   )
 
@@ -86,77 +171,4 @@ test_that("marking helper empty-match path works in a real mirai worker", {
   expect_identical(nrow(result), 1L)
   expect_identical(result$response_status[[1]], "matched_all")
   expect_true(all(is.na(result$marked_text)))
-})
-
-
-test_that("async dependency maps cover direct app-function calls in worker helpers", {
-  helper_env <- environment(analysis_async_tokenizer_globals)
-  tasks <- c(
-    "text_split",
-    "gliner",
-    "categorization",
-    "scoring",
-    "topic_generation",
-    "topic_reduction",
-    "topic_assignment",
-    "code_generation",
-    "marking"
-  )
-
-  # Logging helpers are validated separately and are usually wrapped in
-  # try/tryCatch inside analysis helpers, so they should not make this test
-  # fail when the goal is catching crash-causing missing worker bindings.
-  ignorable_functions <- c(
-    "log_info",
-    "log_debug",
-    "log_warn",
-    "log_error"
-  )
-
-  # This helper brings its own async-globals bundle and resolves its internal
-  # helpers dynamically, so we only need worker helpers to declare direct calls
-  # to it, not its entire internal dependency tree here.
-  self_contained_functions <- "send_prompt_with_retries"
-
-  for (task in tasks) {
-    dep_map <- .analysis_async_dependency_map(task)
-    inspect_fns <- unique(c(names(dep_map), unlist(dep_map, use.names = FALSE)))
-    inspect_fns <- inspect_fns[vapply(
-      inspect_fns,
-      analysis_async_is_app_function,
-      logical(1),
-      env = helper_env
-    )]
-
-    for (fn_name in inspect_fns) {
-      if (fn_name %in% c(ignorable_functions, self_contained_functions)) {
-        next
-      }
-
-      direct_deps <- setdiff(
-        analysis_async_direct_app_dependencies(fn_name, env = helper_env),
-        c(fn_name, ignorable_functions)
-      )
-
-      declared_deps <- unique(c(
-        as.character(dep_map[[fn_name]]),
-        self_contained_functions
-      ))
-
-      missing <- setdiff(direct_deps, declared_deps)
-
-      expect_true(
-        length(missing) == 0,
-        info = sprintf(
-          paste0(
-            "Task '%s': helper '%s' directly calls app functions [%s] ",
-            "that are not declared in .analysis_async_dependency_map()."
-          ),
-          task,
-          fn_name,
-          paste(missing, collapse = ", ")
-        )
-      )
-    }
-  }
 })

@@ -37,12 +37,6 @@ log_error <- function(...) invisible(NULL)
 get_session_id <- function() "test-session"
 log_context_capture <- function(...) list()
 log_context_apply <- function(...) invisible(NULL)
-log_async_globals <- function(log_context) {
-  list(
-    log_context = log_context,
-    log_context_apply = log_context_apply
-  )
-}
 async_message_printer <- function(...) {
   function(...) invisible(NULL)
 }
@@ -129,10 +123,10 @@ test_that("gliner_server passes worker setup globals for async model loading", {
 
       expect_true(all(
         c(
-          "gliner_load_model",
-          "prepare_async_analysis_worker",
-          "initialize_python_environment",
-          "async_message_printer"
+          "kwallm_worker_bootstrap",
+          "app_root",
+          "worker_options",
+          "log_context"
         ) %in%
           names(captured$args)
       ))

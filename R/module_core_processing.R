@@ -339,8 +339,12 @@ processing_server <- function(
 
         promise <- mirai::mirai(
           {
-            log_context_apply(log_context)
-            prepare_async_analysis_worker("categorization")
+            kwallm_worker_bootstrap(
+              task = "categorization",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
             .kwallm__prompt_execution_reset()
 
             on_progress <- function(i, n, text) {
@@ -401,6 +405,9 @@ processing_server <- function(
           },
           .args = c(
             list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
               llm_provider = models$main,
               texts = texts$preprocessed,
               analysis_unit_ids = current_analysis_unit_ids(),
@@ -419,12 +426,7 @@ processing_server <- function(
               streaming_enabled = getOption("paragraph_streaming", TRUE) &&
                 isTRUE(models$main$parameters$stream)
             ),
-            analysis_async_categorization_globals(),
-            analysis_async_worker_setup_globals(),
-            analysis_async_processing_globals(),
-            analysis_async_tokenizer_globals(),
-            log_async_globals(log_context),
-            send_prompt_with_retries_async_globals()
+            kwallm_worker_bootstrap_globals()
           )
         )
 
@@ -471,8 +473,12 @@ processing_server <- function(
 
         promise <- mirai::mirai(
           {
-            log_context_apply(log_context)
-            prepare_async_analysis_worker("scoring")
+            kwallm_worker_bootstrap(
+              task = "scoring",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
             .kwallm__prompt_execution_reset()
 
             on_progress <- function(i, n, text) {
@@ -502,6 +508,9 @@ processing_server <- function(
           },
           .args = c(
             list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
               llm_provider = models$main,
               texts = texts$preprocessed,
               analysis_unit_ids = current_analysis_unit_ids(),
@@ -510,10 +519,7 @@ processing_server <- function(
               progress_primary = progress_primary$async,
               interrupter = interrupter
             ),
-            analysis_async_scoring_globals(),
-            analysis_async_worker_setup_globals(),
-            log_async_globals(log_context),
-            send_prompt_with_retries_async_globals()
+            kwallm_worker_bootstrap_globals()
           )
         )
 
@@ -563,8 +569,12 @@ processing_server <- function(
 
         promise <- mirai::mirai(
           {
-            log_context_apply(log_context)
-            prepare_async_analysis_worker("topic_generation")
+            kwallm_worker_bootstrap(
+              task = "topic_generation",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
             .kwallm__prompt_execution_reset()
 
             # Step 1: Generate candidate topics
@@ -631,9 +641,10 @@ processing_server <- function(
             )
           },
           .args = c(
-            log_async_globals(log_context),
-            send_prompt_with_retries_async_globals(),
             list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
               llm_provider_main = models$main,
               llm_provider_large = models$large,
               texts = texts$preprocessed,
@@ -647,9 +658,7 @@ processing_server <- function(
               progress_secondary = progress_secondary$async,
               interrupter = interrupter
             ),
-            analysis_async_topic_modelling_globals(),
-            analysis_async_worker_setup_globals(),
-            analysis_async_tokenizer_globals()
+            kwallm_worker_bootstrap_globals()
           )
         )
         bind_async_result(
@@ -808,8 +817,12 @@ processing_server <- function(
 
         promise <- mirai::mirai(
           {
-            log_context_apply(log_context)
-            prepare_async_analysis_worker("topic_assignment")
+            kwallm_worker_bootstrap(
+              task = "topic_assignment",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
             .kwallm__prompt_execution_reset()
 
             # Step 4: Assign topics via standalone batch function
@@ -917,8 +930,10 @@ processing_server <- function(
             )
           },
           .args = c(
-            send_prompt_with_retries_async_globals(),
             list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
               topics = topics(),
               llm_provider = models$main,
               texts = texts$preprocessed,
@@ -938,11 +953,7 @@ processing_server <- function(
               streaming_enabled = getOption("paragraph_streaming", TRUE) &&
                 isTRUE(models$main$parameters$stream)
             ),
-            analysis_async_topic_modelling_globals(),
-            analysis_async_worker_setup_globals(),
-            analysis_async_processing_globals(),
-            analysis_async_tokenizer_globals(),
-            log_async_globals(log_context)
+            kwallm_worker_bootstrap_globals()
           )
         )
         bind_async_result(
@@ -1048,8 +1059,12 @@ processing_server <- function(
 
         promise <- mirai::mirai(
           {
-            log_context_apply(log_context)
-            prepare_async_analysis_worker("marking")
+            kwallm_worker_bootstrap(
+              task = "marking",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
             .kwallm__prompt_execution_reset()
 
             marking_output <- mark_texts(
@@ -1081,6 +1096,9 @@ processing_server <- function(
           },
           .args = c(
             list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
               llm_provider = models$main,
               texts = texts$preprocessed,
               analysis_unit_ids = current_analysis_unit_ids(),
@@ -1098,11 +1116,7 @@ processing_server <- function(
               streaming_enabled = getOption("paragraph_streaming", TRUE) &&
                 isTRUE(models$main$parameters$stream)
             ),
-            analysis_async_marking_globals(),
-            analysis_async_worker_setup_globals(),
-            analysis_async_tokenizer_globals(),
-            log_async_globals(log_context),
-            send_prompt_with_retries_async_globals()
+            kwallm_worker_bootstrap_globals()
           )
         )
 
@@ -1402,9 +1416,16 @@ processing_server <- function(
           )
         )
 
+        log_context <- log_context_capture(is_async = TRUE)
+
         promise <- mirai::mirai(
           {
-            prepare_async_download_worker()
+            kwallm_worker_bootstrap(
+              task = "download_bundle",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
             create_analysis_result_download_bundle(
               analysis_result = analysis_result,
               temp_dir = temp_dir
@@ -1412,11 +1433,13 @@ processing_server <- function(
           },
           .args = c(
             list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
               analysis_result = analysis_result,
               temp_dir = tempdir()
             ),
-            analysis_result_async_globals(),
-            download_async_worker_setup_globals()
+            kwallm_worker_bootstrap_globals()
           )
         )
 

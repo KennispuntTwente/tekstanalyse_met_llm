@@ -304,8 +304,12 @@ text_split_server <- function(
 
       mirai::mirai(
         {
-          log_context_apply(log_context)
-          prepare_async_analysis_worker("text_split")
+          kwallm_worker_bootstrap(
+            task = "text_split",
+            app_root = app_root,
+            worker_options = worker_options,
+            log_context = log_context
+          )
 
           split_texts_with_semchunk(
             texts = input_rows$document_text,
@@ -317,17 +321,16 @@ text_split_server <- function(
           )
         },
         .args = c(
-          log_async_globals(log_context),
           list(
+            app_root = kwallm_worker_app_root(),
+            worker_options = kwallm_worker_capture_options(),
+            log_context = log_context,
             input_rows = input_rows(),
             chunk_size = max_tokens_val(),
             overlap = overlap_val(),
-            queue = queue,
-            split_texts_with_semchunk = split_texts_with_semchunk,
-            semchunk_load_chunker = semchunk_load_chunker
+            queue = queue
           ),
-          analysis_async_worker_setup_globals(),
-          analysis_async_python_loader_globals()
+          kwallm_worker_bootstrap_globals()
         )
       ) %...>%
         {

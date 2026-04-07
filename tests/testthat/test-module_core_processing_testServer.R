@@ -18,10 +18,50 @@ mirai_sync_stub <- function(
   all_args <- c(args_from_dots, .args)
 
   expr_sub <- substitute(.expr)
-  eval_env <- list2env(all_args, parent = parent.frame())
+  eval_env <- list2env(all_args, parent = baseenv())
   value <- eval(expr_sub, envir = eval_env)
   promises::promise_resolve(value)
 }
+
+
+make_worker_bootstrap_stub <- function(bindings_env) {
+  force(bindings_env)
+
+  function(
+    task = NULL,
+    app_root = NULL,
+    worker_options = list(),
+    log_context = NULL,
+    env = parent.frame()
+  ) {
+    force(task)
+    force(app_root)
+
+    if (length(worker_options) > 0) {
+      options(worker_options)
+    }
+
+    for (name in ls(bindings_env, all.names = TRUE)) {
+      if (identical(name, "bindings_env")) {
+        next
+      }
+
+      env[[name]] <- get(name, envir = bindings_env, inherits = FALSE)
+    }
+
+    if (exists("log_context_apply", envir = env, inherits = TRUE)) {
+      get("log_context_apply", envir = env, inherits = TRUE)(log_context)
+    }
+
+    invisible(NULL)
+  }
+}
+
+kwallm_worker_app_root <- function(path = here::here()) {
+  normalizePath(path, winslash = "/", mustWork = TRUE)
+}
+
+kwallm_worker_capture_options <- function() list()
 
 
 stub_progress_bar_server <- function(...) {
@@ -76,7 +116,6 @@ test_that("processing_server: topic fit check receives a real provider object", 
   log_analysis_start <- function(...) invisible(NULL)
   log_context_capture <- function(...) list()
   log_context_apply <- function(...) invisible(NULL)
-  log_async_globals <- function(...) list()
   log_info <- function(...) invisible(NULL)
   log_debug <- function(...) invisible(NULL)
   log_warn <- function(...) invisible(NULL)
@@ -87,17 +126,15 @@ test_that("processing_server: topic fit check receives a real provider object", 
 
   app_error <- function(error, ...) stop(error)
 
-  send_prompt_with_retries_async_globals <- function(...) list()
-  analysis_async_topic_modelling_globals <- function(...) list()
-  analysis_async_tokenizer_globals <- function(...) list()
-  analysis_async_worker_setup_globals <- function(...) list()
-  analysis_async_processing_globals <- function(...) list()
-
   .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
   .kwallm__prompt_execution_get <- function(...) NULL
 
   create_candidate_topics <- function(...) c("Candidate 1", "Candidate 2")
   reduce_topics <- function(...) c("Topic A", "Topic B")
+  kwallm_worker_bootstrap <- make_worker_bootstrap_stub(environment())
+  kwallm_worker_bootstrap_globals <- function(...) {
+    list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+  }
 
   showNotification <- function(...) invisible(NULL)
 
@@ -261,7 +298,6 @@ test_that("processing_server: auto-confirm drops blank reduced topics", {
   log_analysis_start <- function(...) invisible(NULL)
   log_context_capture <- function(...) list()
   log_context_apply <- function(...) invisible(NULL)
-  log_async_globals <- function(...) list()
   log_info <- function(...) invisible(NULL)
   log_debug <- function(...) invisible(NULL)
   log_warn <- function(...) invisible(NULL)
@@ -271,12 +307,6 @@ test_that("processing_server: auto-confirm drops blank reduced topics", {
   }
 
   app_error <- function(error, ...) stop(error)
-
-  send_prompt_with_retries_async_globals <- function(...) list()
-  analysis_async_topic_modelling_globals <- function(...) list()
-  analysis_async_tokenizer_globals <- function(...) list()
-  analysis_async_worker_setup_globals <- function(...) list()
-  analysis_async_processing_globals <- function(...) list()
 
   .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
   .kwallm__prompt_execution_get <- function(...) NULL
@@ -310,7 +340,6 @@ test_that("processing_server: auto-confirm drops blank reduced topics", {
     shiny::reactiveVal(NULL)
   }
 
-  prepare_async_analysis_worker <- function(...) invisible(NULL)
   count_tokens <- function(x) {
     if (length(x) > 1) {
       return(rep(1L, length(x)))
@@ -359,6 +388,10 @@ test_that("processing_server: auto-confirm drops blank reduced topics", {
   }
 
   showNotification <- function(...) invisible(NULL)
+  kwallm_worker_bootstrap <- make_worker_bootstrap_stub(environment())
+  kwallm_worker_bootstrap_globals <- function(...) {
+    list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+  }
 
   source(here::here("R", "module_core_processing.R"), local = TRUE)
 
@@ -475,7 +508,6 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
   log_analysis_start <- function(...) invisible(NULL)
   log_context_capture <- function(...) list()
   log_context_apply <- function(...) invisible(NULL)
-  log_async_globals <- function(...) list()
   log_info <- function(...) invisible(NULL)
   log_debug <- function(...) invisible(NULL)
   log_warn <- function(...) invisible(NULL)
@@ -485,14 +517,6 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
   }
 
   app_error <- function(error, ...) stop(error)
-
-  send_prompt_with_retries_async_globals <- function(...) list()
-  analysis_async_topic_modelling_globals <- function(...) list()
-  analysis_async_tokenizer_globals <- function(...) list()
-  analysis_async_worker_setup_globals <- function(...) list()
-  analysis_async_processing_globals <- function(...) list()
-  analysis_result_async_globals <- function(...) list()
-  download_async_worker_setup_globals <- function(...) list()
 
   .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
   .kwallm__prompt_execution_get <- function(...) NULL
@@ -523,7 +547,6 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
     list(fits = TRUE, prompt_tokens = 10L, context_window_tokens = 100L)
   }
 
-  prepare_async_analysis_worker <- function(...) invisible(NULL)
   count_tokens <- function(x) {
     if (length(x) > 1) {
       return(rep(1L, length(x)))
@@ -531,6 +554,7 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
 
     1L
   }
+  get_context_window_size_in_tokens <- function(...) 1000L
 
   captured_reduction_summary <- NULL
   captured_topics_were_edited <- NULL
@@ -551,11 +575,14 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
     data.frame(stringsAsFactors = FALSE)
   }
 
-  prepare_async_download_worker <- function(...) invisible(NULL)
   create_analysis_result_download_bundle <- function(...) {
     path <- tempfile(fileext = ".zip")
     file.create(path)
     path
+  }
+  kwallm_worker_bootstrap <- make_worker_bootstrap_stub(environment())
+  kwallm_worker_bootstrap_globals <- function(...) {
+    list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
   }
 
   source(here::here("R", "module_core_processing.R"), local = TRUE)
@@ -680,7 +707,6 @@ test_that("processing_server: topics_definitive gate blocks assignment when topi
   log_analysis_start <- function(...) invisible(NULL)
   log_context_capture <- function(...) list()
   log_context_apply <- function(...) invisible(NULL)
-  log_async_globals <- function(...) list()
   log_info <- function(...) invisible(NULL)
   log_debug <- function(...) invisible(NULL)
   log_warn <- function(...) invisible(NULL)
@@ -691,12 +717,6 @@ test_that("processing_server: topics_definitive gate blocks assignment when topi
   }
 
   app_error <- function(error, ...) stop(error)
-
-  send_prompt_with_retries_async_globals <- function(...) list()
-  analysis_async_topic_modelling_globals <- function(...) list()
-  analysis_async_tokenizer_globals <- function(...) list()
-  analysis_async_worker_setup_globals <- function(...) list()
-  analysis_async_processing_globals <- function(...) list()
 
   .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
   .kwallm__prompt_execution_get <- function(...) NULL
@@ -728,6 +748,10 @@ test_that("processing_server: topics_definitive gate blocks assignment when topi
   }
 
   showNotification <- function(...) invisible(NULL)
+  kwallm_worker_bootstrap <- make_worker_bootstrap_stub(environment())
+  kwallm_worker_bootstrap_globals <- function(...) {
+    list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+  }
 
   source(here::here("R", "module_core_processing.R"), local = TRUE)
 

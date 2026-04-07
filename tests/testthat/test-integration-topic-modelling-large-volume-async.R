@@ -107,8 +107,12 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
 
   generation_worker <- mirai::mirai(
     {
-      log_context_apply(log_context)
-      prepare_async_analysis_worker("topic_generation")
+      kwallm_worker_bootstrap(
+        task = "topic_generation",
+        app_root = app_root,
+        worker_options = worker_options,
+        log_context = log_context
+      )
 
       candidate_topics <- create_candidate_topics(
         text_batches = text_batches,
@@ -132,16 +136,15 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
     },
     .args = c(
       list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options(),
+        log_context = log_context,
         text_batches = text_batches,
         research_background = "",
         llm_provider_main = main_provider,
         llm_provider_large = large_provider
       ),
-      analysis_async_topic_modelling_globals(),
-      analysis_async_worker_setup_globals(),
-      analysis_async_tokenizer_globals(),
-      log_async_globals(log_context),
-      send_prompt_with_retries_async_globals()
+      kwallm_worker_bootstrap_globals()
     )
   )
 
@@ -160,8 +163,12 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
 
   assignment_worker <- mirai::mirai(
     {
-      log_context_apply(log_context)
-      prepare_async_analysis_worker("topic_assignment")
+      kwallm_worker_bootstrap(
+        task = "topic_assignment",
+        app_root = app_root,
+        worker_options = worker_options,
+        log_context = log_context
+      )
 
       assign_topics(
         texts = texts,
@@ -175,17 +182,15 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
     },
     .args = c(
       list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options(),
+        log_context = log_context,
         texts = texts,
         topics = generation_result$reduced_topics,
         research_background = "",
         llm_provider = main_provider
       ),
-      analysis_async_topic_modelling_globals(),
-      analysis_async_worker_setup_globals(),
-      analysis_async_processing_globals(),
-      analysis_async_tokenizer_globals(),
-      log_async_globals(log_context),
-      send_prompt_with_retries_async_globals()
+      kwallm_worker_bootstrap_globals()
     )
   )
 
@@ -282,8 +287,12 @@ test_that("topic reduction async integration (edit-topics path) uses production 
   # Mirror the exact production pattern from module_misc_edit_topics.R
   reduction_worker <- mirai::mirai(
     {
-      log_context_apply(log_context)
-      prepare_async_analysis_worker("topic_reduction")
+      kwallm_worker_bootstrap(
+        task = "topic_reduction",
+        app_root = app_root,
+        worker_options = worker_options,
+        log_context = log_context
+      )
 
       reduce_topics(
         updated_topics,
@@ -294,15 +303,14 @@ test_that("topic reduction async integration (edit-topics path) uses production 
     },
     .args = c(
       list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options(),
+        log_context = log_context,
         updated_topics = updated_topics,
         research_background = "",
         llm_provider = provider
       ),
-      analysis_async_topic_reduction_globals(),
-      analysis_async_worker_setup_globals(),
-      analysis_async_tokenizer_globals(),
-      log_async_globals(log_context),
-      send_prompt_with_retries_async_globals()
+      kwallm_worker_bootstrap_globals()
     )
   )
 

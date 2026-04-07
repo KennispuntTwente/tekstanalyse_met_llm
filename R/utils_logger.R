@@ -436,31 +436,6 @@ log_context_apply <- function(ctx) {
 }
 
 
-#' Common logging globals for async workers
-#'
-#' When using `mirai::mirai()` with an explicit `.args = ...`,
-#' the worker runs in a separate R process and will not automatically have
-#' access to functions like `log_info()` unless you export them.
-#'
-#' Use this helper to consistently export the logger functions alongside the
-#' captured context produced by `log_context_capture()`.
-#'
-#' @param log_context A `kwallm_log_context` from `log_context_capture()`.
-#' @return A named list suitable for merging into an `.args =` list.
-#' @export
-log_async_globals <- function(log_context = NULL) {
-  list(
-    log_context = log_context,
-    log_context_apply = log_context_apply,
-    log_info = log_info,
-    log_debug = log_debug,
-    log_warn = log_warn,
-    log_error = log_error,
-    log_action = log_action
-  )
-}
-
-
 #' Apply log retention policy
 #'
 #' @param log_dir Log directory

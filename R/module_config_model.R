@@ -769,8 +769,17 @@ model_server <- function(
           id = nid
         )
 
+        log_context <- log_context_capture(is_async = TRUE)
+
         mirai::mirai(
           {
+            kwallm_worker_bootstrap(
+              task = "model_provider_test",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
+
             if (use_json) {
               json_schema <- list(
                 name = "thought_steps",
@@ -800,7 +809,16 @@ model_server <- function(
                 dplyr::pull(content)
             }
           },
-          .args = list(provider = provider, use_json = use_json)
+          .args = c(
+            list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
+              provider = provider,
+              use_json = use_json
+            ),
+            kwallm_worker_bootstrap_globals()
+          )
         ) %...>%
           (function(res) {
             removeNotification(nid)

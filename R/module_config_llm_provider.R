@@ -619,8 +619,17 @@ llm_provider_server <- function(
           duration = 3
         )
 
+        log_context <- log_context_capture(is_async = TRUE)
+
         mirai::mirai(
           {
+            kwallm_worker_bootstrap(
+              task = "llm_provider_models_fetch",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
+
             # IMPORTANT: in mirai workers, do not let raw httr/curl error conditions
             # escape, because they can be non-serializable. Always return a simple list.
 
@@ -739,11 +748,17 @@ llm_provider_server <- function(
               }
             )
           },
-          .args = list(
-            openai_url = openai_url(),
-            api_key_input = api_key_input(),
-            ollama_url = ollama_url(),
-            provider_mode = provider_mode
+          .args = c(
+            list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
+              openai_url = openai_url(),
+              api_key_input = api_key_input(),
+              ollama_url = ollama_url(),
+              provider_mode = provider_mode
+            ),
+            kwallm_worker_bootstrap_globals()
           )
         ) %...>%
           (function(result) {

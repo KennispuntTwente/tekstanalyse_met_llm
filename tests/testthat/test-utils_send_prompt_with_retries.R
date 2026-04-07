@@ -19,17 +19,10 @@ create_mock_llm_provider <- function(model = "test-model") {
   )
 }
 
-test_that("send_prompt_with_retries_async_globals works in real mirai daemon", {
-  # This test verifies that send_prompt_with_retries and its helper functions
-  # can be resolved correctly when passed to a mirai worker via .args.
-  # This catches issues like the one where .kwallm__prompt_trace_new_id
-  # was not found in the worker's environment.
-
+test_that("bootstrap worker resolves prompt trace helper chain", {
   testthat::skip_if_not_installed("mirai")
+  withr::local_dir(here::here())
 
-  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
-
-  # Reset and start a fresh daemon
   tryCatch(mirai::daemons(0), error = function(e) NULL)
   Sys.sleep(0.2)
 
@@ -49,66 +42,41 @@ test_that("send_prompt_with_retries_async_globals works in real mirai daemon", {
 
   Sys.sleep(0.5)
 
-  # Get the async globals - this is what the app does
-  async_globals <- send_prompt_with_retries_async_globals()
-
-  # Also need tidyprompt mocked in the worker - we'll pass a mock directly
-  mock_send_prompt <- function(...) {
-    list(
-      response = "mirai-worker-response",
-      chat_history = data.frame(
-        role = "assistant",
-        content = "mirai-worker-response"
-      )
-    )
-  }
-  mock_llm_provider <- list(
-    parameters = list(model = "test-model"),
-    clone = function() mock_llm_provider
-  )
-
-  # Run mirai with .args pattern (same as module_core_processing.R)
-  m <- mirai::mirai(
+  worker <- mirai::mirai(
     {
-      # This simulates the pattern in the app where send_prompt_with_retries
-      # is called inside a mirai block with helpers passed via .args
+      kwallm_worker_bootstrap(
+        task = "prompt_trace_helper_chain",
+        app_root = app_root,
+        worker_options = worker_options
+      )
 
-      # Mock tidyprompt::send_prompt since we can't install packages in worker
-      tidyprompt_send_prompt <- mock_send_prompt
-
-      # The key test: can send_prompt_with_retries resolve its helpers?
-      # We override send_prompt via local environment trick
-      local({
-        # Create environment with our mock
-        mock_env <- new.env(parent = environment(send_prompt_with_retries))
-        mock_env$`tidyprompt::send_prompt` <- mock_send_prompt
-
-        # Actually call send_prompt_with_retries
-        # This will fail if helpers like .kwallm__prompt_trace_new_id aren't found
-        result <- tryCatch(
-          {
-            # Directly test that helper resolution works
-            prompt_id <- .kwallm__prompt_trace_new_id()
-            if (!is.character(prompt_id) || !nzchar(prompt_id)) {
-              stop("prompt_id generation failed")
-            }
-            "success"
-          },
-          error = function(e) {
-            paste0("error: ", conditionMessage(e))
+      tryCatch(
+        {
+          prompt_id <- .kwallm__prompt_trace_new_id()
+          if (!is.character(prompt_id) || !nzchar(prompt_id)) {
+            stop("prompt_id generation failed")
           }
-        )
-        result
-      })
+
+          stage_id <- .kwallm__prompt_execution_current_stage()
+          if (!is.character(stage_id) || !nzchar(stage_id)) {
+            stop("stage lookup failed")
+          }
+
+          "success"
+        },
+        error = function(e) paste0("error: ", conditionMessage(e))
+      )
     },
     .args = c(
-      async_globals,
-      list(mock_send_prompt = mock_send_prompt)
+      list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options()
+      ),
+      kwallm_worker_bootstrap_globals()
     )
   )
 
-  # Wait for result with timeout
-  result <- m[]
+  result <- worker[]
 
   if (mirai::is_error_value(result)) {
     fail(paste("mirai worker error:", as.character(result)))
@@ -117,15 +85,13 @@ test_that("send_prompt_with_retries_async_globals works in real mirai daemon", {
   expect_equal(result, "success")
 })
 
-test_that("async globals resolve log helpers when tracing is enabled", {
-  # This test verifies that log helper functions work in mirai async contexts
-  # when called the way send_prompt_with_retries does: with pre-resolved
-  # dependencies passed via .ctx argument.
-
+test_that("bootstrap worker resolves prompt trace logging helpers when tracing is enabled", {
   testthat::skip_if_not_installed("mirai")
-  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+  withr::local_dir(here::here())
 
-  # Reset and start a fresh daemon
+  old_opts <- options(send_prompt_with_retries__log_prompts = TRUE)
+  withr::defer(options(old_opts), testthat::teardown_env())
+
   tryCatch(mirai::daemons(0), error = function(e) NULL)
   Sys.sleep(0.2)
 
@@ -145,17 +111,14 @@ test_that("async globals resolve log helpers when tracing is enabled", {
 
   Sys.sleep(0.5)
 
-  async_globals <- send_prompt_with_retries_async_globals()
-
-  # Test that log functions work in mirai when called with .ctx (as
-  # send_prompt_with_retries does) - this is the actual usage pattern
-  m <- mirai::mirai(
+  worker <- mirai::mirai(
     {
-      # Enable prompt tracing so the log code paths actually execute
-      options(send_prompt_with_retries__log_prompts = TRUE)
-      on.exit(options(send_prompt_with_retries__log_prompts = NULL), add = TRUE)
+      kwallm_worker_bootstrap(
+        task = "prompt_trace_logging",
+        app_root = app_root,
+        worker_options = worker_options
+      )
 
-      # Use a temp file to avoid polluting real logs
       temp_log <- tempfile(fileext = ".log")
       options(send_prompt_with_retries__prompt_trace_file = temp_log)
       on.exit(
@@ -163,55 +126,47 @@ test_that("async globals resolve log helpers when tracing is enabled", {
         add = TRUE
       )
 
-      result <- tryCatch(
+      tryCatch(
         {
-          # Test 1: .kwallm__prompt_trace_enabled_to_file should return TRUE
-          enabled <- .kwallm__prompt_trace_enabled_to_file()
-          if (!isTRUE(enabled)) {
-            stop("enabled_to_file should be TRUE when option is set")
+          if (!isTRUE(.kwallm__prompt_trace_enabled_to_file())) {
+            stop("enabled_to_file should be TRUE when tracing is enabled")
           }
 
-          # Build .ctx the same way send_prompt_with_retries does
-          .trace_ctx <- list(
+          trace_ctx <- list(
             enabled = .kwallm__prompt_trace_enabled_to_file,
             append = .kwallm__prompt_trace_append,
             session_id = .kwallm__prompt_trace_session_id
           )
 
-          # Test 2: .kwallm__prompt_trace_log_send should work with .ctx
           .kwallm__prompt_trace_log_send(
             prompt_id = "test-id",
             model_name = "test-model",
             attempt = 1,
             max_tries = 3,
             prompt_text = "test prompt",
-            .ctx = .trace_ctx
+            .ctx = trace_ctx
           )
-
-          # Test 3: .kwallm__prompt_trace_log_reply should work with .ctx
           .kwallm__prompt_trace_log_reply(
             prompt_id = "test-id",
             model_name = "test-model",
             attempts = 1,
             duration_ms = 100,
             response_text = "test response",
-            .ctx = .trace_ctx
+            .ctx = trace_ctx
           )
-
-          # Test 4: .kwallm__prompt_trace_log_error should work with .ctx
           .kwallm__prompt_trace_log_error(
             prompt_id = "test-id",
             model_name = "test-model",
             attempt = 1,
             max_tries = 3,
             err_message = "test error",
-            .ctx = .trace_ctx
+            .ctx = trace_ctx
           )
 
-          # Verify something was written to the log file
           if (!file.exists(temp_log)) {
             stop("Log file was not created")
           }
+
           log_content <- readLines(temp_log)
           if (length(log_content) == 0) {
             stop("Log file is empty")
@@ -219,16 +174,19 @@ test_that("async globals resolve log helpers when tracing is enabled", {
 
           "success"
         },
-        error = function(e) {
-          paste0("error: ", conditionMessage(e))
-        }
+        error = function(e) paste0("error: ", conditionMessage(e))
       )
-      result
     },
-    .args = async_globals
+    .args = c(
+      list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options()
+      ),
+      kwallm_worker_bootstrap_globals()
+    )
   )
 
-  result <- m[]
+  result <- worker[]
 
   if (mirai::is_error_value(result)) {
     fail(paste("mirai worker error:", as.character(result)))

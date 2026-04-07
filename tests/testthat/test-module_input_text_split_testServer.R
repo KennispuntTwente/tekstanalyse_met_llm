@@ -22,6 +22,37 @@ shinyQueue <- function() {
 source(here::here("R", "utils_async_analysis_workers.R"), local = TRUE)
 source(here::here("R", "module_input_text_split.R"), local = TRUE)
 
+kwallm_worker_app_root <- function(path = here::here()) {
+  normalizePath(path, winslash = "/", mustWork = TRUE)
+}
+
+kwallm_worker_capture_options <- function() list()
+
+kwallm_worker_bootstrap <- function(
+  task = NULL,
+  app_root = NULL,
+  worker_options = list(),
+  log_context = NULL,
+  env = parent.frame()
+) {
+  force(task)
+  force(app_root)
+
+  if (length(worker_options) > 0) {
+    options(worker_options)
+  }
+
+  env$split_texts_with_semchunk <- split_texts_with_semchunk
+  env$semchunk_load_chunker <- semchunk_load_chunker
+  env$log_context_apply <- function(...) invisible(NULL)
+
+  invisible(log_context)
+}
+
+kwallm_worker_bootstrap_globals <- function(...) {
+  list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+}
+
 # Minimal stubs used by the module.
 disable_when_processing <- function(processing, input_ids) {
   shiny::observe({
@@ -127,7 +158,7 @@ test_that("text_split_server: clicking split produces split texts (sync-mocked m
       all_args <- c(args_from_dots, .args)
 
       expr_sub <- substitute(.expr)
-      eval_env <- list2env(all_args, parent = parent.frame())
+      eval_env <- list2env(all_args, parent = baseenv())
       value <- eval(expr_sub, envir = eval_env)
       promises::promise_resolve(value)
     },
@@ -351,11 +382,10 @@ test_that("text_split_server passes worker setup globals for semchunk async work
 
       expect_true(all(
         c(
-          "split_texts_with_semchunk",
-          "semchunk_load_chunker",
-          "prepare_async_analysis_worker",
-          "initialize_python_environment",
-          "async_message_printer"
+          "kwallm_worker_bootstrap",
+          "app_root",
+          "worker_options",
+          "log_context"
         ) %in%
           names(captured$args)
       ))

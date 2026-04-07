@@ -46,10 +46,45 @@ mirai_sync_stub <- function(
   all_args <- c(args_from_dots, .args)
 
   expr_sub <- substitute(.expr)
-  eval_env <- list2env(all_args, parent = parent.frame())
+  eval_env <- list2env(all_args, parent = baseenv())
   value <- eval(expr_sub, envir = eval_env)
   promises::promise_resolve(value)
 }
+
+kwallm_worker_bootstrap <- function(
+  task = NULL,
+  app_root = NULL,
+  worker_options = list(),
+  log_context = NULL,
+  env = parent.frame()
+) {
+  force(task)
+  force(app_root)
+
+  if (length(worker_options) > 0) {
+    options(worker_options)
+  }
+
+  env$reduce_topics <- reduce_topics
+  env$get_context_window_size_in_tokens <- get_context_window_size_in_tokens
+  env$tiktoken_load_tokenizer <- tiktoken_load_tokenizer
+  env$count_tokens <- count_tokens
+  env$async_message_printer <- async_message_printer
+  env$send_prompt_with_retries <- send_prompt_with_retries
+  env$app_error <- app_error
+
+  invisible(log_context)
+}
+
+kwallm_worker_bootstrap_globals <- function(...) {
+  list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+}
+
+kwallm_worker_app_root <- function(path = here::here()) {
+  normalizePath(path, winslash = "/", mustWork = TRUE)
+}
+
+kwallm_worker_capture_options <- function() list()
 
 # Patch mirai::mirai to run synchronously for all tests in this file
 mirai_ns <- asNamespace("mirai")

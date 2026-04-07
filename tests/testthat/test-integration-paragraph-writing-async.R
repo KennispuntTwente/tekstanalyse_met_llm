@@ -42,7 +42,11 @@ test_that("categorization async integration writes paragraphs in a real mirai wo
 
   worker <- mirai::mirai(
     {
-      prepare_async_analysis_worker("categorization")
+      kwallm_worker_bootstrap(
+        task = "categorization",
+        app_root = app_root,
+        worker_options = worker_options
+      )
 
       results <- categorize_texts(
         texts = texts,
@@ -82,15 +86,13 @@ test_that("categorization async integration writes paragraphs in a real mirai wo
     },
     .args = c(
       list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options(),
         texts = texts,
         categories = categories,
         llm_provider = provider
       ),
-      analysis_async_categorization_globals(),
-      analysis_async_worker_setup_globals(),
-      analysis_async_processing_globals(),
-      analysis_async_tokenizer_globals(),
-      send_prompt_with_retries_async_globals()
+      kwallm_worker_bootstrap_globals()
     )
   )
 

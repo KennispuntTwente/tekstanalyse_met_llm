@@ -231,30 +231,6 @@ test_that("log_context_capture returns a valid kwallm_log_context", {
 })
 
 
-test_that("log_async_globals returns a list with all required logging functions", {
-  ctx <- structure(
-    list(
-      level = "DEBUG",
-      dir = tempdir(),
-      session_id = "dummy",
-      is_async = TRUE
-    ),
-    class = "kwallm_log_context"
-  )
-
-  globals <- log_async_globals(ctx)
-
-  expect_type(globals, "list")
-  expect_identical(globals$log_context, ctx)
-  expect_true(is.function(globals$log_context_apply))
-  expect_true(is.function(globals$log_info))
-  expect_true(is.function(globals$log_debug))
-  expect_true(is.function(globals$log_warn))
-  expect_true(is.function(globals$log_error))
-  expect_true(is.function(globals$log_action))
-})
-
-
 test_that("log_context_apply bootstraps logger in mirai daemon worker", {
   testthat::skip_if_not_installed("mirai")
 

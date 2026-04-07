@@ -388,8 +388,12 @@ edit_topics_server <- function(
 
         mirai::mirai(
           {
-            log_context_apply(log_context)
-            prepare_async_analysis_worker("topic_reduction")
+            kwallm_worker_bootstrap(
+              task = "topic_reduction",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
 
             reduce_topics(
               updated_topics,
@@ -400,16 +404,15 @@ edit_topics_server <- function(
           },
           .args = c(
             list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
               updated_topics = updated_topics,
               research_background = research_background(),
               llm_provider = llm_provider,
               lang = lang()
             ),
-            analysis_async_topic_reduction_globals(),
-            analysis_async_worker_setup_globals(),
-            analysis_async_tokenizer_globals(),
-            log_async_globals(log_context),
-            send_prompt_with_retries_async_globals()
+            kwallm_worker_bootstrap_globals()
           )
         ) %...>%
           (function(reduced_topics) {

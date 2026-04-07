@@ -790,39 +790,3 @@ send_prompt_with_retries <- function(
     )
   }
 }
-
-
-# Helper for async globals ---------------------------------------------------
-
-#' Get globals required for send_prompt_with_retries in async contexts
-#'
-#' When using `mirai::mirai()` with an explicit `.args = ...`,
-#' the worker runs in a separate R process and will not automatically have
-#' access to the internal helper functions used by `send_prompt_with_retries()`.
-#'
-#' Use this helper to consistently export these functions alongside
-#' `send_prompt_with_retries` itself.
-#'
-#' @return A named list suitable for merging into an `.args =` list.
-#' @export
-send_prompt_with_retries_async_globals <- function() {
-  list(
-    send_prompt_with_retries = send_prompt_with_retries,
-    .kwallm__prompt_trace_new_id = .kwallm__prompt_trace_new_id,
-    .kwallm__prompt_trace_enabled_to_file = .kwallm__prompt_trace_enabled_to_file,
-    .kwallm__prompt_trace_session_id = .kwallm__prompt_trace_session_id,
-    .kwallm__prompt_trace_retention_files = .kwallm__prompt_trace_retention_files,
-    .kwallm__prompt_trace_file_path = .kwallm__prompt_trace_file_path,
-    .kwallm__prompt_trace_append = .kwallm__prompt_trace_append,
-    .kwallm__prompt_trace_cleanup = .kwallm__prompt_trace_cleanup,
-    .kwallm__prompt_trace_serialize = .kwallm__prompt_trace_serialize,
-    .kwallm__prompt_trace_extract_prompt_text = .kwallm__prompt_trace_extract_prompt_text,
-    .kwallm__prompt_trace_log_send = .kwallm__prompt_trace_log_send,
-    .kwallm__prompt_trace_log_reply = .kwallm__prompt_trace_log_reply,
-    .kwallm__prompt_trace_log_error = .kwallm__prompt_trace_log_error,
-    .kwallm__prompt_execution_current_stage = .kwallm__prompt_execution_current_stage,
-    .kwallm__prompt_execution_reset = .kwallm__prompt_execution_reset,
-    .kwallm__prompt_execution_record = .kwallm__prompt_execution_record,
-    .kwallm__prompt_execution_get = .kwallm__prompt_execution_get
-  )
-}
