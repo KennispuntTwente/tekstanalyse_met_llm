@@ -59,7 +59,8 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       ),
       semchunk_load_chunker = c(
         "async_message_printer",
-        "initialize_python_environment"
+        "initialize_python_environment",
+        "safe_py_import"
       ),
       split_texts_with_semchunk = "semchunk_load_chunker"
     ),
@@ -73,7 +74,8 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       ),
       gliner_load_model = c(
         "async_message_printer",
-        "initialize_python_environment"
+        "initialize_python_environment",
+        "safe_py_import"
       )
     ),
     categorization = list(
@@ -86,7 +88,8 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       ),
       tiktoken_load_tokenizer = c(
         "async_message_printer",
-        "initialize_python_environment"
+        "initialize_python_environment",
+        "safe_py_import"
       ),
       count_tokens = "tiktoken_load_tokenizer",
       .kwallm_prompt_context_window_info = c(
@@ -127,7 +130,8 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       ),
       tiktoken_load_tokenizer = c(
         "async_message_printer",
-        "initialize_python_environment"
+        "initialize_python_environment",
+        "safe_py_import"
       ),
       count_tokens = "tiktoken_load_tokenizer",
       create_candidate_topics = c(
@@ -152,7 +156,8 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       ),
       tiktoken_load_tokenizer = c(
         "async_message_printer",
-        "initialize_python_environment"
+        "initialize_python_environment",
+        "safe_py_import"
       ),
       count_tokens = "tiktoken_load_tokenizer",
       reduce_topics = c(
@@ -172,7 +177,8 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       ),
       tiktoken_load_tokenizer = c(
         "async_message_printer",
-        "initialize_python_environment"
+        "initialize_python_environment",
+        "safe_py_import"
       ),
       count_tokens = "tiktoken_load_tokenizer",
       .kwallm_prompt_context_window_info = c(
@@ -207,11 +213,13 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       ),
       semchunk_load_chunker = c(
         "async_message_printer",
-        "initialize_python_environment"
+        "initialize_python_environment",
+        "safe_py_import"
       ),
       tiktoken_load_tokenizer = c(
         "async_message_printer",
-        "initialize_python_environment"
+        "initialize_python_environment",
+        "safe_py_import"
       ),
       count_tokens = "tiktoken_load_tokenizer",
       create_text_batches = "count_tokens",
@@ -245,11 +253,13 @@ async_inject_dependencies <- function(bindings, env = parent.frame()) {
       ),
       semchunk_load_chunker = c(
         "async_message_printer",
-        "initialize_python_environment"
+        "initialize_python_environment",
+        "safe_py_import"
       ),
       tiktoken_load_tokenizer = c(
         "async_message_printer",
-        "initialize_python_environment"
+        "initialize_python_environment",
+        "safe_py_import"
       ),
       count_tokens = "tiktoken_load_tokenizer",
       .kwallm_prompt_context_window_info = c(
@@ -348,6 +358,7 @@ analysis_async_tokenizer_globals <- function() {
 analysis_async_python_loader_globals <- function() {
   list(
     initialize_python_environment = initialize_python_environment,
+    safe_py_import = safe_py_import,
     .python_environment_state_default = .python_environment_state_default,
     .python_environment_state_get = .python_environment_state_get,
     .python_environment_state_set = .python_environment_state_set,

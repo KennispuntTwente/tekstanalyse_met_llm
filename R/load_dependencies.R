@@ -251,6 +251,14 @@ initialize_python_environment <- function(
     is.logical(force_reload) && length(force_reload) == 1
   )
 
+  # Force UTF-8 mode BEFORE Python can be initialized (must be before the
+  # early return, so mirai workers that inherit cached state still get it).
+  # Prevents codecs.lookup() from receiving a raw Windows code page integer.
+  if (.Platform$OS.type == "windows") {
+    Sys.setenv(PYTHONUTF8 = "1")
+    Sys.setenv(PYTHONIOENCODING = "utf-8")
+  }
+
   st <- .python_environment_state_get()
 
   if (
@@ -275,6 +283,33 @@ initialize_python_environment <- function(
 
   suppressWarnings(reticulate::use_virtualenv(virtualenv))
 
+  # Patch codecs.lookup() to coerce integer code-page numbers to strings.
+  # On Windows, some import chains pass a raw code page int (e.g. 1252)
+  # instead of the string "cp1252", crashing with:
+  #   TypeError: lookup() argument must be str, not int
+  if (.Platform$OS.type == "windows") {
+    tryCatch(
+      reticulate::py_run_string(paste0(
+        "import codecs as _codecs\n",
+        "if not hasattr(_codecs, '_kwallm_patched'):\n",
+        "    _orig_lookup = _codecs.lookup\n",
+        "    def _safe_lookup(encoding):\n",
+        "        if isinstance(encoding, int):\n",
+        "            encoding = 'cp' + str(encoding)\n",
+        "        return _orig_lookup(encoding)\n",
+        "    _codecs.lookup = _safe_lookup\n",
+        "    _codecs._kwallm_patched = True\n"
+      )),
+      error = function(e) {
+        warning(
+          "codecs safety patch could not be applied: ",
+          e$message,
+          call. = FALSE
+        )
+      }
+    )
+  }
+
   st$initialized <- TRUE
   st$virtualenv <- virtualenv
   st$install_python_ran <- isTRUE(st$install_python_ran) ||
@@ -284,6 +319,52 @@ initialize_python_environment <- function(
   .python_environment_state_set(st)
 
   invisible(st)
+}
+
+
+#' Import a Python module with a safety net for the Windows codecs bug.
+#'
+#' On Windows, `codecs.lookup()` sometimes receives an integer code-page
+#' number instead of a string, crashing with
+#' `TypeError: lookup() argument must be str, not int`.
+#' This wrapper catches that specific error, (re-)applies the codecs
+#' monkey-patch, and retries once.
+#'
+#' @param module Module name passed to [reticulate::import()].
+#' @param ... Further arguments forwarded to [reticulate::import()].
+#' @return The imported Python module object.
+safe_py_import <- function(module, ...) {
+  tryCatch(
+    reticulate::import(module, ...),
+    error = function(first_err) {
+      is_codecs_bug <- grepl(
+        "lookup.*must be str.*not int",
+        first_err$message,
+        ignore.case = TRUE
+      )
+      if (!is_codecs_bug) {
+        stop(first_err)
+      }
+
+      # Re-apply the codecs patch (may have been lost or never applied)
+      tryCatch(
+        reticulate::py_run_string(paste0(
+          "import codecs as _codecs\n",
+          "_orig_lookup = getattr(_codecs, '_orig_lookup', _codecs.lookup)\n",
+          "def _safe_lookup(encoding):\n",
+          "    if isinstance(encoding, int):\n",
+          "        encoding = 'cp' + str(encoding)\n",
+          "    return _orig_lookup(encoding)\n",
+          "_codecs.lookup = _safe_lookup\n",
+          "_codecs._kwallm_patched = True\n"
+        )),
+        error = function(e) NULL
+      )
+
+      # Retry the import once
+      reticulate::import(module, ...)
+    }
+  )
 }
 
 .python_environment_state_get <- function() {

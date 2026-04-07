@@ -28,7 +28,7 @@ semchunk_load_chunker <- function(
   print_message("Loading Python and semchunk module...")
 
   initialize_python_environment(sync_uv = sync_uv)
-  semchunk <- reticulate::import("semchunk")
+  semchunk <- safe_py_import("semchunk")
 
   #### ───────── Build the chunker ────────────────────────────────
   print_message("Constructing chunker …")

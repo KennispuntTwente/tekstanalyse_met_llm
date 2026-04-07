@@ -27,7 +27,7 @@ gliner_load_model <- function(
   print_message("Loading Python and GLiNER module...")
 
   initialize_python_environment(sync_uv = sync_uv)
-  gliner <- reticulate::import("gliner")
+  gliner <- safe_py_import("gliner")
 
   # 4 Load model -----------------------------------------------------
   Sys.setenv(HF_HUB_DISABLE_SYMLINKS = "1")

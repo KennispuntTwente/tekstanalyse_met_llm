@@ -36,7 +36,7 @@ tiktoken_load_tokenizer <- function(
   print_message("Loading Python and tiktoken module...")
 
   initialize_python_environment(sync_uv = sync_uv)
-  tk <- reticulate::import("tiktoken")
+  tk <- safe_py_import("tiktoken")
 
   ## ── Load tokenizer ───────────────────────────────────────────────
   tok <- tryCatch(
