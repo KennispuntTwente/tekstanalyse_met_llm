@@ -34,11 +34,11 @@ jobs:
 
     steps:
       # 1 source code ---------------------------------------------------
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+      - uses: actions/checkout
 
       # 2 uv ------------------------------------------------------------
       - name: Install uv
-        uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4
+        uses: astral-sh/setup-uv
 
       - name: Install python modules with uv
         run: uv sync
@@ -51,12 +51,12 @@ jobs:
           libx11-dev libnode-dev libwebp-dev
 
       # 4 R toolchain ---------------------------------------------------
-      - uses: r-lib/actions/setup-pandoc@bd49c52ffe281809afa6f0fecbf37483c5dd0b93
-      - uses: r-lib/actions/setup-r@bd49c52ffe281809afa6f0fecbf37483c5dd0b93
+      - uses: r-lib/actions/setup-pandoc
+      - uses: r-lib/actions/setup-r
         with:
           r-version: ${{ matrix.config.r }}
           use-public-rspm: true
-      - uses: r-lib/actions/setup-renv@bd49c52ffe281809afa6f0fecbf37483c5dd0b93
+      - uses: r-lib/actions/setup-renv
 
       # 5 run the tests -------------------------------------------------
       - name: Run shinytest2 tests
