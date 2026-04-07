@@ -558,6 +558,10 @@
         "en": "With a sample size of %d, we had 80%% power to detect an effect size of %.2f (Cohen's d) in this test, which corresponds to %s according to the conventions of [Cohen (1988)](https://doi.org/10.4324/9780203771587). Smaller differences between the language model and the human rater are harder to detect with this sample size."
       },
       {
+        "nl": "Met deze steekproefgrootte kon geen betrouwbare gevoeligheidsanalyse worden berekend.",
+        "en": "No reliable sensitivity analysis could be calculated for this sample size."
+      },
+      {
         "nl": "een klein effect",
         "en": "a small effect"
       },

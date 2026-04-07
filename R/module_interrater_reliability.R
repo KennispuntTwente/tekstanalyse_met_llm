@@ -600,34 +600,46 @@ interrater_server <- function(
                   paired = TRUE
                 )
 
-                # Sensitivity analysis for paired t-test
-                sensitivity <- pwr::pwr.t.test(
-                  n = length(user_scores),
-                  power = 0.80,
-                  sig.level = 0.05,
-                  type = "paired",
-                  alternative = "two.sided"
-                )
-
-                # Interpret the effect size
-                effect_size_d <- sensitivity$d
-                effect_size_label <- if (effect_size_d < 0.3) {
-                  lang()$t("een klein effect")
-                } else if (effect_size_d < 0.7) {
-                  lang()$t("een gemiddeld effect")
-                } else {
-                  lang()$t("een groot effect")
-                }
-
-                # Create Dutch summary sentence
-                sensitivity_sentence <- sprintf(
-                  lang()$t(
-                    "Met een steekproefgrootte van %d hadden we bij deze test 80%% power om een effectgrootte van %.2f (Cohen's d) te detecteren, wat overeenkomt met %s volgens de conventies van [Cohen (1988)](https://doi.org/10.4324/9780203771587). Kleinere verschillen tussen het taalmodel en de menselijke beoordelaar zijn moeilijker te detecteren met deze steekproefgrootte."
+                # Sensitivity analysis can fail for very small samples.
+                # Keep the IRR result and fall back to a generic sentence.
+                sensitivity <- tryCatch(
+                  pwr::pwr.t.test(
+                    n = length(user_scores),
+                    power = 0.80,
+                    sig.level = 0.05,
+                    type = "paired",
+                    alternative = "two.sided"
                   ),
-                  length(user_scores),
-                  effect_size_d,
-                  effect_size_label
+                  error = function(e) NULL
                 )
+
+                sensitivity_sentence <- if (
+                  is.null(sensitivity) ||
+                    is.null(sensitivity$d) ||
+                    !is.finite(sensitivity$d)
+                ) {
+                  lang()$t(
+                    "Met deze steekproefgrootte kon geen betrouwbare gevoeligheidsanalyse worden berekend."
+                  )
+                } else {
+                  effect_size_d <- sensitivity$d
+                  effect_size_label <- if (effect_size_d < 0.3) {
+                    lang()$t("een klein effect")
+                  } else if (effect_size_d < 0.7) {
+                    lang()$t("een gemiddeld effect")
+                  } else {
+                    lang()$t("een groot effect")
+                  }
+
+                  sprintf(
+                    lang()$t(
+                      "Met een steekproefgrootte van %d hadden we bij deze test 80%% power om een effectgrootte van %.2f (Cohen's d) te detecteren, wat overeenkomt met %s volgens de conventies van [Cohen (1988)](https://doi.org/10.4324/9780203771587). Kleinere verschillen tussen het taalmodel en de menselijke beoordelaar zijn moeilijker te detecteren met deze steekproefgrootte."
+                    ),
+                    length(user_scores),
+                    effect_size_d,
+                    effect_size_label
+                  )
+                }
 
                 # Combine tidy t-test result with summary stats
                 t_test_summary <- t_test_result |> broom::tidy()
