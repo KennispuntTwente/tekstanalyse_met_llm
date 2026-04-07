@@ -295,9 +295,11 @@ main_server <- function(
     # UI ---------------------------------------------------------------
 
     output$main_ui <- renderUI({
-      base_ui <- tagList(
+      base_ui <- div(
+        class = "kwallm-page-wrapper",
         # Main header area with user/admin UI and title
         div(
+          class = "kwallm-main-content",
           style = "margin-left: 0.5rem; margin-right: 0.5rem;",
           div(
             style = "
@@ -534,6 +536,7 @@ main_server <- function(
 
         # Footer
         div(
+          class = "kwallm-footer",
           style = "
             text-align: center;
             padding: 20px 0;
