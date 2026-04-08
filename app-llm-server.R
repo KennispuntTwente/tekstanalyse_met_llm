@@ -14,29 +14,37 @@ load_dependencies("regular")
 # - Asynchronous processing also enables progress bar updates in the UI
 #     during the analysis of texts, and live streaming of LLM output
 #     when the LLM is writing summarizing paragraphs
-# - To enable asynchronous processing, you need to use `future::plan()`, e.g.,
-#     `future::plan(multisession)`
+# - To enable asynchronous processing, you need to use `mirai::daemons()`, e.g.,
+#     `mirai::daemons(n)` where n is the number of parallel workers
 # - When asynchronous processing is not needed, you can use
-#     `future::plan("sequential")`; note that the progress bar may lag behind
+#     `mirai::daemons(0)`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
-# - See the documentation for `future::plan()` for more details
+# - See the documentation for `mirai::daemons()` for more details
 
 test_mode <- getOption("shiny.testmode", FALSE)
-test_async <- tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
-  c("true", "1", "yes")
+test_async <- isTRUE(getOption("kwallm.test_async", FALSE)) ||
+  tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in% c("true", "1", "yes")
 
 if (!test_mode || test_async) {
-  if (!exists("future_plan")) {
-    future_plan <- future::plan(future::multisession)
-  }
+  daemon_status <- kwallm_ensure_mirai_daemons()
 
-  log_info(
-    sprintf(
-      "Using %s async workers",
-      future::nbrOfWorkers()
-    ),
-    component = "startup"
-  )
+  if (isTRUE(daemon_status$recycled_pool)) {
+    log_warn(
+      sprintf(
+        "Recycled stale mirai daemons; using %s async workers",
+        daemon_status$status$connections
+      ),
+      component = "startup"
+    )
+  } else {
+    log_info(
+      sprintf(
+        "Using %s async workers (mirai daemons)",
+        daemon_status$status$connections
+      ),
+      component = "startup"
+    )
+  }
 } else {
   log_info(
     paste0(
@@ -135,7 +143,7 @@ for (model in available_models) {
 }
 
 
-# 2.3 Other options -----------------------------------------------------------
+# 2.3 Other options ------------------------------------------------------------
 
 options(
   # - Optionally set a port and host for the Shiny app;
@@ -146,14 +154,6 @@ options(
   # Set max file upload size
   # - This is the maximum size of the file that can be uploaded to the app;
   shiny.maxRequestSize = 100 * 1024^2, # 100 MB
-
-  # Set max size of memory transfer between main & async processes
-  future.globals.maxSize = 3 * 1024^3, # 3 GB
-
-  # Silence future console spam about connection tracking.
-  # Some HTTP client libraries keep curl connections pooled for reuse,
-  # which can trigger false positives when running inside multisession futures.
-  future.connections.onMisuse = "ignore",
 
   # Silence tidyprompt warning about auto-detecting JSON mode.
   tidyprompt.warn.auto.json = FALSE,
@@ -219,11 +219,14 @@ options(
   #   this may be useful to avoid LLM failure in the topic assignment process;
   #     see R/topic_modelling.R
   topic_modelling__always_add_not_applicable = TRUE,
-  # - Parameters for text chunking;
-  #     see R/context_window.R
-  topic_modelling__chunk_size_default = 25,
-  topic_modelling__chunk_size_limit = 100,
-  topic_modelling__number_of_chunks_limit = 50,
+  # - Parameters for topic batching;
+  #     see R/module_misc_context_window.R
+  topic_modelling__batch_size_default = 25,
+  topic_modelling__batch_size_limit = 100,
+  topic_modelling__number_of_batches_limit = getOption(
+    "topic_modelling__number_of_batches_limit",
+    50
+  ),
   topic_modelling__draws_default = 1,
   topic_modelling__draws_limit = 5,
 
@@ -236,7 +239,7 @@ options(
 )
 
 
-## 2.4 Handle test settings -----------------------------------------------------
+## 2.4 Handle test settings ----------------------------------------------------
 
 # These settings are mainly intended for automated testing of the app
 
@@ -245,11 +248,33 @@ if (getOption("anonymization__gliner_test", FALSE)) {
 }
 
 if (!getOption("shiny.testmode", FALSE)) {
-  try(tiktoken_load_tokenizer())
+  tryCatch(
+    tiktoken_load_tokenizer(),
+    error = function(e) {
+      log_warn(
+        paste0(
+          "Tokenizer preload failed: ",
+          conditionMessage(e),
+          ". Token counting will be unavailable until Python is working."
+        ),
+        component = "startup"
+      )
+    }
+  )
 }
 
 
-# 3 Run app -----------------------------------------------------------------
+## 2.5 App version -------------------------------------------------------------
+
+options(
+  kwallm__app_version = tryCatch(
+    jsonlite::fromJSON("package.json")$version,
+    error = function(e) NULL
+  )
+)
+
+
+# 3 Run app --------------------------------------------------------------------
 
 # Make images in 'www/' folder available to the app
 shiny::addResourcePath("www", "www")
