@@ -185,9 +185,9 @@ options(
   #   these enable the user to set their own OpenAI-compatible or Ollama APIs,
   #   as alternative to the preconfigured LLM provider;
   #     see: R/llm_provider.R
-  llm_provider__can_configure_oai = FALSE,
+  llm_provider__can_configure_oai = TRUE,
   llm_provider__default_oai_url = "https://api.openai.com/v1/chat/completions",
-  llm_provider__can_configure_ollama = FALSE,
+  llm_provider__can_configure_ollama = TRUE,
   llm_provider__default_ollama_url = "http://localhost:11434/api/chat",
 
   # - Language for app interface & results (Dutch (nl) or English (en));
@@ -225,7 +225,7 @@ options(
   topic_modelling__batch_size_limit = 100,
   topic_modelling__number_of_batches_limit = getOption(
     "topic_modelling__number_of_batches_limit",
-    50
+    100
   ),
   topic_modelling__draws_default = 1,
   topic_modelling__draws_limit = 5,
