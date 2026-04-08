@@ -407,10 +407,10 @@ prompt_topic_not_applicable_check <- function(
 #' place so you stay in control of token cost:
 #'
 #' 1. **`max_iterations`** – limits how many reduce-and-combine cycles are tried.
-#' 2. **`max_groups`** – puts a hard ceiling on how many prompt batches may ever
-#'    exist *at any stage* of the algorithm.  If a split produces more than
-#'    `max_groups` batches, the function aborts immediately with an informative
-#'    error.
+#' 2. **`max_groups`** – puts a hard ceiling on how many topic-reduction prompt
+#'    batches may ever exist *at any stage* of the algorithm. If a split
+#'    produces more than `max_groups` batches, the function aborts immediately
+#'    with an informative error.
 #'
 #' @param candidate_topics Character vector of candidate topics.
 #' @param research_background (Optional) Background information to feed the LLM.
@@ -420,9 +420,12 @@ prompt_topic_not_applicable_check <- function(
 #' @param language "nl" or "en" – controls the language of the returned topics.
 #' @param always_add_not_applicable Append a generic "Unknown/not applicable"
 #'   topic when missing (default honours global option).
-#' @param max_iterations Maximum number of batch-reduce cycles (default = 4).
-#' @param max_groups Maximum number of prompt batches allowed at *any* iteration
-#'   (default = 16).
+#' @param max_iterations Maximum number of topic-reduction reduce/combine cycles
+#'   (default honours global option `topic_modelling__reduction_max_iterations`,
+#'   fallback 4).
+#' @param max_groups Maximum number of topic-reduction prompt batches allowed at
+#'   *any* iteration (default honours global option
+#'   `topic_modelling__reduction_max_prompt_batches`, fallback 16).
 #'
 #' @return Character vector of reduced topics.
 #' @export
@@ -437,8 +440,14 @@ reduce_topics <- function(
     "topic_modelling__always_add_not_applicable",
     TRUE
   ),
-  max_iterations = 4,
-  max_groups = 16,
+  max_iterations = getOption(
+    "topic_modelling__reduction_max_iterations",
+    getOption("topic_modelling__max_iterations", 4)
+  ),
+  max_groups = getOption(
+    "topic_modelling__reduction_max_prompt_batches",
+    getOption("topic_modelling__max_groups", 16)
+  ),
   interrupter = NULL
 ) {
   language <- match.arg(language)
@@ -469,6 +478,11 @@ reduce_topics <- function(
   if (length(candidate_topics) == 0) {
     stop(
       "reduce_topics(): 'candidate_topics' must contain at least one non-empty topic."
+    )
+  }
+  if (length(candidate_topics) < 2) {
+    stop(
+      "reduce_topics(): 'candidate_topics' must contain at least two non-empty topics."
     )
   }
 
@@ -545,6 +559,18 @@ reduce_topics <- function(
     if (length(current) > 0) {
       batches[[length(batches) + 1]] <- current
     }
+
+    if (length(topics_vec) >= 2 && any(lengths(batches) < 2)) {
+      stop(
+        paste0(
+          "reduce_topics(): The reduction model context window is too small ",
+          "to batch the current topic list without creating a single-topic batch. ",
+          "Use a larger reduction model/context window, shorten the topic labels, ",
+          "or reduce the number of topics before reducing again."
+        )
+      )
+    }
+
     batches
   }
 
@@ -554,7 +580,7 @@ reduce_topics <- function(
     stop(
       "reduce_topics(): Initial split produced ",
       length(batches),
-      " prompt batches, which exceeds 'max_groups' (",
+      " topic-reduction prompt batches, which exceeds 'max_groups' (",
       max_groups,
       "). Either reduce 'candidate_topics', increase the model context window, or raise 'max_groups'."
     )
@@ -587,7 +613,7 @@ reduce_topics <- function(
         iteration,
         " produced ",
         length(batches),
-        " prompt batches, exceeding 'max_groups' (",
+        " topic-reduction prompt batches, exceeding 'max_groups' (",
         max_groups,
         "). Reduce topic count or raise the cap."
       )

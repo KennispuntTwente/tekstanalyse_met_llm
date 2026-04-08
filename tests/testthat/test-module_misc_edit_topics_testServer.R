@@ -161,6 +161,90 @@ test_that("edit_topics_server: confirm sets edited topics and updates exclusive 
 })
 
 
+test_that("edit_topics_server: whitespace-only rows do not satisfy the minimum topic count", {
+  hot_ns <- asNamespace("rhandsontable")
+  shiny_ns <- asNamespace("shiny")
+  old_hot_to_r <- get("hot_to_r", envir = hot_ns)
+  old_show_notification <- get("showNotification", envir = shiny_ns)
+  withr::defer({
+    unlockBinding("hot_to_r", hot_ns)
+    assign("hot_to_r", old_hot_to_r, envir = hot_ns)
+    lockBinding("hot_to_r", hot_ns)
+    unlockBinding("showNotification", shiny_ns)
+    assign("showNotification", old_show_notification, envir = shiny_ns)
+    lockBinding("showNotification", shiny_ns)
+  })
+
+  unlockBinding("hot_to_r", hot_ns)
+  assign(
+    "hot_to_r",
+    function(...) {
+      data.frame(
+        topic = c("Topic 1", "   "),
+        exclusive = c(FALSE, FALSE),
+        stringsAsFactors = FALSE
+      )
+    },
+    envir = hot_ns
+  )
+  lockBinding("hot_to_r", hot_ns)
+
+  unlockBinding("showNotification", shiny_ns)
+  assign(
+    "showNotification",
+    function(ui, type = c("default", "message", "warning", "error"), ...) {
+      last_notification <<- list(
+        ui = as.character(ui),
+        type = match.arg(type)
+      )
+      invisible(NULL)
+    },
+    envir = shiny_ns
+  )
+  lockBinding("showNotification", shiny_ns)
+
+  last_notification <<- NULL
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+
+      topics <- reactiveVal(c("Topic 1", "Topic 2"))
+      exclusive <- reactiveVal(character())
+
+      edited <- edit_topics_server(
+        id = "edit",
+        topics = topics,
+        exclusive_topics = exclusive,
+        research_background = reactiveVal("bg"),
+        assign_multiple_categories = reactiveVal(TRUE),
+        llm_provider = list(parameters = list(model = "unit-test")),
+        assignment_texts = reactive(c("short text")),
+        assignment_llm_provider = reactive(list(
+          parameters = list(model = "unit-test")
+        )),
+        lang = lang
+      )
+
+      list(edited = edited)
+    },
+    {
+      session$flushReact()
+
+      session$setInputs(`edit-topics_table` = list(dummy = TRUE))
+      session$flushReact()
+      session$setInputs(`edit-confirm_topics` = 1)
+      session$flushReact()
+
+      expect_null(edited())
+      expect_false(is.null(last_notification))
+      expect_identical(last_notification$type, "error")
+      expect_match(last_notification$ui, "minimaal 2 onderwerpen")
+    }
+  )
+})
+
+
 test_that("edit_topics_server: reduce_again applies re-reduced topics and keeps valid exclusives", {
   # Stub reduction to a stable new set including the special 'not applicable' topic.
   reduce_topics <<- function(

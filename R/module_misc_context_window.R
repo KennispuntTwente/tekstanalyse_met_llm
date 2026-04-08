@@ -310,13 +310,22 @@ context_window_server <- function(
             }
           },
           "Onderwerpextractie" = {
-            # Approximate categories (as they are not known yet; assume a long list of 50)
-            prompt_multi_category(
-              text = "",
-              research_background = research_background(),
-              categories = paste0("Category ", seq(1, 50)),
-              exclusive_categories = paste0("Category ", seq(2, 50, by = 2))
-            )
+            approx_topics <- paste0("Topic ", seq_len(25))
+
+            if (assign_multiple_categories()) {
+              prompt_multi_category(
+                text = "",
+                research_background = research_background(),
+                categories = approx_topics,
+                exclusive_categories = approx_topics[seq(2, 25, by = 2)]
+              )
+            } else {
+              prompt_category(
+                text = "",
+                research_background = research_background(),
+                categories = approx_topics
+              )
+            }
           },
           "Scoren" = {
             req(scoring_characteristic())

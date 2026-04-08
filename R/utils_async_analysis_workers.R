@@ -28,6 +28,11 @@ kwallm_worker_capture_options <- function() {
     "paragraph_streaming",
     "marking__max_combinations",
     "topic_modelling__always_add_not_applicable",
+    "topic_modelling__reduction_max_prompt_batches",
+    "topic_modelling__reduction_max_iterations",
+    # Backward-compatibility fallback for older custom deployments.
+    "topic_modelling__max_groups",
+    "topic_modelling__max_iterations",
     "tidyprompt.verbose",
     "tidyprompt.warn.auto.json",
     "kwallm.test_fake_llm",

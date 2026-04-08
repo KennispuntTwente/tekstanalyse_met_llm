@@ -40,11 +40,19 @@ edit_topics_server <- function(
         )
       }
 
+      normalize_topic_values <- function(values, unique_only = FALSE) {
+        normalized <- trimws(as.character(values %||% character()))
+        normalized <- normalized[!is.na(normalized) & nzchar(normalized)]
+        if (isTRUE(unique_only)) {
+          normalized <- unique(normalized)
+        }
+        normalized
+      }
+
       topic_assignment_fit_info <- reactive({
         req(topics_table_data())
 
-        current_topics <- trimws(topics_table_data()$topic)
-        current_topics <- current_topics[nzchar(current_topics)]
+        current_topics <- normalize_topic_values(topics_table_data()$topic)
         if (length(current_topics) < 2) {
           return(list(
             fits = TRUE,
@@ -63,11 +71,14 @@ edit_topics_server <- function(
           ))
         }
 
-        current_exclusive <- trimws(
-          topics_table_data()$topic[
-            topics_table_data()$exclusive & nzchar(topics_table_data()$topic)
-          ]
-        )
+        current_exclusive <- if ("exclusive" %in% names(topics_table_data())) {
+          normalize_topic_values(
+            topics_table_data()$topic[topics_table_data()$exclusive %in% TRUE],
+            unique_only = TRUE
+          )
+        } else {
+          character()
+        }
 
         topic_assignment_prompt_context_window_check(
           texts = assignment_text_values,
@@ -300,8 +311,15 @@ edit_topics_server <- function(
         req(!reduction_in_progress())
         df <- topics_table_data()
 
-        updated_topics <- trimws(df$topic[df$topic != ""])
-        updated_exclusive <- trimws(df$topic[df$exclusive & df$topic != ""])
+        updated_topics <- normalize_topic_values(df$topic)
+        updated_exclusive <- if ("exclusive" %in% names(df)) {
+          normalize_topic_values(
+            df$topic[df$exclusive %in% TRUE],
+            unique_only = TRUE
+          )
+        } else {
+          character()
+        }
 
         log_action(
           "topics_confirmed",
@@ -356,8 +374,7 @@ edit_topics_server <- function(
       # re-reduce  ----------------------------------------------------
       observeEvent(input$reduce_again, {
         req(!reduction_in_progress())
-        updated_topics <- trimws(topics_table_data()$topic)
-        updated_topics <- updated_topics[updated_topics != ""]
+        updated_topics <- normalize_topic_values(topics_table_data()$topic)
 
         if (length(updated_topics) < 2) {
           shiny::showNotification(

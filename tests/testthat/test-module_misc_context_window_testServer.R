@@ -120,6 +120,116 @@ test_that("topic_assignment_prompt_context_window_check uses the real topic list
   expect_gt(check$prompt_tokens, check$context_window_tokens)
 })
 
+test_that("context_window_server: topic mode single-label preflight uses 25 synthetic topics", {
+  captured_categories <- NULL
+  multi_called <- FALSE
+
+  module_env <- environment(context_window_server)
+  old_prompt_category <- get("prompt_category", envir = module_env)
+  old_prompt_multi_category <- get("prompt_multi_category", envir = module_env)
+  withr::defer({
+    assign("prompt_category", old_prompt_category, envir = module_env)
+    assign(
+      "prompt_multi_category",
+      old_prompt_multi_category,
+      envir = module_env
+    )
+  })
+
+  assign(
+    "prompt_category",
+    function(text, research_background, categories) {
+      captured_categories <<- categories
+      list(prompt = "category")
+    },
+    envir = module_env
+  )
+  assign(
+    "prompt_multi_category",
+    function(...) {
+      multi_called <<- TRUE
+      list(prompt = "multi_category")
+    },
+    envir = module_env
+  )
+
+  tidyprompt_ns <- asNamespace("tidyprompt")
+  old_construct <- get("construct_prompt_text", envir = tidyprompt_ns)
+  withr::defer({
+    unlockBinding("construct_prompt_text", tidyprompt_ns)
+    assign("construct_prompt_text", old_construct, envir = tidyprompt_ns)
+    lockBinding("construct_prompt_text", tidyprompt_ns)
+  })
+
+  unlockBinding("construct_prompt_text", tidyprompt_ns)
+  assign(
+    "construct_prompt_text",
+    function(x, ...) "PROMPT",
+    envir = tidyprompt_ns
+  )
+  lockBinding("construct_prompt_text", tidyprompt_ns)
+
+  old_get_cw <- get_context_window_size_in_tokens
+  withr::defer({
+    get_context_window_size_in_tokens <<- old_get_cw
+  })
+  get_context_window_size_in_tokens <<- function(model) 100
+
+  shiny::testServer(
+    function(input, output, session) {
+      mode <- reactiveVal("Onderwerpextractie")
+      lang <- make_test_lang("nl")
+
+      models <- reactiveValues(
+        main = list(parameters = list(model = "unit-test-model")),
+        large = NULL
+      )
+
+      categories <- list(
+        texts = reactiveVal(c("CatA")),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(1),
+        exclusive_texts = reactiveVal(character())
+      )
+
+      codes <- list(
+        texts = reactiveVal(c("Code1")),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(1)
+      )
+
+      texts <- reactiveValues(
+        preprocessed = c("some text"),
+        document_text = character()
+      )
+
+      rv <- context_window_server(
+        id = "cw",
+        mode = mode,
+        models = models,
+        categories = categories,
+        scoring_characteristic = reactiveVal("X"),
+        codes = codes,
+        research_background = reactiveVal("background"),
+        assign_multiple_categories = reactiveVal(FALSE),
+        texts = texts,
+        processing = reactiveVal(FALSE),
+        lang = lang
+      )
+
+      list(rv = rv)
+    },
+    {
+      for (i in 1:10) {
+        session$flushReact()
+      }
+
+      expect_identical(captured_categories, paste0("Topic ", seq_len(25)))
+      expect_false(multi_called)
+    }
+  )
+})
+
 
 test_that("context_window_server: fit flag flips based on context window size", {
   # Monkeypatch tidyprompt::construct_prompt_text without pkgload/devtools.

@@ -201,6 +201,10 @@ options(
   topic_modelling__batch_size_default = 25,
   topic_modelling__batch_size_limit = 100,
   topic_modelling__number_of_batches_limit = 50,
+  # - Safety caps for topic reduction;
+  #   these apply only while reducing the candidate-topic list.
+  topic_modelling__reduction_max_prompt_batches = 16,
+  topic_modelling__reduction_max_iterations = 4,
   topic_modelling__draws_default = 1,
   topic_modelling__draws_limit = 5,
 

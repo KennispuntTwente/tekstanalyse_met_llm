@@ -38,6 +38,12 @@ reduction_model <- .kwallm_get_stage_model_id(
 )
 research_background <- analysis_result@metadata@research_background
 by_column_name <- analysis_result@input@grouping_column
+topic_provenance <- result_payload@topic_provenance
+topic_batch_size <- topic_provenance@batch_size
+topic_draws <- topic_provenance@draws
+topic_n_batches <- topic_provenance@n_batches
+topics_human_edited <- isTRUE(topic_provenance@human_edited)
+auto_added_not_applicable <- isTRUE(topic_provenance@auto_added_not_applicable)
 
 source(here::here("R", "style_datatable_config.R"), local = TRUE)
 source(here::here("R", "utils_quotes.R"), local = TRUE)
@@ -54,10 +60,47 @@ Hierbij is een topic modelling-procedure is toegepast op basis van
 [Wanrooij, Manhar, en Yang (2024)](https://bnaic2024.sites.uu.nl/wp-content/uploads/sites/986/2024/10/Topic-Modeling-for-Small-Data-using-Generative-LLMs.pdf)
 en [Pham et al. (2023)](https://arxiv.org/abs/2311.01449). Deze procedure bestaat uit 3 stappen:
 
-* Bij stap 1 worden de teksten aan het LLM gepresenteerd in willekeurig getrokken groepen
-van maximaal 5 teksten, met de vraag om te reageren met mogelijke onderwerpen 
-die niet te specifiek en niet te algemeen zijn. Dit vorm de lijst van mogelijke onderwerpen.
-Voor deze stap is het model `r htmltools::htmlEscape(main_model)` gebruikt.
+```{r echo=FALSE, results='asis', error=TRUE}
+step_1_text <- paste0(
+  "* Bij stap 1 worden de unieke analyse-eenheden gegroepeerd in prompt-batches"
+)
+if (!is.null(topic_batch_size)) {
+  step_1_text <- paste0(
+    step_1_text,
+    " van maximaal ",
+    topic_batch_size,
+    " teksten"
+  )
+}
+step_1_text <- paste0(
+  step_1_text,
+  ". De eerste trekking behoudt de uploadvolgorde; eventuele extra trekkingen husselen de teksten opnieuw."
+)
+if (!is.null(topic_draws)) {
+  step_1_text <- paste0(
+    step_1_text,
+    " In deze run kon elke tekst maximaal ",
+    topic_draws,
+    if (topic_draws == 1) " keer" else " keer",
+    " worden getrokken."
+  )
+}
+if (!is.null(topic_n_batches)) {
+  step_1_text <- paste0(
+    step_1_text,
+    " Dit leverde ",
+    topic_n_batches,
+    " batches voor kandidaats-onderwerpen op."
+  )
+}
+step_1_text <- paste0(
+  step_1_text,
+  " Het model kreeg de vraag om mogelijke onderwerpen terug te geven die niet te specifiek en niet te algemeen zijn. Dit vormt de lijst van kandidaats-onderwerpen. Voor deze stap is het model `",
+  htmltools::htmlEscape(main_model),
+  "` gebruikt."
+)
+cat(step_1_text)
+```
 
 * Bij stap 2 wordt de lijst van mogelijke onderwerpen
 gepresenteerd aan het LLM, waarbij gevraagd wordt de lijst onderwerpen terug te brengen
@@ -75,6 +118,22 @@ if (assign_multiple_categories) {
 * Bij stap 3 wordt elke tekst individueel gepresenteerd aan het LLM, samen
 met de lijst van definitieve onderwerpen, met de vraag om deze toe te wijzen aan 
 de tekst. `r multiple_categories_text`. Voor deze stap is het model `r htmltools::htmlEscape(main_model)` gebruikt. 
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (topics_human_edited || auto_added_not_applicable) {
+  cat("### Herkomst van de onderwerpenlijst\n")
+  if (topics_human_edited) {
+    cat(
+      "De definitieve onderwerpenlijst is handmatig aangepast voordat de onderwerpen aan de teksten werden toegekend.\n\n"
+    )
+  }
+  if (auto_added_not_applicable) {
+    cat(
+      "Een generiek onderwerp 'Onbekend/niet van toepassing' is automatisch toegevoegd, omdat in de gereduceerde onderwerpenlijst nog geen gelijkwaardig onderwerp aanwezig was.\n\n"
+    )
+  }
+}
+```
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 if (has_paragraphs) {
@@ -354,7 +413,7 @@ for (i in seq_len(nrow(paragraphs_df))) {
             bsicons::bs_icon("exclamation-triangle-fill", class = "me-2 fs-1"),
             htmltools::tags$small(
               htmltools::tags$i(
-                "De prompt voor de samenvatting van deze categorie paste",
+                "De prompt voor de samenvatting van dit onderwerp paste",
                 " niet in het context-window van het taalmodel.",
                 " Mogelijk zijn niet alle instructies of teksten door het taalmodel gezien."
               )

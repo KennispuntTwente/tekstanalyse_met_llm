@@ -289,6 +289,74 @@ test_that("reduce_topics drops empty topic labels", {
   expect_identical(as.vector(result), c("Alpha", "Beta"))
 })
 
+test_that("reduce_topics requires at least two non-empty topics", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  expect_error(
+    reduce_topics(
+      candidate_topics = c("  only topic  ", "", NA_character_, "   "),
+      research_background = "",
+      llm_provider = create_test_provider(),
+      language = "en",
+      always_add_not_applicable = FALSE
+    ),
+    "at least two non-empty topics"
+  )
+})
+
+test_that("reduce_topics aborts before creating a single-topic reduction batch", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  send_prompt_with_retries <- function(...) {
+    testthat::fail("send_prompt_with_retries should not be called")
+  }
+  count_tokens <- function(...) 1L
+  get_context_window_size_in_tokens <- function(...) 8L
+  log_info <- function(...) invisible(NULL)
+
+  expect_error(
+    reduce_topics(
+      candidate_topics = c("Topic A", "Topic B"),
+      research_background = "",
+      llm_provider = create_test_provider(),
+      language = "en",
+      always_add_not_applicable = FALSE
+    ),
+    "single-topic batch"
+  )
+})
+
+test_that("reduce_topics uses configurable topic-reduction safety caps by default", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  call_count <- 0L
+  send_prompt_with_retries <- function(...) {
+    call_count <<- call_count + 1L
+    list(topics = c("Topic A", "Topic B"))
+  }
+  count_tokens <- function(...) 1L
+  get_context_window_size_in_tokens <- function(...) 10L
+  log_info <- function(...) invisible(NULL)
+
+  old_opts <- options(
+    topic_modelling__reduction_max_prompt_batches = 2L,
+    topic_modelling__reduction_max_iterations = 1L
+  )
+  withr::defer(options(old_opts))
+
+  expect_error(
+    reduce_topics(
+      candidate_topics = c("Topic 1", "Topic 2", "Topic 3", "Topic 4"),
+      research_background = "",
+      llm_provider = create_test_provider(),
+      language = "en",
+      always_add_not_applicable = FALSE
+    ),
+    "Prompt still too large after 1 reductions"
+  )
+  expect_identical(call_count, 2L)
+})
+
 test_that("assign_topics multi-label: early NA produces NA topic columns", {
   source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)

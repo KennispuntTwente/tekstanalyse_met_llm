@@ -337,6 +337,74 @@ source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   )
 }
 
+.build_topic_report_regression_analysis_result <- function(language) {
+  irr_kappa <- list(
+    subjects = 10,
+    raters = 2,
+    irr.name = "Kappa",
+    stat.name = "z",
+    statistic = 1.0,
+    p.value = 0.5,
+    value = 0.4
+  )
+
+  texts_df <- .make_smoke_texts_df(document_text = c("Text 1", "Text 2"))
+  results_table <- data.frame(
+    text = c("Text 1", "Text 2"),
+    result = c("Topic A", "Topic B"),
+    stringsAsFactors = FALSE
+  )
+  paragraph_entries <- list(list(
+    topic = "Topic A",
+    paragraph = 'Summary with "Text 1".',
+    texts = "Text 1",
+    analysis_unit_ids = 1L,
+    prompt_fits = FALSE
+  ))
+  reduced_topics <- c("Topic A", "Topic B")
+  attr(reduced_topics, "reduction_summary") <- list(
+    not_applicable_requested = TRUE,
+    auto_added_not_applicable = TRUE,
+    not_applicable_check_performed = TRUE,
+    reduction_iterations = 2L
+  )
+
+  build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    paragraph_entries = paragraph_entries,
+    uuid = paste0("topic-regression-", language),
+    mode = "Onderwerpextractie",
+    research_background = "",
+    style_prompt = NULL,
+    irr_result = irr_kappa,
+    language = language,
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .render_test_models(),
+    topics = c("Topic A", "Topic B"),
+    exclusive_topics = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = TRUE,
+    context_window = list(
+      batch_size = 25,
+      draws = 2,
+      n_batches = 2,
+      n_tokens_context_window = 1000
+    ),
+    stage_prompt_previews = list(
+      topic_candidate_generation = "candidate prompt",
+      topic_reduction = "reduction prompt",
+      topic_assignment = "assignment prompt",
+      paragraph_generation = "paragraph prompt"
+    ),
+    candidate_topics = c("Topic A", "Topic B"),
+    reduced_topics = reduced_topics,
+    topics_were_edited = TRUE
+  )
+}
+
 test_that("report templates render (smoke)", {
   testthat::skip_if_not_installed("rmarkdown")
   testthat::skip_if_not_installed("knitr")
@@ -391,6 +459,102 @@ test_that("report templates render (smoke)", {
 
       expect_true(file.exists(out_file))
       expect_true(file.info(out_file)$size > 0)
+    }
+  })
+})
+
+test_that("Topic reports render updated batching wording and provenance details", {
+  testthat::skip_if_not_installed("rmarkdown")
+  testthat::skip_if_not_installed("knitr")
+  testthat::skip_if_not_installed("here")
+  testthat::skip_if_not_installed("htmltools")
+  testthat::skip_if_not_installed("bslib")
+  testthat::skip_if_not_installed("DT")
+  testthat::skip_if_not_installed("dplyr")
+  testthat::skip_if_not_installed("tidyr")
+  testthat::skip_if_not_installed("stringr")
+  testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+
+  expected_strings <- list(
+    en = c(
+      "of up to 25 texts",
+      "upload order",
+      "Topic list provenance",
+      "edited manually before topic assignment",
+      "Unknown/not applicable",
+      "The prompt for the summary of this topic did"
+    ),
+    nl = c(
+      "van maximaal 25 teksten",
+      "uploadvolgorde",
+      "Herkomst van de onderwerpenlijst",
+      "handmatig aangepast",
+      "Onbekend/niet van toepassing",
+      "De prompt voor de samenvatting van dit onderwerp paste"
+    )
+  )
+  legacy_strings <- list(
+    en = c(
+      "randomly drawn groups of up to 5 texts",
+      "The prompt for the summary of this category did"
+    ),
+    nl = c(
+      "willekeurig getrokken groepen van maximaal 5 teksten",
+      "De prompt voor de samenvatting van deze categorie paste"
+    )
+  )
+
+  out_dir <- withr::local_tempdir()
+  report_paths <- list.files(
+    here::here("R"),
+    pattern = "^report_Onderwerpextractie_.*\\.Rmd$",
+    full.names = TRUE
+  )
+  expect_true(length(report_paths) > 0)
+
+  withr::with_dir(here::here(), {
+    for (report_path in report_paths) {
+      language <- .report_language_from_path(report_path)
+      out_file <- file.path(
+        out_dir,
+        paste0(
+          "topic-regression-",
+          tools::file_path_sans_ext(basename(report_path)),
+          ".html"
+        )
+      )
+
+      res <- try(
+        rmarkdown::render(
+          input = report_path,
+          output_file = out_file,
+          params = list(
+            analysis_result = .build_topic_report_regression_analysis_result(
+              language
+            )
+          ),
+          quiet = TRUE,
+          envir = .report_render_env(environment())
+        ),
+        silent = TRUE
+      )
+
+      if (inherits(res, "try-error")) {
+        stop(paste0(
+          "Render failed for ",
+          basename(report_path),
+          ": ",
+          as.character(res)
+        ))
+      }
+
+      html <- paste(readLines(out_file, warn = FALSE), collapse = "\n")
+      for (expected in expected_strings[[language]]) {
+        expect_match(html, expected, fixed = TRUE)
+      }
+      for (legacy in legacy_strings[[language]]) {
+        expect_false(grepl(legacy, html, fixed = TRUE))
+      }
     }
   })
 })
