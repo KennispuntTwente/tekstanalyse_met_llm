@@ -558,7 +558,7 @@ gliner_server <- function(
           div(
             style = "max-height: 80%; overflow-y: auto; overflow-x: hidden; max-width: 100%;",
             class = "pii-entities-table-container",
-            DTOutput(ns("pii_entities_table"))
+            DT::DTOutput(ns("pii_entities_table"))
           )
         )
       })
