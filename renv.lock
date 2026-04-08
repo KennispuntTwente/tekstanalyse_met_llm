@@ -2665,6 +2665,12 @@
       "Source": "Repository",
       "Repository": "CRAN"
     },
+    "rollama": {
+      "Package": "rollama",
+      "Version": "0.3.0",
+      "Source": "Repository",
+      "Repository": "CRAN"
+    },
     "rprojroot": {
       "Package": "rprojroot",
       "Version": "2.1.1",
