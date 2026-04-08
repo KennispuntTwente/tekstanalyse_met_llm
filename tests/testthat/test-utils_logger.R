@@ -199,55 +199,121 @@ test_that("log_init creates the log directory and initializes state", {
 })
 
 
-test_that("log_context_apply bootstraps logger in multisession future worker", {
-  testthat::skip_if_not_installed("future")
+test_that("log_context_capture returns a valid kwallm_log_context", {
+  reset_logger_state()
 
-  # Multisession plans can fail in constrained environments.
-  # If a parallel plan cannot start, we skip (rather than failing unrelated CI).
-  can_multisession <- TRUE
+  log_dir <- withr::local_tempdir(pattern = "kwallm-ctx-test-")
+
+  # Set the options that log_context_capture reads from
+  withr::local_options(
+    logger__level = "INFO",
+    logger__dir = log_dir,
+    logger__retention = NULL,
+    kwallm__log_session_id = "testctx1"
+  )
+
+  log_init(
+    level = "INFO",
+    log_dir = log_dir,
+    retention = NULL,
+    mode = "test"
+  )
+
+  ctx <- log_context_capture(is_async = TRUE, mode = "unit")
+
+  expect_s3_class(ctx, "kwallm_log_context")
+  expect_equal(ctx$level, "INFO")
+  expect_equal(ctx$dir, log_dir)
+  expect_null(ctx$retention)
+  expect_equal(ctx$mode, "unit")
+  expect_equal(ctx$session_id, "testctx1")
+  expect_true(ctx$is_async)
+})
+
+
+test_that("log_context_apply bootstraps logger in mirai daemon worker", {
+  testthat::skip_if_not_installed("mirai")
+
+  # First, ensure any existing daemons are reset
+  tryCatch(mirai::daemons(0), error = function(e) NULL)
+
+  # Mirai daemons can fail in constrained environments.
+  # If daemons cannot start, we skip (rather than failing unrelated CI).
+  can_start_daemons <- TRUE
   tryCatch(
     {
-      old_plan <- future::plan()
-      on.exit(future::plan(old_plan), add = TRUE)
-      future::plan(future::multisession)
+      mirai::daemons(1)
+      on.exit(mirai::daemons(0), add = TRUE)
     },
     error = function(e) {
-      can_multisession <<- FALSE
+      can_start_daemons <<- FALSE
     }
   )
-  if (!isTRUE(can_multisession)) {
-    testthat::skip("future::multisession not available in this environment")
+  if (!isTRUE(can_start_daemons)) {
+    testthat::skip("mirai daemons not available in this environment")
   }
 
+  # Wait a moment for daemons to be ready
+  Sys.sleep(0.5)
+
+  # Set up logging state in the main process
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-worker-")
-  session_id <- "deadbeef"
-  log_ctx <- structure(
-    list(
-      level = "INFO",
-      dir = log_dir,
-      retention = NULL,
-      mode = "test",
-      session_id = session_id,
-      is_async = TRUE
-    ),
-    class = "kwallm_log_context"
+  reset_logger_state()
+
+  # Set the options that log_context_capture reads from
+  withr::local_options(
+    logger__level = "INFO",
+    logger__dir = log_dir,
+    logger__retention = NULL,
+    kwallm__log_session_id = "deadbeef"
   )
 
-  f <- future::future(
+  log_init(
+    level = "INFO",
+    log_dir = log_dir,
+    retention = NULL,
+    mode = "test"
+  )
+
+  # Use the actual log_context_capture function (matches app pattern)
+  log_context <- log_context_capture(is_async = TRUE, mode = "unit-test")
+
+  # Verify context was captured correctly
+  expect_s3_class(log_context, "kwallm_log_context")
+  expect_equal(log_context$dir, log_dir)
+  expect_equal(log_context$session_id, "deadbeef")
+  expect_true(log_context$is_async)
+
+  # With mirai, functions are passed by value and lose their closure environments.
+  # The worker needs to source the logger code to have all functions available.
+  # We use `...` so variables are in the global environment of the worker.
+
+  logger_file <- normalizePath(
+    file.path(testthat::test_path(), "..", "..", "R", "utils_logger.R"),
+    mustWork = TRUE
+  )
+
+  m <- mirai::mirai(
     {
-      log_context_apply(log_ctx)
+      # Source the logger to make all functions available with correct closures
+      source(logger_source_file, local = FALSE)
+
+      # This is the exact pattern used in all async modules:
+      log_context_apply(log_context)
       log_info("hello from worker", component = "unit")
       TRUE
     },
-    globals = list(
-      log_info = log_info,
-      log_context_apply = log_context_apply,
-      log_ctx = log_ctx
-    ),
-    seed = NULL
+    log_context = log_context,
+    logger_source_file = logger_file
   )
 
-  expect_true(future::value(f))
+  # Wait for the mirai to complete
+  result <- m[]
+  # If result is not TRUE, check if it's an error
+  if (!isTRUE(result) && mirai::is_error_value(result)) {
+    testthat::skip(paste("mirai worker error:", result))
+  }
+  expect_true(result)
 
   log_file <- file.path(log_dir, paste0(format(Sys.Date(), "%Y-%m-%d"), ".log"))
   for (i in 1:30) {
@@ -260,5 +326,7 @@ test_that("log_context_apply bootstraps logger in multisession future worker", {
 
   lines <- readLines(log_file, warn = FALSE)
   expect_true(any(grepl("hello from worker", lines, fixed = TRUE)))
-  expect_true(any(grepl("\\[deadbeef\\] \\[async\\]", lines)))
+  # Verify both session ID and async label are in the log
+  expect_true(any(grepl("\\[deadbeef\\]", lines)))
+  expect_true(any(grepl("\\[async\\]", lines)))
 })

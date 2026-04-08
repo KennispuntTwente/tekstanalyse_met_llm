@@ -19,6 +19,182 @@ create_mock_llm_provider <- function(model = "test-model") {
   )
 }
 
+test_that("bootstrap worker resolves prompt trace helper chain", {
+  testthat::skip_if_not_installed("mirai")
+  withr::local_dir(here::here())
+
+  tryCatch(mirai::daemons(0), error = function(e) NULL)
+  Sys.sleep(0.2)
+
+  can_start_daemons <- TRUE
+  tryCatch(
+    {
+      mirai::daemons(1)
+      on.exit(mirai::daemons(0), add = TRUE)
+    },
+    error = function(e) {
+      can_start_daemons <<- FALSE
+    }
+  )
+  if (!isTRUE(can_start_daemons)) {
+    testthat::skip("mirai daemons not available in this environment")
+  }
+
+  Sys.sleep(0.5)
+
+  worker <- mirai::mirai(
+    {
+      kwallm_worker_bootstrap(
+        task = "prompt_trace_helper_chain",
+        app_root = app_root,
+        worker_options = worker_options
+      )
+
+      tryCatch(
+        {
+          prompt_id <- .kwallm__prompt_trace_new_id()
+          if (!is.character(prompt_id) || !nzchar(prompt_id)) {
+            stop("prompt_id generation failed")
+          }
+
+          stage_id <- .kwallm__prompt_execution_current_stage()
+          if (!is.character(stage_id) || !nzchar(stage_id)) {
+            stop("stage lookup failed")
+          }
+
+          "success"
+        },
+        error = function(e) paste0("error: ", conditionMessage(e))
+      )
+    },
+    .args = c(
+      list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options()
+      ),
+      kwallm_worker_bootstrap_globals()
+    )
+  )
+
+  result <- worker[]
+
+  if (mirai::is_error_value(result)) {
+    fail(paste("mirai worker error:", as.character(result)))
+  }
+
+  expect_equal(result, "success")
+})
+
+test_that("bootstrap worker resolves prompt trace logging helpers when tracing is enabled", {
+  testthat::skip_if_not_installed("mirai")
+  withr::local_dir(here::here())
+
+  old_opts <- options(send_prompt_with_retries__log_prompts = TRUE)
+  withr::defer(options(old_opts), testthat::teardown_env())
+
+  tryCatch(mirai::daemons(0), error = function(e) NULL)
+  Sys.sleep(0.2)
+
+  can_start_daemons <- TRUE
+  tryCatch(
+    {
+      mirai::daemons(1)
+      on.exit(mirai::daemons(0), add = TRUE)
+    },
+    error = function(e) {
+      can_start_daemons <<- FALSE
+    }
+  )
+  if (!isTRUE(can_start_daemons)) {
+    testthat::skip("mirai daemons not available in this environment")
+  }
+
+  Sys.sleep(0.5)
+
+  worker <- mirai::mirai(
+    {
+      kwallm_worker_bootstrap(
+        task = "prompt_trace_logging",
+        app_root = app_root,
+        worker_options = worker_options
+      )
+
+      temp_log <- tempfile(fileext = ".log")
+      options(send_prompt_with_retries__prompt_trace_file = temp_log)
+      on.exit(
+        options(send_prompt_with_retries__prompt_trace_file = NULL),
+        add = TRUE
+      )
+
+      tryCatch(
+        {
+          if (!isTRUE(.kwallm__prompt_trace_enabled_to_file())) {
+            stop("enabled_to_file should be TRUE when tracing is enabled")
+          }
+
+          trace_ctx <- list(
+            enabled = .kwallm__prompt_trace_enabled_to_file,
+            append = .kwallm__prompt_trace_append,
+            session_id = .kwallm__prompt_trace_session_id
+          )
+
+          .kwallm__prompt_trace_log_send(
+            prompt_id = "test-id",
+            model_name = "test-model",
+            attempt = 1,
+            max_tries = 3,
+            prompt_text = "test prompt",
+            .ctx = trace_ctx
+          )
+          .kwallm__prompt_trace_log_reply(
+            prompt_id = "test-id",
+            model_name = "test-model",
+            attempts = 1,
+            duration_ms = 100,
+            response_text = "test response",
+            .ctx = trace_ctx
+          )
+          .kwallm__prompt_trace_log_error(
+            prompt_id = "test-id",
+            model_name = "test-model",
+            attempt = 1,
+            max_tries = 3,
+            err_message = "test error",
+            .ctx = trace_ctx
+          )
+
+          if (!file.exists(temp_log)) {
+            stop("Log file was not created")
+          }
+
+          log_content <- readLines(temp_log)
+          if (length(log_content) == 0) {
+            stop("Log file is empty")
+          }
+
+          "success"
+        },
+        error = function(e) paste0("error: ", conditionMessage(e))
+      )
+    },
+    .args = c(
+      list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options()
+      ),
+      kwallm_worker_bootstrap_globals()
+    )
+  )
+
+  result <- worker[]
+
+  if (mirai::is_error_value(result)) {
+    fail(paste("mirai worker error:", as.character(result)))
+  }
+
+  expect_equal(result, "success")
+})
+
 test_that("send_prompt_with_retries returns response on successful first try", {
   source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
 
@@ -139,6 +315,44 @@ test_that("send_prompt_with_retries respects max_interactions parameter", {
   )
 
   expect_equal(captured_args$max_interactions, 42)
+})
+
+test_that("send_prompt_with_retries records execution provenance including retries", {
+  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+
+  call_count <- 0
+  .kwallm__prompt_execution_reset()
+
+  withr::local_options(kwallm__prompt_execution_stage = "scoring")
+
+  local_mocked_bindings(
+    send_prompt = function(...) {
+      call_count <<- call_count + 1
+      if (call_count < 3) {
+        stop("Temporary error")
+      }
+      create_mock_result("success after retries")
+    },
+    .package = "tidyprompt"
+  )
+
+  result <- send_prompt_with_retries(
+    prompt = "test prompt",
+    llm_provider = create_mock_llm_provider(),
+    max_tries = 5,
+    max_interactions = 7,
+    retry_delay_seconds = 0
+  )
+
+  execution_rows <- .kwallm__prompt_execution_get()
+
+  expect_equal(result, "success after retries")
+  expect_equal(nrow(execution_rows), 1)
+  expect_equal(execution_rows$stage_id[[1]], "scoring")
+  expect_equal(execution_rows$try_count[[1]], 3L)
+  expect_equal(execution_rows$max_interactions[[1]], 7L)
+  expect_equal(execution_rows$completion_status[[1]], "success")
+  expect_match(execution_rows$error_messages[[1]], "Temporary error")
 })
 
 test_that("send_prompt_with_retries uses default options", {

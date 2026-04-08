@@ -295,9 +295,11 @@ main_server <- function(
     # UI ---------------------------------------------------------------
 
     output$main_ui <- renderUI({
-      base_ui <- tagList(
+      base_ui <- div(
+        class = "kwallm-page-wrapper",
         # Main header area with user/admin UI and title
         div(
+          class = "kwallm-main-content",
           style = "margin-left: 0.5rem; margin-right: 0.5rem;",
           div(
             style = "
@@ -534,6 +536,7 @@ main_server <- function(
 
         # Footer
         div(
+          class = "kwallm-footer",
           style = "
             text-align: center;
             padding: 20px 0;
@@ -567,22 +570,70 @@ main_server <- function(
 
     # 1 Text management ----------------------------------------------
 
-    # Text upload
-    raw_texts <- text_upload_server("text_upload", processing, lang)
+    # Upload defines the source-document rows. At this point source_document_*
+    # and document_* still refer to the same rows.
+    text_upload_result <- text_upload_server("text_upload", processing, lang)
+    uploaded_document_texts <- text_upload_result$texts
+    uploaded_document_rows <- text_upload_result$text_rows
+    by_column_name <- text_upload_result$by_column_name
+    by_column_lookup <- text_upload_result$by_column_lookup
+    upload_info <- text_upload_result$upload_info
 
-    # Split texts
-    split_texts <- text_split_server(
+    # Splitting can turn one source document row into many current document rows.
+    split_result <- text_split_server(
       "text_split",
       processing = processing,
-      raw_texts = raw_texts,
+      mode = mode,
+      document_texts = uploaded_document_texts,
+      document_rows = uploaded_document_rows,
       lang = lang
     )
+    split_document_texts <- split_result$texts
+    split_document_rows <- split_result$rows
+    split_in_progress <- split_result$split_in_progress
+    split_settings <- split_result$split_settings
 
-    # Pre-process texts, show table
+    # Remap group metadata by source-document id so split chunks inherit the
+    # groups of their source rows without relying on text equality.
+    split_by_column_lookup <- reactive({
+      original_lookup <- by_column_lookup()
+      current_rows <- split_document_rows()
+
+      if (is.null(original_lookup) || is.null(current_rows)) {
+        return(original_lookup)
+      }
+
+      if (
+        !all(c("source_document_id", "by_value") %in% names(original_lookup))
+      ) {
+        stop(
+          "by_column_lookup must contain source_document_id and by_value"
+        )
+      }
+
+      merged <- merge(
+        current_rows[c("document_id", "source_document_id", "document_text")],
+        original_lookup[c("source_document_id", "by_value")],
+        by = "source_document_id",
+        all.x = TRUE
+      )
+
+      data.frame(
+        document_id = merged$document_id,
+        source_document_id = merged$source_document_id,
+        text = merged$document_text,
+        by_value = merged$by_value,
+        stringsAsFactors = FALSE
+      )
+    })
+
+    # Text management keeps the document rows but deduplicates them into
+    # analysis units for the LLM.
     texts <- text_management_server(
       id = "text_management",
       processing = processing,
-      raw_texts = split_texts,
+      document_texts = split_document_texts,
+      document_rows = split_document_rows,
       lang = lang,
       gliner_model = gliner_model
     )
@@ -720,6 +771,11 @@ main_server <- function(
       assign_multiple_categories = assign_multiple_categories_toggle,
       write_paragraphs = write_paragraphs_toggle,
       context_window = context_window,
+      by_column_name = by_column_name,
+      by_column_lookup = split_by_column_lookup,
+      split_settings = split_settings,
+      upload_info = upload_info,
+      split_in_progress = split_in_progress,
       lang = lang
     )
 

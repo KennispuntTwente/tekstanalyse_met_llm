@@ -7,6 +7,13 @@ marking_codes_ui <- function(id) {
   )
 }
 
+.kwallm_marking_code_generation_chunk_settings <- function(context_window) {
+  list(
+    text_size_tokens = as.numeric(context_window$max_tokens %||% 256),
+    overlap_size_tokens = as.numeric(context_window$overlap %||% 0)
+  )
+}
+
 marking_codes_server <- function(
   id,
   mode,
@@ -97,9 +104,9 @@ marking_codes_server <- function(
     ## Auto-generate codes by reading texts ---------------------------------
 
     # Interrupter can stop async processing if user quits
-    interrupter <- ipc::AsyncInterruptor$new()
+    interrupter <- AsyncInterruptor$new()
     # Queue to communicate between async/main process
-    queue <- ipc::shinyQueue()
+    queue <- shinyQueue()
 
     # Helper to check if number of texts is under maximum
     number_of_texts_under_maximum <- function(
@@ -202,17 +209,27 @@ marking_codes_server <- function(
 
         # Set model
         llm_provider <- models$main
+        chunk_settings <- .kwallm_marking_code_generation_chunk_settings(
+          context_window
+        )
 
         # Async generate codes
         queue$consumer$start()
-        log_ctx <- log_context_capture(is_async = TRUE)
+        log_context <- log_context_capture(is_async = TRUE)
 
-        future_promise(
+        mirai::mirai(
           {
-            log_context_apply(log_ctx)
+            kwallm_worker_bootstrap(
+              task = "code_generation",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
 
             generate_codes_by_reading_texts(
               texts = texts,
+              text_size_tokens = text_size_tokens,
+              overlap_size_tokens = overlap_size_tokens,
               research_background = research_background,
               llm_provider = llm_provider,
               queue = queue,
@@ -220,35 +237,22 @@ marking_codes_server <- function(
               language = language
             )
           },
-          globals = c(
-            log_async_globals(log_ctx),
-            send_prompt_with_retries_async_globals(),
+          .args = c(
             list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
               texts = texts$preprocessed,
+              text_size_tokens = chunk_settings$text_size_tokens,
+              overlap_size_tokens = chunk_settings$overlap_size_tokens,
               research_background = research_background(),
               llm_provider = llm_provider,
               queue = queue,
               interrupter = interrupter,
-              language = lang()$get_translation_language(),
-              generate_codes_by_reading_texts = generate_codes_by_reading_texts,
-              get_context_window_size_in_tokens = get_context_window_size_in_tokens,
-              create_text_chunks = create_text_chunks,
-              create_candidate_topics = create_candidate_topics,
-              prompt_candidate_topics = prompt_candidate_topics,
-              reduce_topics = reduce_topics,
-              semchunk_load_chunker = semchunk_load_chunker,
-              tiktoken_load_tokenizer = tiktoken_load_tokenizer,
-              count_tokens = count_tokens,
-              async_message_printer = async_message_printer
-            )
-          ),
-          packages = c(
-            "tidyprompt",
-            "purrr",
-            "dplyr",
-            "stringr"
-          ),
-          seed = NULL
+              language = lang()$get_translation_language()
+            ),
+            kwallm_worker_bootstrap_globals()
+          )
         ) %...>%
           {
             generated_codes(.)
@@ -346,181 +350,6 @@ marking_codes_server <- function(
     ))
   })
 }
-
-# 2 Helpers ----------------------------------------------------------
-
-#' Generate potential marking codes by letting the LLM read all texts.
-#'
-#' @param texts Character vector of texts to analyze.
-#' @param llm_provider tidyprompt provider to call.
-generate_codes_by_reading_texts <- function(
-  texts,
-  text_size_tokens = 256,
-  overlap_size_tokens = 64,
-  research_background = "",
-  llm_provider,
-  queue = NULL,
-  interrupter = NULL,
-  language = c("nl", "en")
-) {
-  # Validate inputs
-  language <- match.arg(language)
-  stopifnot(
-    is.character(texts),
-    length(texts) > 0,
-    all(nzchar(texts)),
-    is.numeric(text_size_tokens),
-    text_size_tokens > 0,
-    is.numeric(overlap_size_tokens),
-    overlap_size_tokens >= 0
-  )
-
-  # Helper to print messages to the console + queue if needed
-  print_message <- function(
-    message,
-    type = c("info", "success")
-  ) {
-    type <- match.arg(type)
-    if (type == "success") {
-      cli::cli_alert_success(message)
-      message <- paste0(
-        cli::col_green("✔"),
-        " ",
-        message
-      )
-    } else {
-      message <- paste0(
-        cli::col_blue("ℹ"),
-        " ",
-        message
-      )
-      cli::cli_alert_info(message)
-    }
-
-    if (!is.null(queue)) {
-      try(queue$producer$fireAssignReactive(
-        "generate_codes_message",
-        message
-      ))
-    }
-  }
-
-  # Load chunker
-  print_message("Loading semantic chunker...")
-  chunker_name <- paste0("semchunker_", text_size_tokens)
-  if (
-    !exists(
-      chunker_name
-    )
-  ) {
-    semchunker <- semchunk_load_chunker(chunk_size = text_size_tokens)
-    assign(chunker_name, semchunker, envir = .GlobalEnv)
-  } else {
-    semchunker <- get(chunker_name, envir = .GlobalEnv)
-  }
-
-  if (!is.null(interrupter)) {
-    interrupter$execInterrupts()
-  }
-
-  # Split texts
-  split_texts <- semchunker(
-    texts,
-    overlap = overlap_size_tokens
-  ) |>
-    unlist()
-  if (length(split_texts) == length(texts)) {
-    print_message("No splitting needed, using original texts...")
-  } else {
-    print_message(paste0(
-      "Split ",
-      length(texts),
-      " texts into ",
-      length(split_texts),
-      " smaller texts..."
-    ))
-  }
-
-  if (!is.null(interrupter)) {
-    interrupter$execInterrupts()
-  }
-
-  # Determine context window size
-  model <- llm_provider$parameters$model
-  n_tokens_context_window <- get_context_window_size_in_tokens(model)
-  if (is.null(n_tokens_context_window)) {
-    n_tokens_context_window <- 2048
-  }
-
-  # Create text chunks
-  chunks <- create_text_chunks(
-    split_texts,
-    chunk_size = 50,
-    draws = 1,
-    n_tokens_context_window = n_tokens_context_window
-  )
-  print_message(paste0(
-    "Created ",
-    length(chunks),
-    " text chunk(s) from the texts..."
-  ))
-
-  # Create candidate topics
-  candidate_topics <- c()
-  for (i in seq_along(chunks)) {
-    if (!is.null(interrupter)) {
-      interrupter$execInterrupts()
-    }
-
-    chunk <- chunks[[i]]
-    print_message(paste0(
-      "Reading chunk ",
-      i,
-      " of ",
-      length(chunks),
-      "..."
-    ))
-
-    candidate_topics_x <- create_candidate_topics(
-      list(chunk),
-      research_background = research_background,
-      llm_provider = llm_provider,
-      language = language
-    )
-
-    candidate_topics <- c(
-      candidate_topics,
-      candidate_topics_x
-    )
-  }
-  # Make unique
-  candidate_topics <- unique(candidate_topics)
-  # Print progress
-  print_message(paste0(
-    "Created ",
-    length(candidate_topics),
-    " candidate codes, reducing to final list..."
-  ))
-
-  # Reduce topics
-  final_topics <- reduce_topics(
-    candidate_topics = candidate_topics,
-    research_background = research_background,
-    llm_provider = llm_provider,
-    always_add_not_applicable = FALSE,
-    interrupter = interrupter,
-    language = language
-  )
-
-  print_message(paste0(
-    "Generated ",
-    length(final_topics),
-    " codes"
-  ))
-
-  return(final_topics)
-}
-
 
 # 3 Example/development usage --------------------------------------
 if (FALSE) {

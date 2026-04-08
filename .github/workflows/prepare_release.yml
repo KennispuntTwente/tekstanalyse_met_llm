@@ -126,7 +126,7 @@ jobs:
             Admin rights are not required to use this app. However, the app may ask to access your local network to find a free port for the R (Shiny) process. If you do not (or cannot) grant permission, port **21471** is chosen by default. If that port is busy the app will fail to start. In some cases, the app may not close properly (keeping the port occupied) and therefore cannot restart. If that happens: close the R processes on your machine via task manager, or restart your machine.
 
             ## Container app
-            You can use the pre-built container:
+            You can use the pre-built container. The GitHub Container Registry image is published for `linux/amd64` and `linux/arm64`:
             1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
             2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
             3. Browse to `http://localhost:3838`
@@ -160,7 +160,7 @@ jobs:
             Admin-rechten zijn niet nodig voor het gebruik van deze app. De app kan wel toestemming vragen tot je lokale netwerk om een vrije port voor R (Shiny) te vinden. Geef je geen toestemming, dan wordt standaard de port **21471** gebruikt. Is die port bezet, dan start de app niet. Soms komt het voor dat de app niet goed afsluit, en de port bezet houdt. Sluit in dat geval alle R-processen af via taakbeheer, of restart je machine.
 
             ## Container-app
-            Gebruik de pre-built container:
+            Gebruik de pre-built container. De image in GitHub Container Registry wordt gepubliceerd voor `linux/amd64` en `linux/arm64`:
             1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
             2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
             3. Open `http://localhost:3838` in je browser

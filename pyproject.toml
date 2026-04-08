@@ -8,7 +8,7 @@ dependencies = [
   "tiktoken>=0.1.1",
   "semchunk>=3.2.2",
   "gliner>=0.2.5",
-  "torch>=2.3.0"
+  "torch>=2.8.0",
 ]
 [tool.uv.sources]
 torch = [

@@ -4,6 +4,12 @@
 
 library(testthat)
 
+create_test_provider <- function(model = "test-model") {
+  provider <- list(parameters = list(model = model))
+  provider$clone <- function() provider
+  provider
+}
+
 test_that("prompt_category validates input arguments", {
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
 
@@ -57,6 +63,8 @@ test_that("prompt_category returns a usable prompt object", {
   prompt_text <- tidyprompt::construct_prompt_text(prompt)
   expect_true(is.character(prompt_text))
   expect_true(nchar(prompt_text) > 0)
+  expect_match(prompt_text, "<text>", fixed = TRUE)
+  expect_match(prompt_text, "<categories>", fixed = TRUE)
 })
 
 test_that("prompt_multi_category validates input and exclusive categories", {
@@ -111,7 +119,7 @@ test_that("prompt_category includes research background when provided", {
   )
 
   prompt_text <- tidyprompt::construct_prompt_text(prompt_with_bg)
-  expect_match(prompt_text, "Research background")
+  expect_match(prompt_text, "<research_background>", fixed = TRUE)
   expect_match(prompt_text, "customer feedback research")
 })
 
@@ -127,4 +135,123 @@ test_that("prompt_multi_category includes exclusive category annotation", {
   prompt_text <- tidyprompt::construct_prompt_text(prompt)
   expect_match(prompt_text, "\\[exclusive\\]")
   expect_match(prompt_text, "unclear")
+  expect_match(prompt_text, "<categories>", fixed = TRUE)
+})
+
+test_that("categorize_texts returns binary columns for multi-label output", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  analysis_unit_ids <- c(11L, 22L)
+
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
+    force(prompt)
+    force(llm_provider)
+
+    if (
+      grepl("text a", tidyprompt::construct_prompt_text(prompt), fixed = TRUE)
+    ) {
+      return("cat1")
+    }
+
+    c("cat1", "cat2")
+  }
+
+  result <- categorize_texts(
+    texts = c("text a", "text b"),
+    analysis_unit_ids = analysis_unit_ids,
+    categories = c("cat1", "cat2"),
+    llm_provider = create_test_provider(),
+    assign_multiple_categories = TRUE
+  )
+
+  expect_false("result" %in% names(result))
+  expect_identical(result$analysis_unit_id, analysis_unit_ids)
+  expect_identical(result$text, c("text a", "text b"))
+  expect_identical(result$cat1, c(TRUE, TRUE))
+  expect_identical(result$cat2, c(FALSE, TRUE))
+})
+
+test_that("categorize_texts supports progress, interruption, and early NA", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  call_count <- 0
+  interrupt_count <- 0
+  progress_events <- list()
+
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
+    call_count <<- call_count + 1
+    if (call_count == 1) {
+      return("cat1")
+    }
+
+    NA_character_
+  }
+
+  interrupter <- list(
+    execInterrupts = function() {
+      interrupt_count <<- interrupt_count + 1
+    }
+  )
+
+  result <- categorize_texts(
+    texts = c("text a", "text b", "text c"),
+    analysis_unit_ids = c(1L, 2L, 3L),
+    categories = c("cat1", "cat2"),
+    llm_provider = create_test_provider(),
+    on_progress = function(i, n, text) {
+      progress_events[[length(progress_events) + 1]] <<- list(
+        i = i,
+        n = n,
+        text = text
+      )
+    },
+    interrupter = interrupter
+  )
+
+  expect_identical(result$analysis_unit_id, c(1L, 2L, 3L))
+  expect_equal(result$text, c("text a", "text b", "text c"))
+  # Row 1 succeeded, row 2 failed (NA), row 3 was never processed (NA)
+  expect_equal(result$result, c("cat1", NA, NA))
+  expect_equal(call_count, 2)
+  expect_equal(interrupt_count, 2)
+  expect_length(progress_events, 2)
+  expect_equal(progress_events[[1]], list(i = 1, n = 3, text = "text a"))
+  expect_equal(progress_events[[2]], list(i = 2, n = 3, text = "text b"))
+})
+
+test_that("categorize_texts multi-label: early NA produces NA category columns", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  call_count <- 0
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
+    call_count <<- call_count + 1
+    if (call_count == 1) {
+      return("cat1")
+    }
+    NA_character_
+  }
+
+  result <- categorize_texts(
+    texts = c("text a", "text b", "text c"),
+    analysis_unit_ids = c(1L, 2L, 3L),
+    categories = c("cat1", "cat2"),
+    llm_provider = create_test_provider(),
+    assign_multiple_categories = TRUE
+  )
+
+  expect_false("result" %in% names(result))
+  # All category columns should have NAs for failed rows
+  result_cols <- setdiff(names(result), "text")
+  expect_true(length(result_cols) > 0)
+  expect_true(anyNA(result[result_cols]))
+  # First text succeeded so should not be NA
+  expect_false(is.na(result$cat1[1]))
+  # Second text failed so should be NA
+  expect_true(is.na(result$cat1[2]))
+  # Third text was never processed so should be NA, not FALSE
+  expect_true(is.na(result$cat1[3]))
+  expect_true(is.na(result$cat2[3]))
 })

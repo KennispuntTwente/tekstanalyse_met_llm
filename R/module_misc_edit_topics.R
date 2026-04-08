@@ -14,6 +14,8 @@ edit_topics_server <- function(
   research_background,
   assign_multiple_categories,
   llm_provider,
+  assignment_texts = reactive(character()),
+  assignment_llm_provider = reactive(NULL),
   lang = default_lang()
 ) {
   moduleServer(
@@ -38,11 +40,61 @@ edit_topics_server <- function(
         )
       }
 
+      topic_assignment_fit_info <- reactive({
+        req(topics_table_data())
+
+        current_topics <- trimws(topics_table_data()$topic)
+        current_topics <- current_topics[nzchar(current_topics)]
+        if (length(current_topics) < 2) {
+          return(list(
+            fits = TRUE,
+            prompt_tokens = NA_integer_,
+            context_window_tokens = NA_integer_
+          ))
+        }
+
+        assignment_provider <- assignment_llm_provider()
+        assignment_text_values <- assignment_texts()
+        if (is.null(assignment_provider) || !length(assignment_text_values)) {
+          return(list(
+            fits = TRUE,
+            prompt_tokens = NA_integer_,
+            context_window_tokens = NA_integer_
+          ))
+        }
+
+        current_exclusive <- trimws(
+          topics_table_data()$topic[
+            topics_table_data()$exclusive & nzchar(topics_table_data()$topic)
+          ]
+        )
+
+        topic_assignment_prompt_context_window_check(
+          texts = assignment_text_values,
+          topics = current_topics,
+          research_background = research_background(),
+          llm_provider = assignment_provider,
+          assign_multiple_categories = assign_multiple_categories(),
+          exclusive_topics = current_exclusive
+        )
+      })
+
+      topic_assignment_fit_message <- function(fit_info) {
+        sprintf(
+          lang()$t(
+            "De huidige onderwerpenlijst past niet binnen het context-window van het toekenningsmodel (%d > %d tokens). Verminder het aantal of de lengte van de onderwerpen voordat je doorgaat."
+          ),
+          fit_info$prompt_tokens,
+          fit_info$context_window_tokens
+        )
+      }
+
       shiny::exportTestValues(
         started = started(),
         reduction_in_progress = reduction_in_progress(),
         rereduced_topics = rereduced_topics(),
-        topics_table_data = topics_table_data()
+        topics_table_data = topics_table_data(),
+        topic_assignment_prompt_fits = topic_assignment_fit_info()$fits
       )
 
       ## ── first-run modal ────────────────────────────────────────
@@ -70,6 +122,7 @@ edit_topics_server <- function(
             lang()$t("Controleer de onderwerpen en pas ze aan waar nodig."),
             br(),
             HTML(lang()$t("<i>Dubbel-klik op een cel om te bewerken.</i>")),
+            uiOutput(ns("topic_assignment_fit_warning")),
             hr(),
             fluidRow(
               column(
@@ -178,6 +231,22 @@ edit_topics_server <- function(
         topics_table_data(rhandsontable::hot_to_r(input$topics_table))
       })
 
+      output$topic_assignment_fit_warning <- renderUI({
+        fit_info <- topic_assignment_fit_info()
+        if (isTRUE(fit_info$fits)) {
+          return(NULL)
+        }
+
+        div(
+          class = "alert alert-danger d-flex align-items-center mt-2",
+          bsicons::bs_icon("exclamation-triangle-fill"),
+          span(
+            class = "ms-2",
+            topic_assignment_fit_message(fit_info)
+          )
+        )
+      })
+
       # add / delete-empty / reset rows -------------------------------
       observeEvent(input$add_topic, {
         df <- topics_table_data()
@@ -258,6 +327,16 @@ edit_topics_server <- function(
           return()
         }
 
+        fit_info <- topic_assignment_fit_info()
+        if (!isTRUE(fit_info$fits)) {
+          shiny::showNotification(
+            topic_assignment_fit_message(fit_info),
+            type = "error",
+            duration = NULL
+          )
+          return()
+        }
+
         exclusive_topics(updated_exclusive)
         removeModal()
         edited_topics(updated_topics)
@@ -305,11 +384,16 @@ edit_topics_server <- function(
           component = "topics"
         )
 
-        log_ctx <- log_context_capture(is_async = TRUE)
+        log_context <- log_context_capture(is_async = TRUE)
 
-        future_promise(
+        mirai::mirai(
           {
-            log_context_apply(log_ctx)
+            kwallm_worker_bootstrap(
+              task = "topic_reduction",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
 
             reduce_topics(
               updated_topics,
@@ -318,23 +402,18 @@ edit_topics_server <- function(
               language = lang$get_translation_language()
             )
           },
-          packages = c("tidyprompt", "tidyverse"),
-          globals = c(
+          .args = c(
             list(
-              reduce_topics = reduce_topics,
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
               updated_topics = updated_topics,
               research_background = research_background(),
               llm_provider = llm_provider,
-              lang = lang(),
-              get_context_window_size_in_tokens = get_context_window_size_in_tokens,
-              tiktoken_load_tokenizer = tiktoken_load_tokenizer,
-              count_tokens = count_tokens,
-              async_message_printer = async_message_printer
+              lang = lang()
             ),
-            log_async_globals(log_ctx),
-            send_prompt_with_retries_async_globals()
-          ),
-          seed = NULL
+            kwallm_worker_bootstrap_globals()
+          )
         ) %...>%
           (function(reduced_topics) {
             if (length(reduced_topics) < 2 || anyDuplicated(reduced_topics)) {
@@ -416,7 +495,7 @@ if (FALSE) {
   library(shinyjs)
   library(rhandsontable)
   library(tidyprompt)
-  library(future)
+  library(mirai)
   library(promises)
 
   ui <- bslib::page(

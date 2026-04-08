@@ -1,0 +1,72 @@
+{
+  "export": {
+    "categories-fields-isEditing": false,
+    "categories-fields-n_fields": 3,
+    "categories-fields-txt_in_fields": [
+      "a",
+      "b",
+      ""
+    ],
+    "processing-processing": true,
+    "processing-success": true,
+    "text_management-anonymization_mode": "simple",
+    "text_management-texts__df": {
+      "source_document_id": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "document_id": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "source_document_text": [
+        "lovely product!",
+        "bad product!",
+        "no opinion!",
+        "my email address is l.koning@kennispunttwente.nl",
+        "oke!"
+      ],
+      "document_text": [
+        "lovely product!",
+        "bad product!",
+        "no opinion!",
+        "my email address is l.koning@kennispunttwente.nl",
+        "oke!"
+      ],
+      "preprocessed": [
+        "lovely product!",
+        "bad product!",
+        "no opinion!",
+        "my email address is << removed e-mail address >>",
+        "oke!"
+      ],
+      "analysis_unit_id": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "text_management-texts__document_text": [
+      "lovely product!",
+      "bad product!",
+      "no opinion!",
+      "my email address is l.koning@kennispunttwente.nl",
+      "oke!"
+    ],
+    "text_management-texts__preprocessed": [
+      "lovely product!",
+      "bad product!",
+      "no opinion!",
+      "my email address is << removed e-mail address >>",
+      "oke!"
+    ]
+  }
+}

@@ -28,14 +28,197 @@ send_prompt_with_retries <- function(
     "send_prompt_with_retries__max_interactions",
     10
   ),
-  stream_callback = NULL
+  stream_callback = NULL,
+  execution_scope = NULL
 ) {
   tries <- 0
+
   result <- NULL
   call_start_time <- Sys.time()
   model_name <- llm_provider$parameters$model %||% "unknown"
-  prompt_id <- .kwallm__prompt_trace_new_id()
+
+  normalize_scope_scalar <- function(value) {
+    if (is.null(value) || !length(value) || all(is.na(value))) {
+      return(NULL)
+    }
+
+    as.character(value)[1]
+  }
+
+  normalize_scope_int <- function(value) {
+    if (is.null(value) || !length(value) || all(is.na(value))) {
+      return(NULL)
+    }
+
+    as.integer(value)[1]
+  }
+
+  normalize_scope_int_vector <- function(value) {
+    if (is.null(value) || !length(value)) {
+      return(NULL)
+    }
+
+    value <- as.integer(value[!is.na(value)])
+    if (!length(value)) {
+      return(NULL)
+    }
+
+    unname(value)
+  }
+
+  normalize_scope_chr_vector <- function(value) {
+    if (is.null(value) || !length(value)) {
+      return(NULL)
+    }
+
+    value <- as.character(value[!is.na(value)])
+    if (!length(value)) {
+      return(NULL)
+    }
+
+    unname(value)
+  }
+
+  normalize_execution_scope <- function(scope) {
+    if (is.null(scope)) {
+      return(NULL)
+    }
+    if (!is.list(scope) || is.data.frame(scope)) {
+      stop("execution_scope must be NULL or a named list")
+    }
+
+    allowed_fields <- c(
+      "kind",
+      "analysis_unit_ids",
+      "chunk_ids",
+      "chunk_indexes",
+      "batch_index",
+      "subject_kind",
+      "subject_value",
+      "topic_values",
+      "reduction_iteration"
+    )
+
+    scope <- scope[intersect(names(scope), allowed_fields)]
+    if (!length(scope)) {
+      return(NULL)
+    }
+
+    scope$kind <- normalize_scope_scalar(scope$kind)
+    scope$analysis_unit_ids <- normalize_scope_int_vector(
+      scope$analysis_unit_ids
+    )
+    scope$chunk_ids <- normalize_scope_int_vector(scope$chunk_ids)
+    scope$chunk_indexes <- normalize_scope_int_vector(scope$chunk_indexes)
+    scope$batch_index <- normalize_scope_int(scope$batch_index)
+    scope$subject_kind <- normalize_scope_scalar(scope$subject_kind)
+    scope$subject_value <- normalize_scope_scalar(scope$subject_value)
+    scope$topic_values <- normalize_scope_chr_vector(scope$topic_values)
+    scope$reduction_iteration <- normalize_scope_int(scope$reduction_iteration)
+
+    scope <- scope[!vapply(scope, is.null, logical(1))]
+    if (!length(scope)) {
+      return(NULL)
+    }
+
+    scope
+  }
+
+  execution_scope <- normalize_execution_scope(execution_scope)
+
+  # Inline helper resolver (needed for mirai async contexts where helpers
+  # are passed via .args and not in lexical scope)
+  resolve_helper <- function(name) {
+    # First try to find in calling environment chain (for mirai .args)
+    for (e in sys.frames()) {
+      if (exists(name, envir = e, inherits = FALSE)) {
+        fn <- get(name, envir = e, inherits = FALSE)
+        if (is.function(fn)) return(fn)
+      }
+    }
+    # Fall back to regular lookup (works in normal context)
+    tryCatch(
+      get(name, envir = parent.frame(2), inherits = TRUE),
+      error = function(err) {
+        # Last resort: try global environment
+        get(name, envir = globalenv(), inherits = TRUE)
+      }
+    )
+  }
+
+  # Resolve ALL trace helpers dynamically at start
+  # These will be passed as arguments to log functions to avoid nested resolution
+  .trace_new_id <- resolve_helper(".kwallm__prompt_trace_new_id")
+  .trace_extract_prompt_text <- resolve_helper(
+    ".kwallm__prompt_trace_extract_prompt_text"
+  )
+  .trace_log_send <- resolve_helper(".kwallm__prompt_trace_log_send")
+  .trace_log_reply <- resolve_helper(".kwallm__prompt_trace_log_reply")
+  .trace_log_error <- resolve_helper(".kwallm__prompt_trace_log_error")
+  .trace_serialize <- resolve_helper(".kwallm__prompt_trace_serialize")
+
+  # Also resolve the dependencies needed BY the log functions
+  .trace_enabled <- resolve_helper(".kwallm__prompt_trace_enabled_to_file")
+  .trace_append <- resolve_helper(".kwallm__prompt_trace_append")
+  .trace_session_id <- resolve_helper(".kwallm__prompt_trace_session_id")
+  .exec_current_stage <- resolve_helper(
+    ".kwallm__prompt_execution_current_stage"
+  )
+  .exec_record <- resolve_helper(".kwallm__prompt_execution_record")
+
+  # Bundle trace context for passing to log functions
+  .trace_ctx <- list(
+    enabled = .trace_enabled,
+    append = .trace_append,
+    session_id = .trace_session_id
+  )
+
+  prompt_id <- .trace_new_id()
   prompt_text <- NULL
+  error_messages <- character()
+
+  record_execution <- function(completion_status, final_error_message = NULL) {
+    duration_ms <- as.numeric(difftime(
+      Sys.time(),
+      call_start_time,
+      units = "secs"
+    )) *
+      1000
+
+    .exec_record(data.frame(
+      prompt_id = prompt_id,
+      stage_id = .exec_current_stage(),
+      model_id = as.character(model_name),
+      started_at = format(
+        call_start_time,
+        "%Y-%m-%dT%H:%M:%OS3Z",
+        tz = "UTC"
+      ),
+      completed_at = format(
+        Sys.time(),
+        "%Y-%m-%dT%H:%M:%OS3Z",
+        tz = "UTC"
+      ),
+      duration_ms = duration_ms,
+      try_count = as.integer(tries),
+      max_tries = as.integer(max_tries),
+      retry_delay_seconds = as.numeric(retry_delay_seconds),
+      max_interactions = as.integer(max_interactions),
+      completion_status = as.character(completion_status),
+      error_messages = if (length(error_messages)) {
+        paste(unique(error_messages), collapse = " || ")
+      } else {
+        NA_character_
+      },
+      final_error_message = if (is.null(final_error_message)) {
+        NA_character_
+      } else {
+        as.character(final_error_message)
+      },
+      prompt_scope = I(list(execution_scope)),
+      stringsAsFactors = FALSE
+    ))
+  }
 
   # Log LLM call start
   tryCatch(
@@ -62,13 +245,14 @@ send_prompt_with_retries <- function(
 
     # Log prompt text once (first send), but include prompt_id for later correlation.
     if (tries == 1 && (is.null(prompt_text) || !is.character(prompt_text))) {
-      prompt_text <- .kwallm__prompt_trace_extract_prompt_text(prompt)
-      .kwallm__prompt_trace_log_send(
+      prompt_text <- .trace_extract_prompt_text(prompt)
+      .trace_log_send(
         prompt_id = prompt_id,
         model_name = model_name,
         attempt = tries,
         max_tries = max_tries,
-        prompt_text = prompt_text
+        prompt_text = prompt_text,
+        .ctx = .trace_ctx
       )
     }
 
@@ -100,12 +284,14 @@ send_prompt_with_retries <- function(
         result
       },
       error = function(e) {
-        .kwallm__prompt_trace_log_error(
+        error_messages <<- c(error_messages, conditionMessage(e))
+        .trace_log_error(
           prompt_id = prompt_id,
           model_name = model_name,
           attempt = tries,
           max_tries = max_tries,
-          err_message = conditionMessage(e)
+          err_message = conditionMessage(e),
+          .ctx = .trace_ctx
         )
 
         # Log retry attempt
@@ -124,6 +310,10 @@ send_prompt_with_retries <- function(
         )
 
         if (tries == max_tries) {
+          record_execution(
+            completion_status = "error",
+            final_error_message = conditionMessage(e)
+          )
           stop(sprintf(
             "Error in LLM call after %d attempts: %s\nFinal error:\n%s",
             max_tries,
@@ -142,6 +332,14 @@ send_prompt_with_retries <- function(
   }
 
   if (is.null(result)) {
+    record_execution(
+      completion_status = "error",
+      final_error_message = paste0(
+        "Failed to get a response from the LLM after ",
+        max_tries,
+        " attempts."
+      )
+    )
     # Log final failure
     tryCatch(
       log_error(
@@ -163,6 +361,10 @@ send_prompt_with_retries <- function(
   }
 
   if (is.null(result$response)) {
+    record_execution(
+      completion_status = "invalid_response",
+      final_error_message = "Reached the LLM, but failed to get a valid reply"
+    )
     # Log invalid response
     tryCatch(
       log_error(
@@ -186,6 +388,10 @@ send_prompt_with_retries <- function(
     ))
   }
 
+  # Record execution provenance before logging so duration_ms and completed_at
+  # reflect the actual LLM call time rather than including logging overhead.
+  record_execution(completion_status = "success")
+
   # Log successful LLM call
   duration_ms <- as.numeric(difftime(
     Sys.time(),
@@ -208,15 +414,71 @@ send_prompt_with_retries <- function(
   )
 
   # Optional: log final response text (correlated via prompt_id)
-  .kwallm__prompt_trace_log_reply(
+  .trace_log_reply(
     prompt_id = prompt_id,
     model_name = model_name,
     attempts = tries,
     duration_ms = duration_ms,
-    response_text = .kwallm__prompt_trace_serialize(result$response)
+    response_text = .trace_serialize(result$response),
+    .ctx = .trace_ctx
   )
 
   return(result$response)
+}
+
+
+# Helpers (execution provenance) ---------------------------------------------
+
+.kwallm__prompt_execution_current_stage <- function() {
+  stage_id <- getOption("kwallm__prompt_execution_stage", "unknown")
+  stage_id <- as.character(stage_id %||% "unknown")
+  if (!length(stage_id) || is.na(stage_id[[1]]) || !nzchar(stage_id[[1]])) {
+    return("unknown")
+  }
+
+  stage_id[[1]]
+}
+
+.kwallm__prompt_execution_reset <- function() {
+  options(kwallm__prompt_execution_records = list())
+  invisible(NULL)
+}
+
+.kwallm__prompt_execution_record <- function(record) {
+  if (!is.data.frame(record) || !nrow(record)) {
+    return(invisible(NULL))
+  }
+
+  records <- getOption("kwallm__prompt_execution_records", list())
+  options(kwallm__prompt_execution_records = c(records, list(record)))
+  invisible(NULL)
+}
+
+.kwallm__prompt_execution_get <- function() {
+  records <- getOption("kwallm__prompt_execution_records", list())
+
+  if (!length(records)) {
+    return(data.frame(
+      prompt_id = character(),
+      stage_id = character(),
+      model_id = character(),
+      started_at = character(),
+      completed_at = character(),
+      duration_ms = numeric(),
+      try_count = integer(),
+      max_tries = integer(),
+      retry_delay_seconds = numeric(),
+      max_interactions = integer(),
+      completion_status = character(),
+      error_messages = character(),
+      final_error_message = character(),
+      prompt_scope = I(list()),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  rows <- do.call(rbind, records)
+  rows[!duplicated(rows$prompt_id), , drop = FALSE]
 }
 
 
@@ -405,17 +667,31 @@ send_prompt_with_retries <- function(
   model_name,
   attempt,
   max_tries,
-  prompt_text
+  prompt_text,
+  .ctx = NULL
 ) {
-  if (.kwallm__prompt_trace_enabled_to_file()) {
+  # Use pre-resolved context from caller, or fall back to direct calls
+  .enabled <- if (!is.null(.ctx)) {
+    .ctx$enabled
+  } else {
+    .kwallm__prompt_trace_enabled_to_file
+  }
+  .append <- if (!is.null(.ctx)) .ctx$append else .kwallm__prompt_trace_append
+  .session_id <- if (!is.null(.ctx)) {
+    .ctx$session_id
+  } else {
+    .kwallm__prompt_trace_session_id
+  }
+
+  if (.enabled()) {
     tryCatch(
-      .kwallm__prompt_trace_append(c(
+      .append(c(
         "---- PROMPT_SEND ----",
         paste0(
           "time_utc=",
           format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
         ),
-        paste0("session_id=", .kwallm__prompt_trace_session_id()),
+        paste0("session_id=", .session_id()),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempt=", attempt),
@@ -434,17 +710,31 @@ send_prompt_with_retries <- function(
   model_name,
   attempts,
   duration_ms,
-  response_text
+  response_text,
+  .ctx = NULL
 ) {
-  if (.kwallm__prompt_trace_enabled_to_file()) {
+  # Use pre-resolved context from caller, or fall back to direct calls
+  .enabled <- if (!is.null(.ctx)) {
+    .ctx$enabled
+  } else {
+    .kwallm__prompt_trace_enabled_to_file
+  }
+  .append <- if (!is.null(.ctx)) .ctx$append else .kwallm__prompt_trace_append
+  .session_id <- if (!is.null(.ctx)) {
+    .ctx$session_id
+  } else {
+    .kwallm__prompt_trace_session_id
+  }
+
+  if (.enabled()) {
     tryCatch(
-      .kwallm__prompt_trace_append(c(
+      .append(c(
         "---- RESPONSE_RECEIVED ----",
         paste0(
           "time_utc=",
           format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
         ),
-        paste0("session_id=", .kwallm__prompt_trace_session_id()),
+        paste0("session_id=", .session_id()),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempts=", attempts),
@@ -463,17 +753,31 @@ send_prompt_with_retries <- function(
   model_name,
   attempt,
   max_tries,
-  err_message
+  err_message,
+  .ctx = NULL
 ) {
-  if (.kwallm__prompt_trace_enabled_to_file()) {
+  # Use pre-resolved context from caller, or fall back to direct calls
+  .enabled <- if (!is.null(.ctx)) {
+    .ctx$enabled
+  } else {
+    .kwallm__prompt_trace_enabled_to_file
+  }
+  .append <- if (!is.null(.ctx)) .ctx$append else .kwallm__prompt_trace_append
+  .session_id <- if (!is.null(.ctx)) {
+    .ctx$session_id
+  } else {
+    .kwallm__prompt_trace_session_id
+  }
+
+  if (.enabled()) {
     tryCatch(
-      .kwallm__prompt_trace_append(c(
+      .append(c(
         "---- CALL_ERROR ----",
         paste0(
           "time_utc=",
           format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
         ),
-        paste0("session_id=", .kwallm__prompt_trace_session_id()),
+        paste0("session_id=", .session_id()),
         paste0("prompt_id=", prompt_id),
         paste0("model=", model_name),
         paste0("attempt=", attempt),
@@ -485,36 +789,4 @@ send_prompt_with_retries <- function(
       error = function(e) NULL
     )
   }
-}
-
-
-# Helper for async globals ---------------------------------------------------
-
-#' Get globals required for send_prompt_with_retries in async contexts
-#'
-#' When using `future()` / `future_promise()` with an explicit `globals = ...`,
-#' the worker runs in a separate R session and will not automatically have
-#' access to the internal helper functions used by `send_prompt_with_retries()`.
-#'
-#' Use this helper to consistently export these functions alongside
-#' `send_prompt_with_retries` itself.
-#'
-#' @return A named list suitable for merging into a `globals =` list.
-#' @export
-send_prompt_with_retries_async_globals <- function() {
-  list(
-    send_prompt_with_retries = send_prompt_with_retries,
-    .kwallm__prompt_trace_new_id = .kwallm__prompt_trace_new_id,
-    .kwallm__prompt_trace_enabled_to_file = .kwallm__prompt_trace_enabled_to_file,
-    .kwallm__prompt_trace_session_id = .kwallm__prompt_trace_session_id,
-    .kwallm__prompt_trace_retention_files = .kwallm__prompt_trace_retention_files,
-    .kwallm__prompt_trace_file_path = .kwallm__prompt_trace_file_path,
-    .kwallm__prompt_trace_append = .kwallm__prompt_trace_append,
-    .kwallm__prompt_trace_cleanup = .kwallm__prompt_trace_cleanup,
-    .kwallm__prompt_trace_serialize = .kwallm__prompt_trace_serialize,
-    .kwallm__prompt_trace_extract_prompt_text = .kwallm__prompt_trace_extract_prompt_text,
-    .kwallm__prompt_trace_log_send = .kwallm__prompt_trace_log_send,
-    .kwallm__prompt_trace_log_reply = .kwallm__prompt_trace_log_reply,
-    .kwallm__prompt_trace_log_error = .kwallm__prompt_trace_log_error
-  )
 }

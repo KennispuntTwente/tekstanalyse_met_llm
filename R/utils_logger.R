@@ -33,7 +33,7 @@
 
 # 1 Internal state ------------------------------------------------------------
 
-# NOTE: This file must work inside `future::multisession` workers.
+# NOTE: This file must work inside `mirai` daemon workers.
 # Environments (including R6 objects) are not serializable across processes,
 # so we keep the logger state in `options()` as a plain list.
 
@@ -209,9 +209,9 @@ log_init <- function(
 
 #' Initialize logging in async workers
 #'
-#' Future workers run in fresh R sessions and may not have the logger helpers
+#' Mirai daemons run in separate R processes and may not have the logger helpers
 #' (including internal `.write_log`) loaded. This helper can be called at the
-#' start of a `future()` / `future_promise()` expression to (re)load the logger
+#' start of a `mirai::mirai()` expression to (re)load the logger
 #' code and initialize it in that worker.
 #'
 #' This function is best-effort and must never crash processing.
@@ -433,31 +433,6 @@ log_context_apply <- function(ctx) {
   )
 
   invisible(NULL)
-}
-
-
-#' Common logging globals for async workers
-#'
-#' When using `future()` / `future_promise()` with an explicit `globals = ...`,
-#' the worker runs in a separate R session and will not automatically have
-#' access to functions like `log_info()` unless you export them.
-#'
-#' Use this helper to consistently export the logger functions alongside the
-#' captured context produced by `log_context_capture()`.
-#'
-#' @param log_ctx A `kwallm_log_context` from `log_context_capture()`.
-#' @return A named list suitable for merging into a `globals =` list.
-#' @export
-log_async_globals <- function(log_ctx = NULL) {
-  list(
-    log_ctx = log_ctx,
-    log_context_apply = log_context_apply,
-    log_info = log_info,
-    log_debug = log_debug,
-    log_warn = log_warn,
-    log_error = log_error,
-    log_action = log_action
-  )
 }
 
 

@@ -14,29 +14,37 @@ load_dependencies("electron")
 # - Asynchronous processing also enables progress bar updates in the UI
 #     during the analysis of texts, and live streaming of LLM output
 #     when the LLM is writing summarizing paragraphs
-# - To enable asynchronous processing, you need to use `future::plan()`, e.g.,
-#     `future::plan(multisession)`
+# - To enable asynchronous processing, you need to use `mirai::daemons()`, e.g.,
+#     `mirai::daemons(n)` where n is the number of parallel workers
 # - When asynchronous processing is not needed, you can use
-#     `future::plan("sequential")`; note that the progress bar may lag behind
+#     `mirai::daemons(0)`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
-# - See the documentation for `future::plan()` for more details
+# - See the documentation for `mirai::daemons()` for more details
 
 test_mode <- getOption("shiny.testmode", FALSE)
-test_async <- tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
-  c("true", "1", "yes")
+test_async <- isTRUE(getOption("kwallm.test_async", FALSE)) ||
+  tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in% c("true", "1", "yes")
 
 if (!test_mode || test_async) {
-  if (!exists("future_plan")) {
-    future_plan <- future::plan(future::multisession)
-  }
+  daemon_status <- kwallm_ensure_mirai_daemons()
 
-  log_info(
-    sprintf(
-      "Using %s async workers",
-      future::nbrOfWorkers()
-    ),
-    component = "startup"
-  )
+  if (isTRUE(daemon_status$recycled_pool)) {
+    log_warn(
+      sprintf(
+        "Recycled stale mirai daemons; using %s async workers",
+        daemon_status$status$connections
+      ),
+      component = "startup"
+    )
+  } else {
+    log_info(
+      sprintf(
+        "Using %s async workers (mirai daemons)",
+        daemon_status$status$connections
+      ),
+      component = "startup"
+    )
+  }
 } else {
   log_info(
     paste0(
@@ -61,10 +69,11 @@ if (!test_mode || test_async) {
 # - Note: your system may need to have the relevant environment variables set
 #     for the LLM provider to work, e.g., `OPENAI_API_KEY` for OpenAI
 # - Note: currently, context window size for models is hardcoded
-#     in function `get_context_window_size_in_tokens` in R/context_window.R
+#     in function `get_context_window_size_in_tokens` in R/utils_context_window.R
 #   You may want to replace this function with a more dynamic one,
 #     or add your own hardcoded values for the models you use
-#     The function will default to 2048 if a model is not recognised
+#     The function will return NULL if a model is not recognised;
+#     the context window module then falls back to 2048
 # - Note: if you make the 'preconfigured_models_...' object a named list,
 #     the names will be shown in the dropdown for the user. If you do not provide names,
 #     the model names will be shown. Names must be unique. If you want to use
@@ -115,14 +124,6 @@ options(
   # - This is the maximum size of the file that can be uploaded to the app;
   shiny.maxRequestSize = 100 * 1024^2, # 100 MB
 
-  # Set max size of memory transfer between main & async processes
-  future.globals.maxSize = 3 * 1024^3, # 3 GB
-
-  # Silence future console spam about connection tracking.
-  # Some HTTP client libraries keep curl connections pooled for reuse,
-  # which can trigger false positives when running inside multisession futures.
-  future.connections.onMisuse = "ignore",
-
   # Silence tidyprompt warning about auto-detecting JSON mode.
   tidyprompt.warn.auto.json = FALSE,
 
@@ -152,6 +153,10 @@ options(
   # - Maximum number of texts to process at once;
   #     see: R/processing.R
   processing__max_texts = 3000,
+
+  # - Maximum number of (text-chunk x code) combinations in marking mode;
+  #     see: R/analysis_marking.R
+  marking__max_combinations = 50000,
 
   # - Configuration of LLM provider by user;
   #   these enable the user to set their own OpenAI-compatible or Ollama APIs,
@@ -191,11 +196,11 @@ options(
   #   this may be useful to avoid LLM failure in the topic assignment process;
   #     see R/topic_modelling.R
   topic_modelling__always_add_not_applicable = TRUE,
-  # - Parameters for text chunking;
-  #     see R/context_window.R
-  topic_modelling__chunk_size_default = 25,
-  topic_modelling__chunk_size_limit = 100,
-  topic_modelling__number_of_chunks_limit = 50,
+  # - Parameters for topic batching;
+  #     see R/module_misc_context_window.R
+  topic_modelling__batch_size_default = 25,
+  topic_modelling__batch_size_limit = 100,
+  topic_modelling__number_of_batches_limit = 50,
   topic_modelling__draws_default = 1,
   topic_modelling__draws_limit = 5,
 
@@ -217,8 +222,30 @@ if (getOption("anonymization__gliner_test", FALSE)) {
 }
 
 if (!getOption("shiny.testmode", FALSE)) {
-  try(tiktoken_load_tokenizer())
+  tryCatch(
+    tiktoken_load_tokenizer(),
+    error = function(e) {
+      log_warn(
+        paste0(
+          "Tokenizer preload failed: ",
+          conditionMessage(e),
+          ". Token counting will be unavailable until Python is working."
+        ),
+        component = "startup"
+      )
+    }
+  )
 }
+
+
+## 2.5 App version -------------------------------------------------------------
+
+options(
+  kwallm__app_version = tryCatch(
+    jsonlite::fromJSON("package.json")$version,
+    error = function(e) NULL
+  )
+)
 
 
 # 3 Run app -----------------------------------------------------------------
@@ -237,18 +264,12 @@ server_fn <- main_server(
 )
 
 server_wrapped <- function(input, output, session) {
-  # Best-effort cleanup for multisession workers.
+  # Best-effort cleanup for mirai daemons.
   # Registered via shiny::onStop() for compatibility with older Shiny versions.
   shiny::onStop(function() {
     try(
       {
-        future::plan("sequential")
-      },
-      silent = TRUE
-    )
-    try(
-      {
-        future::ClusterRegistry("stop")
+        mirai::daemons(0)
       },
       silent = TRUE
     )

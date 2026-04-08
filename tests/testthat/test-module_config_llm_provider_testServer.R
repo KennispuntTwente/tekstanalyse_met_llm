@@ -6,14 +6,17 @@ suppressWarnings(library(promises))
 testthat::skip_if_not_installed("later")
 
 test_that("llm_provider_server: switches modes and fetches OpenAI models (mocked)", {
+  # Store original mirai function
+  original_mirai <- mirai::mirai
+
   # Deterministic async stub: ignore expr, return models based on provider_mode.
   # This keeps tests fast and avoids real network.
-  future <- function(expr, globals = NULL, ...) {
-    if (is.null(globals)) {
-      globals <- list()
+  stub_mirai <- function(expr, .args = NULL, ...) {
+    if (is.null(.args)) {
+      .args <- list()
     }
 
-    provider_mode <- globals$provider_mode %||% "openai"
+    provider_mode <- .args$provider_mode %||% "openai"
 
     models <- if (identical(provider_mode, "openai")) {
       c("gpt-4.1-nano-2025-04-14", "gpt-test")
@@ -32,7 +35,18 @@ test_that("llm_provider_server: switches modes and fetches OpenAI models (mocked
     ))
   }
 
-  # Source locally so the module sees our stubbed `future()`.
+  # Replace mirai::mirai with our stub
+  assignInNamespace("mirai", stub_mirai, ns = "mirai")
+
+  # Restore on exit
+  on.exit(
+    {
+      assignInNamespace("mirai", original_mirai, ns = "mirai")
+    },
+    add = TRUE
+  )
+
+  # Source locally so the module sees our stubbed async code.
   source(here::here("R", "module_core_processing.R"), local = TRUE) # disable_when_processing
   source(here::here("R", "component_icon_button.R"), local = TRUE) # icon_toggle_button used in UI
   source(here::here("R", "component_card_header_with_tooltip.R"), local = TRUE)
@@ -97,13 +111,16 @@ test_that("llm_provider_server: switches modes and fetches OpenAI models (mocked
 
 
 test_that("llm_provider_server: switches modes and fetches Ollama models (mocked)", {
+  # Store original mirai function
+  original_mirai <- mirai::mirai
+
   # Deterministic async stub: ignore expr, return models based on provider_mode.
-  future <- function(expr, globals = NULL, ...) {
-    if (is.null(globals)) {
-      globals <- list()
+  stub_mirai <- function(expr, .args = NULL, ...) {
+    if (is.null(.args)) {
+      .args <- list()
     }
 
-    provider_mode <- globals$provider_mode %||% "ollama"
+    provider_mode <- .args$provider_mode %||% "ollama"
 
     models <- if (identical(provider_mode, "openai")) {
       c("gpt-4.1-nano-2025-04-14", "gpt-test")
@@ -121,6 +138,17 @@ test_that("llm_provider_server: switches modes and fetches Ollama models (mocked
       models = models
     ))
   }
+
+  # Replace mirai::mirai with our stub
+  assignInNamespace("mirai", stub_mirai, ns = "mirai")
+
+  # Restore on exit
+  on.exit(
+    {
+      assignInNamespace("mirai", original_mirai, ns = "mirai")
+    },
+    add = TRUE
+  )
 
   source(here::here("R", "module_core_processing.R"), local = TRUE)
   source(here::here("R", "component_icon_button.R"), local = TRUE)
@@ -166,6 +194,117 @@ test_that("llm_provider_server: switches modes and fetches Ollama models (mocked
         llm_provider_rv$configured_models,
         c("llama3.1:8b", "qwen2.5:7b")
       )
+    }
+  )
+})
+
+
+test_that("llm_provider_server: preconfigured-only mode works when both can_configure flags are FALSE", {
+  library(bslib)
+
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+  source(here::here("R", "component_icon_button.R"), local = TRUE)
+  source(here::here("R", "component_card_header_with_tooltip.R"), local = TRUE)
+  source(here::here("R", "component_description_box.R"), local = TRUE)
+  source(here::here("R", "module_config_llm_provider.R"), local = TRUE)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      processing <- reactiveVal(FALSE)
+
+      llm_provider_rv <- llm_provider_server(
+        id = "llm_provider",
+        processing = processing,
+        has_preconfigured_llm_provider = TRUE,
+        can_configure_oai = FALSE,
+        can_configure_ollama = FALSE,
+        lang = lang
+      )
+
+      list(
+        lang = lang,
+        processing = processing,
+        llm_provider_rv = llm_provider_rv
+      )
+    },
+    {
+      # The card must render (not be hidden by the req guard).
+      rendered_card <- output$`llm_provider-llm_provider_card`$html
+      expect_true(
+        nchar(rendered_card) > 0,
+        info = "Provider card should render when preconfigured provider is available"
+      )
+
+      # Mode should default to preconfigured.
+      expect_equal(llm_provider_rv$provider_mode, "preconfigured")
+
+      # No configured provider in preconfigured mode (model module handles it).
+      expect_null(llm_provider_rv$llm_provider_configured)
+
+      # The mode description should be rendered.
+      rendered_desc <- output$`llm_provider-mode_description`$html
+      expect_true(nchar(rendered_desc) > 0)
+    }
+  )
+})
+
+
+test_that("llm_provider_server: env OPENAI_API_KEY is never rendered into the browser", {
+  secret <- "sk-secret-test-key-do-not-leak-12345"
+  withr::local_envvar(OPENAI_API_KEY = secret)
+
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+  source(here::here("R", "component_icon_button.R"), local = TRUE)
+  source(here::here("R", "component_card_header_with_tooltip.R"), local = TRUE)
+  source(here::here("R", "component_description_box.R"), local = TRUE)
+  source(here::here("R", "module_config_llm_provider.R"), local = TRUE)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      processing <- reactiveVal(FALSE)
+
+      llm_provider_rv <- llm_provider_server(
+        id = "llm_provider",
+        processing = processing,
+        has_preconfigured_llm_provider = TRUE,
+        can_configure_oai = TRUE,
+        can_configure_ollama = TRUE,
+        lang = lang
+      )
+
+      list(
+        lang = lang,
+        processing = processing,
+        llm_provider_rv = llm_provider_rv
+      )
+    },
+    {
+      # Switch to OpenAI mode to trigger the API key input renderUI.
+      session$setInputs(`llm_provider-select_openai` = 1)
+      session$flushReact()
+
+      # The env key must be active server-side (provider is configured).
+      expect_true(!is.null(llm_provider_rv$llm_provider_configured))
+
+      # Rendered HTML must NOT contain the secret.
+      rendered_html <- output$`llm_provider-api_key_input`$html
+      expect_false(
+        grepl(secret, rendered_html, fixed = TRUE),
+        info = "Server-side OPENAI_API_KEY must never appear in browser HTML"
+      )
+
+      # The placeholder should hint that an env key is present.
+      expect_true(
+        grepl("env", rendered_html, fixed = TRUE),
+        info = "Placeholder should indicate an env key is configured"
+      )
+
+      # A user-entered key should override the env key.
+      session$setInputs(`llm_provider-api_key_text` = "user-provided-key")
+      session$flushReact()
+      expect_true(!is.null(llm_provider_rv$llm_provider_configured))
     }
   )
 })

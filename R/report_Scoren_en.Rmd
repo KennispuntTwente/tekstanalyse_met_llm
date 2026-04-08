@@ -6,28 +6,41 @@ output:
       version: 5
       bootswatch: lux
 params:
-  result_list: !r list(df = data.frame(result = c(1), text = c("Tekst A")), irr = list(estimate = setNames(27.58, "mean difference"), statistic = setNames(8.975326, "t"), p.value = 6.416833e-12, parameter = setNames(49, "df"), conf.low = 21.40484, conf.high = 33.75516, method = "Paired t-test", alternative = "two.sided", llm_mean = 23.33, llm_sd = 5.72, user_mean = 36.7824, user_sd = 7.23), sensitivity_sentence = "Met een steekproefgrootte van (...).")
+  analysis_result: !r NULL
 
 ---
 
 ```{r include=FALSE, error=TRUE}
-rl <- params$result_list
+analysis_result <- params$analysis_result
+stopifnot(inherits(analysis_result, "AnalysisResult"))
+
+report_df <- .kwallm_report_results_df(analysis_result)
+group_lookup <- .kwallm_report_group_lookup(analysis_result)
+result_payload <- analysis_result@results
+reliability_summary <- if (is.null(analysis_result@reliability)) {
+  NULL
+} else {
+  analysis_result@reliability@summary
+}
+main_model <- .kwallm_get_stage_model_id(analysis_result, "scoring")
+research_background <- analysis_result@metadata@research_background
+by_column_name <- analysis_result@input@grouping_column
+
 source(here::here("R", "style_datatable_config.R"), local = TRUE)
+source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ```
 
 ## Method
 
-`r nrow(rl$df)` texts were analyzed with an LLM (model: `r htmltools::htmlEscape(rl$model)`),
-where the LLM was asked to provide a score (1-100) indicating
-how well a text fits the characteristic '*`r htmltools::htmlEscape(rl$scoring_characteristic)`*'.
+`r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to provide a score (0-100) indicating
+how well a text fits the characteristic '*`r htmltools::htmlEscape(result_payload@characteristic)`*'.
 
 Each text was presented separately to the LLM.
 
 ```{r echo=FALSE, results='asis', error=TRUE}
-research_background <- rl$research_background
 research_background <- htmltools::htmlEscape(research_background)
 if (
-  !is.null(rl$research_background)
+  !is.null(analysis_result@metadata@research_background)
   && research_background != ""
 ) {
   cat(paste0(
@@ -42,34 +55,62 @@ if (
 ```
 
 ```{r echo=FALSE, results='asis', error=TRUE}
-if (!is.null(rl$irr)) {
-  sensitivity_sentence <- htmltools::htmlEscape(rl$irr$sensitivity_sentence)
+if (!is.null(reliability_summary)) {
+  sensitivity_sentence <- htmltools::htmlEscape(
+    reliability_summary$sensitivity_sentence
+  )
+  # Guard against NaN values from degenerate t-test (constant/equal scores)
+  irr_statistic <- ifelse(
+    is.nan(reliability_summary$statistic),
+    0,
+    reliability_summary$statistic
+  )
+  irr_p_value <- ifelse(
+    is.nan(reliability_summary$p.value),
+    1,
+    reliability_summary$p.value
+  )
+  irr_estimate <- ifelse(
+    is.nan(reliability_summary$estimate),
+    0,
+    reliability_summary$estimate
+  )
+  irr_conf_low <- ifelse(
+    is.nan(reliability_summary$conf.low),
+    NA,
+    reliability_summary$conf.low
+  )
+  irr_conf_high <- ifelse(
+    is.nan(reliability_summary$conf.high),
+    NA,
+    reliability_summary$conf.high
+  )
   cat(paste0(
     "### Reliability\n",
     "The inter-rater reliability between the language model and a human rater was calculated.",
     " A random sample of ",
-    rl$irr$subjects, " texts was taken.",
+    reliability_summary$subjects, " texts was taken.",
     "A paired t-test was used to compare the scores given by the language model with those given by the human rater.",
     " The mean difference between the scores is ",
-    round(rl$irr$estimate, 2), " (95% CI [",
-    round(rl$irr$conf.low, 2), ", ",
-    round(rl$irr$conf.high, 2), "];",
-    " mean language model = ", round(rl$irr$llm_mean, 2),
-    " [sd = ", round(rl$irr$llm_sd, 2), "];",
-    " mean human rater = ", round(rl$irr$user_mean, 2),
-    " [sd = ", round(rl$irr$user_sd, 2), "]).",
+    round(irr_estimate, 2), " (95% CI [",
+    round(irr_conf_low, 2), ", ",
+    round(irr_conf_high, 2), "];",
+    " mean language model = ", round(reliability_summary$llm_mean, 2),
+    " [sd = ", round(reliability_summary$llm_sd, 2), "];",
+    " mean human rater = ", round(reliability_summary$user_mean, 2),
+    " [sd = ", round(reliability_summary$user_sd, 2), "]).",
     " This is a  ",
     dplyr::case_when(
-      rl$irr$p.value < 0.05 ~ "significant",
+      irr_p_value < 0.05 ~ "significant",
       TRUE ~ "not significant"
     ),
-    " difference (t(", rl$irr$parameter, ") = ",
-    round(rl$irr$statistic, 3), ", p = ", round(rl$irr$p.value, 3), ") ",
+    " difference (t(", reliability_summary$parameter, ") = ",
+    round(irr_statistic, 3), ", p = ", round(irr_p_value, 3), ") ",
     " and can be interpreted as ",
     dplyr::case_when(
-      rl$irr$p.value >= 0.05 ~ "an agreement between the scores of the language model and the human rater",
-      rl$irr$llm_mean > rl$irr$user_mean ~ "an overestimation of the scores by the language model",
-      rl$irr$llm_mean < rl$irr$user_mean ~ "an underestimation of the scores by the language model",
+      irr_p_value >= 0.05 ~ "an agreement between the scores of the language model and the human rater",
+      reliability_summary$llm_mean > reliability_summary$user_mean ~ "an overestimation of the scores by the language model",
+      reliability_summary$llm_mean < reliability_summary$user_mean ~ "an underestimation of the scores by the language model",
       TRUE ~ "?"
   ), ".\n\n", sensitivity_sentence
   ))
@@ -83,7 +124,7 @@ if (!is.null(rl$irr)) {
 Below table shows statistics of the given scores.
 
 ```{r results='asis', echo=FALSE, error=TRUE}
-rl$df |>
+report_df |>
   dplyr::summarise(
     Mean = round(mean(result), 2),
     `Standard deviation` = round(sd(result), 2),
@@ -98,12 +139,34 @@ rl$df |>
   )
 ```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+# Show grouped statistics if by_column is specified
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
+  cat("\n### Statistics per group\n\n")
+  cat(paste0(
+    "Below table shows score statistics, ",
+    "broken down by **", htmltools::htmlEscape(by_column_name), "**.\n\n"
+  ))
+}
+```
+
+```{r echo=FALSE, results='asis', error=TRUE}
+if (!is.null(by_column_name) && !is.null(group_lookup)) {
+  generate_grouped_score_table(
+    df = report_df,
+    by_values = group_lookup,
+    by_column_name = by_column_name,
+    language = "en"
+  )
+}
+```
+
 ### Per text
 
 Below table shows the scores per text.
 
 ```{r results='asis', echo=FALSE, error=TRUE}
-rl$df |>
+report_df |>
   dplyr::select(result, text) |>
   dplyr::rename(Text = text, Score = result) |>
   dplyr::arrange(dplyr::desc(Score)) |>

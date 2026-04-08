@@ -142,6 +142,13 @@ test_that("interrater_server (Scoren): runs paired t-test and returns summary st
 
       expect_equal(irr$result$user_mean, mean(c(10, 20, 30)))
       expect_equal(irr$result$llm_mean, mean(c(10, 20, 30)))
+
+      # When all paired differences are zero, t.test() returns NaN.
+      # The module should guard against this and produce clean numeric values.
+      expect_false(is.nan(irr$result$statistic))
+      expect_false(is.nan(irr$result$p.value))
+      expect_equal(irr$result$statistic, 0)
+      expect_equal(irr$result$p.value, 1)
     }
   )
 })

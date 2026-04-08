@@ -87,7 +87,7 @@ test_that("app_error: with NULL session stops after logging", {
 })
 
 
-test_that("app_error: downgrades IPC interrupt error from fatal to nonfatal", {
+test_that("app_error: downgrades legacy interrupt transport error from fatal to nonfatal", {
   test_dir <- withr::local_tempdir()
   withr::local_dir(test_dir)
 
@@ -97,6 +97,31 @@ test_that("app_error: downgrades IPC interrupt error from fatal to nonfatal", {
   expect_output(
     app_error(
       ipc_err,
+      when = "unit",
+      fatal = TRUE,
+      shiny_session = sess,
+      lang = make_translator("nl")
+    ),
+    regexp = "Error:"
+  )
+  expect_false(sess$is_closed())
+})
+
+
+test_that("app_error: downgrades local async interrupt error from fatal to nonfatal", {
+  test_dir <- withr::local_tempdir()
+  withr::local_dir(test_dir)
+
+  sess <- make_fake_session()
+
+  interrupt_err <- structure(
+    list(message = "user cancelled"),
+    class = c("kwallm_async_interrupt", "error", "condition")
+  )
+
+  expect_output(
+    app_error(
+      interrupt_err,
       when = "unit",
       fatal = TRUE,
       shiny_session = sess,

@@ -27,7 +27,7 @@ test_that("text_management_server: errors if all anonymization methods disabled"
   expect_error(
     text_management_server(
       id = "tm",
-      raw_texts = reactiveVal(c("x")),
+      document_texts = reactiveVal(c("x")),
       gliner_model = NULL,
       processing = reactiveVal(FALSE),
       lang = make_test_lang("nl")
@@ -37,7 +37,7 @@ test_that("text_management_server: errors if all anonymization methods disabled"
 })
 
 
-test_that("text_management_server: regex default produces anonymized + squished texts", {
+test_that("text_management_server: regex default produces anonymized preprocessed texts", {
   withr::local_options(list(
     anonymization__default = "regex",
     anonymization__none = TRUE,
@@ -48,7 +48,7 @@ test_that("text_management_server: regex default produces anonymized + squished 
   shiny::testServer(
     function(input, output, session) {
       lang <- make_test_lang("nl")
-      raw <- reactiveVal(c(
+      document_texts <- reactiveVal(c(
         " Mail me at bob@example.com ",
         "Call +31 6 1234 5678",
         "Postcode 1234 AB"
@@ -56,13 +56,13 @@ test_that("text_management_server: regex default produces anonymized + squished 
 
       texts <- text_management_server(
         id = "tm",
-        raw_texts = reactive(raw()),
+        document_texts = reactive(document_texts()),
         gliner_model = NULL,
         processing = reactiveVal(FALSE),
         lang = lang
       )
 
-      list(raw = raw, texts = texts, lang = lang)
+      list(document_texts = document_texts, texts = texts, lang = lang)
     },
     {
       session$flushReact()
@@ -85,9 +85,6 @@ test_that("text_management_server: regex default produces anonymized + squished 
         joined,
         fixed = TRUE
       ))
-
-      # squish happened
-      expect_false(grepl("  ", joined, fixed = TRUE))
     }
   )
 })
@@ -101,26 +98,29 @@ test_that("text_management_server: fallback to 'none' when regex disabled and de
     anonymization__gliner_model = FALSE
   ))
 
-  # This is validated early and should error because default 'regex' is not enabled.
-  expect_error(
-    text_management_server(
-      id = "tm",
-      raw_texts = reactiveVal(c("x")),
-      gliner_model = NULL,
-      processing = reactiveVal(FALSE),
-      lang = make_test_lang("nl")
+  # The warning fires before moduleServer() which then errors on missing session.
+  expect_warning(
+    tryCatch(
+      text_management_server(
+        id = "tm",
+        document_texts = reactiveVal(c("x")),
+        gliner_model = NULL,
+        processing = reactiveVal(FALSE),
+        lang = make_test_lang("nl")
+      ),
+      error = function(e) NULL
     ),
     "Default anonymization method 'regex'"
   )
 })
 
 
-test_that("pre_process_texts: replaces email/phone/postcode markers", {
+test_that("anonymize_texts_with_regex replaces email/phone/postcode markers", {
   lang <- shiny.i18n::Translator$new(
     translation_json_path = here::here("language", "language.json")
   )
   lang$set_translation_language("nl")
-  out <- pre_process_texts(
+  out <- anonymize_texts_with_regex(
     c(
       "a@b.com",
       "+31 6 1234 5678",
@@ -144,4 +144,94 @@ test_that("pre_process_texts: replaces email/phone/postcode markers", {
     out,
     fixed = TRUE
   )))
+})
+
+
+test_that("anonymize_texts_with_regex preserves surrounding whitespace", {
+  lang <- shiny.i18n::Translator$new(
+    translation_json_path = here::here("language", "language.json")
+  )
+  lang$set_translation_language("nl")
+
+  out <- anonymize_texts_with_regex(
+    c("  a@b.com  "),
+    lang = lang
+  )
+
+  expect_true(startsWith(out[[1]], "  "))
+  expect_true(endsWith(out[[1]], "  "))
+})
+
+
+test_that("text_management_server keeps structurally different texts distinct", {
+  withr::local_options(list(
+    anonymization__default = "none",
+    anonymization__none = TRUE,
+    anonymization__regex = TRUE,
+    anonymization__gliner_model = FALSE
+  ))
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("en")
+      document_texts <- reactiveVal(c(" same\n\ntext ", "same text"))
+
+      texts <- text_management_server(
+        id = "tm",
+        document_texts = reactive(document_texts()),
+        gliner_model = NULL,
+        processing = reactiveVal(FALSE),
+        lang = lang
+      )
+
+      list(texts = texts)
+    },
+    {
+      session$flushReact()
+
+      expect_identical(texts$document_text, c(" same\n\ntext ", "same text"))
+      expect_identical(texts$preprocessed, c(" same\n\ntext ", "same text"))
+      expect_identical(
+        texts$analysis_units$preprocessed,
+        c(" same\n\ntext ", "same text")
+      )
+      expect_identical(texts$df$analysis_unit_id, c(1L, 2L))
+    }
+  )
+})
+
+
+test_that("text_management_server maps duplicate rows to shared analysis units", {
+  withr::local_options(list(
+    anonymization__default = "none",
+    anonymization__none = TRUE,
+    anonymization__regex = TRUE,
+    anonymization__gliner_model = FALSE
+  ))
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("en")
+      document_texts <- reactiveVal(c("same", "same", "other"))
+
+      texts <- text_management_server(
+        id = "tm",
+        document_texts = reactive(document_texts()),
+        gliner_model = NULL,
+        processing = reactiveVal(FALSE),
+        lang = lang
+      )
+
+      list(texts = texts)
+    },
+    {
+      session$flushReact()
+
+      expect_identical(texts$preprocessed, c("same", "other"))
+      expect_identical(texts$analysis_units$analysis_unit_id, c(1L, 2L))
+      expect_identical(texts$analysis_units$preprocessed, c("same", "other"))
+      expect_identical(texts$df$document_text, c("same", "same", "other"))
+      expect_identical(texts$df$analysis_unit_id, c(1L, 1L, 2L))
+    }
+  )
 })

@@ -17,13 +17,14 @@ app_error <- function(
     translation_json_path = "language/language.json"
   )
 ) {
-  # Downgrade IPC error which occurs after interrupting process
+  # Downgrade known async interruption errors to nonfatal.
   if (
     isTRUE(grepl(
       "Cannot pop from destroyed TextFileSource",
       try(conditionMessage(error), silent = TRUE),
       fixed = TRUE
-    ))
+    )) ||
+      inherits(error, "kwallm_async_interrupt")
   ) {
     fatal <- FALSE
   }

@@ -1,7 +1,7 @@
 # LLM Streaming Module
 # This module provides a UI component and server logic for displaying real-time
 # LLM streaming output in the Shiny app. It follows the same pattern as
-# component_progress_bar.R, using ipc::shinyQueue() for async communication.
+# component_progress_bar.R, using the local async queue for worker updates.
 
 # 1 UI --------------------------------------------------------------------
 
@@ -113,7 +113,7 @@ llm_streaming_server <- function(
 
     # Async controller -------------------------------------------------------
 
-    queue <- ipc::shinyQueue()
+    queue <- shinyQueue()
     queue$consumer$start(millis = 100)
 
     async <- AsyncStreamController$new(queue)
@@ -154,7 +154,7 @@ llm_streaming_server <- function(
 #' AsyncStreamController
 #'
 #' R6 class for controlling the stream output from an async context.
-#' Uses ipc::shinyQueue() to send updates to the main Shiny process.
+#' Uses the local async queue to send updates to the main Shiny process.
 #' Follows the same pattern as AsyncProgressBarController in component_progress_bar.R.
 #'
 #' @export
@@ -195,59 +195,15 @@ AsyncStreamController <- R6::R6Class(
   )
 )
 
-
-# 4 Streaming Callback Factory --------------------------------------------
-
-#' Create a streaming callback for tidyprompt providers
-#'
-#' Creates a callback function compatible with tidyprompt's stream_callback
-#' parameter. The callback sends streaming tokens to a Shiny reactive via
-#' an ipc::shinyQueue.
-#'
-#' @param queue An ipc::shinyQueue object for async communication
-#' @param mode One of "token" (append each token) or "partial" (replace with partial response)
-#'
-#' @return A function suitable for use as stream_callback in a tidyprompt provider
-#' @export
-create_stream_callback <- function(queue, mode = c("partial", "token")) {
-  mode <- match.arg(mode)
-
-  function(token, meta) {
-    if (mode == "partial") {
-      # Replace entire text with accumulated partial response
-      try(queue$producer$fireAssignReactive(
-        "stream_text",
-        meta$partial_response %||% ""
-      ))
-    } else {
-      # Append just the new token (less reliable due to queue timing)
-      current_text <- ""
-      try({
-        current_text <- queue$producer$fireEval({
-          stream_text()
-        })
-      })
-      try(queue$producer$fireAssignReactive(
-        "stream_text",
-        paste0(current_text, token)
-      ))
-    }
-    invisible(TRUE)
-  }
-}
-
-
-# 5 Example/development usage ---------------------------------------------
+# 4 Example/development usage ---------------------------------------------
 
 if (FALSE) {
   library(shiny)
   library(bslib)
   library(tidyprompt)
-  library(future)
+  library(mirai)
   library(promises)
-  library(ipc)
-
-  future::plan(future::multisession)
+  mirai::daemons(2)
 
   ui <- bslib::page(
     shinyjs::useShinyjs(),
@@ -274,7 +230,7 @@ if (FALSE) {
       stream$show()
 
       # Simulate streaming with a simple example
-      future_promise(
+      mirai::mirai(
         {
           for (i in 1:10) {
             Sys.sleep(0.3)
@@ -288,7 +244,7 @@ if (FALSE) {
           }
           "Done!"
         },
-        globals = list(stream_async = stream$async)
+        .args = list(stream_async = stream$async)
       ) %...>%
         (function(result) {
           stream$append("\n\n--- Complete ---")

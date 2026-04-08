@@ -7,11 +7,13 @@ Sys.setenv(FOR_DISABLE_CONSOLE_CTRL_HANDLER = "1")
 gliner_load_model <- function(
   model_name = "urchade/gliner_multi_pii-v1",
   test_model = FALSE,
+  sync_uv = FALSE,
   queue = NULL
 ) {
   stopifnot(
     is.character(model_name) && length(model_name) == 1,
     is.logical(test_model) && length(test_model) == 1,
+    is.logical(sync_uv) && length(sync_uv) == 1,
     is.null(queue) || inherits(queue, "Queue")
   )
 
@@ -24,10 +26,8 @@ gliner_load_model <- function(
   ## 1 Load Python, GLiNER -------------------------------------------
   print_message("Loading Python and GLiNER module...")
 
-  Sys.unsetenv("RETICULATE_PYTHON")
-  reticulate:::uv_exec("sync")
-  reticulate::use_virtualenv("./.venv")
-  gliner <- reticulate::import("gliner")
+  initialize_python_environment(sync_uv = sync_uv)
+  gliner <- safe_py_import("gliner")
 
   # 4 Load model -----------------------------------------------------
   Sys.setenv(HF_HUB_DISABLE_SYMLINKS = "1")

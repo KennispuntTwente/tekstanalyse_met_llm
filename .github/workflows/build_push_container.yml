@@ -20,6 +20,7 @@ on:
 env:
   IMAGE_NAME: ghcr.io/kennispunttwente/tekstanalyse_met_llm
   BASE_IMAGE_NAME: ghcr.io/kennispunttwente/tekstanalyse_met_llm-base
+  IMAGE_PLATFORMS: linux/amd64,linux/arm64
 
 permissions:
   contents: read
@@ -101,10 +102,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          if docker buildx imagetools inspect "${{ steps.base.outputs.base_ref }}" > /dev/null 2>&1; then
+          if ! raw_manifest=$(docker buildx imagetools inspect --raw "${{ steps.base.outputs.base_ref }}" 2> /dev/null); then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          missing_platforms=()
+          IFS=',' read -ra required_platforms <<< "${{ env.IMAGE_PLATFORMS }}"
+          for platform in "${required_platforms[@]}"; do
+            os="${platform%/*}"
+            arch="${platform#*/}"
+
+            if ! jq -e --arg os "$os" --arg arch "$arch" '
+              if has("manifests") then
+                any(.manifests[]?; .platform.os == $os and .platform.architecture == $arch)
+              else
+                .os == $os and .architecture == $arch
+              end
+            ' <<< "$raw_manifest" > /dev/null; then
+              missing_platforms+=("$platform")
+            fi
+          done
+
+          if [ "${#missing_platforms[@]}" -eq 0 ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
+            printf 'missing_platforms=%s\n' "${missing_platforms[*]}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build & push base image (heavy deps)
@@ -117,7 +141,7 @@ jobs:
           tags: |
             ${{ steps.base.outputs.base_ref }}
             ${{ env.BASE_IMAGE_NAME }}:base-latest
-          platforms: linux/amd64
+          platforms: ${{ env.IMAGE_PLATFORMS }}
           cache-from: type=registry,ref=${{ env.BASE_IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.BASE_IMAGE_NAME }}:buildcache,mode=max
 
@@ -139,14 +163,71 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ steps.vars.outputs.tags }}
-          platforms: linux/amd64
+          platforms: ${{ env.IMAGE_PLATFORMS }}
           build-args: |
             BASE_IMAGE=${{ steps.base.outputs.base_ref }}
           cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
 
-      # Show resulting image config (inspect the primary tag)
-      - name: Check image config
+      - name: Smoke test published image architectures
+        timeout-minutes: 30
+        shell: bash
         run: |
-          docker pull ${{ steps.vars.outputs.primary_tag }}
-          docker inspect ${{ steps.vars.outputs.primary_tag }} | jq '.[0].Config'
+          set -euo pipefail
+
+          image_ref="${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+          raw_manifest=$(docker buildx imagetools inspect --raw "$image_ref")
+
+          IFS=',' read -ra platforms <<< "${{ env.IMAGE_PLATFORMS }}"
+          for platform in "${platforms[@]}"; do
+            os="${platform%/*}"
+            arch="${platform#*/}"
+
+            case "$platform" in
+              linux/amd64)
+                expected_machine="x86_64"
+                expected_platform_token="x86_64"
+                ok_marker="AMD64_SMOKE_OK"
+                ;;
+              linux/arm64)
+                expected_machine="aarch64"
+                expected_platform_token="aarch64"
+                ok_marker="ARM64_SMOKE_OK"
+                ;;
+              *)
+                echo "Unsupported smoke-test platform: $platform" >&2
+                exit 1
+                ;;
+            esac
+
+            platform_digest=$(jq -r \
+              --arg os "$os" \
+              --arg arch "$arch" \
+              'first(.manifests[]? | select(.platform.os == $os and .platform.architecture == $arch) | .digest) // empty' \
+              <<< "$raw_manifest")
+
+            if [[ -z "$platform_digest" ]]; then
+              echo "No published digest found for platform: $platform" >&2
+              exit 1
+            fi
+
+            platform_ref="${{ env.IMAGE_NAME }}@${platform_digest}"
+
+            # Keep the smoke test lightweight. Full GLiNER inference under QEMU
+            # is slow on emulated arm64 and emits benign PyTorch CPU-probing noise.
+            r_expr='expected_machine <- Sys.getenv("EXPECTED_MACHINE"); expected_platform_token <- Sys.getenv("EXPECTED_PLATFORM_TOKEN"); ok_marker <- Sys.getenv("OK_MARKER"); stopifnot(nzchar(expected_machine), nzchar(expected_platform_token), nzchar(ok_marker)); stopifnot(grepl(expected_platform_token, R.version$platform)); stopifnot(identical(Sys.info()[["machine"]], expected_machine)); library(reticulate); Sys.unsetenv("RETICULATE_PYTHON"); use_virtualenv("./.venv", required = TRUE); tk <- import("tiktoken"); sc <- import("semchunk"); gliner <- import("gliner"); stopifnot(length(tk$get_encoding("cl100k_base")$encode("KWALLM smoke test")) > 0L); stopifnot(py_has_attr(sc, "chunkerify")); stopifnot(py_has_attr(gliner$GLiNER, "from_pretrained")); gliner_config_matches <- list.files(".venv", pattern = "^gliner_config\\.json$", recursive = TRUE, full.names = TRUE); gliner_weights_matches <- list.files(".venv", pattern = "^(model\\.safetensors|pytorch_model\\.bin)$", recursive = TRUE, full.names = TRUE); stopifnot(length(gliner_config_matches) >= 1L); stopifnot(length(gliner_weights_matches) >= 1L); cat(ok_marker, "\n");'
+
+            docker pull "$platform_ref"
+            docker run --rm \
+              --platform "$platform" \
+              -e EXPECTED_MACHINE="$expected_machine" \
+              -e EXPECTED_PLATFORM_TOKEN="$expected_platform_token" \
+              -e OK_MARKER="$ok_marker" \
+              "$platform_ref" \
+              Rscript -e "$r_expr"
+          done
+
+      # Show resulting multi-arch manifest in GHCR
+      - name: Check published image manifests
+        run: |
+          docker buildx imagetools inspect "${{ steps.vars.outputs.primary_tag }}"

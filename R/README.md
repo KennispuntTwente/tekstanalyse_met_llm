@@ -14,6 +14,7 @@ Quick overview of the files & naming conventions used in this folder.
 | `module_misc_` | Miscellaneous modules (anonymization, context window, edit topics) |
 | `module_toggle_` | Toggle/switch option modules (interrater reliability, write paragraphs); user can use these to turn off/on simple options during use |
 | `report_` | R Markdown report templates (`.Rmd`) for presenting analysis results to users |
+| `result_` | S7 typed result model, builders, and serializers for export contracts |
 | `style_` | CSS/JS styling and DataTable configurations |
 | `utils_` | Utility/helper functions (tokenizer, error handling, API retries) |
 

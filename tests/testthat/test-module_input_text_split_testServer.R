@@ -4,7 +4,54 @@ suppressWarnings(library(promises))
 
 # Keep these tests deterministic and avoid requiring the full app wiring.
 
+shinyQueue <- function() {
+  structure(
+    list(
+      consumer = list(
+        start = function(millis = 50) invisible(millis),
+        stop = function() invisible(NULL)
+      ),
+      producer = list(
+        fireAssignReactive = function(...) invisible(NULL)
+      )
+    ),
+    class = "Queue"
+  )
+}
+
+source(here::here("R", "utils_async_analysis_workers.R"), local = TRUE)
 source(here::here("R", "module_input_text_split.R"), local = TRUE)
+
+kwallm_worker_app_root <- function(path = here::here()) {
+  normalizePath(path, winslash = "/", mustWork = TRUE)
+}
+
+kwallm_worker_capture_options <- function() list()
+
+kwallm_worker_bootstrap <- function(
+  task = NULL,
+  app_root = NULL,
+  worker_options = list(),
+  log_context = NULL,
+  env = parent.frame()
+) {
+  force(task)
+  force(app_root)
+
+  if (length(worker_options) > 0) {
+    options(worker_options)
+  }
+
+  env$split_texts_with_semchunk <- split_texts_with_semchunk
+  env$semchunk_load_chunker <- semchunk_load_chunker
+  env$log_context_apply <- function(...) invisible(NULL)
+
+  invisible(log_context)
+}
+
+kwallm_worker_bootstrap_globals <- function(...) {
+  list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+}
 
 # Minimal stubs used by the module.
 disable_when_processing <- function(processing, input_ids) {
@@ -40,127 +87,114 @@ semchunk_load_chunker <- function(chunk_size = 128, queue = NULL) {
 }
 
 async_message_printer <- function(...) invisible(NULL)
+initialize_python_environment <- function(...) invisible(NULL)
 
 
-test_that("text_split_server: returns raw texts when toggle is off", {
+test_that("text_split_server: returns document texts when toggle is off", {
   shiny::testServer(
     function(input, output, session) {
-      raw_texts <- reactiveVal(c("a", "b"))
+      document_texts <- reactiveVal(c("a", "b"))
       processing <- reactiveVal(FALSE)
       lang <- make_test_lang("nl")
 
-      texts <- text_split_server(
+      split_result <- text_split_server(
         id = "split",
-        raw_texts = raw_texts,
+        document_texts = document_texts,
         processing = processing,
         lang = lang,
         enabled = TRUE
       )
+      texts <- split_result$texts
+      source_document_texts <- split_result$source_document_texts
 
-      list(texts = texts, raw_texts = raw_texts, lang = lang)
+      list(
+        texts = texts,
+        source_document_texts = source_document_texts,
+        document_texts = document_texts,
+        lang = lang
+      )
     },
     {
-      expect_equal(texts(), raw_texts())
+      expect_equal(texts(), document_texts())
+      expect_null(source_document_texts())
 
       # Explicitly set toggle to "Nee" (default) to ensure stability.
       session$setInputs(`split-toggle` = lang()$t("Nee"))
       session$flushReact()
 
-      expect_equal(texts(), raw_texts())
+      expect_equal(texts(), document_texts())
+      expect_null(source_document_texts())
     }
   )
 })
 
 
-test_that("text_split_server: clicking split produces split texts (sync-mocked future)", {
-  testthat::skip_if_not_installed("ipc")
+test_that("text_split_server: clicking split produces split texts (sync-mocked mirai)", {
+  testthat::skip_if_not_installed("mirai")
 
-  # Monkeypatch namespaced calls (ipc::shinyQueue, promises::future_promise)
-  # without requiring pkgload/devtools.
-  ipc_ns <- asNamespace("ipc")
-  promises_ns <- asNamespace("promises")
+  mirai_ns <- asNamespace("mirai")
 
-  old_shinyQueue <- get("shinyQueue", envir = ipc_ns)
-  old_future_promise <- get("future_promise", envir = promises_ns)
+  old_mirai <- get("mirai", envir = mirai_ns)
 
   withr::defer({
-    unlockBinding("shinyQueue", ipc_ns)
-    assign("shinyQueue", old_shinyQueue, envir = ipc_ns)
-    lockBinding("shinyQueue", ipc_ns)
-
-    unlockBinding("future_promise", promises_ns)
-    assign("future_promise", old_future_promise, envir = promises_ns)
-    lockBinding("future_promise", promises_ns)
+    unlockBinding("mirai", mirai_ns)
+    assign("mirai", old_mirai, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
   })
 
-  # Stub ipc queue so we don't need the real async queue internals.
-  unlockBinding("shinyQueue", ipc_ns)
+  # Make mirai run synchronously while still returning a promise.
+  unlockBinding("mirai", mirai_ns)
   assign(
-    "shinyQueue",
-    function() {
-      list(
-        consumer = list(
-          start = function(millis = 50) invisible(millis),
-          stop = function() invisible(NULL)
-        ),
-        producer = list(
-          fireAssignReactive = function(...) invisible(NULL)
-        )
-      )
-    },
-    envir = ipc_ns
-  )
-  lockBinding("shinyQueue", ipc_ns)
-
-  # Make future_promise run synchronously while still returning a promise.
-  unlockBinding("future_promise", promises_ns)
-  assign(
-    "future_promise",
+    "mirai",
     function(
-      expr = NULL,
-      envir = parent.frame(),
+      .expr,
       ...,
-      substitute = TRUE,
-      queue = promises::future_promise_queue()
+      .args = list(),
+      .timeout = NULL,
+      .compute = NULL
     ) {
-      dots <- list(...)
-      globals <- dots$globals
-      if (is.null(globals)) {
-        globals <- list()
-      }
+      # Combine ... and .args
+      args_from_dots <- list(...)
+      all_args <- c(args_from_dots, .args)
 
-      expr_sub <- if (isTRUE(substitute)) substitute(expr) else expr
-      env <- list2env(globals, parent = envir)
-
-      value <- eval(expr_sub, envir = env)
+      expr_sub <- substitute(.expr)
+      eval_env <- list2env(all_args, parent = baseenv())
+      value <- eval(expr_sub, envir = eval_env)
       promises::promise_resolve(value)
     },
-    envir = promises_ns
+    envir = mirai_ns
   )
-  lockBinding("future_promise", promises_ns)
+  lockBinding("mirai", mirai_ns)
 
   shiny::testServer(
     function(input, output, session) {
-      raw_texts <- reactiveVal(c("alpha", "beta"))
+      document_texts <- reactiveVal(c("alpha", "beta"))
       processing <- reactiveVal(FALSE)
       lang <- make_test_lang("nl")
 
-      texts <- text_split_server(
+      split_result <- text_split_server(
         id = "split",
-        raw_texts = raw_texts,
+        document_texts = document_texts,
         processing = processing,
         lang = lang,
         enabled = TRUE
       )
+      texts <- split_result$texts
+      source_document_texts <- split_result$source_document_texts
 
-      list(texts = texts, raw_texts = raw_texts, lang = lang)
+      list(
+        texts = texts,
+        source_document_texts = source_document_texts,
+        document_texts = document_texts,
+        lang = lang
+      )
     },
     {
       # Turn splitting on.
       session$setInputs(`split-toggle` = lang()$t("Ja"))
       session$flushReact()
 
-      expect_equal(texts(), raw_texts())
+      expect_equal(texts(), document_texts())
 
       # Trigger splitting.
       session$setInputs(`split-max_tokens` = 5)
@@ -174,14 +208,254 @@ test_that("text_split_server: clicking split produces split texts (sync-mocked f
       session$flushReact()
 
       expect_true(is.character(texts()))
-      expect_true(length(texts()) > length(raw_texts()))
+      expect_true(length(texts()) > length(document_texts()))
       expect_true(all(grepl("__", texts(), fixed = TRUE)))
 
-      # Changing raw texts resets prior split results.
-      raw_texts(c("gamma"))
+      # source_document_texts maps each chunk back to its upload row text.
+      expect_equal(length(source_document_texts()), length(texts()))
+      expect_true(all(source_document_texts() %in% c("alpha", "beta")))
+
+      # Changing document texts resets prior split results.
+      document_texts(c("gamma"))
       session$flushReact()
 
       expect_equal(texts(), c("gamma"))
+      expect_null(source_document_texts())
+    }
+  )
+})
+
+
+test_that("text_split_server ignores stale async split results after source text changes", {
+  testthat::skip_if_not_installed("mirai")
+
+  mirai_ns <- asNamespace("mirai")
+
+  old_mirai <- get("mirai", envir = mirai_ns)
+  deferred <- new.env(parent = emptyenv())
+
+  withr::defer({
+    unlockBinding("mirai", mirai_ns)
+    assign("mirai", old_mirai, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  unlockBinding("mirai", mirai_ns)
+  assign(
+    "mirai",
+    function(
+      .expr,
+      ...,
+      .args = list(),
+      .timeout = NULL,
+      .compute = NULL
+    ) {
+      promises::promise(function(resolve, reject) {
+        deferred$resolve <- resolve
+        deferred$reject <- reject
+      })
+    },
+    envir = mirai_ns
+  )
+  lockBinding("mirai", mirai_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      document_texts <- reactiveVal(c("alpha", "beta"))
+      processing <- reactiveVal(FALSE)
+      lang <- make_test_lang("nl")
+
+      split_result <- text_split_server(
+        id = "split",
+        document_texts = document_texts,
+        processing = processing,
+        lang = lang,
+        enabled = TRUE
+      )
+
+      texts <- split_result$texts
+      source_document_texts <- split_result$source_document_texts
+
+      list(
+        texts = texts,
+        source_document_texts = source_document_texts,
+        document_texts = document_texts,
+        lang = lang
+      )
+    },
+    {
+      session$setInputs(`split-toggle` = lang()$t("Ja"))
+      session$flushReact()
+
+      session$setInputs(`split-max_tokens` = 5)
+      session$flushReact()
+
+      session$setInputs(`split-split_texts` = 1)
+      session$flushReact()
+
+      expect_null(texts())
+
+      stale_result <- split_texts_with_semchunk(
+        texts = c("alpha", "beta"),
+        source_document_ids = c(1L, 2L),
+        source_document_texts = c("alpha", "beta"),
+        chunk_size = 5
+      )
+
+      document_texts(c("gamma"))
+      session$flushReact()
+
+      deferred$resolve(stale_result)
+      later::run_now(0.25)
+      session$flushReact()
+
+      expect_identical(texts(), c("gamma"))
+      expect_null(source_document_texts())
+    }
+  )
+})
+
+
+test_that("text_split_server passes worker setup globals for semchunk async work", {
+  testthat::skip_if_not_installed("mirai")
+
+  mirai_ns <- asNamespace("mirai")
+
+  old_mirai <- get("mirai", envir = mirai_ns)
+  captured <- new.env(parent = emptyenv())
+
+  withr::defer({
+    unlockBinding("mirai", mirai_ns)
+    assign("mirai", old_mirai, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  unlockBinding("mirai", mirai_ns)
+  assign(
+    "mirai",
+    function(
+      .expr,
+      ...,
+      .args = list(),
+      .timeout = NULL,
+      .compute = NULL
+    ) {
+      force(.timeout)
+      force(.compute)
+
+      captured$args <- c(list(...), .args)
+
+      promises::promise(function(resolve, reject) {
+        captured$resolve <- resolve
+        captured$reject <- reject
+      })
+    },
+    envir = mirai_ns
+  )
+  lockBinding("mirai", mirai_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      document_texts <- reactiveVal(c("alpha", "beta"))
+      processing <- reactiveVal(FALSE)
+      lang <- make_test_lang("nl")
+
+      split_result <- text_split_server(
+        id = "split",
+        document_texts = document_texts,
+        processing = processing,
+        lang = lang,
+        enabled = TRUE
+      )
+
+      list(split_result = split_result, lang = lang)
+    },
+    {
+      session$setInputs(`split-toggle` = lang()$t("Ja"))
+      session$flushReact()
+
+      session$setInputs(`split-max_tokens` = 5)
+      session$flushReact()
+
+      session$setInputs(`split-split_texts` = 1)
+      session$flushReact()
+
+      expect_true(all(
+        c(
+          "kwallm_worker_bootstrap",
+          "app_root",
+          "worker_options",
+          "log_context"
+        ) %in%
+          names(captured$args)
+      ))
+    }
+  )
+})
+
+
+test_that("split_texts_with_semchunk preserves row lineage metadata", {
+  result <- split_texts_with_semchunk(
+    texts = c("alpha", "beta"),
+    source_document_ids = c(10L, 20L),
+    source_document_texts = c("Doc A", "Doc B"),
+    chunk_size = 5
+  )
+
+  expect_identical(
+    result$texts,
+    c("alpha__1", "alpha__2", "beta__1", "beta__2")
+  )
+  expect_identical(
+    result$source_document_text,
+    c("Doc A", "Doc A", "Doc B", "Doc B")
+  )
+  expect_identical(result$rows$source_document_id, c(10L, 10L, 20L, 20L))
+  expect_identical(result$rows$document_id, c(1L, 2L, 3L, 4L))
+  expect_identical(
+    result$rows$source_document_text,
+    c("Doc A", "Doc A", "Doc B", "Doc B")
+  )
+  expect_identical(
+    result$rows$document_text,
+    c("alpha__1", "alpha__2", "beta__1", "beta__2")
+  )
+})
+
+
+test_that("text_split_server ignores manual splitting in marking mode", {
+  shiny::testServer(
+    function(input, output, session) {
+      document_texts <- reactiveVal(c("a", "b"))
+      processing <- reactiveVal(FALSE)
+      mode <- reactiveVal("Markeren")
+      lang <- make_test_lang("nl")
+
+      split_result <- text_split_server(
+        id = "split",
+        document_texts = document_texts,
+        processing = processing,
+        mode = mode,
+        lang = lang,
+        enabled = TRUE
+      )
+
+      texts <- split_result$texts
+      split_settings <- split_result$split_settings
+
+      list(
+        texts = texts,
+        split_settings = split_settings,
+        document_texts = document_texts,
+        lang = lang
+      )
+    },
+    {
+      session$setInputs(`split-toggle` = lang()$t("Ja"))
+      session$flushReact()
+
+      expect_identical(texts(), document_texts())
+      expect_false(split_settings()$enabled)
     }
   )
 })

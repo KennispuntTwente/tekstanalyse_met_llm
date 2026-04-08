@@ -88,7 +88,8 @@ interrater_server <- function(
       return <- reactiveValues(
         start = start,
         done = FALSE,
-        result = NULL
+        result = NULL,
+        sample = NULL
       )
 
       # State can be: "configure_sample", "rating", "finished"
@@ -267,10 +268,10 @@ interrater_server <- function(
                 label = HTML(paste0(
                   "<i>",
                   htmltools::htmlEscape(item_text),
-                  lang()$t("</i><br><br><b>Geef een score (1–100):</b>")
+                  lang()$t("</i><br><br><b>Geef een score (0–100):</b>")
                 )),
                 value = selected_choice %||% NA,
-                min = 1,
+                min = 0,
                 max = 100,
                 step = 1
               )
@@ -394,6 +395,7 @@ interrater_server <- function(
 
         # Store sampled data and switch to rating mode
         sampled_data_rv(data_subset)
+        return$sample <- data_subset
         user_ratings_store(list())
         current_item_index(1)
         return$result <- NULL
@@ -435,6 +437,7 @@ interrater_server <- function(
         # Reset relevant states
         module_state("configure_sample")
         sampled_data_rv(NULL)
+        return$sample <- NULL
         user_ratings_store(list())
         current_item_index(1)
         return$result <- NULL
@@ -527,11 +530,11 @@ interrater_server <- function(
           if (
             is.null(user_input) ||
               !is.numeric(user_input) ||
-              user_input < 1 ||
+              user_input < 0 ||
               user_input > 100
           ) {
             showNotification(
-              lang()$t("Voer een geldige score in tussen 1 en 100."),
+              lang()$t("Voer een geldige score in tussen 0 en 100."),
               type = "warning"
             )
             return()
@@ -597,37 +600,61 @@ interrater_server <- function(
                   paired = TRUE
                 )
 
-                # Sensitivity analysis for paired t-test
-                sensitivity <- pwr::pwr.t.test(
-                  n = length(user_scores),
-                  power = 0.80,
-                  sig.level = 0.05,
-                  type = "paired",
-                  alternative = "two.sided"
-                )
-
-                # Interpret the effect size
-                effect_size_d <- sensitivity$d
-                effect_size_label <- if (effect_size_d < 0.3) {
-                  lang()$t("een klein effect")
-                } else if (effect_size_d < 0.7) {
-                  lang()$t("een gemiddeld effect")
-                } else {
-                  lang()$t("een groot effect")
-                }
-
-                # Create Dutch summary sentence
-                sensitivity_sentence <- sprintf(
-                  lang()$t(
-                    "Met een steekproefgrootte van %d hadden we bij deze test 80%% power om een effectgrootte van %.2f (Cohen's d) te detecteren, wat overeenkomt met %s volgens de conventies van [Cohen (1988)](https://doi.org/10.4324/9780203771587). Kleinere verschillen tussen het taalmodel en de menselijke beoordelaar zijn moeilijker te detecteren met deze steekproefgrootte."
+                # Sensitivity analysis can fail for very small samples.
+                # Keep the IRR result and fall back to a generic sentence.
+                sensitivity <- tryCatch(
+                  pwr::pwr.t.test(
+                    n = length(user_scores),
+                    power = 0.80,
+                    sig.level = 0.05,
+                    type = "paired",
+                    alternative = "two.sided"
                   ),
-                  length(user_scores),
-                  effect_size_d,
-                  effect_size_label
+                  error = function(e) NULL
                 )
+
+                sensitivity_sentence <- if (
+                  is.null(sensitivity) ||
+                    is.null(sensitivity$d) ||
+                    !is.finite(sensitivity$d)
+                ) {
+                  lang()$t(
+                    "Met deze steekproefgrootte kon geen betrouwbare gevoeligheidsanalyse worden berekend."
+                  )
+                } else {
+                  effect_size_d <- sensitivity$d
+                  effect_size_label <- if (effect_size_d < 0.3) {
+                    lang()$t("een klein effect")
+                  } else if (effect_size_d < 0.7) {
+                    lang()$t("een gemiddeld effect")
+                  } else {
+                    lang()$t("een groot effect")
+                  }
+
+                  sprintf(
+                    lang()$t(
+                      "Met een steekproefgrootte van %d hadden we bij deze test 80%% power om een effectgrootte van %.2f (Cohen's d) te detecteren, wat overeenkomt met %s volgens de conventies van [Cohen (1988)](https://doi.org/10.4324/9780203771587). Kleinere verschillen tussen het taalmodel en de menselijke beoordelaar zijn moeilijker te detecteren met deze steekproefgrootte."
+                    ),
+                    length(user_scores),
+                    effect_size_d,
+                    effect_size_label
+                  )
+                }
 
                 # Combine tidy t-test result with summary stats
                 t_test_summary <- t_test_result |> broom::tidy()
+
+                # Guard against degenerate cases where all score
+                # differences are zero (constant/equal scores).
+                # t.test() returns NaN for statistic and p.value in
+                # this scenario.
+                if (is.nan(t_test_summary$statistic)) {
+                  t_test_summary$statistic <- 0
+                }
+                if (is.nan(t_test_summary$p.value)) {
+                  t_test_summary$p.value <- 1
+                }
+
                 summary_stats <- list(
                   user_mean = mean(user_scores, na.rm = TRUE),
                   user_sd = sd(user_scores, na.rm = TRUE),
@@ -643,7 +670,7 @@ interrater_server <- function(
                 )
 
                 # Combine everything into one list
-                result_list <- c(as.list(t_test_summary), summary_stats)
+                result_summary <- c(as.list(t_test_summary), summary_stats)
 
                 # Log IRR t-test results
                 log_info(
@@ -657,7 +684,7 @@ interrater_server <- function(
                   component = "irr"
                 )
 
-                result_list
+                result_summary
               } else {
                 # Kappa for categorical data
 
@@ -865,7 +892,7 @@ if (FALSE) {
       # )
       # For testing score data:
       result = sample(
-        c(1:100),
+        c(0:100),
         75,
         replace = TRUE
       )

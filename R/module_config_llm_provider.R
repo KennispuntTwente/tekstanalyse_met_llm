@@ -27,9 +27,14 @@ llm_provider_server <- function(
 
       # Main card UI -----------------------------------------------------------
 
-      # Decide to render the card; only render if can at least configure Ollama or OpenAI
+      # Decide to render the card; render if there is a preconfigured provider
+      #   or if the user can configure at least one provider
       output$llm_provider_card <- renderUI({
-        req(isTRUE(can_configure_oai) || isTRUE(can_configure_ollama))
+        req(
+          isTRUE(has_preconfigured_llm_provider) ||
+            isTRUE(can_configure_oai) ||
+            isTRUE(can_configure_ollama)
+        )
 
         tagList(
           tags$style(HTML(
@@ -381,12 +386,22 @@ llm_provider_server <- function(
 
       # API key  ---------------------------------------------------------------
 
-      initial_api_key <- Sys.getenv("OPENAI_API_KEY")
-      api_key_input <- reactiveVal(initial_api_key)
-      prev_api_key_has_value <- reactiveVal(nchar(initial_api_key %||% "") > 0)
+      env_api_key <- Sys.getenv("OPENAI_API_KEY")
+      # Server-side effective key; never rendered into the browser DOM.
+      api_key_input <- reactiveVal(env_api_key)
+      prev_api_key_has_value <- reactiveVal(nchar(env_api_key %||% "") > 0)
+
+      # Track whether the user has explicitly entered a key so the initial
+      # empty-string from the rendered input does not overwrite the env var.
+      user_entered_api_key <- reactiveVal(FALSE)
 
       # Reactively update API key (updating URLs only when 'get models' is clicked)
-      observeEvent(input$api_key_text, api_key_input(input$api_key_text))
+      observeEvent(input$api_key_text, {
+        if (user_entered_api_key() || nchar(input$api_key_text %||% "") > 0) {
+          user_entered_api_key(TRUE)
+          api_key_input(input$api_key_text)
+        }
+      })
 
       # Log set/cleared transitions (avoid per-keystroke logging)
       observeEvent(
@@ -447,7 +462,12 @@ llm_provider_server <- function(
                   id = ns_api,
                   type = "password",
                   class = "form-control",
-                  value = api_key_input(),
+                  value = "",
+                  placeholder = if (nchar(env_api_key) > 0) {
+                    "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (env)"
+                  } else {
+                    ""
+                  },
                   style = "width: 100%;" # Ensure full width inside the input group
                 ),
                 tags$button(
@@ -599,11 +619,19 @@ llm_provider_server <- function(
           duration = 3
         )
 
-        future(
+        log_context <- log_context_capture(is_async = TRUE)
+
+        mirai::mirai(
           {
-            # IMPORTANT: in futures, do not let raw httr/curl error conditions
-            # escape, because they can be non-serializable and get replaced by
-            # generic future::evalFuture() errors. Always return a simple list.
+            kwallm_worker_bootstrap(
+              task = "llm_provider_models_fetch",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
+
+            # IMPORTANT: in mirai workers, do not let raw httr/curl error conditions
+            # escape, because they can be non-serializable. Always return a simple list.
 
             safe_trim <- function(x, max_chars = 2000) {
               x <- as.character(x %||% "")
@@ -720,11 +748,17 @@ llm_provider_server <- function(
               }
             )
           },
-          globals = list(
-            openai_url = openai_url(),
-            api_key_input = api_key_input(),
-            ollama_url = ollama_url(),
-            provider_mode = provider_mode
+          .args = c(
+            list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
+              openai_url = openai_url(),
+              api_key_input = api_key_input(),
+              ollama_url = ollama_url(),
+              provider_mode = provider_mode
+            ),
+            kwallm_worker_bootstrap_globals()
           )
         ) %...>%
           (function(result) {

@@ -64,7 +64,7 @@ yes_no_toggle_card_server <- function(
     # Render modal button if modal_config is provided
     output$modal_button <- renderUI({
       req(modal_config)
-      modal_trigger_icon(
+      modal_button <- modal_trigger_icon(
         ns = ns,
         input_id = "show_modal",
         icon_name = modal_config$icon,
@@ -72,6 +72,12 @@ yes_no_toggle_card_server <- function(
         is_active = nzchar(modal_value()),
         font_size = "1rem"
       )
+
+      if (isTRUE(processing())) {
+        modal_button <- shinyjs::disabled(modal_button)
+      }
+
+      modal_button
     })
 
     # Show modal when button is clicked
@@ -193,20 +199,25 @@ yes_no_toggle_card_server <- function(
           ),
           card_body(
             p(t(question_text), class = "mb-2 text-center"),
-            div(
-              class = "d-flex justify-content-center",
-              shinyWidgets::radioGroupButtons(
+            div(class = "d-flex justify-content-center", {
+              toggle_buttons <- shinyWidgets::radioGroupButtons(
                 ns("toggle"),
                 NULL,
                 choices = c(lang()$t("Nee"), lang()$t("Ja")),
-                selected = if (default_value) {
+                selected = if (isTRUE(toggle())) {
                   lang()$t("Ja")
                 } else {
                   lang()$t("Nee")
                 },
                 size = "sm"
               )
-            )
+
+              if (isTRUE(processing())) {
+                toggle_buttons <- shinyjs::disabled(toggle_buttons)
+              }
+
+              toggle_buttons
+            })
           )
         )
       )

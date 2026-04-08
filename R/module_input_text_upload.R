@@ -3,7 +3,69 @@
 # Can select a sheet for Excel files, and a specific column for files with multiple columns
 # Can filter rows based on column values through a modal dialog
 # Note: pre-processing of texts is handled in the text_management module,
-#   this module only uploads the raw data
+#   this module establishes the source-document and current-document rows.
+
+.kwallm_raw_starts_with <- function(raw, prefix) {
+  stopifnot(is.raw(raw), is.numeric(prefix))
+
+  length(raw) >= length(prefix) &&
+    identical(
+      as.integer(raw[seq_along(prefix)]),
+      as.integer(prefix)
+    )
+}
+
+
+.kwallm_strip_utf_bom <- function(text) {
+  sub("^\ufeff", "", text)
+}
+
+
+.kwallm_read_text_with_encoding <- function(path, encoding) {
+  con <- file(path, open = "r", encoding = encoding)
+  on.exit(close(con), add = TRUE)
+
+  paste(readLines(con, warn = FALSE, skipNul = TRUE), collapse = "\n")
+}
+
+
+.kwallm_decode_txt_file <- function(path) {
+  stopifnot(is.character(path), length(path) == 1, nzchar(path))
+
+  raw <- readBin(path, "raw", file.info(path)$size)
+
+  if (.kwallm_raw_starts_with(raw, c(0xEF, 0xBB, 0xBF))) {
+    decoded <- rawToChar(raw[-seq_len(3)])
+    Encoding(decoded) <- "UTF-8"
+    return(.kwallm_strip_utf_bom(decoded))
+  }
+
+  if (.kwallm_raw_starts_with(raw, c(0xFF, 0xFE))) {
+    decoded <- .kwallm_read_text_with_encoding(path, "UTF-16LE")
+    return(.kwallm_strip_utf_bom(decoded))
+  }
+
+  if (.kwallm_raw_starts_with(raw, c(0xFE, 0xFF))) {
+    decoded <- .kwallm_read_text_with_encoding(path, "UTF-16BE")
+    return(.kwallm_strip_utf_bom(decoded))
+  }
+
+  txt_content <- tryCatch(
+    {
+      decoded <- rawToChar(raw)
+      if (!validUTF8(decoded)) {
+        stop("not valid utf-8")
+      }
+      Encoding(decoded) <- "UTF-8"
+      decoded
+    },
+    error = function(e) {
+      iconv(rawToChar(raw), from = "", to = "UTF-8", sub = "")
+    }
+  )
+
+  .kwallm_strip_utf_bom(txt_content)
+}
 
 # 1 UI ---------------------------------------------------------------
 text_upload_ui <- function(id) {
@@ -25,6 +87,143 @@ text_upload_server <- function(
 ) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    # Stable id for the uploaded source row, even when text values repeat.
+    source_id_col <- ".kwallm_source_document_id"
+
+    # ---- Helpers ------------------------------------------------------------
+    discard_empty <- function(x) {
+      x <- as.character(x)
+      x <- x[!is.na(x)]
+      keep <- stringr::str_trim(x) != ""
+      x[keep]
+    }
+
+    ensure_source_document_id <- function(df) {
+      stopifnot(is.data.frame(df))
+
+      if (!source_id_col %in% names(df)) {
+        df[[source_id_col]] <- seq_len(nrow(df))
+      }
+
+      df
+    }
+
+    visible_uploaded_columns <- function(df) {
+      if (is.null(df)) {
+        return(character())
+      }
+
+      setdiff(names(df), source_id_col)
+    }
+
+    build_unsplit_rows <- function(df, text_col) {
+      if (
+        is.null(df) ||
+          is.null(text_col) ||
+          !nzchar(text_col) ||
+          !text_col %in% names(df)
+      ) {
+        return(NULL)
+      }
+
+      text_vals <- as.character(df[[text_col]])
+      keep <- !is.na(text_vals) & stringr::str_trim(text_vals) != ""
+
+      if (!any(keep)) {
+        return(data.frame(
+          source_document_id = integer(),
+          document_id = integer(),
+          source_document_text = character(),
+          document_text = character(),
+          stringsAsFactors = FALSE
+        ))
+      }
+
+      source_ids <- as.integer(df[[source_id_col]][keep])
+      document_text_vals <- text_vals[keep]
+
+      # source_document_* describes the uploaded row.
+      # document_* describes the current row passed to later modules.
+      # Before splitting, those two layers are still the same row.
+      data.frame(
+        source_document_id = source_ids,
+        document_id = source_ids,
+        source_document_text = document_text_vals,
+        document_text = document_text_vals,
+        stringsAsFactors = FALSE
+      )
+    }
+
+    normalize_upload_info <- function(file_df) {
+      stopifnot(!is.null(file_df), nrow(file_df) >= 1)
+
+      file_df <- file_df[1, , drop = FALSE]
+      file_name <- as.character(file_df$name[[1]])
+      list(
+        name = file_name,
+        size = as.numeric(file_df$size[[1]] %||% 0),
+        type = as.character(file_df$type[[1]] %||% ""),
+        datapath = as.character(file_df$datapath[[1]]),
+        ext = tolower(tools::file_ext(file_name))
+      )
+    }
+
+    read_txt_file <- function(file_info, split_lines) {
+      txt_content <- .kwallm_decode_txt_file(file_info$datapath)
+      txt_lines <- strsplit(txt_content, "\r?\n")[[1]]
+
+      txt <- if (isTRUE(split_lines)) {
+        discard_empty(stringr::str_trim(txt_lines))
+      } else {
+        paste(txt_lines, collapse = "\n")
+      }
+
+      ensure_source_document_id(data.frame(
+        text = txt,
+        stringsAsFactors = FALSE
+      ))
+    }
+
+    reset_file_input <- function(file_name = NULL) {
+      shinyjs::delay(50, shinyjs::reset("text_file"))
+      shinyjs::delay(
+        80,
+        shinyjs::runjs(sprintf(
+          paste0(
+            "(function(){",
+            "var el=document.getElementById(%s);",
+            "if(!el){return;}",
+            "var group=el.closest('.input-group');",
+            "if(!group){return;}",
+            "var text=group.querySelector('input.form-control[readonly]');",
+            "if(!text){return;}",
+            "text.value=%s;",
+            "})();"
+          ),
+          jsonlite::toJSON(ns("text_file"), auto_unbox = TRUE),
+          jsonlite::toJSON(file_name %||% "", auto_unbox = TRUE)
+        ))
+      )
+    }
+
+    clear_by_column_data <- function() {
+      by_column_values(NULL)
+      by_column_lookup(NULL)
+    }
+
+    clear_upload_state <- function() {
+      document_texts(NULL)
+      text_rows(NULL)
+      uploaded_data(NULL)
+      sheet_names(NULL)
+      filter_spec(NULL)
+      clear_by_column_data()
+      by_column(NULL)
+      selected_sheet(NULL)
+      selected_column(NULL)
+      uploaded_file_info(NULL)
+      file_type(NULL)
+    }
 
     output$card <- renderUI({
       card(
@@ -81,45 +280,123 @@ text_upload_server <- function(
               ),
 
               # ---------- Column selector -----------------------------------
-              div(
-                id = ns("column_container"), # ◄ NEW: easy hide/show
-                class = "selector-container",
-                style = "max-width: 300px; min-height: 100px;", # reserved height
-                uiOutput(ns("column_selector"))
-              ),
+              uiOutput(ns("column_group_controls")),
               # ---- Text mode selector (for .txt files) -------------------
               uiOutput(ns("txt_mode_ui"))
             )
-          )
+          ),
+          div(
+            class = "d-flex justify-content-center mt-3",
+            uiOutput(ns("file_status"))
+          ),
+          tags$script(HTML(sprintf(
+            paste0(
+              "(function(){",
+              "var inputId=%s;",
+              "setTimeout(function(){",
+              "var el=document.getElementById(inputId);",
+              "if(!el || el.dataset.kwallmResetOnClick==='1'){return;}",
+              "el.addEventListener('click', function(){ this.value=''; });",
+              "el.dataset.kwallmResetOnClick='1';",
+              "}, 0);",
+              "})();"
+            ),
+            jsonlite::toJSON(ns("text_file"), auto_unbox = TRUE)
+          )))
         )
       )
     })
 
-    observeEvent(
-      input$txt_split_lines,
-      {
-        req(file_type() == "txt")
-        req(input$txt_split_lines %in% c(lang()$t("Nee"), lang()$t("Ja")))
-        log_action(
-          "txt_split_lines_changed",
-          details = sprintf("value=%s", input$txt_split_lines)
-        )
-      },
-      ignoreInit = TRUE
-    )
-    # ---- Helpers ------------------------------------------------------------
-    discard_empty <- function(x) {
-      x <- x[!is.na(x)]
-      keep <- stringr::str_trim(x) != ""
-      unique(x[keep])
-    }
-
     # ---- Reactive values ----------------------------------------------------
-    raw_texts <- reactiveVal(NULL) # vector of texts returned by module
+    document_texts <- reactiveVal(NULL) # current document texts before preprocessing
+    text_rows <- reactiveVal(NULL) # row-level source/document lineage for those texts
     uploaded_data <- reactiveVal(NULL) # raw data (data.frame) read from file
     sheet_names <- reactiveVal(NULL) # character vector of Excel sheet names
+    by_column <- reactiveVal(NULL) # name of optional grouping column
+    by_column_values <- reactiveVal(NULL) # values of by column aligned with texts
+    by_column_lookup <- reactiveVal(NULL) # duplicate-preserving lookup for reports
     filter_spec <- reactiveVal(NULL) # list(col = <chr>, vals = <chr>) | NULL
     file_type <- reactiveVal(NULL) # ◄ NEW: current file extension
+    uploaded_file_info <- reactiveVal(NULL)
+    selected_sheet <- reactiveVal(NULL)
+    selected_column <- reactiveVal(NULL)
+    txt_split_lines_choice <- reactiveVal(TRUE)
+
+    current_txt_split_lines <- reactive({
+      if (
+        !is.null(input$txt_split_lines) &&
+          input$txt_split_lines %in% c(lang()$t("Nee"), lang()$t("Ja"))
+      ) {
+        identical(input$txt_split_lines, lang()$t("Ja"))
+      } else {
+        txt_split_lines_choice()
+      }
+    })
+
+    current_sheet <- reactive({
+      input$sheet %||% selected_sheet()
+    })
+
+    current_column <- reactive({
+      input$column %||% selected_column()
+    })
+
+    current_by_column <- reactive({
+      if (is.null(input$by_column)) {
+        by_column()
+      } else if (!nzchar(input$by_column)) {
+        NULL
+      } else {
+        input$by_column
+      }
+    })
+
+    shiny::exportTestValues(
+      uploaded_file_name = uploaded_file_info()$name %||% NULL,
+      file_type = file_type(),
+      selected_sheet = selected_sheet(),
+      selected_column = selected_column(),
+      txt_split_lines = txt_split_lines_choice(),
+      by_column = by_column()
+    )
+
+    output$file_status <- renderUI({
+      current_file <- uploaded_file_info()
+      if (is.null(current_file)) {
+        return(NULL)
+      }
+
+      div(
+        class = "small text-muted text-center",
+        style = "max-width: 100%; word-break: break-word;",
+        div(
+          class = "d-inline-flex align-items-center gap-2 px-3 py-2 rounded bg-light",
+          tags$span(icon("file"), " "),
+          tags$strong(current_file$name)
+        )
+      )
+    })
+
+    output$column_group_controls <- renderUI({
+      if (identical(file_type(), "txt")) {
+        return(NULL)
+      }
+
+      tagList(
+        div(
+          id = ns("column_container"),
+          class = "selector-container",
+          style = "max-width: 300px; min-height: 100px;",
+          uiOutput(ns("column_selector"))
+        ),
+        div(
+          id = ns("by_column_container"),
+          class = "selector-container",
+          style = "max-width: 300px; min-height: 100px;",
+          uiOutput(ns("by_column_selector"))
+        )
+      )
+    })
 
     # Logical reactive: is a filter currently active?
     filter_active <- reactive({
@@ -154,47 +431,121 @@ text_upload_server <- function(
       df[df[[col]] %in% spec$vals, , drop = FALSE]
     })
 
+    refresh_by_column_values <- function() {
+      df <- filtered_data()
+      text_col <- current_column()
+      by_col <- current_by_column()
+
+      if (
+        is.null(df) ||
+          is.null(text_col) ||
+          !nzchar(text_col) ||
+          is.null(by_col) ||
+          !nzchar(by_col) ||
+          !by_col %in% names(df)
+      ) {
+        clear_by_column_data()
+        return(invisible(NULL))
+      }
+
+      text_vals <- df[[text_col]]
+      by_vals <- df[[by_col]]
+      keep <- !is.na(text_vals) & stringr::str_trim(text_vals) != ""
+      text_keep <- text_vals[keep]
+      by_keep <- by_vals[keep]
+      source_ids <- as.integer(df[[source_id_col]][keep])
+
+      by_column_lookup(data.frame(
+        source_document_id = source_ids,
+        text = text_keep,
+        by_value = by_keep,
+        stringsAsFactors = FALSE
+      ))
+
+      by_column_values(by_keep)
+      invisible(NULL)
+    }
+
+    refresh_text_rows <- function() {
+      df <- filtered_data()
+      if (is.null(df)) {
+        text_rows(NULL)
+        document_texts(NULL)
+        return(invisible(NULL))
+      }
+
+      text_col <- if (identical(file_type(), "txt")) {
+        "text"
+      } else {
+        current_column()
+      }
+
+      rows <- build_unsplit_rows(df, text_col)
+      text_rows(rows)
+      if (is.null(rows)) {
+        document_texts(NULL)
+      } else {
+        document_texts(rows$document_text)
+      }
+      invisible(NULL)
+    }
+
+    observeEvent(
+      input$txt_split_lines,
+      {
+        req(input$txt_split_lines %in% c(lang()$t("Nee"), lang()$t("Ja")))
+        split_lines <- identical(input$txt_split_lines, lang()$t("Ja"))
+
+        if (!identical(txt_split_lines_choice(), split_lines)) {
+          txt_split_lines_choice(split_lines)
+          log_action(
+            "txt_split_lines_changed",
+            details = sprintf("value=%s", input$txt_split_lines)
+          )
+        }
+      },
+      ignoreInit = TRUE
+    )
+
     # ---- File upload --------------------------------------------------------
     observe({
       req(input$text_file)
+
+      file_info <- normalize_upload_info(input$text_file)
+      previous_column <- isolate(selected_column())
+      previous_by_column <- isolate(by_column())
+      previous_sheet <- isolate(selected_sheet())
 
       # Log file upload
       log_info(
         sprintf(
           "File uploaded: name=%s, type=%s",
-          input$text_file$name,
-          tools::file_ext(input$text_file$name)
+          file_info$name,
+          file_info$ext
         ),
         component = "upload"
       )
 
       # Reset all state -------------------------------------------------------
-      raw_texts(NULL)
+      document_texts(NULL)
       uploaded_data(NULL)
       sheet_names(NULL)
       filter_spec(NULL)
+      clear_by_column_data()
+      by_column(NULL)
+      selected_column(NULL)
 
-      file_ext <- tools::file_ext(input$text_file$name)
-      file_type(file_ext) # ◄ track for UI logic
-      file_path <- input$text_file$datapath
+      uploaded_file_info(file_info)
+      file_type(file_info$ext)
 
-      if (file_ext == "txt") {
+      if (identical(file_info$ext, "txt")) {
+        selected_sheet(NULL)
         tryCatch(
           {
-            # read every line first
-            txt_lines <- readLines(file_path, encoding = "UTF-8", warn = FALSE)
-
-            split_lines <- isTRUE(input$txt_split_lines == lang()$t("Ja"))
-
-            txt <- if (split_lines) {
-              discard_empty(stringr::str_trim(txt_lines))
-            } else {
-              paste(txt_lines, collapse = "\n") # combine to single text
-            }
-
-            df <- data.frame(text = txt, stringsAsFactors = FALSE)
+            df <- read_txt_file(file_info, current_txt_split_lines())
             uploaded_data(df)
-            raw_texts(df$text)
+            text_rows(build_unsplit_rows(df, "text"))
+            document_texts(text_rows()$document_text)
           },
           error = function(e) {
             log_error(
@@ -208,38 +559,71 @@ text_upload_server <- function(
               paste(lang()$t("Error bij lezen van tekstbestand:"), e$message),
               type = "error"
             )
+            clear_upload_state()
           }
         )
-      } else if (file_ext %in% c("csv", "tsv")) {
+        reset_file_input(uploaded_file_info()$name %||% NULL)
+      } else if (file_info$ext %in% c("csv", "tsv")) {
+        selected_sheet(NULL)
         tryCatch(
           {
-            df <- vroom::vroom(file_path)
-            uploaded_data(df)
+            df <- vroom::vroom(file_info$datapath)
+            uploaded_data(ensure_source_document_id(df))
+
+            if (!is.null(previous_column) && previous_column %in% names(df)) {
+              selected_column(previous_column)
+            }
+            if (
+              !is.null(previous_by_column) &&
+                previous_by_column %in% names(df) &&
+                !identical(previous_by_column, selected_column())
+            ) {
+              by_column(previous_by_column)
+            }
           },
           error = function(e) {
             log_error(
               sprintf(
                 "Upload read error: file_type=%s, error=%s",
-                file_ext,
+                file_info$ext,
                 conditionMessage(e)
               ),
               component = "upload"
             )
             showNotification(
               paste(
-                lang()$t("Error bij lezen van CSV/TSV bestand:"),
+                lang()$t("Error bij lezen van CSV/TSV-bestand:"),
                 e$message
               ),
               type = "error"
             )
+            clear_upload_state()
           }
         )
-      } else if (file_ext == "xlsx") {
+        reset_file_input(uploaded_file_info()$name %||% NULL)
+      } else if (file_info$ext == "xlsx") {
         tryCatch(
           {
-            sheets <- readxl::excel_sheets(file_path)
+            sheets <- readxl::excel_sheets(file_info$datapath)
             sheet_names(sheets)
-            # Wait for user to choose sheet before loading data
+
+            desired_sheet <- previous_sheet %||% sheets[1]
+            if (!desired_sheet %in% sheets) {
+              desired_sheet <- sheets[1]
+            }
+            selected_sheet(desired_sheet)
+            uploaded_data(
+              ensure_source_document_id(
+                readxl::read_excel(file_info$datapath, sheet = desired_sheet)
+              )
+            )
+
+            if (!is.null(previous_column)) {
+              selected_column(previous_column)
+            }
+            if (!is.null(previous_by_column)) {
+              by_column(previous_by_column)
+            }
           },
           error = function(e) {
             log_error(
@@ -253,13 +637,27 @@ text_upload_server <- function(
               paste(lang()$t("Error bij lezen van Excel-bestand:"), e$message),
               type = "error"
             )
+            clear_upload_state()
           }
         )
-      } else if (file_ext == "sav") {
+        reset_file_input(uploaded_file_info()$name %||% NULL)
+      } else if (file_info$ext == "sav") {
+        selected_sheet(NULL)
         tryCatch(
           {
-            df <- haven::read_sav(file_path)
-            uploaded_data(df)
+            df <- haven::read_sav(file_info$datapath)
+            uploaded_data(ensure_source_document_id(df))
+
+            if (!is.null(previous_column) && previous_column %in% names(df)) {
+              selected_column(previous_column)
+            }
+            if (
+              !is.null(previous_by_column) &&
+                previous_by_column %in% names(df) &&
+                !identical(previous_by_column, selected_column())
+            ) {
+              by_column(previous_by_column)
+            }
           },
           error = function(e) {
             log_error(
@@ -273,14 +671,16 @@ text_upload_server <- function(
               paste(lang()$t("Error bij lezen van SAV-bestand:"), e$message),
               type = "error"
             )
+            clear_upload_state()
           }
         )
+        reset_file_input(uploaded_file_info()$name %||% NULL)
       } else {
         log_warn(
           sprintf(
             "Unsupported upload file type: name=%s, file_type=%s",
-            input$text_file$name,
-            file_ext
+            file_info$name,
+            file_info$ext
           ),
           component = "upload"
         )
@@ -288,18 +688,8 @@ text_upload_server <- function(
           lang()$t("Niet ondersteund bestandstype"),
           type = "error"
         )
-      }
-    })
-
-    # ---- Show / hide column selector depending on file type ---------------
-    observe({
-      if (is.null(file_type())) {
-        return()
-      }
-      if (file_type() == "txt") {
-        shinyjs::hide(ns("column_container"))
-      } else {
-        shinyjs::show(ns("column_container"))
+        clear_upload_state()
+        reset_file_input()
       }
     })
 
@@ -318,7 +708,11 @@ text_upload_server <- function(
             ns("txt_split_lines"),
             NULL,
             choices = c(lang()$t("Nee"), lang()$t("Ja")),
-            selected = lang()$t("Ja"),
+            selected = if (isTRUE(txt_split_lines_choice())) {
+              lang()$t("Ja")
+            } else {
+              lang()$t("Nee")
+            },
             size = "sm"
           )
         )
@@ -332,18 +726,31 @@ text_upload_server <- function(
         ns("sheet"),
         lang()$t("Selecteer sheet"),
         choices = sheet_names(),
-        selected = sheet_names()[1]
+        selected = current_sheet() %||% sheet_names()[1]
       )
     })
 
-    observeEvent(input$sheet, {
-      req(input$text_file, input$sheet)
-      file_path <- input$text_file$datapath
+    observeEvent(
+      input$sheet,
+      {
+        req(input$sheet)
+        selected_sheet(input$sheet)
+        log_action("sheet_selected", details = input$sheet)
+      },
+      ignoreInit = TRUE
+    )
+
+    observeEvent(selected_sheet(), {
+      file_info <- uploaded_file_info()
+      req(
+        !is.null(file_info),
+        identical(file_info$ext, "xlsx"),
+        selected_sheet()
+      )
       tryCatch(
         {
-          df <- readxl::read_excel(file_path, sheet = input$sheet)
-          uploaded_data(df)
-          log_action("sheet_selected", details = input$sheet)
+          df <- readxl::read_excel(file_info$datapath, sheet = selected_sheet())
+          uploaded_data(ensure_source_document_id(df))
         },
         error = function(e) {
           showNotification(
@@ -361,22 +768,139 @@ text_upload_server <- function(
         return(NULL)
       }
       cols <- names(filtered_data())
+      cols <- visible_uploaded_columns(filtered_data())
       # if (length(cols) <= 1) return(NULL)
       selectInput(
         ns("column"),
         lang()$t("Selecteer kolom met teksten"),
         choices = cols,
-        selected = NULL
+        selected = current_column()
       )
     })
 
-    observeEvent(input$column, {
+    observeEvent(
+      input$column,
+      {
+        req(filtered_data())
+        col <- input$column
+        if (!is.null(col) && nzchar(col)) {
+          selected_column(col)
+          refresh_text_rows()
+          refresh_by_column_values()
+          log_action("column_selected", details = col)
+        } else {
+          selected_column(NULL)
+          text_rows(NULL)
+          document_texts(NULL)
+        }
+      },
+      ignoreInit = TRUE
+    )
+
+    # ---- By column selector (grouping variable) ----------------------------
+    output$by_column_selector <- renderUI({
       req(filtered_data())
-      col <- input$column
-      if (!is.null(col) && nzchar(col)) {
-        log_action("column_selected", details = col)
-        txt <- filtered_data()[[col]]
-        raw_texts(discard_empty(txt))
+      if (file_type() == "txt") {
+        return(NULL)
+      }
+      cols <- names(filtered_data())
+      cols <- visible_uploaded_columns(filtered_data())
+      # Exclude the text column from available by columns
+      text_col <- current_column()
+      available_cols <- setdiff(cols, text_col)
+      if (length(available_cols) == 0) {
+        return(NULL)
+      }
+
+      tagList(
+        selectInput(
+          ns("by_column"),
+          tagList(
+            lang()$t("Selecteer groepsvariabele"),
+            tooltip(
+              bsicons::bs_icon("info-circle"),
+              lang()$t(
+                "Selecteer optioneel een kolom om de resultaten op te splitsen per groep. In het rapport worden dan frequenties/statistieken per groep getoond naast de totalen."
+              )
+            )
+          ),
+          choices = stats::setNames(
+            c("", available_cols),
+            c("", available_cols)
+          ),
+          selected = by_column() %||% ""
+        )
+      )
+    })
+
+    observeEvent(input$by_column, {
+      col <- input$by_column
+      if (is.null(col) || !nzchar(col)) {
+        by_column(NULL)
+        clear_by_column_data()
+        log_action("by_column_cleared")
+      } else {
+        by_column(col)
+        refresh_by_column_values()
+        log_action("by_column_selected", details = col)
+      }
+    })
+
+    # Update by-column metadata when filtered_data, column, or by_column changes
+    observe({
+      req(filtered_data())
+      text_col <- current_column()
+      by_col <- current_by_column()
+
+      if (is.null(text_col) || !nzchar(text_col)) {
+        clear_by_column_data()
+        return()
+      }
+
+      if (is.null(by_col) || !nzchar(by_col)) {
+        clear_by_column_data()
+        return()
+      }
+
+      if (!by_col %in% names(filtered_data())) {
+        clear_by_column_data()
+        return()
+      }
+
+      # Keep both the dedup-aligned vector and the report lookup in sync.
+      refresh_by_column_values()
+    })
+
+    observe({
+      file_info <- uploaded_file_info()
+
+      if (is.null(file_info) || is.null(uploaded_data())) {
+        return()
+      }
+
+      if (identical(file_info$ext, "txt")) {
+        if (!identical(selected_column(), "text")) {
+          selected_column("text")
+        }
+        if (!is.null(by_column())) {
+          by_column(NULL)
+        }
+        return()
+      }
+
+      cols <- visible_uploaded_columns(uploaded_data())
+      current_column <- selected_column()
+      if (is.null(current_column) || !current_column %in% cols) {
+        selected_column(NULL)
+      }
+
+      current_by_column <- by_column()
+      available_by_columns <- setdiff(cols, selected_column())
+      if (
+        !is.null(current_by_column) &&
+          (!current_by_column %in% available_by_columns)
+      ) {
+        by_column(NULL)
       }
     })
 
@@ -450,8 +974,8 @@ text_upload_server <- function(
       shinyWidgets::pickerInput(
         ns("filter_col"),
         label = lang()$t("Kies kolom voor filter"),
-        choices = names(uploaded_data()),
-        selected = filter_spec()$col %||% input$column %||% NULL,
+        choices = visible_uploaded_columns(uploaded_data()),
+        selected = filter_spec()$col %||% current_column() %||% NULL,
         options = shinyWidgets::pickerOptions(container = "body")
       )
     })
@@ -461,7 +985,9 @@ text_upload_server <- function(
       if (!is.null(input$filter_col)) {
         df_col <- uploaded_data()[[input$filter_col]]
       } else {
-        df_col <- uploaded_data()[[1]]
+        visible_cols <- visible_uploaded_columns(uploaded_data())
+        req(length(visible_cols) > 0)
+        df_col <- uploaded_data()[[visible_cols[[1]]]]
       }
 
       counts <- table(na.omit(df_col))
@@ -555,30 +1081,97 @@ text_upload_server <- function(
       removeModal()
     })
 
-    # Refresh raw_texts when filter or column changes ------------------------
-    observeEvent(filtered_data(), {
+    # Refresh current document texts when filter or column changes ------------
+    observe({
       df <- filtered_data()
       req(df)
 
-      if (file_type() == "txt") {
-        # single-column data.frame called “text”
-        raw_texts(discard_empty(df[["text"]]))
-      } else if (!is.null(input$column) && nzchar(input$column)) {
-        raw_texts(discard_empty(df[[input$column]]))
-      }
+      refresh_text_rows()
     })
+
+    # Re-read persisted txt upload when split mode changes after upload -------
+    observeEvent(
+      txt_split_lines_choice(),
+      {
+        file_info <- uploaded_file_info()
+        req(!is.null(file_info), identical(file_info$ext, "txt"))
+
+        tryCatch(
+          {
+            df <- read_txt_file(file_info, current_txt_split_lines())
+            uploaded_data(df)
+            text_rows(build_unsplit_rows(df, "text"))
+            document_texts(text_rows()$document_text)
+          },
+          error = function(e) {
+            log_error(
+              sprintf(
+                "Upload read error: file_type=txt, error=%s",
+                conditionMessage(e)
+              ),
+              component = "upload"
+            )
+            showNotification(
+              paste(lang()$t("Error bij lezen van tekstbestand:"), e$message),
+              type = "error"
+            )
+          }
+        )
+      },
+      ignoreInit = TRUE
+    )
 
     # ---- Disable inputs while processing -----------------------------------
     disable_when_processing(
       processing,
-      c("text_file", "sheet", "column", "filter_btn", "txt_split_lines")
+      c(
+        "text_file",
+        "sheet",
+        "column",
+        "by_column",
+        "filter_btn",
+        "txt_split_lines"
+      )
     )
 
     # ---- Reset fileInput on new session ------------------------------------
     shinyjs::reset("text_file")
 
-    # ---- Return raw texts (character vector) -------------------------------
-    return(raw_texts)
+    upload_info <- reactive({
+      spec <- filter_spec()
+      filter_df <- if (is.null(spec)) {
+        NULL
+      } else {
+        data.frame(
+          column = rep(
+            spec$col %||% NA_character_,
+            length(spec$vals %||% character())
+          ),
+          value = as.character(spec$vals %||% character()),
+          stringsAsFactors = FALSE
+        )
+      }
+
+      list(
+        file_type = file_type(),
+        selected_sheet = current_sheet(),
+        text_column = current_column(),
+        grouping_column = current_by_column(),
+        filter_spec = filter_df,
+        txt_split_lines = txt_split_lines_choice()
+      )
+    })
+
+    # ---- Return current document texts and by_column info ------------------
+    # Return a list with current document texts and grouping metadata.
+    return(list(
+      texts = document_texts,
+      text_rows = text_rows,
+      by_column_name = by_column,
+      by_column_values = by_column_values,
+      by_column_lookup = by_column_lookup,
+      upload_info = upload_info
+    ))
   })
 }
 
@@ -598,11 +1191,11 @@ if (FALSE) {
   server <- function(input, output, session) {
     processing <- reactiveVal(FALSE) # Simulate processing state
 
-    raw_texts <- text_upload_server("text_upload_module", processing)
+    upload_result <- text_upload_server("text_upload_module", processing)
 
     observe({
-      req(raw_texts())
-      print(raw_texts()) # For debugging: print uploaded texts
+      req(upload_result$texts())
+      print(upload_result$texts())
     })
   }
 

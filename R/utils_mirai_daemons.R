@@ -1,0 +1,134 @@
+# Helpers for validating and recycling the shared mirai daemon pool.
+
+#' Compute the configured mirai worker count
+#'
+#' @return Integer worker count, always at least 1.
+kwallm_mirai_default_workers <- function(
+  detect_cores = parallel::detectCores,
+  getenv = Sys.getenv
+) {
+  max_cores <- suppressWarnings(as.integer(detect_cores()))
+  if (is.na(max_cores) || max_cores < 1L) {
+    max_cores <- 1L
+  }
+
+  requested_workers <- suppressWarnings(as.integer(
+    getenv("KWALLM_N_ASYNC_WORKERS", unset = "2")
+  ))
+  if (is.na(requested_workers) || requested_workers < 1L) {
+    requested_workers <- 2L
+  }
+
+  min(max_cores, requested_workers)
+}
+
+
+#' Probe the current mirai daemon pool
+#'
+#' @param timeout_ms Timeout in milliseconds for the worker ping.
+#'
+#' @return TRUE when a worker responds successfully, FALSE otherwise.
+kwallm_mirai_probe <- function(
+  timeout_ms = getOption("kwallm__mirai_probe_timeout_ms", 1000L),
+  mirai_fn = mirai::mirai,
+  is_error_value = mirai::is_error_value
+) {
+  timeout_ms <- suppressWarnings(as.integer(timeout_ms))
+  if (is.na(timeout_ms) || timeout_ms < 1L) {
+    timeout_ms <- 1000L
+  }
+
+  ping <- tryCatch(
+    mirai_fn(
+      {
+        TRUE
+      },
+      .timeout = timeout_ms
+    ),
+    error = function(e) e
+  )
+  if (inherits(ping, "error")) {
+    return(FALSE)
+  }
+
+  result <- tryCatch(
+    ping[],
+    error = function(e) e
+  )
+
+  !inherits(result, "error") &&
+    !isTRUE(is_error_value(result)) &&
+    identical(result, TRUE)
+}
+
+
+#' Ensure the shared mirai daemon pool is alive
+#'
+#' A configured daemon pool can outlive a stopped Shiny app in the same R
+#' session. This helper treats `daemons_set()` as configuration only, verifies
+#' liveness with a cheap worker ping, and recycles the pool when the ping fails.
+#'
+#' @param n_workers Desired number of workers.
+#' @param probe_timeout_ms Timeout in milliseconds for the worker ping.
+#'
+#' @return Named list describing the daemon state after validation.
+kwallm_ensure_mirai_daemons <- function(
+  n_workers = kwallm_mirai_default_workers(),
+  probe_timeout_ms = getOption("kwallm__mirai_probe_timeout_ms", 1000L),
+  daemons_set = mirai::daemons_set,
+  daemons = mirai::daemons,
+  status = mirai::status,
+  probe = kwallm_mirai_probe,
+  sleep = Sys.sleep
+) {
+  n_workers <- suppressWarnings(as.integer(n_workers))
+  if (is.na(n_workers) || n_workers < 1L) {
+    n_workers <- 1L
+  }
+
+  current_status <- tryCatch(
+    status(),
+    error = function(e) list(connections = 0L, daemons = 0L)
+  )
+  current_connections <- suppressWarnings(as.integer(current_status$connections[[
+    1
+  ]]))
+  if (is.na(current_connections)) {
+    current_connections <- 0L
+  }
+
+  had_daemons <- isTRUE(tryCatch(daemons_set(), error = function(e) FALSE))
+  pool_healthy <- FALSE
+  recycled_pool <- FALSE
+
+  if (had_daemons && current_connections > 0L) {
+    pool_healthy <- isTRUE(probe(timeout_ms = probe_timeout_ms))
+  }
+
+  if (had_daemons && !pool_healthy) {
+    recycled_pool <- TRUE
+    tryCatch(daemons(0), error = function(e) NULL)
+    sleep(0.1)
+  }
+
+  if (!had_daemons || !pool_healthy) {
+    daemons(n_workers)
+
+    if (!isTRUE(probe(timeout_ms = probe_timeout_ms))) {
+      stop("mirai daemons started but failed the health probe")
+    }
+  }
+
+  final_status <- tryCatch(
+    status(),
+    error = function(e) list(connections = 0L, daemons = 0L)
+  )
+
+  list(
+    requested_workers = n_workers,
+    had_daemons = had_daemons,
+    recycled_pool = recycled_pool,
+    reused_pool = had_daemons && pool_healthy,
+    status = final_status
+  )
+}

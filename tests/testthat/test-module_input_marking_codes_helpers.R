@@ -1,7 +1,7 @@
 library(testthat)
 
 # Source locally so we can stub dependencies without loading the full app stack.
-source(here::here("R", "module_input_marking_codes.R"), local = TRUE)
+source(here::here("R", "analysis_code_generation.R"), local = TRUE)
 
 # ---- Stubs (avoid Python/LLM/network) -------------------------------------
 
@@ -26,41 +26,52 @@ get_context_window_size_in_tokens <- function(model) {
   2048
 }
 
-# Deterministic chunking: just group sequentially into 2 chunks.
-create_text_chunks <- function(
+# Deterministic batching: just group sequentially into 2 batches.
+create_text_batches <- function(
   texts,
-  chunk_size = 50,
+  batch_size = 50,
   draws = 1,
   n_tokens_context_window = 2048,
-  base_prompt_text = ""
+  base_prompt_text = "",
+  text_formatter = NULL
 ) {
-  force(chunk_size)
+  force(batch_size)
   force(draws)
   force(n_tokens_context_window)
   force(base_prompt_text)
+  force(text_formatter)
 
-  # Use first half and second half as two chunks.
+  # Use first half and second half as two batches.
   split_at <- ceiling(length(texts) / 2)
   list(texts[seq_len(split_at)], texts[(split_at + 1):length(texts)])
 }
 
 # Candidate topic generation + reduction are the LLM parts; stub them.
 create_candidate_topics <- function(
-  text_chunks,
+  text_batches,
   research_background,
   llm_provider,
-  language = c("nl", "en")
+  language = c("nl", "en"),
+  on_progress = NULL,
+  interrupter = NULL
 ) {
-  force(text_chunks)
+  force(text_batches)
   force(research_background)
   force(llm_provider)
   language <- match.arg(language)
+  force(interrupter)
 
-  if (language == "nl") {
+  result <- if (language == "nl") {
     c("Code 1", "Code 2")
   } else {
     c("Code 1", "Code 2")
   }
+
+  if (!is.null(on_progress)) {
+    on_progress(1, length(text_batches), text_batches[[1]], result)
+  }
+
+  result
 }
 
 reduce_topics <- function(

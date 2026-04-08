@@ -74,7 +74,7 @@ gliner_server <- function(
       }
 
       # Queue object to talk to the main process when loading model from async
-      queue <- ipc::shinyQueue()
+      queue <- shinyQueue()
 
       # Make available to the main server:
       #   start function; done status; result (will be the anonymized texts)
@@ -352,7 +352,7 @@ gliner_server <- function(
 
           ## 3 Build a progress bar that the worker can update
           n_txt <- length(pii_texts())
-          progress <- ipc::AsyncProgress$new(
+          progress <- AsyncProgress$new(
             message = lang()$t("Detectie van entiteiten…"),
             detail = sprintf(lang()$t("0 van %d teksten"), n_txt)
           )
@@ -361,20 +361,25 @@ gliner_server <- function(
           queue$consumer$start(millis = 250)
 
           session_id <- get_session_id()
-          log_ctx <- log_context_capture(
+          log_context <- log_context_capture(
             session_id = session_id,
             is_async = TRUE
           )
 
-          ## 4 Spawn the future that runs GLiNER model on texts
-          future(
+          ## 4 Spawn the mirai worker that runs GLiNER model on texts
+          mirai::mirai(
             {
-              log_context_apply(log_ctx)
+              kwallm_worker_bootstrap(
+                task = "gliner",
+                app_root = app_root,
+                worker_options = worker_options,
+                log_context = log_context
+              )
 
               if (is.null(gliner_model)) {
                 # If we are truly in async mode, we load the model here;
                 #   because reticulate objects cannot be passed to async processes
-                #   (in that case, ensure `gliner_model` is NULL when passing it on in 'globals')
+                #   (in that case, ensure `gliner_model` is NULL when passing it on in mirai .args)
                 # If not in async, then the gliner_model may already be loaded
                 gliner_model <- gliner_load_model(queue = queue)
               }
@@ -394,19 +399,19 @@ gliner_server <- function(
                 # Return a named list; original texts are names
                 setNames(pii_texts)
             },
-            globals = c(
-              log_async_globals(log_ctx),
+            .args = c(
               list(
+                app_root = kwallm_worker_app_root(),
+                worker_options = kwallm_worker_capture_options(),
+                log_context = log_context,
                 gliner_model = gliner_model,
-                gliner_load_model = gliner_load_model,
                 pii_texts = pii_texts(),
                 labels = labels,
                 progress = progress,
-                queue = queue,
-                async_message_printer = async_message_printer
-              )
-            ),
-            seed = NULL
+                queue = queue
+              ),
+              kwallm_worker_bootstrap_globals()
+            )
           ) %...>%
             {
               ## SUCCESS ─ tidy predictions & then set state to “evaluating”
@@ -868,11 +873,9 @@ if (FALSE) {
   library(bslib)
   library(bsicons)
   library(htmltools)
-  library(future)
+  library(mirai)
   library(promises)
   library(DT)
-  library(ipc)
-
   # Load components in R/-folder
   r_files <- list.files(
     path = "R",

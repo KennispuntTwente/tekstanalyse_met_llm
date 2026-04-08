@@ -23,6 +23,49 @@ model_ui <- function(
 
 # 2 Server ---------------------------------------------------------
 
+#' Run a lightweight provider test through the standard retry path
+#'
+#' @param provider LLM provider object to test.
+#' @param use_json Logical; whether to request structured JSON output.
+#'
+#' @return Character scalar with the provider response, or pretty-printed JSON.
+run_model_provider_test <- function(provider, use_json = FALSE) {
+  stopifnot(is.logical(use_json), length(use_json) == 1)
+
+  prompt <- tidyprompt::tidyprompt(if (isTRUE(use_json)) "Hi!?" else "Hi!")
+
+  if (isTRUE(use_json)) {
+    json_schema <- list(
+      name = "thought_steps",
+      description = NULL,
+      schema = list(
+        type = "object",
+        properties = list(
+          steps = list(type = "array", items = list(type = "string")),
+          final_answer = list(type = "string")
+        ),
+        required = c("steps", "final_answer"),
+        additionalProperties = FALSE
+      )
+    )
+
+    prompt <- prompt |>
+      tidyprompt::answer_as_json(
+        schema = json_schema,
+        type = "auto"
+      )
+
+    return(jsonlite::toJSON(
+      send_prompt_with_retries(prompt, provider),
+      auto_unbox = TRUE,
+      pretty = TRUE
+    ))
+  }
+
+  response <- send_prompt_with_retries(prompt, provider)
+  as.character(response %||% "")[1]
+}
+
 #' Model selector + configuration UI.
 #'
 #' @param preconfigured_llm_provider_model_main Named list of tidyprompt providers (main model choices).
@@ -454,7 +497,7 @@ model_server <- function(
         save_selection("main")
         update_json_mode_ui("main")
         update_temperature_ui(session, input, models, "main")
-        update_top_p_ui(session, input, models, "large")
+        update_top_p_ui(session, input, models, "main")
         main_provider_updated(Sys.time())
         log_action(
           "model_selected",
@@ -769,39 +812,29 @@ model_server <- function(
           id = nid
         )
 
-        promises::future_promise(
-          {
-            if (use_json) {
-              json_schema <- list(
-                name = "thought_steps",
-                description = NULL,
-                schema = list(
-                  type = "object",
-                  properties = list(
-                    steps = list(type = "array", items = list(type = "string")),
-                    final_answer = list(type = "string")
-                  ),
-                  required = c("steps", "final_answer"),
-                  additionalProperties = FALSE
-                )
-              )
+        log_context <- log_context_capture(is_async = TRUE)
 
-              "Hi!?" %>%
-                tidyprompt::answer_as_json(
-                  schema = json_schema,
-                  type = "auto"
-                ) %>%
-                tidyprompt::send_prompt(provider) %>%
-                jsonlite::toJSON(auto_unbox = TRUE, pretty = TRUE)
-            } else {
-              provider$complete_chat("Hi!") %>%
-                .$completed %>%
-                dplyr::slice_tail(n = 1) %>%
-                dplyr::pull(content)
-            }
+        mirai::mirai(
+          {
+            kwallm_worker_bootstrap(
+              task = "model_provider_test",
+              app_root = app_root,
+              worker_options = worker_options,
+              log_context = log_context
+            )
+
+            run_model_provider_test(provider, use_json = use_json)
           },
-          globals = list(provider = provider, use_json = use_json),
-          packages = c("tidyprompt", "dplyr", "jsonlite", "magrittr")
+          .args = c(
+            list(
+              app_root = kwallm_worker_app_root(),
+              worker_options = kwallm_worker_capture_options(),
+              log_context = log_context,
+              provider = provider,
+              use_json = use_json
+            ),
+            kwallm_worker_bootstrap_globals()
+          )
         ) %...>%
           (function(res) {
             removeNotification(nid)

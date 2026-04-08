@@ -183,9 +183,10 @@ async function launchShinyApp(port) {
 }
 
 async function waitForShiny(port) {
+  const TIMEOUT_MS = 90 * 1000; // 90 seconds
   return new Promise((resolve, reject) => {
-    waitOn({ resources: [`http://127.0.0.1:${port}`] }, (err) => {
-      if (err) reject(err);
+    waitOn({ resources: [`http://127.0.0.1:${port}`], timeout: TIMEOUT_MS }, (err) => {
+      if (err) reject(new Error(`Shiny did not become ready within ${TIMEOUT_MS / 1000}s: ${err.message}`));
       else resolve();
     });
   });
@@ -201,8 +202,7 @@ function createSplashWindow() {
     title: 'KWALLM: Text analysis with LLM',
     icon: path.join(__dirname, 'www', 'icon.ico'),
     webPreferences: {
-      contextIsolation: true,
-      preload: path.join(__dirname, 'splash-preload.js')
+      contextIsolation: true
     }
   });
 
@@ -232,7 +232,7 @@ function createSplashWindow() {
         </style>
       </head>
       <body>
-        <h1>App is loading...</h2>
+        <h1>App is loading...</h1>
         <p>This should take no longer than 30 seconds.<br>
         (The first time may take longer, as it needs to install Python.)<br>
         Is it not working? View the log file:<br><br>
