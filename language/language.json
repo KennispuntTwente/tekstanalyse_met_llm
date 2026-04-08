@@ -1504,6 +1504,34 @@
       {
         "nl": "Sectie",
         "en": "Section"
+      },
+      {
+        "nl": "Semantische chunker laden...",
+        "en": "Loading semantic chunker..."
+      },
+      {
+        "nl": "Geen splitsing nodig, originele teksten worden gebruikt...",
+        "en": "No splitting needed, using original texts..."
+      },
+      {
+        "nl": "{n_texts} teksten gesplitst in {n_split} kleinere teksten...",
+        "en": "Split {n_texts} texts into {n_split} smaller texts..."
+      },
+      {
+        "nl": "{n_batches} tekstbatch(es) aangemaakt van de teksten...",
+        "en": "Created {n_batches} text batch(es) from the texts..."
+      },
+      {
+        "nl": "Batch {i} van {n} gelezen ({n_codes} kandidaat-codes)",
+        "en": "Read batch {i} of {n} ({n_codes} candidate codes)"
+      },
+      {
+        "nl": "{n_candidates} kandidaat-codes aangemaakt, reduceren naar definitieve lijst...",
+        "en": "Created {n_candidates} candidate codes, reducing to final list..."
+      },
+      {
+        "nl": "{n_codes} codes gegenereerd",
+        "en": "Generated {n_codes} codes"
       }
   ]
 }

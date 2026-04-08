@@ -452,10 +452,10 @@ test_that("generate_grouped_marking_prevalence_table shows document-level code p
     marked_text = c("alpha", NA, NA, "beta", NA),
     response_status = c(
       "matched_all",
-      "completed",
-      "completed",
       "matched_all",
-      "completed"
+      "matched_all",
+      "matched_all",
+      "matched_all"
     ),
     stringsAsFactors = FALSE
   )
@@ -498,8 +498,8 @@ test_that("generate_grouped_marking_frequency_table counts texts and spans by gr
     response_status = c(
       "matched_all",
       "matched_all",
-      "completed",
-      "completed",
+      "matched_all",
+      "matched_all",
       "matched_all",
       "matched_all"
     ),
@@ -1038,8 +1038,8 @@ test_that("Markeren report renders grouped marking summaries", {
         marked_text = c("alpha", NA, NA, "beta"),
         response_status = c(
           "matched_all",
-          "completed",
-          "completed",
+          "matched_all",
+          "matched_all",
           "matched_all"
         ),
         stringsAsFactors = FALSE

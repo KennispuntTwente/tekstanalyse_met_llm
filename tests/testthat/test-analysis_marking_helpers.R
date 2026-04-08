@@ -240,3 +240,44 @@ test_that(".kwallm_marking_build_highlighted_excerpt only highlights the matched
 
   expect_identical(excerpt, "alpha **beta** gamma beta")
 })
+
+
+# Repeated identical spans ------------------------------------------------
+
+test_that(".kwallm_marking_clean_results preserves distinct occurrences of the same marked text", {
+  # Two matches for "beta" at different absolute positions should both survive
+  df_result <- data.frame(
+    analysis_unit_id = c(1L, 1L),
+    analysis_unit_text = c(
+      "alpha beta gamma beta delta",
+      "alpha beta gamma beta delta"
+    ),
+    chunk_id = c(1L, 1L),
+    chunk_index = c(1L, 1L),
+    chunk_text = c(
+      "alpha beta gamma beta delta",
+      "alpha beta gamma beta delta"
+    ),
+    code = c("Topic", "Topic"),
+    source_marked_text = c("beta", "beta"),
+    marked_text = c("beta", "beta"),
+    match_start = c(7L, 18L),
+    match_end = c(10L, 21L),
+    match_distance = c(0L, 0L),
+    match_method = c("exact", "exact"),
+    response_status = c("matched_all", "matched_all"),
+    stringsAsFactors = FALSE
+  )
+
+  cleaned <- .kwallm_marking_clean_results(df_result)
+
+  matched <- cleaned[
+    !is.na(cleaned$marked_text) & nzchar(cleaned$marked_text),
+  ]
+  expect_equal(nrow(matched), 2)
+  expect_true(all(matched$marked_text == "beta"))
+  # Absolute spans should be distinct
+  expect_true(
+    matched$absolute_match_start[1] != matched$absolute_match_start[2]
+  )
+})

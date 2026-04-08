@@ -391,6 +391,11 @@
   )
 }
 
+# Returns the allowed response_status values for marking results.
+.kwallm_marking_response_statuses <- function() {
+  c("matched_all", "partial_after_max_interactions")
+}
+
 # Builds an empty topic-generation settings table.
 # We use this as the default for topic mode configuration.
 .kwallm_empty_topic_generation_settings <- function() {
@@ -1011,6 +1016,38 @@ MarkingResult <- S7::new_class(
         !all(self@markings$code_id %in% self@codes$code_id)
     ) {
       problems <- c(problems, "markings$code_id must reference codes")
+    }
+    # Validate response_status values
+    allowed <- .kwallm_marking_response_statuses()
+    if (nrow(self@responses) > 0) {
+      vals <- self@responses$response_status[
+        !is.na(self@responses$response_status)
+      ]
+      bad <- setdiff(vals, allowed)
+      if (length(bad)) {
+        problems <- c(
+          problems,
+          paste0(
+            "responses$response_status contains invalid values: ",
+            paste(shQuote(bad), collapse = ", ")
+          )
+        )
+      }
+    }
+    if (nrow(self@markings) > 0) {
+      vals <- self@markings$response_status[
+        !is.na(self@markings$response_status)
+      ]
+      bad <- setdiff(vals, allowed)
+      if (length(bad)) {
+        problems <- c(
+          problems,
+          paste0(
+            "markings$response_status contains invalid values: ",
+            paste(shQuote(bad), collapse = ", ")
+          )
+        )
+      }
     }
     .kwallm_problems_or_null(problems)
   }
