@@ -15,14 +15,22 @@ test_that("process_button renderUI disables on mode-specific prerequisites", {
     info = "disable_flag must check categories$editing()"
   )
   expect_true(
-    grepl("categories\\$unique_non_empty_count\\(\\)\\s*<\\s*2", src_text, perl = TRUE),
+    grepl(
+      "categories\\$unique_non_empty_count\\(\\)\\s*<\\s*2",
+      src_text,
+      perl = TRUE
+    ),
     info = "disable_flag must check categories$unique_non_empty_count() < 2"
   )
 
   # Scoring: empty characteristic.
   # The disable_flag should contain this check so the button is not clickable.
   expect_true(
-    grepl("nchar\\(scoring_characteristic\\(\\)\\)\\s*<\\s*1", src_text, perl = TRUE),
+    grepl(
+      "nchar\\(scoring_characteristic\\(\\)\\)\\s*<\\s*1",
+      src_text,
+      perl = TRUE
+    ),
     info = "disable_flag must check nchar(scoring_characteristic()) < 1"
   )
 
@@ -32,7 +40,11 @@ test_that("process_button renderUI disables on mode-specific prerequisites", {
     info = "disable_flag must check codes$editing()"
   )
   expect_true(
-    grepl("codes\\$unique_non_empty_count\\(\\)\\s*<\\s*1", src_text, perl = TRUE),
+    grepl(
+      "codes\\$unique_non_empty_count\\(\\)\\s*<\\s*1",
+      src_text,
+      perl = TRUE
+    ),
     info = "disable_flag must check codes$unique_non_empty_count() < 1"
   )
 })
