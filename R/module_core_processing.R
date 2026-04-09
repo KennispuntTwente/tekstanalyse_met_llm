@@ -218,6 +218,8 @@ processing_server <- function(
 
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
+
+        log_context_capture(is_async = TRUE)
       }
 
       # Connects a `mirai` promise to a reactive setter plus shared error
