@@ -1839,6 +1839,21 @@ processing_server <- function(
           isTRUE(processing_has_pending_gliner_anonymization(texts)) ||
           isTRUE(split_in_progress())
 
+        # Mode-specific prerequisites: keep button disabled until inputs are
+        # valid so users cannot click before the mode is ready.
+        if (!disable_flag) {
+          disable_flag <- switch(
+            mode(),
+            "Categorisatie" = isTRUE(categories$editing()) ||
+              categories$unique_non_empty_count() < 2,
+            "Scoren" = isTRUE(nchar(scoring_characteristic()) < 1),
+            "Markeren" = isTRUE(codes$editing()) ||
+              codes$unique_non_empty_count() < 1 ||
+              length(unique(codes$texts())) < length(codes$texts()),
+            FALSE
+          )
+        }
+
         actionButton(
           ns("process"),
           label = btn_label,
