@@ -47,8 +47,9 @@ icon_toggle_button <- function(
     )
   }
 
-  div(
+  tags$button(
     id = full_id,
+    type = "button",
     class = paste(css_prefix, if (is_active) paste0(css_prefix, "-active")),
     title = title,
     onclick = sprintf("Shiny.setInputValue('%s', Math.random())", full_id),
@@ -102,15 +103,22 @@ icon_toggle_css <- function(prefix = "llm-icon") {
     "
     .%s {
       padding: 2px;
+      border: none;
+      background: transparent;
       border-radius: 2px;
       transition: all 0.2s ease;
       cursor: pointer;
     }
     
-    .%s:hover {
+    .%s:hover:not(:disabled) {
       background-color: #f0f0f0;
       box-shadow: 0 0 5px rgba(0,0,0,0.15);
       transform: scale(1.05);
+    }
+    
+    .%s:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
     
     .%s-active {
@@ -120,6 +128,7 @@ icon_toggle_css <- function(prefix = "llm-icon") {
       cursor: default;
     }
   ",
+    prefix,
     prefix,
     prefix,
     prefix
