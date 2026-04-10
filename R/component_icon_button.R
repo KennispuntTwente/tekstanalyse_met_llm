@@ -105,6 +105,8 @@ icon_toggle_css <- function(prefix = "llm-icon") {
       padding: 2px;
       border: none;
       background: transparent;
+      outline: none;
+      appearance: none;
       border-radius: 2px;
       transition: all 0.2s ease;
       cursor: pointer;

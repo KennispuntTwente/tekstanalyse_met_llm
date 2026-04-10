@@ -168,23 +168,32 @@ text_management_server <- function(
           "
           /* --- icon buttons in text‑management (GLiNER / Regex / None) --- */
           .tm-icon {
-            padding: 2px;              /* same visual feel as .llm-icon */
+            padding: 2px;
+            border: none;
+            background: transparent;
+            outline: none;
+            appearance: none;
             border-radius: 2px;
             transition: all 0.2s ease;
             cursor: pointer;
           }
 
-          .tm-icon:hover {
+          .tm-icon:hover:not(:disabled) {
             background-color: #f0f0f0;
             box-shadow: 0 0 5px rgba(0,0,0,0.15);
             transform: scale(1.05);
+          }
+
+          .tm-icon:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
           }
 
           .tm-icon-active {
             background-color: #f0f0f0;
             box-shadow: 0 0 5px rgba(0,0,0,0.15);
             transform: scale(1.05);
-            cursor: default;           /* disable pointer while active */
+            cursor: default;
           }
         "
         )),
