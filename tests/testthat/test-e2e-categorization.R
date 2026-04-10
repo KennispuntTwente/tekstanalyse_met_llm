@@ -29,6 +29,7 @@ test_that("{shinytest2} recording: standard process - categorization", {
   app$set_inputs(`research_background-research_background` = "no clue!")
   app$set_inputs(`categories-fields-field1` = "Positive")
   app$set_inputs(`categories-fields-field2` = "Negative")
+  wait_for_bound_input(app, "categories-fields-toggleEdit")
   app$click("categories-fields-toggleEdit")
   app$wait_for_value(
     export = "categories-fields-isEditing",
@@ -42,6 +43,7 @@ test_that("{shinytest2} recording: standard process - categorization", {
   app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
 
   # Start processing
+  wait_for_bound_input(app, "processing-process")
   wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
   app$wait_for_value(

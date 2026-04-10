@@ -45,6 +45,7 @@ test_that("{shinytest2} recording: standard process - scoring", {
   set_fake_models(app)
 
   # Start processing
+  wait_for_bound_input(app, "processing-process")
   wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
   app$wait_for_value(

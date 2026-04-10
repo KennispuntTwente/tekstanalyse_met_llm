@@ -44,7 +44,7 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   app$set_inputs(`assign_multiple_categories_toggle-toggle` = "Yes")
   app$set_inputs(`human_in_the_loop_toggle-toggle` = "Yes")
   app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
-  app$set_inputs(`interrater_toggle-interrater_reliability` = "No")
+  app$set_inputs(`interrater_toggle-toggle` = "No")
   app$set_inputs(`write_paragraphs_toggle-toggle` = "Yes")
 
   # Start processing

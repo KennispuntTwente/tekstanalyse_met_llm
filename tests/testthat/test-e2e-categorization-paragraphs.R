@@ -35,6 +35,7 @@ test_that("{shinytest2} recording: categorization with paragraph writing", {
   )
   app$set_inputs(`categories-fields-field1` = "Positive feedback")
   app$set_inputs(`categories-fields-field2` = "Negative feedback")
+  wait_for_bound_input(app, "categories-fields-toggleEdit")
   app$click("categories-fields-toggleEdit")
   app$wait_for_value(
     export = "categories-fields-isEditing",
@@ -43,17 +44,15 @@ test_that("{shinytest2} recording: categorization with paragraph writing", {
   )
 
   # Set deterministic fake model
-  app$wait_for_js(
-    "!!document.getElementById('model-main_model')",
-    timeout = 30000
-  )
-  app$set_inputs(`model-main_model` = "kwallm-fake-main-1024")
+  set_fake_models(app)
 
   # IMPORTANT: Enable paragraph writing - this is what this test specifically covers
   app$set_inputs(`write_paragraphs_toggle-toggle` = "Yes")
   app$set_inputs(`assign_multiple_categories_toggle-toggle` = "Yes")
 
   # Start processing
+  wait_for_bound_input(app, "processing-process")
+  wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
   app$wait_for_value(
     export = "processing-success",
