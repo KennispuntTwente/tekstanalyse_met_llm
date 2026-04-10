@@ -1482,6 +1482,10 @@
         "en": "Splitting did not result in more texts"
       },
       {
+        "nl": "Instellingen gewijzigd - splits de teksten opnieuw",
+        "en": "Settings changed - split the texts again"
+      },
+      {
         "nl": "Verticaal",
         "en": "Vertical"
       },

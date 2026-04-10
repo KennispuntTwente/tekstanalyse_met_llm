@@ -490,6 +490,21 @@ text_split_server <- function(
       c("toggle", "max_tokens", "overlap", "split_texts")
     )
 
+    # Invalidate stale chunks when settings change -----------------
+    observe({
+      max_tokens_val()
+      overlap_val()
+
+      if (isTRUE(splitting()) && !is.null(isolate(split_rows()))) {
+        split_rows(NULL)
+        split_document_texts(NULL)
+        source_document_texts(NULL)
+        semchunk_message(
+          lang()$t("Instellingen gewijzigd - splits de teksten opnieuw")
+        )
+      }
+    })
+
     split_settings <- reactive({
       list(
         enabled = isTRUE(splitting()) && !isTRUE(active_marking_mode()),
