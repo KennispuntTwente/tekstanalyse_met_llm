@@ -389,7 +389,10 @@ model_server <- function(
                   shiny::actionLink(
                     ns("main_cog"),
                     NULL,
-                    icon = shiny::icon("gear")
+                    icon = shiny::icon("gear"),
+                    `aria-label` = lang()$t(
+                      "Geavanceerde instellingen voor dit model"
+                    )
                   ),
                   lang()$t("Geavanceerde instellingen voor dit model")
                 )
@@ -443,7 +446,10 @@ model_server <- function(
                     ns("large_cog"),
                     NULL,
                     icon = shiny::icon("gear"),
-                    class = "ms-2"
+                    class = "ms-2",
+                    `aria-label` = lang()$t(
+                      "Geavanceerde instellingen voor dit model"
+                    )
                   ),
                   lang()$t("Geavanceerde instellingen voor dit model")
                 )

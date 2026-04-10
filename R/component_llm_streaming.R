@@ -49,6 +49,7 @@ llm_streaming_ui <- function(
       style = display_style,
       tags$pre(
         id = ns("stream_output"),
+        `aria-live` = "polite",
         style = "
           max-height: 200px;
           overflow-y: auto;

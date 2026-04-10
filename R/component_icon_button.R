@@ -52,6 +52,8 @@ icon_toggle_button <- function(
     type = "button",
     class = paste(css_prefix, if (is_active) paste0(css_prefix, "-active")),
     title = title,
+    `aria-label` = title,
+    `aria-pressed` = tolower(is_active),
     onclick = sprintf("Shiny.setInputValue('%s', Math.random())", full_id),
     icon_content
   ) |>
@@ -170,7 +172,8 @@ modal_trigger_icon <- function(
   actionLink(
     ns(input_id),
     icon(icon_name, lib = "font-awesome"),
-    style = style
+    style = style,
+    `aria-label` = tooltip_text
   ) |>
     bslib::tooltip(tooltip_text)
 }

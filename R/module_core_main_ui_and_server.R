@@ -326,7 +326,8 @@ main_server <- function(
                 style = "display: flex; justify-content: center; align-items: center; gap: 10px;",
                 img(
                   src = "www/logo.png",
-                  style = "width: 3rem; height: 3rem"
+                  style = "width: 3rem; height: 3rem",
+                  alt = ""
                 ),
                 h1(
                   style = "margin: 0; text-align: center;",
@@ -334,7 +335,8 @@ main_server <- function(
                 ),
                 img(
                   src = "www/logo.png",
-                  style = "width: 3rem; height: 3rem; transform: scaleX(-1);"
+                  style = "width: 3rem; height: 3rem; transform: scaleX(-1);",
+                  alt = ""
                 )
               ),
               tags$hr(

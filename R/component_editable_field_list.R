@@ -104,7 +104,8 @@ editable_field_list_server <- function(
         ns("toggleEdit"),
         label = tagList(button_label, ""),
         class = "btn btn-primary",
-        style = "min-width: 75px;"
+        style = "min-width: 75px;",
+        `aria-label` = if (isEditing()) "Save" else "Edit"
       )
 
       if (isTRUE(processing())) {
@@ -121,13 +122,15 @@ editable_field_list_server <- function(
         ns("addField"),
         label = icon("plus"),
         class = "btn btn-success category-button",
-        style = "min-width: 75px;"
+        style = "min-width: 75px;",
+        `aria-label` = "Add"
       )
       remove_button <- actionButton(
         ns("removeField"),
         label = icon("minus"),
         class = "btn btn-danger category-button",
-        style = "min-width: 75px;"
+        style = "min-width: 75px;",
+        `aria-label` = "Remove"
       )
 
       if (buttons_disabled) {

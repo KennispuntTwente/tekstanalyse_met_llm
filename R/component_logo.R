@@ -52,6 +52,7 @@ kpt_logo_ui <- function(
         href = "https://kennispunttwente.nl",
         target = "_blank",
         class = "logo-wrapper",
+        `aria-label` = "Kennispunt Twente",
         img(
           src = logo_src,
           class = "logo-img",
@@ -114,6 +115,7 @@ github_logo_ui <- function(
         href = repo_url,
         target = "_blank",
         class = "logo-wrapper",
+        `aria-label` = "GitHub repository",
         img(src = logo_src, class = "logo-img", alt = "GitHub (avatar)") |>
           bslib::tooltip("GitHub-repository")
       )

@@ -58,7 +58,8 @@ progress_bar_ui <- function(
         div(
           id = ns("text"),
           default_text,
-          class = "text-center mb-3"
+          class = "text-center mb-3",
+          `aria-live` = "polite"
         )
       )
     )

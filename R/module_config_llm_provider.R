@@ -500,6 +500,7 @@ llm_provider_server <- function(
                   id = ns_btn,
                   type = "button",
                   class = "btn btn-outline-secondary",
+                  `aria-label` = "Toggle password visibility",
                   onclick = sprintf(
                     "Shiny.setInputValue('%s', Math.random())",
                     ns_btn
