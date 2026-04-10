@@ -119,7 +119,7 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
 
 Below table shows, for each text row, chunk, and code, which part of the text was marked by the language model.
 
-Column 'Text' contains the current text row in the app, column 'Chunk' contains the chunk that was shown to the language model,
+Column 'Text' contains the original uploaded text, column 'Chunk' contains the (possibly preprocessed) chunk that was shown to the language model,
 the column 'Code' contains the code for which the text was checked, the column 'Marked text' contains the literal text span returned by the language model,
 and the column 'Response status' indicates whether the chunk/code response fully resolved or only partial literal matches survived the correction loop.
 An empty value in 'Marked text' means no relevant span was returned for that chunk/code combination.

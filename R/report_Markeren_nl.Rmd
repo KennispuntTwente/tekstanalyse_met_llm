@@ -118,7 +118,7 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
 
 Onderstaande tabel toont per tekstrij, chunk en code welk deel van de tekst is gemarkeerd door het taalmodel.
 
-Kolom 'Tekst' bevat de huidige tekstrij in de app, kolom 'Chunk' bevat de chunk die aan het taalmodel is getoond,
+Kolom 'Tekst' bevat de originele geüploade tekst, kolom 'Chunk' bevat de (mogelijk voorbewerkte) chunk die aan het taalmodel is getoond,
 de kolom 'Code' bevat de code waarvoor de tekst is gecontroleerd, de kolom 'Gemarkeerde tekst' bevat het letterlijke tekstdeel dat door het taalmodel is teruggegeven,
 en de kolom 'Responsestatus' geeft aan of de chunk/code-respons volledig is opgelost of dat alleen partiele letterlijke matches overbleven na de correctielus.
 Een lege waarde in 'Gemarkeerde tekst' betekent dat er voor die chunk/code-combinatie geen relevant tekstdeel is teruggegeven.
