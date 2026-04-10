@@ -751,6 +751,7 @@ text_upload_server <- function(
         {
           df <- readxl::read_excel(file_info$datapath, sheet = selected_sheet())
           uploaded_data(ensure_source_document_id(df))
+          filter_spec(NULL)
         },
         error = function(e) {
           showNotification(
