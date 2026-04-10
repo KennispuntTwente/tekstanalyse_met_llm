@@ -333,7 +333,7 @@ model_server <- function(
       output$url <- renderUI({
         # In Ollama/OpenAI mode, show URL of configured provider
         if (llm_provider_rv$provider_mode %in% c("openai", "ollama")) {
-          return(HTML(llm_provider_rv$llm_provider_configured$url))
+          return(tags$span(llm_provider_rv$llm_provider_configured$url))
         }
 
         # Otherwise, show URL of chosen LLM providers (preconfigured)
@@ -342,19 +342,21 @@ model_server <- function(
             !is.null(models$main$url) &&
               isTRUE(models$main$url == models$large$url)
           ) {
-            return(HTML(models$main$url))
+            return(tags$span(models$main$url))
           } else {
             req(models$main$url, models$large$url)
-            return(HTML(paste0(
-              models$main$url,
-              "<br>&<br>",
-              models$large$url
-            )))
+            return(tagList(
+              tags$span(models$main$url),
+              tags$br(),
+              "&",
+              tags$br(),
+              tags$span(models$large$url)
+            ))
           }
         }
 
         req(models$main$url)
-        return(HTML(models$main$url))
+        return(tags$span(models$main$url))
       })
 
       # Handle provider/model selection ----------------------------------------
