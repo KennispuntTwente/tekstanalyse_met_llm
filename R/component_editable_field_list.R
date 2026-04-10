@@ -329,7 +329,7 @@ editable_field_list_server <- function(
     exclusive_flags <- reactive({
       show_excl <- isTRUE(show_exclusive()) || identical(show_exclusive, TRUE)
       if (!show_excl) {
-        rep(TRUE, n_fields())
+        rep(FALSE, n_fields())
       } else {
         exclusive_vals()
       }

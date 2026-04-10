@@ -780,10 +780,6 @@ processing_server <- function(
       # paragraphs.
       start_topic_assignment <- function() {
         req(topics())
-        if (!assign_multiple_categories()) {
-          # If not assigning multiple categories, set each topic is exclusive
-          exclusive_topics(topics())
-        }
 
         log_info(
           sprintf(
