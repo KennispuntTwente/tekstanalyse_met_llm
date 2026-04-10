@@ -22,6 +22,10 @@ test_that("process_button renderUI disables on mode-specific prerequisites", {
     ),
     info = "disable_flag must check categories$unique_non_empty_count() < 2"
   )
+  expect_true(
+    grepl("categories\\$has_duplicates\\(\\)", src_text, perl = TRUE),
+    info = "disable_flag must check categories$has_duplicates()"
+  )
 
   # Scoring: empty characteristic.
   # The disable_flag should contain this check so the button is not clickable.
@@ -46,6 +50,10 @@ test_that("process_button renderUI disables on mode-specific prerequisites", {
       perl = TRUE
     ),
     info = "disable_flag must check codes$unique_non_empty_count() < 1"
+  )
+  expect_true(
+    grepl("codes\\$has_duplicates\\(\\)", src_text, perl = TRUE),
+    info = "disable_flag must check codes$has_duplicates()"
   )
 })
 

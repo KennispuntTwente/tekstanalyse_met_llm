@@ -325,6 +325,13 @@ editable_field_list_server <- function(
       length(nonEmptyTexts())
     })
 
+    hasDuplicates <- reactive({
+      vals <- txt_in_fields()
+      trimmed <- trimws(vals)
+      trimmed <- trimmed[nzchar(trimmed)]
+      length(trimmed) != length(unique(trimmed))
+    })
+
     # Exclusive flags (respects show_exclusive)
     exclusive_flags <- reactive({
       show_excl <- isTRUE(show_exclusive()) || identical(show_exclusive, TRUE)
@@ -368,6 +375,7 @@ editable_field_list_server <- function(
       texts = nonEmptyTexts,
       editing = isEditing,
       unique_non_empty_count = nonEmptyUniqueCount,
+      has_duplicates = hasDuplicates,
       exclusive_texts = exclusive_texts,
       set_values = set_values
     ))

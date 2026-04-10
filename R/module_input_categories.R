@@ -83,6 +83,7 @@ categories_server <- function(
       texts = fields$texts,
       editing = fields$editing,
       unique_non_empty_count = fields$unique_non_empty_count,
+      has_duplicates = fields$has_duplicates,
       exclusive_texts = fields$exclusive_texts
     ))
   })

@@ -331,6 +331,13 @@ processing_server <- function(
           )
           return()
         }
+        if (isTRUE(categories$has_duplicates())) {
+          shiny::showNotification(
+            lang()$t("Categorieen moeten uniek zijn."),
+            type = "error"
+          )
+          return()
+        }
         req(isFALSE(context_window$any_fit_problem))
 
         log_context <- start_processing_run()
@@ -1038,7 +1045,7 @@ processing_server <- function(
           )
           return()
         }
-        if (length(unique(codes$texts())) < length(codes$texts())) {
+        if (isTRUE(codes$has_duplicates())) {
           shiny::showNotification(
             lang()$t("Codes moeten uniek zijn."),
             type = "error"
@@ -1841,11 +1848,12 @@ processing_server <- function(
           disable_flag <- switch(
             mode(),
             "Categorisatie" = isTRUE(categories$editing()) ||
-              categories$unique_non_empty_count() < 2,
+              categories$unique_non_empty_count() < 2 ||
+              isTRUE(categories$has_duplicates()),
             "Scoren" = isTRUE(nchar(trimws(scoring_characteristic())) < 1),
             "Markeren" = isTRUE(codes$editing()) ||
               codes$unique_non_empty_count() < 1 ||
-              length(unique(codes$texts())) < length(codes$texts()),
+              isTRUE(codes$has_duplicates()),
             FALSE
           )
         }

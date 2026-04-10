@@ -598,6 +598,10 @@
         "en": "You must specify at least 2 categories."
       },
       {
+        "nl": "Categorieen moeten uniek zijn.",
+        "en": "Categories must be unique."
+      },
+      {
         "nl": "Geef een karakteristiek op.",
         "en": "Please specify a characteristic."
       },

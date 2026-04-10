@@ -346,7 +346,8 @@ marking_codes_server <- function(
     return(list(
       texts = fields$texts,
       editing = fields$editing,
-      unique_non_empty_count = fields$unique_non_empty_count
+      unique_non_empty_count = fields$unique_non_empty_count,
+      has_duplicates = fields$has_duplicates
     ))
   })
 }
