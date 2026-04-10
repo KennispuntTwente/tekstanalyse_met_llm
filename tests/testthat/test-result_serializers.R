@@ -954,6 +954,8 @@ test_that("input provenance and irr sample are serialized", {
   expect_equal(metadata$input$split_overlap, 16)
   expect_equal(metadata$reliability$sample$text, "Text 1")
   expect_true("reliability" %in% names(sheets))
+  expect_true("reliability_sample" %in% names(sheets))
+  expect_equal(sheets$reliability_sample$text, "Text 1")
 })
 
 test_that("stage execution provenance is serialized", {

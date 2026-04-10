@@ -310,6 +310,9 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         )
       }
     )
+    if (is.data.frame(analysis_result@reliability@sample)) {
+      sheets$reliability_sample <- analysis_result@reliability@sample
+    }
   }
 
   Filter(function(x) is.data.frame(x), sheets)
