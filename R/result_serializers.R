@@ -427,6 +427,10 @@ write_analysis_result_metadata_json <- function(
 .kwallm_report_results_df_marking <- function(analysis_result) {
   result <- analysis_result@results
   base <- .kwallm_document_unit_map(analysis_result)
+  # Marking chunks and marked_text derive from the preprocessed/anonymized
+  # text, not from the original document_text.  Use preprocessed_text so the
+  # displayed text column is consistent with chunk_text and marked_text.
+  analysis_units <- analysis_result@text_lineage@analysis_units
   codes_lookup <- .kwallm_codes_lookup(result@codes)
 
   if (!nrow(result@chunks)) {
@@ -441,16 +445,24 @@ write_analysis_result_metadata_json <- function(
     ))
   }
 
+  base_with_preprocessed <- merge(
+    base[c("analysis_unit_id", "document_id")],
+    analysis_units[c("analysis_unit_id", "preprocessed_text")],
+    by = "analysis_unit_id",
+    all.x = TRUE,
+    all.y = FALSE
+  )
+
   chunk_docs <- merge(
     result@chunks,
-    base[c("analysis_unit_id", "document_id", "document_text")],
+    base_with_preprocessed,
     by = "analysis_unit_id",
     all.x = TRUE,
     all.y = FALSE
   )
 
   if (!nrow(result@codes)) {
-    out <- chunk_docs[c("document_id", "document_text", "chunk_text")]
+    out <- chunk_docs[c("document_id", "preprocessed_text", "chunk_text")]
     out$code <- character(nrow(out))
     out$marked_text <- NA_character_
     out$response_status <- NA_character_
@@ -488,7 +500,7 @@ write_analysis_result_metadata_json <- function(
 
   out <- merged[c(
     "document_id",
-    "document_text",
+    "preprocessed_text",
     "chunk_text",
     "code",
     "marked_text",
