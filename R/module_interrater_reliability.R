@@ -317,7 +317,7 @@ interrater_server <- function(
                   class = "d-flex justify-content-center justify-content-md-start",
                   actionButton(
                     ns("reset_module"),
-                    "Reset",
+                    lang()$t("Reset"),
                     icon = icon("undo"),
                     class = "btn-warning"
                   )

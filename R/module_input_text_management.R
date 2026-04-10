@@ -576,7 +576,7 @@ text_management_server <- function(
           class = "text-center mb-3",
           actionButton(
             ns("open_gliner_modal"),
-            "Open GLiNER",
+            lang()$t("Open GLiNER"),
             class = "btn btn-primary"
           )
         )
@@ -691,7 +691,8 @@ text_management_server <- function(
       {
         data.frame(Tekst = texts$preprocessed)
       },
-      options = list(pageLength = 5, scrollX = TRUE)
+      options = list(pageLength = 5, scrollX = TRUE),
+      colnames = lang()$t("Tekst")
     )
 
     observeEvent(anonymization_mode(), {

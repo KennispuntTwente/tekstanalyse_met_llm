@@ -176,7 +176,7 @@ edit_topics_server <- function(
             modal_footer_buttons(
               left = actionButton(
                 ns("reset_topics"),
-                "Reset",
+                lang()$t("Reset"),
                 icon = icon("undo"),
                 class = "btn-warning"
               ),

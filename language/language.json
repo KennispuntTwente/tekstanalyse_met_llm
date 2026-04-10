@@ -786,6 +786,14 @@
         "en": "Click here to report this error message as a GitHub issue. Thank you!"
       },
       {
+        "nl": "Fout",
+        "en": "Error"
+      },
+      {
+        "nl": "Open GLiNER",
+        "en": "Open GLiNER"
+      },
+      {
         "nl": "Trek als:",
         "en": "Draw as:"
       },
