@@ -27,7 +27,7 @@ test_that("process_button renderUI disables on mode-specific prerequisites", {
   # The disable_flag should contain this check so the button is not clickable.
   expect_true(
     grepl(
-      "nchar\\(scoring_characteristic\\(\\)\\)\\s*<\\s*1",
+      "nchar\\(trimws\\(scoring_characteristic\\(\\)\\)\\)\\s*<\\s*1",
       src_text,
       perl = TRUE
     ),

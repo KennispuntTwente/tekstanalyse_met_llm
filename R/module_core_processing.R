@@ -458,7 +458,7 @@ processing_server <- function(
         ) {
           return()
         }
-        if (isTRUE(nchar(scoring_characteristic()) < 1)) {
+        if (isTRUE(nchar(trimws(scoring_characteristic())) < 1)) {
           shiny::showNotification(
             lang()$t("Geef een karakteristiek op."),
             type = "error"
@@ -1842,7 +1842,7 @@ processing_server <- function(
             mode(),
             "Categorisatie" = isTRUE(categories$editing()) ||
               categories$unique_non_empty_count() < 2,
-            "Scoren" = isTRUE(nchar(scoring_characteristic()) < 1),
+            "Scoren" = isTRUE(nchar(trimws(scoring_characteristic())) < 1),
             "Markeren" = isTRUE(codes$editing()) ||
               codes$unique_non_empty_count() < 1 ||
               length(unique(codes$texts())) < length(codes$texts()),
