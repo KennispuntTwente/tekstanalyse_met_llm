@@ -335,9 +335,12 @@ editable_field_list_server <- function(
       }
     })
 
-    # Texts that are marked exclusive
+    # Texts that are marked exclusive (trimmed + deduplicated like texts())
     exclusive_texts <- reactive({
-      txt_in_fields()[exclusive_flags()]
+      raw <- txt_in_fields()[exclusive_flags()]
+      trimmed <- trimws(raw)
+      trimmed <- trimmed[nzchar(trimmed)]
+      unique(trimmed)
     })
 
     # Method to programmatically set field values (e.g., after code generation)

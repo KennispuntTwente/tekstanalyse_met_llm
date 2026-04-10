@@ -52,8 +52,8 @@ test_that("categories_server: save/edit cycle and exclusive selection", {
       expect_equal(sort(categories$texts()), sort(c("A", "B")))
       expect_equal(categories$unique_non_empty_count(), 2)
 
-      # exclusive_texts uses the raw values currently flagged exclusive
-      expect_equal(categories$exclusive_texts(), "  A  ")
+      # exclusive_texts is now trimmed+unique, matching texts()
+      expect_equal(categories$exclusive_texts(), "A")
 
       # Back to edit
       session$setInputs(`categories-fields-toggleEdit` = 2)
