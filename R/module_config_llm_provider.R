@@ -343,7 +343,7 @@ llm_provider_server <- function(
                   )
                 )
               ),
-              value = openai_url(),
+              value = isolate(openai_url()),
               width = "100%"
             )
           ))
@@ -354,13 +354,30 @@ llm_provider_server <- function(
             textInput(
               ns("ollama_url"),
               lang()$t("Ollama-API endpoint URL:"),
-              value = ollama_url(),
+              value = isolate(ollama_url()),
               width = "100%"
             )
           ))
         }
         return(NULL)
       })
+
+      # Keep URL reactiveVals in sync with the text inputs so the
+      # configured provider updates immediately, not only on Ping.
+      observeEvent(
+        input$openai_url,
+        {
+          openai_url(input$openai_url)
+        },
+        ignoreInit = TRUE
+      )
+      observeEvent(
+        input$ollama_url,
+        {
+          ollama_url(input$ollama_url)
+        },
+        ignoreInit = TRUE
+      )
 
       # Mode description UI ----------------------------------------------------
 
@@ -574,14 +591,7 @@ llm_provider_server <- function(
         last_model_request_time(now)
         provider_mode <- llm_provider_rv$provider_mode
 
-        # Update reactive values for URL only when button is clicked
         if (provider_mode == "openai") {
-          openai_url(input$openai_url)
-          log_action(
-            "llm_url_changed",
-            details = sprintf("provider=openai, url=%s", input$openai_url)
-          )
-
           api_key_len <- nchar(api_key_input() %||% "")
           log_action(
             "api_key_used_for_models_ping",
@@ -590,12 +600,6 @@ llm_provider_server <- function(
               api_key_len > 0,
               api_key_len
             )
-          )
-        } else if (provider_mode == "ollama") {
-          ollama_url(input$ollama_url)
-          log_action(
-            "llm_url_changed",
-            details = sprintf("provider=ollama, url=%s", input$ollama_url)
           )
         }
 

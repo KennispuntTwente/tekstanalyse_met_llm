@@ -308,3 +308,69 @@ test_that("llm_provider_server: env OPENAI_API_KEY is never rendered into the br
     }
   )
 })
+
+
+test_that("llm_provider_server: URL change updates provider immediately without Ping", {
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+  source(here::here("R", "component_icon_button.R"), local = TRUE)
+  source(here::here("R", "component_card_header_with_tooltip.R"), local = TRUE)
+  source(here::here("R", "component_description_box.R"), local = TRUE)
+  source(here::here("R", "module_config_llm_provider.R"), local = TRUE)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      processing <- reactiveVal(FALSE)
+
+      llm_provider_rv <- llm_provider_server(
+        id = "llm_provider",
+        processing = processing,
+        has_preconfigured_llm_provider = TRUE,
+        can_configure_oai = TRUE,
+        can_configure_ollama = TRUE,
+        lang = lang
+      )
+
+      list(
+        lang = lang,
+        processing = processing,
+        llm_provider_rv = llm_provider_rv
+      )
+    },
+    {
+      # Switch to OpenAI mode and provide an API key.
+      session$setInputs(`llm_provider-select_openai` = 1)
+      session$flushReact()
+      session$setInputs(`llm_provider-api_key_text` = "test-key")
+      session$flushReact()
+
+      old_url <- llm_provider_rv$llm_provider_configured$url
+
+      # Type a new URL — provider should update without clicking Ping.
+      session$setInputs(
+        `llm_provider-openai_url` = "https://new-endpoint.example.com/v1"
+      )
+      session$flushReact()
+
+      expect_equal(
+        llm_provider_rv$llm_provider_configured$url,
+        "https://new-endpoint.example.com/v1",
+        info = "Provider URL must update immediately when the input changes"
+      )
+
+      # Switch to Ollama mode and change URL.
+      session$setInputs(`llm_provider-select_ollama` = 1)
+      session$flushReact()
+      session$setInputs(
+        `llm_provider-ollama_url` = "http://remote:11434/api/chat"
+      )
+      session$flushReact()
+
+      expect_equal(
+        llm_provider_rv$llm_provider_configured$url,
+        "http://remote:11434/api/chat",
+        info = "Ollama provider URL must update immediately when the input changes"
+      )
+    }
+  )
+})
