@@ -254,8 +254,8 @@
         "en": "Model for topic reduction"
       },
       {
-        "nl": "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren.",
-        "en": "Choose the desired analysis method: categorization, scoring, or topic extraction."
+        "nl": "Kies de gewenste analysemethode: categoriseren, scoren, onderwerpen extraheren of markeren.",
+        "en": "Choose the desired analysis method: categorization, scoring, topic extraction, or marking."
       },
       {
         "nl": "Modus",
@@ -1588,6 +1588,22 @@
       {
         "nl": "Verwijder dubbele codes",
         "en": "Remove duplicate codes"
+      },
+      {
+        "nl": "Provider testen...",
+        "en": "Testing provider..."
+      },
+      {
+        "nl": "Provider heeft geantwoord (succes):",
+        "en": "Provider responded (success):"
+      },
+      {
+        "nl": "Laden...",
+        "en": "Loading..."
+      },
+      {
+        "nl": "Kies de gewenste analysemethode: categoriseren, scoren, onderwerpen extraheren of markeren.",
+        "en": "Choose the desired analysis method: categorization, scoring, topic extraction, or marking."
       }
   ]
 }

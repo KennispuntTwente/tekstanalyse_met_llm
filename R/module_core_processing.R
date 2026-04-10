@@ -1596,7 +1596,7 @@ processing_server <- function(
             tags$div(
               class = "spinner-border",
               role = "status",
-              tags$span(class = "visually-hidden", "Loading...")
+              tags$span(class = "visually-hidden", lang()$t("Laden..."))
             ),
             br(),
             p(lang()$t("Download wordt voorbereid..."))

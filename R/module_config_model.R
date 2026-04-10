@@ -806,7 +806,7 @@ model_server <- function(
 
         nid <- paste0(which, if (use_json) "_test_json" else "_test")
         showNotification(
-          "Testing provider...",
+          lang()$t("Provider testen..."),
           type = "message",
           duration = NULL,
           id = nid
@@ -860,7 +860,12 @@ model_server <- function(
               component = "llm"
             )
             showNotification(
-              paste0("Provider responded (success):\n'", res, "'"),
+              paste0(
+                lang()$t("Provider heeft geantwoord (succes):"),
+                "\n'",
+                res,
+                "'"
+              ),
               type = "message",
               duration = 5
             )
