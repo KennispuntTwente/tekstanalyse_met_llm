@@ -246,7 +246,7 @@ text_split_server <- function(
           ),
           value = 0,
           min = 0,
-          step = 1
+          step = 0.1
         ),
         # Button to split texts
         div(
