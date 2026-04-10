@@ -1600,10 +1600,6 @@
       {
         "nl": "Laden...",
         "en": "Loading..."
-      },
-      {
-        "nl": "Kies de gewenste analysemethode: categoriseren, scoren, onderwerpen extraheren of markeren.",
-        "en": "Choose the desired analysis method: categorization, scoring, topic extraction, or marking."
       }
   ]
 }
