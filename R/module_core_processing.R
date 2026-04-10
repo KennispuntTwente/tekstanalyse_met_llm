@@ -54,6 +54,7 @@ processing_server <- function(
   split_settings = reactiveVal(list()),
   upload_info = reactiveVal(list()),
   split_in_progress = reactiveVal(FALSE),
+  layout_view = reactiveVal("vertical"),
   lang = default_lang()
 ) {
   ns <- NS(id)
@@ -1834,36 +1835,55 @@ processing_server <- function(
           paste0(lang()$t("Verwerk"), " (", n_pre, ")")
         )
 
-        # Disable if no texts OR if there is a context-window fit problem
-        disable_flag <- (n_pre == 0) ||
-          !processing_models_ready(models, mode()) ||
-          isTRUE(context_window$any_fit_problem) ||
-          isTRUE(context_window$too_many_batches) ||
-          isTRUE(processing_has_pending_gliner_anonymization(texts)) ||
-          isTRUE(split_in_progress())
+        # Compute active blockers that prevent processing from starting.
+        blockers <- processing_active_blockers(
+          n_pre = n_pre,
+          models = models,
+          mode = mode(),
+          context_window = context_window,
+          texts = texts,
+          split_in_progress = split_in_progress(),
+          categories = categories,
+          scoring_characteristic = scoring_characteristic(),
+          codes = codes,
+          lang = lang()
+        )
 
-        # Mode-specific prerequisites: keep button disabled until inputs are
-        # valid so users cannot click before the mode is ready.
-        if (!disable_flag) {
-          disable_flag <- switch(
-            mode(),
-            "Categorisatie" = isTRUE(categories$editing()) ||
-              categories$unique_non_empty_count() < 2 ||
-              isTRUE(categories$has_duplicates()),
-            "Scoren" = isTRUE(nchar(trimws(scoring_characteristic())) < 1),
-            "Markeren" = isTRUE(codes$editing()) ||
-              codes$unique_non_empty_count() < 1 ||
-              isTRUE(codes$has_duplicates()),
-            FALSE
-          )
-        }
+        disable_flag <- length(blockers) > 0L
 
-        actionButton(
+        btn <- actionButton(
           ns("process"),
           label = btn_label,
           class = "btn btn-primary btn-lg snake-btn",
           disabled = disable_flag
         )
+
+        if (!disable_flag) {
+          return(btn)
+        }
+
+        # Build inline guidance listing the active blockers.
+        is_sections <- identical(layout_view(), "sections")
+        section_label <- if (is_sections) lang()$t("Sectie") else NULL
+
+        items <- lapply(blockers, function(b) {
+          msg <- b$message
+          if (is_sections && !is.null(section_label)) {
+            msg <- paste0(msg, " (", section_label, " ", b$section, ")")
+          }
+          tags$li(msg)
+        })
+
+        blocker_ui <- div(
+          class = "alert alert-info mt-3 text-start",
+          style = "max-width: 500px; margin-left: auto; margin-right: auto;",
+          tags$ul(
+            class = "mb-0 ps-3",
+            items
+          )
+        )
+
+        tagList(btn, blocker_ui)
       })
 
       ### 2.9.4 Interruption & cancel ------------------------------------------

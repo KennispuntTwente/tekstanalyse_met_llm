@@ -304,3 +304,173 @@ test_that("processing_results_have_invalid_na is mode-aware", {
     processing_results_have_invalid_na(valid_marking_results, "Markeren")
   )
 })
+
+
+# processing_active_blockers ------------------------------------------------
+
+test_that("processing_active_blockers returns empty list when all OK", {
+  lang <- list(t = function(x) x)
+  models <- list(main = "some-model")
+  ctx <- list(any_fit_problem = FALSE, too_many_batches = FALSE)
+  texts <- list(
+    anonymization_requested_mode = "none",
+    anonymization_completed = TRUE
+  )
+  cats <- list(
+    editing = function() FALSE,
+    unique_non_empty_count = function() 3L,
+    has_duplicates = function() FALSE
+  )
+
+  result <- processing_active_blockers(
+    n_pre = 5L,
+    models = models,
+    mode = "Categorisatie",
+    context_window = ctx,
+    texts = texts,
+    split_in_progress = FALSE,
+    categories = cats,
+    lang = lang
+  )
+
+  expect_length(result, 0L)
+})
+
+test_that("processing_active_blockers detects general blockers", {
+  lang <- list(t = function(x) x)
+  models <- list(main = NULL)
+  ctx <- list(any_fit_problem = TRUE, too_many_batches = TRUE)
+  texts <- list(
+    anonymization_requested_mode = "gliner",
+    anonymization_completed = FALSE
+  )
+
+  result <- processing_active_blockers(
+    n_pre = 0L,
+    models = models,
+    mode = "Categorisatie",
+    context_window = ctx,
+    texts = texts,
+    split_in_progress = TRUE,
+    lang = lang
+  )
+
+  keys <- vapply(result, `[[`, character(1), "key")
+  expect_true("no_texts" %in% keys)
+  expect_true("models_missing" %in% keys)
+  expect_true("context_overflow" %in% keys)
+  expect_true("too_many_batches" %in% keys)
+  expect_true("gliner_pending" %in% keys)
+  expect_true("split_in_progress" %in% keys)
+})
+
+test_that("processing_active_blockers detects categorization blockers", {
+  lang <- list(t = function(x) x)
+  models <- list(main = "m")
+  ctx <- list(any_fit_problem = FALSE, too_many_batches = FALSE)
+  texts <- list(anonymization_requested_mode = "none")
+  cats <- list(
+    editing = function() TRUE,
+    unique_non_empty_count = function() 1L,
+    has_duplicates = function() TRUE
+  )
+
+  result <- processing_active_blockers(
+    n_pre = 3L,
+    models = models,
+    mode = "Categorisatie",
+    context_window = ctx,
+    texts = texts,
+    split_in_progress = FALSE,
+    categories = cats,
+    lang = lang
+  )
+
+  keys <- vapply(result, `[[`, character(1), "key")
+  expect_true("categories_editing" %in% keys)
+  expect_true("categories_too_few" %in% keys)
+  expect_true("categories_duplicates" %in% keys)
+  # Section should be 3 for all category blockers.
+  sections <- vapply(result, `[[`, integer(1), "section")
+  expect_true(all(
+    sections[
+      keys %in%
+        c(
+          "categories_editing",
+          "categories_too_few",
+          "categories_duplicates"
+        )
+    ] ==
+      3L
+  ))
+})
+
+test_that("processing_active_blockers detects scoring blocker", {
+  lang <- list(t = function(x) x)
+  models <- list(main = "m")
+  ctx <- list(any_fit_problem = FALSE, too_many_batches = FALSE)
+  texts <- list(anonymization_requested_mode = "none")
+
+  result <- processing_active_blockers(
+    n_pre = 3L,
+    models = models,
+    mode = "Scoren",
+    context_window = ctx,
+    texts = texts,
+    split_in_progress = FALSE,
+    scoring_characteristic = "  ",
+    lang = lang
+  )
+
+  keys <- vapply(result, `[[`, character(1), "key")
+  expect_true("scoring_empty" %in% keys)
+  expect_equal(result[[1]]$section, 3L)
+})
+
+test_that("processing_active_blockers detects marking blockers", {
+  lang <- list(t = function(x) x)
+  models <- list(main = "m")
+  ctx <- list(any_fit_problem = FALSE, too_many_batches = FALSE)
+  texts <- list(anonymization_requested_mode = "none")
+  codes <- list(
+    editing = function() TRUE,
+    unique_non_empty_count = function() 0L,
+    has_duplicates = function() TRUE
+  )
+
+  result <- processing_active_blockers(
+    n_pre = 3L,
+    models = models,
+    mode = "Markeren",
+    context_window = ctx,
+    texts = texts,
+    split_in_progress = FALSE,
+    codes = codes,
+    lang = lang
+  )
+
+  keys <- vapply(result, `[[`, character(1), "key")
+  expect_true("codes_editing" %in% keys)
+  expect_true("codes_too_few" %in% keys)
+  expect_true("codes_duplicates" %in% keys)
+})
+
+test_that("processing_active_blockers skips mode-specific for other modes", {
+  lang <- list(t = function(x) x)
+  models <- list(main = "m", large = "l")
+  ctx <- list(any_fit_problem = FALSE, too_many_batches = FALSE)
+  texts <- list(anonymization_requested_mode = "none")
+
+  # Onderwerpextractie has no mode-specific blockers (no categories/codes/scoring).
+  result <- processing_active_blockers(
+    n_pre = 3L,
+    models = models,
+    mode = "Onderwerpextractie",
+    context_window = ctx,
+    texts = texts,
+    split_in_progress = FALSE,
+    lang = lang
+  )
+
+  expect_length(result, 0L)
+})

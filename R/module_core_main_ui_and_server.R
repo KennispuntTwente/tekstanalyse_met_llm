@@ -776,6 +776,7 @@ main_server <- function(
       split_settings = split_settings,
       upload_info = upload_info,
       split_in_progress = split_in_progress,
+      layout_view = last_layout_view,
       lang = lang
     )
 

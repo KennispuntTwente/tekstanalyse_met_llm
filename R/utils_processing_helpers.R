@@ -160,6 +160,142 @@ processing_models_ready <- function(models, mode = NULL) {
 }
 
 
+#' Compute active blockers that prevent the process button from being clicked
+#'
+#' Returns a list of blocker entries. Each entry is a list with `key` (stable
+#' identifier), `message` (translated user-facing text), and `section` (the
+#' wizard section where the user can fix the issue). An empty list means no
+#' blockers are active and the button should be enabled.
+#'
+#' @param n_pre Integer count of preprocessed texts.
+#' @param models Reactive-values-like object with `main` and `large` entries.
+#' @param mode Current processing mode name.
+#' @param context_window List with `any_fit_problem` and `too_many_batches`.
+#' @param texts Reactive-values-like object from `text_management_server()`.
+#' @param split_in_progress Logical; TRUE while text splitting is running.
+#' @param categories Editable field list return value (or NULL for non-cat modes).
+#' @param scoring_characteristic Character scalar (or NULL for non-scoring modes).
+#' @param codes Editable field list return value (or NULL for non-marking modes).
+#' @param lang Translator object with `$t()` method.
+#'
+#' @return List of `list(key, message, section)` entries.
+processing_active_blockers <- function(
+  n_pre,
+  models,
+  mode,
+  context_window,
+  texts,
+  split_in_progress,
+  categories = NULL,
+  scoring_characteristic = NULL,
+  codes = NULL,
+  lang
+) {
+  blockers <- list()
+
+  add <- function(key, message, section) {
+    blockers[[length(blockers) + 1L]] <<- list(
+      key = key,
+      message = message,
+      section = section
+    )
+  }
+
+  # General conditions (all modes)
+  if (isTRUE(n_pre == 0L)) {
+    add("no_texts", lang$t("Geen teksten geüpload"), 1L)
+  }
+
+  if (!processing_models_ready(models, mode)) {
+    add("models_missing", lang$t("Geen model geselecteerd"), 4L)
+  }
+
+  if (isTRUE(context_window$any_fit_problem)) {
+    add(
+      "context_overflow",
+      lang$t("Sommige teksten overschrijden het context-window"),
+      4L
+    )
+  }
+
+  if (isTRUE(context_window$too_many_batches)) {
+    add(
+      "too_many_batches",
+      lang$t("Te veel batches voor onderwerpextractie"),
+      4L
+    )
+  }
+
+  if (isTRUE(processing_has_pending_gliner_anonymization(texts))) {
+    add(
+      "gliner_pending",
+      lang$t("GLiNER-anonimisering nog niet voltooid"),
+      1L
+    )
+  }
+
+  if (isTRUE(split_in_progress)) {
+    add("split_in_progress", lang$t("Teksten worden gesplitst"), 1L)
+  }
+
+  # Mode-specific conditions
+  if (identical(mode, "Categorisatie") && !is.null(categories)) {
+    if (isTRUE(categories$editing())) {
+      add(
+        "categories_editing",
+        lang$t("Sla de categorieën eerst op"),
+        3L
+      )
+    }
+    if (
+      is.function(categories$unique_non_empty_count) &&
+        categories$unique_non_empty_count() < 2
+    ) {
+      add(
+        "categories_too_few",
+        lang$t("Minimaal 2 categorieën vereist"),
+        3L
+      )
+    }
+    if (isTRUE(categories$has_duplicates())) {
+      add(
+        "categories_duplicates",
+        lang$t("Verwijder dubbele categorieën"),
+        3L
+      )
+    }
+  }
+
+  if (identical(mode, "Scoren")) {
+    sc <- scoring_characteristic %||% ""
+    if (isTRUE(nchar(trimws(sc)) < 1)) {
+      add(
+        "scoring_empty",
+        lang$t("Vul een scoringskenmerk in"),
+        3L
+      )
+    }
+  }
+
+  if (identical(mode, "Markeren") && !is.null(codes)) {
+    if (isTRUE(codes$editing())) {
+      add("codes_editing", lang$t("Sla de codes eerst op"), 3L)
+    }
+    if (
+      is.function(codes$unique_non_empty_count) &&
+        codes$unique_non_empty_count() < 1
+    ) {
+      add("codes_too_few", lang$t("Minimaal 1 code vereist"), 3L)
+    }
+    if (isTRUE(codes$has_duplicates())) {
+      add("codes_duplicates", lang$t("Verwijder dubbele codes"), 3L)
+    }
+  }
+
+  blockers
+}
+
+
 #' Safely read the model id for logging and diagnostics
 #'
 #' @param model Provider object or `NULL`.

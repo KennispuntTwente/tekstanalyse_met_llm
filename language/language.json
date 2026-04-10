@@ -1536,6 +1536,58 @@
       {
         "nl": "{n_codes} codes gegenereerd",
         "en": "Generated {n_codes} codes"
+      },
+      {
+        "nl": "Geen teksten geüpload",
+        "en": "No texts uploaded"
+      },
+      {
+        "nl": "Geen model geselecteerd",
+        "en": "No model selected"
+      },
+      {
+        "nl": "Sommige teksten overschrijden het context-window",
+        "en": "Some texts exceed the context window"
+      },
+      {
+        "nl": "Te veel batches voor onderwerpextractie",
+        "en": "Too many batches for topic extraction"
+      },
+      {
+        "nl": "GLiNER-anonimisering nog niet voltooid",
+        "en": "GLiNER anonymization not yet completed"
+      },
+      {
+        "nl": "Teksten worden gesplitst",
+        "en": "Text splitting in progress"
+      },
+      {
+        "nl": "Sla de categorieën eerst op",
+        "en": "Save the categories first"
+      },
+      {
+        "nl": "Minimaal 2 categorieën vereist",
+        "en": "At least 2 categories required"
+      },
+      {
+        "nl": "Verwijder dubbele categorieën",
+        "en": "Remove duplicate categories"
+      },
+      {
+        "nl": "Vul een scoringskenmerk in",
+        "en": "Enter a scoring characteristic"
+      },
+      {
+        "nl": "Sla de codes eerst op",
+        "en": "Save the codes first"
+      },
+      {
+        "nl": "Minimaal 1 code vereist",
+        "en": "At least 1 code required"
+      },
+      {
+        "nl": "Verwijder dubbele codes",
+        "en": "Remove duplicate codes"
       }
   ]
 }
