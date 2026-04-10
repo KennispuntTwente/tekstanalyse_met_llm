@@ -21,12 +21,14 @@ test_that("{shinytest2} upload card keeps consistent state across navigation and
 
   wait_for_text_upload_input(app)
   app$upload_file(`text_upload-text_file` = temp_csv)
+  wait_for_select_option(app, "text_upload-column", "text")
   app$set_inputs(`text_upload-column` = "text")
   app$wait_for_value(
     export = "text_management-texts__document_text",
     timeout = 10000,
     ignore = c(NULL)
   )
+  wait_for_bound_input(app, "text_upload-by_column")
   app$set_inputs(`text_upload-by_column` = "group")
 
   expect_equal(
