@@ -693,7 +693,7 @@ test_that("Categorisatie reports use correct category wording, not topic/subject
       )
       paragraph_entries <- list(list(
         topic = "A",
-        paragraph = 'Summary with "Text 1".',
+        paragraph = 'Summary with "Text 1" & details.',
         texts = "Text 1",
         analysis_unit_ids = 1L,
         prompt_fits = TRUE
@@ -754,7 +754,11 @@ test_that("Categorisatie reports use correct category wording, not topic/subject
         expect_false(grepl(s, html_multi, fixed = TRUE))
       }
 
-      # --- Single-label variant ---
+      # No double-escaping: &amp;amp; or &amp;lt; must not appear
+      expect_false(grepl("&amp;amp;", html_multi, fixed = TRUE))
+      expect_false(grepl("&amp;lt;", html_multi, fixed = TRUE))
+      # The properly-escaped & from the paragraph text must be present
+      expect_true(grepl("&amp;", html_multi, fixed = TRUE))
       ar_single <- .build_smoke_analysis_result(report_path)
       out_single <- file.path(
         out_dir,

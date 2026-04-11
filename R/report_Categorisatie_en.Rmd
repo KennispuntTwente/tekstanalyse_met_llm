@@ -269,7 +269,7 @@ for (i in seq_len(nrow(paragraphs_df))) {
     paragraph_text = paragraph_text,
     supporting_texts = supporting_texts,
     lang = "en",
-    escape_html = TRUE
+    escape_html = FALSE
   )
   
   #### 2 Check if paragraph has attribute about prompt not fitting in context window ####
