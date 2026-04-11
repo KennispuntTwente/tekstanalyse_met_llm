@@ -1004,3 +1004,472 @@ test_that("processing_server: process click is ignored when required models are 
     }
   )
 })
+
+
+# 5. Marking branch ------------------------------------------------------------
+
+test_that("processing_server: marking branch dispatches mark_texts and stores results", {
+  source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+
+  progress_bar_server <- stub_progress_bar_server
+  llm_streaming_server <- stub_llm_streaming_server
+
+  processing_texts_under_maximum <- function(...) TRUE
+  processing_split_ready <- function(...) TRUE
+  processing_anonymization_ready <- function(...) TRUE
+  processing_has_pending_gliner_anonymization <- function(...) FALSE
+  processing_results_have_invalid_na <- function(...) FALSE
+
+  log_action <- function(...) invisible(NULL)
+  log_analysis_start <- function(...) invisible(NULL)
+  log_context_capture <- function(...) list()
+  log_context_apply <- function(...) invisible(NULL)
+  log_info <- function(...) invisible(NULL)
+  log_debug <- function(...) invisible(NULL)
+  log_warn <- function(...) invisible(NULL)
+
+  handle_detailed_error <- function(...) {
+    function(err) stop(err)
+  }
+
+  app_error <- function(error, ...) stop(error)
+
+  .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
+  .kwallm__prompt_execution_get <- function(...) NULL
+
+  captured_codes <- NULL
+  captured_texts <- NULL
+
+  # Stub mark_texts to capture inputs and return a valid marking data frame.
+  mark_texts <- function(
+    texts,
+    analysis_unit_ids,
+    codes,
+    text_size_tokens = 128,
+    overlap_size_tokens = 64,
+    research_background = "",
+    style_prompt = "",
+    llm_provider,
+    write_paragraphs = TRUE,
+    ...
+  ) {
+    captured_codes <<- codes
+    captured_texts <<- texts
+
+    result <- data.frame(
+      analysis_unit_id = rep(analysis_unit_ids, each = length(codes)),
+      chunk_id = seq_len(length(analysis_unit_ids) * length(codes)),
+      chunk_index = 1L,
+      chunk_text = rep(texts, each = length(codes)),
+      code = rep(codes, times = length(analysis_unit_ids)),
+      source_marked_text = NA_character_,
+      marked_text = NA_character_,
+      match_start = NA_integer_,
+      match_end = NA_integer_,
+      match_distance = NA_integer_,
+      match_method = NA_character_,
+      response_status = "matched_all",
+      stringsAsFactors = FALSE
+    )
+
+    attr(result, "paragraphs") <- NULL
+    result
+  }
+
+  build_analysis_result <- function(...) {
+    structure(list(), class = "MockAnalysisResult")
+  }
+  analysis_result_expected_paragraph_subject_count <- function(...) 0L
+  .kwallm_report_results_df <- function(...) {
+    data.frame(stringsAsFactors = FALSE)
+  }
+  create_analysis_result_download_bundle <- function(...) {
+    path <- tempfile(fileext = ".zip")
+    file.create(path)
+    path
+  }
+  interrater_server <- function(...) {
+    list(
+      start = function() invisible(NULL),
+      done = shiny::reactiveVal(FALSE),
+      result = NULL,
+      sample = NULL
+    )
+  }
+
+  showNotification <- function(...) invisible(NULL)
+  kwallm_worker_bootstrap <- make_worker_bootstrap_stub(environment())
+  kwallm_worker_bootstrap_globals <- function(...) {
+    list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+  }
+
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+
+  mirai_ns <- asNamespace("mirai")
+  old_mirai_fn <- get("mirai", envir = mirai_ns)
+  withr::defer({
+    if (bindingIsLocked("mirai", mirai_ns)) {
+      unlockBinding("mirai", mirai_ns)
+    }
+    assign("mirai", old_mirai_fn, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  if (bindingIsLocked("mirai", mirai_ns)) {
+    unlockBinding("mirai", mirai_ns)
+  }
+  assign("mirai", mirai_sync_stub, envir = mirai_ns)
+  lockBinding("mirai", mirai_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+
+      texts <- shiny::reactiveValues(
+        preprocessed = c("eerste tekst", "tweede tekst"),
+        analysis_units = data.frame(analysis_unit_id = c(1L, 2L)),
+        df = data.frame(
+          analysis_unit_id = c(1L, 2L),
+          document_text = c("eerste tekst", "tweede tekst"),
+          preprocessed = c("eerste tekst", "tweede tekst"),
+          stringsAsFactors = FALSE
+        )
+      )
+
+      models <- shiny::reactiveValues(
+        main = kwallm_test_llm_provider("kwallm-fake-main-1024"),
+        large = NULL
+      )
+
+      categories <- list(
+        texts = shiny::reactiveVal(character()),
+        exclusive_texts = shiny::reactiveVal(character()),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(0)
+      )
+
+      codes <- list(
+        texts = shiny::reactiveVal(c("positief", "negatief")),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(2),
+        has_duplicates = shiny::reactiveVal(FALSE)
+      )
+
+      context_window <- shiny::reactiveValues(
+        any_fit_problem = FALSE,
+        too_many_batches = FALSE,
+        n_tokens_context_window = 100000L,
+        text_batches = list(c("eerste tekst", "tweede tekst")),
+        max_tokens = 256L,
+        overlap = 0L
+      )
+
+      processing_server(
+        id = "processing",
+        mode = shiny::reactiveVal("Markeren"),
+        interrater_reliability_toggle = shiny::reactiveVal(FALSE),
+        texts = texts,
+        llm_provider_rv = shiny::reactiveValues(),
+        models = models,
+        categories = categories,
+        scoring_characteristic = shiny::reactiveVal(""),
+        codes = codes,
+        research_background = shiny::reactiveVal("Achtergrond"),
+        style_prompt = shiny::reactiveVal(""),
+        human_in_the_loop = shiny::reactiveVal(FALSE),
+        assign_multiple_categories = shiny::reactiveVal(FALSE),
+        write_paragraphs = shiny::reactiveVal(FALSE),
+        context_window = context_window,
+        lang = lang
+      )
+
+      NULL
+    },
+    {
+      session$setInputs(`processing-process` = 1)
+
+      for (i in seq_len(30)) {
+        later::run_now(timeout = 0)
+        session$flushReact()
+
+        if (!is.null(captured_codes)) {
+          break
+        }
+      }
+
+      expect_identical(captured_codes, c("positief", "negatief"))
+      expect_identical(captured_texts, c("eerste tekst", "tweede tekst"))
+    }
+  )
+})
+
+test_that("processing_server: marking branch blocks when codes are being edited", {
+  source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
+
+  progress_bar_server <- stub_progress_bar_server
+  llm_streaming_server <- stub_llm_streaming_server
+
+  processing_texts_under_maximum <- function(...) TRUE
+  processing_split_ready <- function(...) TRUE
+  processing_anonymization_ready <- function(...) TRUE
+  processing_has_pending_gliner_anonymization <- function(...) FALSE
+
+  log_action <- function(...) invisible(NULL)
+  log_analysis_start <- function(...) invisible(NULL)
+  log_context_capture <- function(...) list()
+  log_context_apply <- function(...) invisible(NULL)
+  log_info <- function(...) invisible(NULL)
+  log_debug <- function(...) invisible(NULL)
+  log_warn <- function(...) invisible(NULL)
+
+  handle_detailed_error <- function(...) {
+    function(err) stop(err)
+  }
+
+  app_error <- function(error, ...) stop(error)
+
+  .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
+  .kwallm__prompt_execution_get <- function(...) NULL
+
+  worker_started <- FALSE
+  mark_texts <- function(...) {
+    worker_started <<- TRUE
+    data.frame(stringsAsFactors = FALSE)
+  }
+
+  showNotification <- function(...) invisible(NULL)
+  kwallm_worker_bootstrap <- make_worker_bootstrap_stub(environment())
+  kwallm_worker_bootstrap_globals <- function(...) {
+    list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+  }
+
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+
+  mirai_ns <- asNamespace("mirai")
+  old_mirai_fn <- get("mirai", envir = mirai_ns)
+  withr::defer({
+    if (bindingIsLocked("mirai", mirai_ns)) {
+      unlockBinding("mirai", mirai_ns)
+    }
+    assign("mirai", old_mirai_fn, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  if (bindingIsLocked("mirai", mirai_ns)) {
+    unlockBinding("mirai", mirai_ns)
+  }
+  assign("mirai", mirai_sync_stub, envir = mirai_ns)
+  lockBinding("mirai", mirai_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+
+      texts <- shiny::reactiveValues(
+        preprocessed = c("tekst"),
+        analysis_units = data.frame(analysis_unit_id = 1L),
+        df = data.frame(
+          analysis_unit_id = 1L,
+          document_text = "tekst",
+          preprocessed = "tekst",
+          stringsAsFactors = FALSE
+        )
+      )
+
+      models <- shiny::reactiveValues(
+        main = kwallm_test_llm_provider("kwallm-fake-main-1024"),
+        large = NULL
+      )
+
+      categories <- list(
+        texts = shiny::reactiveVal(character()),
+        exclusive_texts = shiny::reactiveVal(character()),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(0)
+      )
+
+      codes <- list(
+        texts = shiny::reactiveVal(c("code_a")),
+        editing = shiny::reactiveVal(TRUE),
+        unique_non_empty_count = shiny::reactiveVal(1),
+        has_duplicates = shiny::reactiveVal(FALSE)
+      )
+
+      context_window <- shiny::reactiveValues(
+        any_fit_problem = FALSE,
+        too_many_batches = FALSE,
+        n_tokens_context_window = 100000L,
+        text_batches = list("tekst"),
+        max_tokens = 256L,
+        overlap = 0L
+      )
+
+      processing_server(
+        id = "processing",
+        mode = shiny::reactiveVal("Markeren"),
+        interrater_reliability_toggle = shiny::reactiveVal(FALSE),
+        texts = texts,
+        llm_provider_rv = shiny::reactiveValues(),
+        models = models,
+        categories = categories,
+        scoring_characteristic = shiny::reactiveVal(""),
+        codes = codes,
+        research_background = shiny::reactiveVal(""),
+        style_prompt = shiny::reactiveVal(""),
+        human_in_the_loop = shiny::reactiveVal(FALSE),
+        assign_multiple_categories = shiny::reactiveVal(FALSE),
+        write_paragraphs = shiny::reactiveVal(FALSE),
+        context_window = context_window,
+        lang = lang
+      )
+
+      NULL
+    },
+    {
+      session$setInputs(`processing-process` = 1)
+
+      for (i in seq_len(15)) {
+        later::run_now(timeout = 0)
+        session$flushReact()
+      }
+
+      expect_false(worker_started)
+    }
+  )
+})
+
+test_that("processing_server: marking branch blocks when no codes are provided", {
+  source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
+
+  progress_bar_server <- stub_progress_bar_server
+  llm_streaming_server <- stub_llm_streaming_server
+
+  processing_texts_under_maximum <- function(...) TRUE
+  processing_split_ready <- function(...) TRUE
+  processing_anonymization_ready <- function(...) TRUE
+  processing_has_pending_gliner_anonymization <- function(...) FALSE
+
+  log_action <- function(...) invisible(NULL)
+  log_analysis_start <- function(...) invisible(NULL)
+  log_context_capture <- function(...) list()
+  log_context_apply <- function(...) invisible(NULL)
+  log_info <- function(...) invisible(NULL)
+  log_debug <- function(...) invisible(NULL)
+  log_warn <- function(...) invisible(NULL)
+
+  handle_detailed_error <- function(...) {
+    function(err) stop(err)
+  }
+
+  app_error <- function(error, ...) stop(error)
+
+  .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
+  .kwallm__prompt_execution_get <- function(...) NULL
+
+  worker_started <- FALSE
+  mark_texts <- function(...) {
+    worker_started <<- TRUE
+    data.frame(stringsAsFactors = FALSE)
+  }
+
+  showNotification <- function(...) invisible(NULL)
+  kwallm_worker_bootstrap <- make_worker_bootstrap_stub(environment())
+  kwallm_worker_bootstrap_globals <- function(...) {
+    list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+  }
+
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+
+  mirai_ns <- asNamespace("mirai")
+  old_mirai_fn <- get("mirai", envir = mirai_ns)
+  withr::defer({
+    if (bindingIsLocked("mirai", mirai_ns)) {
+      unlockBinding("mirai", mirai_ns)
+    }
+    assign("mirai", old_mirai_fn, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  if (bindingIsLocked("mirai", mirai_ns)) {
+    unlockBinding("mirai", mirai_ns)
+  }
+  assign("mirai", mirai_sync_stub, envir = mirai_ns)
+  lockBinding("mirai", mirai_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+
+      texts <- shiny::reactiveValues(
+        preprocessed = c("tekst"),
+        analysis_units = data.frame(analysis_unit_id = 1L),
+        df = data.frame(
+          analysis_unit_id = 1L,
+          document_text = "tekst",
+          preprocessed = "tekst",
+          stringsAsFactors = FALSE
+        )
+      )
+
+      models <- shiny::reactiveValues(
+        main = kwallm_test_llm_provider("kwallm-fake-main-1024"),
+        large = NULL
+      )
+
+      categories <- list(
+        texts = shiny::reactiveVal(character()),
+        exclusive_texts = shiny::reactiveVal(character()),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(0)
+      )
+
+      codes <- list(
+        texts = shiny::reactiveVal(character()),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(0),
+        has_duplicates = shiny::reactiveVal(FALSE)
+      )
+
+      context_window <- shiny::reactiveValues(
+        any_fit_problem = FALSE,
+        too_many_batches = FALSE,
+        n_tokens_context_window = 100000L,
+        text_batches = list("tekst"),
+        max_tokens = 256L,
+        overlap = 0L
+      )
+
+      processing_server(
+        id = "processing",
+        mode = shiny::reactiveVal("Markeren"),
+        interrater_reliability_toggle = shiny::reactiveVal(FALSE),
+        texts = texts,
+        llm_provider_rv = shiny::reactiveValues(),
+        models = models,
+        categories = categories,
+        scoring_characteristic = shiny::reactiveVal(""),
+        codes = codes,
+        research_background = shiny::reactiveVal(""),
+        style_prompt = shiny::reactiveVal(""),
+        human_in_the_loop = shiny::reactiveVal(FALSE),
+        assign_multiple_categories = shiny::reactiveVal(FALSE),
+        write_paragraphs = shiny::reactiveVal(FALSE),
+        context_window = context_window,
+        lang = lang
+      )
+
+      NULL
+    },
+    {
+      session$setInputs(`processing-process` = 1)
+
+      for (i in seq_len(15)) {
+        later::run_now(timeout = 0)
+        session$flushReact()
+      }
+
+      expect_false(worker_started)
+    }
+  )
+})

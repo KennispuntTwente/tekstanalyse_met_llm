@@ -1258,10 +1258,6 @@
         "en": "The model will mark relevant parts in the texts for each specified code. For example, with the code 'color', the model would mark 'yellow' in the text 'the sun is yellow'."
       },
       {
-        "nl": " Het resultaat bevat een databestand, rapport en optioneel samenvattende alinea's.",
-        "en": " The result includes a data file, report, and optionally summary paragraphs."
-      },
-      {
         "nl": "Voer de codes in waarvoor het taalmodel relevante delen van de teksten zal markeren.",
         "en": "Enter the codes for which the language model will mark relevant parts of the texts."
       },
