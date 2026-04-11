@@ -45,7 +45,7 @@ processing_server <- function(
   codes,
   research_background,
   style_prompt,
-  human_in_the_loop = reactiveVal(TRUE),
+  human_in_the_loop = reactiveVal(FALSE),
   assign_multiple_categories = reactiveVal(TRUE),
   write_paragraphs = reactiveVal(TRUE),
   context_window,
