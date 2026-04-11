@@ -542,7 +542,7 @@ mark_texts <- function(
     return(unmatched_rows)
   }
 
-  chunk_occurrence_lookup <- matched_rows |>
+  chunk_occurrence_lookup <- cleaned |>
     dplyr::distinct(
       analysis_unit_id,
       chunk_id,

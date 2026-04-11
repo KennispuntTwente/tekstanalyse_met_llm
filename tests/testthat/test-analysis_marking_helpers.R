@@ -281,3 +281,36 @@ test_that(".kwallm_marking_clean_results preserves distinct occurrences of the s
     matched$absolute_match_start[1] != matched$absolute_match_start[2]
   )
 })
+
+test_that(".kwallm_marking_clean_results ranks chunk occurrence across all chunks, not just matched", {
+  # Two identical chunks "alpha beta gamma"; chunk 1 has no match, chunk 2 does.
+  # The match in chunk 2 should resolve to the *second* occurrence in the full text.
+  full_text <- "alpha beta gamma. alpha beta gamma."
+  chunk <- "alpha beta gamma"
+  df_result <- data.frame(
+    analysis_unit_id = c(1L, 1L),
+    analysis_unit_text = c(full_text, full_text),
+    chunk_id = c(1L, 2L),
+    chunk_index = c(1L, 2L),
+    chunk_text = c(chunk, chunk),
+    code = c("Topic", "Topic"),
+    source_marked_text = c(NA_character_, "beta"),
+    marked_text = c(NA_character_, "beta"),
+    match_start = c(NA_integer_, 7L),
+    match_end = c(NA_integer_, 10L),
+    match_distance = c(NA_integer_, 0L),
+    match_method = c(NA_character_, "exact"),
+    response_status = c("no_match", "matched_all"),
+    stringsAsFactors = FALSE
+  )
+
+  cleaned <- .kwallm_marking_clean_results(df_result)
+
+  matched <- cleaned[
+    !is.na(cleaned$marked_text) & nzchar(cleaned$marked_text),
+  ]
+  expect_equal(nrow(matched), 1)
+  # "beta" in the second occurrence of the chunk starts at position 25
+  expect_equal(matched$absolute_match_start, 25L)
+  expect_equal(matched$absolute_match_end, 28L)
+})
