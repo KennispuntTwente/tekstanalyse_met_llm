@@ -78,7 +78,7 @@ test_that("{shinytest2} recording: standard process - categorization", {
   results_by_text <- results[match(texts, results$text), , drop = FALSE]
   expect_identical(
     results_by_text$Negative,
-    c(FALSE, TRUE, FALSE, FALSE, FALSE)
+    c(FALSE, TRUE, FALSE, FALSE, FALSE, FALSE)
   )
   expect_true(all(rowSums(results[c("Positive", "Negative")]) > 0))
 

@@ -72,7 +72,7 @@ test_that("{shinytest2} recording: standard process - scoring", {
   expect_true(is.numeric(results$result))
 
   results_by_text <- results[match(texts, results$text), , drop = FALSE]
-  expect_identical(results_by_text$result, c(68, 32, 50, 50, 50))
+  expect_identical(results_by_text$result, c(68, 32, 50, 50, 50, 50))
 
   expect_identical(
     app$get_value(export = "text_management-texts__preprocessed"),
