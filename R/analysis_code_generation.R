@@ -134,7 +134,11 @@ generate_codes_by_reading_texts <- function(
     n_tokens_context_window = n_tokens_context_window,
     base_prompt_text = base_prompt_text,
     text_formatter = function(text, index) {
-      paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
+      escaped <- escape_prompt_delimiters(
+        text,
+        c("text", "texts", "research_background")
+      )
+      paste0("<text ", index, ">\n", escaped, "\n</text ", index, ">")
     },
     separator = "\n\n"
   )

@@ -3,6 +3,7 @@
 
 library(testthat)
 
+source(here::here("R", "utils_prompt_sanitization.R"))
 source(here::here("R", "analysis_marking.R"))
 
 # Tests for best_literal_substring helper

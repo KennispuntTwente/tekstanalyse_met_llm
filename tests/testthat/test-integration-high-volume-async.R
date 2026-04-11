@@ -1,4 +1,5 @@
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 
 build_large_volume_analysis_texts <- function(n = 3000) {
   templates <- c(

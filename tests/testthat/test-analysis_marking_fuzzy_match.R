@@ -1,6 +1,7 @@
 # This script tests the fuzzy matching which is performed in R/analys_marking.R
 
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"))
 source(here::here("R", "analysis_marking.R"))
 
 # Deterministic k-substitution mutator used in “property-like” tests

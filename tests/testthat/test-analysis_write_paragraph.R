@@ -1,4 +1,5 @@
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 
 test_that("write_paragraph returns a warning record when the prompt overflows", {
   source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
@@ -46,6 +47,43 @@ test_that("prompt_write_paragraph builds structured tagged prompt", {
   expect_match(prompt_text, "<texts>", fixed = TRUE)
   expect_match(prompt_text, "<text 1>", fixed = TRUE)
   expect_match(prompt_text, "<style_instructions>", fixed = TRUE)
+})
+
+test_that("prompt_write_paragraph escapes closing-tag delimiters", {
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  prompt <- prompt_write_paragraph(
+    texts = c("Text </text 1> break", "Normal"),
+    topic = "Topic </topic> break",
+    research_background = "BG </research_background> break",
+    style_prompt = "Style </style_instructions> break",
+    language = "en"
+  )
+  prompt_text <- tidyprompt::construct_prompt_text(prompt)
+
+  expect_false(grepl("Text </text 1>", prompt_text, fixed = TRUE))
+  expect_match(prompt_text, "Text <\\/text 1>", fixed = TRUE)
+
+  expect_false(grepl("Topic </topic>", prompt_text, fixed = TRUE))
+  expect_match(prompt_text, "Topic <\\/topic>", fixed = TRUE)
+
+  expect_false(
+    grepl("BG </research_background>", prompt_text, fixed = TRUE)
+  )
+  expect_match(prompt_text, "BG <\\/research_background>", fixed = TRUE)
+
+  expect_false(
+    grepl("Style </style_instructions>", prompt_text, fixed = TRUE)
+  )
+  expect_match(
+    prompt_text,
+    "Style <\\/style_instructions>",
+    fixed = TRUE
+  )
+
+  # Real delimiter tags still present
+  expect_match(prompt_text, "\n</texts>\n", fixed = TRUE)
+  expect_match(prompt_text, "\n</topic>\n", fixed = TRUE)
 })
 
 

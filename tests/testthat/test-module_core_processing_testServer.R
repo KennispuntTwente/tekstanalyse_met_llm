@@ -7,6 +7,7 @@ testthat::skip_if_not_installed("tidyprompt")
 testthat::skip_if_not_installed("mirai")
 testthat::skip_if_not_installed("later")
 
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
 
 mirai_sync_stub <- function(

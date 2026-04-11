@@ -1,6 +1,7 @@
 library(testthat)
 
 # Source locally so we can stub dependencies without loading the full app stack.
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 source(here::here("R", "analysis_code_generation.R"), local = TRUE)
 
 # ---- Stubs (avoid Python/LLM/network) -------------------------------------
@@ -33,7 +34,8 @@ create_text_batches <- function(
   draws = 1,
   n_tokens_context_window = 2048,
   base_prompt_text = "",
-  text_formatter = NULL
+  text_formatter = NULL,
+  ...
 ) {
   force(batch_size)
   force(draws)

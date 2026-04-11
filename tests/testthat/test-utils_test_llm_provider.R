@@ -1,4 +1,5 @@
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 
 `%||%` <- function(x, y) {
   if (is.null(x)) y else x

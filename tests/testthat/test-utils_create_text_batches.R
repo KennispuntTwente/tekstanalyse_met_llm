@@ -1,4 +1,5 @@
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 
 # Source locally so we can stub count_tokens without loading reticulate/tiktoken.
 source(here::here("R", "utils_create_text_batches.R"), local = TRUE)
