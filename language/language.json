@@ -1258,8 +1258,8 @@
         "en": "The model will mark relevant parts in the texts for each specified code. For example, with the code 'color', the model would mark 'yellow' in the text 'the sun is yellow'."
       },
       {
-        "nl": " (Let op: deze modus is nog in ontwikkeling. Je krijgt voorlopig alleen een databestand met de gemarkeerde teksten terug. De modus kan nog bugs bevatten.)",
-        "en": " (Note: this mode is still under development. For now, you will only receive a data file with the marked texts back. The mode may still contain bugs.)"
+        "nl": " Het resultaat bevat een databestand, rapport en optioneel samenvattende alinea's.",
+        "en": " The result includes a data file, report, and optionally summary paragraphs."
       },
       {
         "nl": "Voer de codes in waarvoor het taalmodel relevante delen van de teksten zal markeren.",
@@ -1322,8 +1322,8 @@
         "en": " This mode is particularly intended for longer texts, such as interviews. It is not necessary to have split texts into smaller pieces in this mode; that happens automatically during the analysis."
       },
       {
-        "nl": " (Let op: deze modus is nog in ontwikkeling, en kan nog bugs bevatten. De vorm van de rapportage wordt op termijn nog verbeterd.)",
-        "en": " (Note: this mode is still under development and may contain bugs. The format of the report will be improved in the future.)"
+        "nl": " Het resultaat bevat een databestand, rapport en optioneel samenvattende alinea's.",
+        "en": " The result includes a data file, report, and optionally summary paragraphs."
       },
       {
         "nl": "Er is nog geen LLM provider ingesteld",

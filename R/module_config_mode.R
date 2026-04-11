@@ -77,7 +77,7 @@ mode_server <- function(
               " Deze modus is met name bedoeld voor langere teksten, zoals interviews. Het is bij deze modus niet nodig om teksten gesplitst te hebben naar kleinere stukken; dat gebeurt automatisch tijdens de analyse."
             ),
             lang()$t(
-              " (Let op: deze modus is nog in ontwikkeling, en kan nog bugs bevatten. De vorm van de rapportage wordt op termijn nog verbeterd.)"
+              " Het resultaat bevat een databestand, rapport en optioneel samenvattende alinea's."
             )
           )
         )
