@@ -107,4 +107,12 @@ test_that("{shinytest2} recording: scoring with inter-rater reliability", {
     sheet = "reliability"
   )
   expect_gt(nrow(bundle_reliability), 0)
+  expect_true(
+    "subjects" %in% names(bundle_reliability),
+    label = "reliability sheet must contain subjects column"
+  )
+  expect_true(
+    !anyNA(bundle_reliability$subjects),
+    label = "subjects must not be NA"
+  )
 })

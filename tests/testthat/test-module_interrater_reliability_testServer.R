@@ -137,9 +137,11 @@ test_that("interrater_server (Scoren): runs paired t-test and returns summary st
         c("p.value", "statistic", "estimate") %in% names(irr$result)
       ))
       expect_true(all(
-        c("user_mean", "llm_mean", "user_sd", "llm_sd") %in% names(irr$result)
+        c("user_mean", "llm_mean", "user_sd", "llm_sd", "subjects") %in%
+          names(irr$result)
       ))
 
+      expect_equal(irr$result$subjects, 3)
       expect_equal(irr$result$user_mean, mean(c(10, 20, 30)))
       expect_equal(irr$result$llm_mean, mean(c(10, 20, 30)))
 

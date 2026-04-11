@@ -656,6 +656,7 @@ interrater_server <- function(
                 }
 
                 summary_stats <- list(
+                  subjects = length(user_scores),
                   user_mean = mean(user_scores, na.rm = TRUE),
                   user_sd = sd(user_scores, na.rm = TRUE),
                   llm_mean = mean(original_scores, na.rm = TRUE),
