@@ -225,7 +225,9 @@ prompt_multi_category <- function(
     tidyprompt::prompt_wrap(
       extraction_fn = function(x) {
         normalized <- trimws(tolower(x))
-        numbers <- unlist(strsplit(normalized, "[,\\s]+"))
+        tokens <- unlist(strsplit(normalized, "[,;/|.\\s]+", perl = TRUE))
+        tokens <- trimws(tokens[nzchar(tokens)])
+        numbers <- tokens[grepl("^\\d+$", tokens)]
         valid_numbers <- numbers[
           numbers %in% as.character(seq_along(categories))
         ]

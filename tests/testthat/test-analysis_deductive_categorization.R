@@ -305,3 +305,48 @@ test_that("prompt_multi_category escapes closing-tag delimiters in user content"
   expect_match(prompt_text, "Text <\\/text>", fixed = TRUE)
   expect_match(prompt_text, "\n</text>\n", fixed = TRUE)
 })
+
+
+# Multi-label extraction tests -----------------------------------------------
+
+test_that("prompt_multi_category extraction parses comma-space separated numbers", {
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  categories <- c("cat1", "cat2", "cat3", "cat4", "cat5")
+  prompt <- prompt_multi_category(
+    text = "test",
+    categories = categories,
+    exclusive_categories = character(0)
+  )
+
+  wraps <- prompt$get_prompt_wraps()
+  extraction_fn <- Find(
+    function(w) is.function(w$extraction_fn),
+    wraps
+  )$extraction_fn
+
+  # "1, 3, 5" must return all three categories
+  result <- extraction_fn("1, 3, 5")
+  expect_equal(result, c("cat1", "cat3", "cat5"))
+
+  # "1, 2" must return both (was previously losing category 2)
+  result <- extraction_fn("1, 2")
+  expect_equal(result, c("cat1", "cat2"))
+
+  # Trailing period: "1, 3." must still return both
+
+  result <- extraction_fn("1, 3.")
+  expect_equal(result, c("cat1", "cat3"))
+
+  # Single number still works
+  result <- extraction_fn("2")
+  expect_equal(result, c("cat2"))
+
+  # Semicolons and slashes
+  result <- extraction_fn("1;4")
+  expect_equal(result, c("cat1", "cat4"))
+
+  # No valid numbers triggers feedback
+  result <- extraction_fn("nothing")
+  expect_s3_class(result, "llm_feedback")
+})
