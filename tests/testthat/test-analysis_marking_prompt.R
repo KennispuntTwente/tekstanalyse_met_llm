@@ -450,6 +450,25 @@ test_that("normalize_marking_matches does not invent short raw string matches", 
   expect_s3_class(result, "tbl_df")
   expect_equal(nrow(result), 1)
   expect_true(is.na(result$marked_text[[1]]))
+  expect_identical(result$response_status[[1]], "no_match")
+})
+
+test_that("normalize_marking_matches reports partial status when some needles miss", {
+  source(here::here("R", "analysis_marking.R"), local = TRUE)
+
+  result <- .kwallm_normalize_marking_matches(
+    "the sun is yellow",
+    c("sun", "zzz_nonexistent")
+  )
+
+  expect_s3_class(result, "tbl_df")
+  # Only "sun" should survive
+  expect_equal(nrow(result), 1)
+  expect_identical(result$marked_text[[1]], "sun")
+  expect_identical(
+    result$response_status[[1]],
+    "partial_after_max_interactions"
+  )
 })
 
 test_that("mark_texts and mark_text_prompt respect send_prompt_with_retries__max_interactions option", {

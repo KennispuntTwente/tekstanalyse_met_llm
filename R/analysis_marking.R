@@ -947,8 +947,19 @@ mark_text_prompt <- function(
       abs = 2,
       step_div = 5L
     )
+    n_total <- nrow(matches)
     matches <- matches[!is.na(matches$match), , drop = FALSE]
-    return(.kwallm_marking_matches_from_find_matches(matches))
+    status <- if (!nrow(matches)) {
+      "no_match"
+    } else if (nrow(matches) < n_total) {
+      "partial_after_max_interactions"
+    } else {
+      "matched_all"
+    }
+    return(.kwallm_marking_matches_from_find_matches(
+      matches,
+      response_status = status
+    ))
   }
 
   stop("Unexpected marking match result type")
