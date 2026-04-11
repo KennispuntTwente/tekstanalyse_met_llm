@@ -39,7 +39,7 @@ source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 
 ## Methode
 
-`r .kwallm_report_text_count_summary(analysis_result)` Het LLM (model: `r htmltools::htmlEscape(main_model)`) kreeg de vraag om elke tekst in te delen in één van de volgende `r length(categories)` categorieën:
+`r .kwallm_report_text_count_summary(analysis_result)` Het LLM (model: `r htmltools::htmlEscape(main_model)`) kreeg de vraag om elke tekst in te delen in `r if (assign_multiple_categories) "één of meer van" else "één van"` de volgende `r length(categories)` categorieën:
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 cat("<blockquote>")
@@ -60,9 +60,9 @@ if (assign_multiple_categories) {
 ```{r echo=FALSE, results='asis', error=TRUE}
 if (has_paragraphs) {
   cat(paste0(
-    "Met de teksten waaraan onderwerpen zijn toegevoegd, heeft een taalmodel ",
+    "Met de teksten waaraan categorieën zijn toegewezen, heeft een taalmodel ",
   "(", htmltools::htmlEscape(main_model), ") tenslotte een rapport geschreven.", "\n",
-    "Per onderwerp is met quotes samengevat wat er is gezegd."
+    "Per categorie is met quotes samengevat wat er is gezegd."
   ))
 }
 ```
@@ -220,7 +220,7 @@ output <- list()
 
 output <- append(output, list(
   htmltools::HTML("<h3>Rapport</h3>"),
-  htmltools::HTML("<p>Onderstaande paragrafen zijn de samenvattingen van de teksten per onderwerp.</p>"),
+  htmltools::HTML("<p>Onderstaande paragrafen zijn de samenvattingen van de teksten per categorie.</p>"),
   htmltools::div(
     class = "d-flex justify-content-center",
     htmltools::div(

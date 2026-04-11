@@ -39,7 +39,7 @@ source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 
 ## Method
 
-`r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to assign one of the following `r length(categories)` categories to each text:
+`r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to assign `r if (assign_multiple_categories) "one or more of" else "one of"` the following `r length(categories)` categories to each text:
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 cat("<blockquote>")
@@ -60,9 +60,9 @@ if (assign_multiple_categories) {
 ```{r echo=FALSE, results='asis', error=TRUE}
 if (has_paragraphs) {
   cat(paste0(
-    "With the texts to which subjects were added, a language model ",
+    "With the texts to which categories were assigned, a language model ",
   "(", htmltools::htmlEscape(main_model), ") finally wrote a report.", "\n",
-    "For each subject, a summary was created with quotes summarizing what was said."
+    "For each category, a summary was created with quotes summarizing what was said."
   ))
 }
 ```
@@ -220,7 +220,7 @@ output <- list()
 
 output <- append(output, list(
   htmltools::HTML("<h3>Report</h3>"),
-  htmltools::HTML("<p>The following paragraphs are the summaries of the texts per topic.</p>"),
+  htmltools::HTML("<p>The following paragraphs are the summaries of the texts per category.</p>"),
   htmltools::div(
     class = "d-flex justify-content-center",
     htmltools::div(

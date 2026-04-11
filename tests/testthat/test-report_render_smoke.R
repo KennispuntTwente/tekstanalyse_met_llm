@@ -634,6 +634,167 @@ test_that("Categorisatie report renders with by_column_* set", {
   })
 })
 
+test_that("Categorisatie reports use correct category wording, not topic/subject", {
+  testthat::skip_if_not_installed("rmarkdown")
+  testthat::skip_if_not_installed("knitr")
+  testthat::skip_if_not_installed("here")
+  testthat::skip_if_not_installed("htmltools")
+  testthat::skip_if_not_installed("bslib")
+  testthat::skip_if_not_installed("DT")
+  testthat::skip_if_not_installed("dplyr")
+  testthat::skip_if_not_installed("tidyr")
+  testthat::skip_if_not_installed("stringr")
+  testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+
+  out_dir <- withr::local_tempdir()
+
+  report_paths <- list.files(
+    here::here("R"),
+    pattern = "^report_Categorisatie_.*\\.Rmd$",
+    full.names = TRUE
+  )
+  expect_true(length(report_paths) > 0)
+
+  expected_multi <- list(
+    en = c(
+      "one or more of the following",
+      "categories were assigned",
+      "per category"
+    ),
+    nl = c(
+      "of meer van de volgende",
+      "zijn toegewezen",
+      "per categorie"
+    )
+  )
+  forbidden_multi <- list(
+    en = c("subjects were added", "per topic"),
+    nl = c("onderwerpen zijn toegevoegd", "per onderwerp")
+  )
+
+  expected_single <- list(
+    en = c("assign one of the following", "per category"),
+    nl = c("in te delen in \u00e9\u00e9n van de volgende", "per categorie")
+  )
+
+  withr::with_dir(here::here(), {
+    for (report_path in report_paths) {
+      language <- .report_language_from_path(report_path)
+
+      # --- Multi-label variant ---
+      texts_df <- .make_smoke_texts_df(
+        document_text = c("Text 1", "Text 2")
+      )
+      results_table <- data.frame(
+        text = c("Text 1", "Text 2"),
+        A = c(TRUE, FALSE),
+        B = c(FALSE, TRUE),
+        stringsAsFactors = FALSE
+      )
+      paragraph_entries <- list(list(
+        topic = "A",
+        paragraph = 'Summary with "Text 1".',
+        texts = "Text 1",
+        analysis_unit_ids = 1L,
+        prompt_fits = TRUE
+      ))
+
+      ar_multi <- build_analysis_result(
+        texts_df = texts_df,
+        results_table = results_table,
+        paragraph_entries = paragraph_entries,
+        uuid = paste0("cat-multi-", language),
+        mode = "Categorisatie",
+        research_background = "",
+        style_prompt = NULL,
+        language = language,
+        models = .render_test_models(),
+        categories = c("A", "B"),
+        assign_multiple_categories = TRUE,
+        write_paragraphs = TRUE,
+        stage_prompt_previews = list(
+          categorization = "prompt",
+          paragraph_generation = "paragraph prompt"
+        )
+      )
+
+      out_multi <- file.path(
+        out_dir,
+        paste0("cat-multi-", basename(report_path), ".html")
+      )
+      res <- try(
+        rmarkdown::render(
+          input = report_path,
+          output_file = out_multi,
+          intermediates_dir = out_dir,
+          params = list(analysis_result = ar_multi),
+          quiet = TRUE,
+          envir = .report_render_env(environment())
+        ),
+        silent = TRUE
+      )
+      if (inherits(res, "try-error")) {
+        stop(paste0(
+          "Render failed for multi-label ",
+          basename(report_path),
+          ": ",
+          as.character(res)
+        ))
+      }
+
+      html_multi <- gsub(
+        "\\s+",
+        " ",
+        paste(readLines(out_multi, warn = FALSE), collapse = " ")
+      )
+      for (s in expected_multi[[language]]) {
+        expect_true(grepl(s, html_multi, fixed = TRUE))
+      }
+      for (s in forbidden_multi[[language]]) {
+        expect_false(grepl(s, html_multi, fixed = TRUE))
+      }
+
+      # --- Single-label variant ---
+      ar_single <- .build_smoke_analysis_result(report_path)
+      out_single <- file.path(
+        out_dir,
+        paste0("cat-single-", basename(report_path), ".html")
+      )
+      res <- try(
+        rmarkdown::render(
+          input = report_path,
+          output_file = out_single,
+          intermediates_dir = out_dir,
+          params = list(analysis_result = ar_single),
+          quiet = TRUE,
+          envir = .report_render_env(environment())
+        ),
+        silent = TRUE
+      )
+      if (inherits(res, "try-error")) {
+        stop(paste0(
+          "Render failed for single-label ",
+          basename(report_path),
+          ": ",
+          as.character(res)
+        ))
+      }
+
+      html_single <- gsub(
+        "\\s+",
+        " ",
+        paste(readLines(out_single, warn = FALSE), collapse = " ")
+      )
+      for (s in expected_single[[language]]) {
+        expect_true(grepl(s, html_single, fixed = TRUE))
+      }
+      for (s in forbidden_multi[[language]]) {
+        expect_false(grepl(s, html_single, fixed = TRUE))
+      }
+    }
+  })
+})
+
 test_that("Markeren reports escape supporting text HTML in paragraph accordions", {
   testthat::skip_if_not_installed("rmarkdown")
   testthat::skip_if_not_installed("knitr")
