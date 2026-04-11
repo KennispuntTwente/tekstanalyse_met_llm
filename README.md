@@ -6,7 +6,7 @@
 
 # KWALLM: text analysis with LLM (app)
 
-KWALLM is an app (developed with R, Shiny) for (automated) qualitative text analysis using large language models (LLMs). Through a user-friendly interface, users can upload texts and have them analyzed by an LLM. The app offers various types of analysis, including categorization, scoring on characteristics, topic modelling, and marking texts according to qualitative codes.
+KWALLM is an app (developed with R, Shiny) for (automated) qualitative text analysis using large language models (LLMs). Through a user-friendly interface, users can upload texts and have them analyzed by an LLM. The app offers various types of analysis, including categorization, scoring on characteristics, topic extraction, and marking texts according to qualitative codes.
 
 *[Klik hier voor een Nederlandse README (click here for a Dutch README).](#kwallm-tekstanalyse-met-llm-app)*
 
@@ -18,7 +18,7 @@ KWALLM is an app (developed with R, Shiny) for (automated) qualitative text anal
 
 - **Scoring on a feature**: Users define a feature (e.g., 'positive sentiment'), and the model scores texts based on the degree to which they match the feature
 
-- **Topic modelling**: The model identifies topics in the texts without requiring predefined categories or features. Topics are then assigned to texts. Based on methods from [Wanrooij, Manhar & Yang (2024)](https://bnaic2024.sites.uu.nl/wp-content/uploads/sites/986/2024/10/Topic-Modeling-for-Small-Data-using-Generative-LLMs.pdf) and [Pham et al. (2023)](https://arxiv.org/abs/2311.01449). This approach is shown to outperform BERTopic and works well on small datasets
+- **Topic extraction**: The model identifies topics in the texts without requiring predefined categories or features. Topics are then assigned to texts. Based on methods from [Wanrooij, Manhar & Yang (2024)](https://bnaic2024.sites.uu.nl/wp-content/uploads/sites/986/2024/10/Topic-Modeling-for-Small-Data-using-Generative-LLMs.pdf) and [Pham et al. (2023)](https://arxiv.org/abs/2311.01449). This approach is shown to outperform BERTopic and works well on small datasets
 
 - **Marking**: The model will mark relevant parts of the text for a qualitative code. For example, given the code 'colour', the model will highlight all parts of the text that mention a colour (e.g., 'yellow' in the sentence 'the sun is yellow').
 Users can provide their own codes, or an LLM can automatically generate codes based on the texts. This mode is suitable for longer texts such as interviews or focus group discussions
@@ -163,7 +163,7 @@ The name also includes 'kwal' (Dutch for: jellyfish), which is the logo of the a
   <img src="example/screenshot_interface_en.png" alt="Screenshot of interface" />
 </div>
 
-### Report with results (topic modelling)
+### Report with results (topic extraction)
 
 <div align="center">
   <img src="example/usecases/product_reviews/report_with_results_screenshot_en.png" alt="Screenshot of report" />
@@ -183,7 +183,7 @@ KWALLM is een app (ontwikkeld met R, Shiny) voor (automatische) kwalitatieve
 tekstanalyse met large language models (LLMs). Via een gebruiksvriendelijke
 interface kunnen gebruikers teksten uploaden en deze laten analyseren
 door een taalmodel. De app biedt verschillende analyse-mogelijkheden,
-zoals categorisatie, scoren op kenmerken, topic modelling, en teksten markeren 
+zoals categorisatie, scoren op kenmerken, onderwerpextractie, en teksten markeren 
 naar kwalitatieve codes.
 
 *[Click here for an English README (klik hier voor een Engelse README).](#kwallm-text-analysis-with-llm-app)*
@@ -200,7 +200,7 @@ naar kwalitatieve codes.
     model scoort teksten op in hoeverre ze bij dit kenmerk
     passen. Bijvoorbeeld, 'positief sentiment'
 
--   **Topic modelling**: het model bepaalt zelf de onderwerpen in de
+-   **Onderwerpextractie**: het model bepaalt zelf de onderwerpen in de
     teksten, zonder dat de gebruiker vooraf categorieën of
     kenmerken hoeft aan te leveren. Daarna worden de onderwerpen
     toegekend aan de teksten. Op basis van procedures beschreven
@@ -389,7 +389,7 @@ Omdat 'kwal' in de naam voorkomt, is het logo van de app een kwal.
   <img src="example/screenshot_interface_nl.png" alt="Screenshot van de interface" />
 </div>
 
-### Rapport met resultaten (topic modelling)
+### Rapport met resultaten (onderwerpextractie)
 
 <div align="center">
   <img src="example/usecases/product_reviews/report_with_results_screenshot_nl.png" alt="Screenshot van een rapport met resultaten" />

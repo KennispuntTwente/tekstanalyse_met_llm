@@ -1,4 +1,4 @@
-# Module for selecting mode; categorization/scoring/topic modelling
+# Module for selecting mode; categorization/scoring/topic extraction
 
 # 1 UI ---------------------------------------------------------------
 mode_ui <- function(id) {

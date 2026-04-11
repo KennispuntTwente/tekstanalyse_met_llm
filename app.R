@@ -197,7 +197,7 @@ options(
   # - If a topic 'unknown/not applicable' should always be added
   #   to to the list of candiate topics during topic modelling;
   #   this may be useful to avoid LLM failure in the topic assignment process;
-  #     see R/topic_modelling.R
+  #     see R/analysis_inductive_topic_modelling.R
   topic_modelling__always_add_not_applicable = TRUE,
   # - Parameters for topic batching;
   #     see R/module_misc_context_window.R
