@@ -938,19 +938,32 @@ if (FALSE) {
   texts <- sentences_df$sentence
   research_background <- ""
 
+  # Build the base prompt scaffold (no text blocks) so that per-text
+  # tokens are not double-counted by the batcher.
+  base_prompt_text <- prompt_candidate_topics(
+    text_batch = character(0),
+    research_background = research_background,
+    language = "en"
+  ) |>
+    tidyprompt::construct_prompt_text()
+
   # Group analysis-unit texts into prompt batches
   text_batches <- create_text_batches(
     texts,
     batch_size = 50,
     draws = 1,
     n_tokens_context_window = 2048,
-    base_prompt_text = ""
+    base_prompt_text = base_prompt_text,
+    text_formatter = function(text, index) {
+      paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
+    },
+    separator = "\n\n"
   )
 
   # Use LLM to generate topics
   candidate_topics <- create_candidate_topics(
     text_batches,
-    research_background,
+    research_background = research_background,
     llm_provider = llm_provider_openai(
       parameters = list(model = "gpt-4.1-2025-04-14")
     )
