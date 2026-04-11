@@ -169,7 +169,8 @@ test_that("processing_server: topic fit check receives a real provider object", 
       research_background,
       llm_provider,
       assign_multiple_categories,
-      exclusive_topics
+      exclusive_topics,
+      n_tokens_context_window = NULL
     ) {
       captured_provider <<- llm_provider
       list(fits = FALSE, prompt_tokens = 140L, context_window_tokens = 100L)
@@ -236,6 +237,7 @@ test_that("processing_server: topic fit check receives a real provider object", 
       context_window <- shiny::reactiveValues(
         any_fit_problem = FALSE,
         too_many_batches = FALSE,
+        n_tokens_context_window = 100000L,
         text_batches = list(c("first text", "second text"))
       )
 
@@ -326,7 +328,8 @@ test_that("processing_server: auto-confirm drops blank reduced topics", {
     research_background,
     llm_provider,
     assign_multiple_categories,
-    exclusive_topics
+    exclusive_topics,
+    n_tokens_context_window = NULL
   ) {
     force(texts)
     force(research_background)
@@ -447,6 +450,7 @@ test_that("processing_server: auto-confirm drops blank reduced topics", {
       context_window <- shiny::reactiveValues(
         any_fit_problem = FALSE,
         too_many_batches = FALSE,
+        n_tokens_context_window = 100000L,
         text_batches = list(c("first text", "second text"))
       )
 
@@ -641,6 +645,7 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
       context_window <- shiny::reactiveValues(
         any_fit_problem = FALSE,
         too_many_batches = FALSE,
+        n_tokens_context_window = 100000L,
         text_batches = list(c("first text", "second text"))
       )
 
@@ -807,6 +812,7 @@ test_that("processing_server: topics_definitive gate blocks assignment when topi
       context_window <- shiny::reactiveValues(
         any_fit_problem = FALSE,
         too_many_batches = FALSE,
+        n_tokens_context_window = 100000L,
         text_batches = list(c("first text", "second text"))
       )
 
@@ -951,6 +957,7 @@ test_that("processing_server: process click is ignored when required models are 
       context_window <- shiny::reactiveValues(
         any_fit_problem = FALSE,
         too_many_batches = FALSE,
+        n_tokens_context_window = 100000L,
         text_batches = list(c("first text", "second text"))
       )
 

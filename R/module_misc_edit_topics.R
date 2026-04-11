@@ -16,6 +16,7 @@ edit_topics_server <- function(
   llm_provider,
   assignment_texts = reactive(character()),
   assignment_llm_provider = reactive(NULL),
+  n_tokens_context_window = reactive(NULL),
   lang = default_lang()
 ) {
   moduleServer(
@@ -86,7 +87,8 @@ edit_topics_server <- function(
           research_background = research_background(),
           llm_provider = assignment_provider,
           assign_multiple_categories = assign_multiple_categories(),
-          exclusive_topics = current_exclusive
+          exclusive_topics = current_exclusive,
+          n_tokens_context_window = n_tokens_context_window()
         )
       })
 
@@ -416,7 +418,8 @@ edit_topics_server <- function(
               updated_topics,
               research_background,
               llm_provider,
-              language = lang$get_translation_language()
+              language = lang$get_translation_language(),
+              n_tokens_context_window = n_tokens_context_window_val
             )
           },
           .args = c(
@@ -427,6 +430,7 @@ edit_topics_server <- function(
               updated_topics = updated_topics,
               research_background = research_background(),
               llm_provider = llm_provider,
+              n_tokens_context_window_val = n_tokens_context_window(),
               lang = lang()
             ),
             kwallm_worker_bootstrap_globals()

@@ -392,3 +392,44 @@ test_that("assign_topics multi-label: early NA produces NA topic columns", {
   expect_true(is.na(result[["Topic A"]][3]))
   expect_true(is.na(result[["Topic B"]][3]))
 })
+
+
+# 5. reduce_topics honours explicit n_tokens_context_window override ------
+
+test_that("reduce_topics uses n_tokens_context_window when supplied", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  send_prompt_with_retries <- function(...) {
+    list(topics = c("Alpha", "Beta"))
+  }
+  count_tokens <- function(...) 1L
+  # Return NULL so fallback would be 2048; the explicit override should win
+
+  get_context_window_size_in_tokens <- function(...) NULL
+  log_info <- function(...) invisible(NULL)
+
+  # With a very small explicit context window the two topics won't fit in
+  # one batch, triggering the single-topic-batch guard.
+  expect_error(
+    reduce_topics(
+      candidate_topics = c("Topic A", "Topic B"),
+      research_background = "",
+      llm_provider = create_test_provider(),
+      language = "en",
+      always_add_not_applicable = FALSE,
+      n_tokens_context_window = 8L
+    ),
+    "single-topic batch"
+  )
+
+  # With a large explicit override, reduction completes normally.
+  result <- reduce_topics(
+    candidate_topics = c("Topic A", "Topic B"),
+    research_background = "",
+    llm_provider = create_test_provider(),
+    language = "en",
+    always_add_not_applicable = FALSE,
+    n_tokens_context_window = 100000L
+  )
+  expect_true(length(result) >= 1)
+})

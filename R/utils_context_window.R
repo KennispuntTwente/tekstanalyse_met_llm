@@ -100,7 +100,8 @@ topic_assignment_prompt_context_window_check <- function(
   research_background = "",
   llm_provider,
   assign_multiple_categories = FALSE,
-  exclusive_topics = character()
+  exclusive_topics = character(),
+  n_tokens_context_window = NULL
 ) {
   provider_model <- tryCatch(
     llm_provider$parameters$model,
@@ -137,20 +138,26 @@ topic_assignment_prompt_context_window_check <- function(
     )
   }
 
-  assignment_context_window <- get_context_window_size_in_tokens(provider_model)
-  if (is.null(assignment_context_window)) {
-    assignment_context_window <- 2048
-    tryCatch(
-      log_warn(
-        sprintf(
-          "Unknown context window for model '%s'; falling back to %d tokens.",
-          provider_model,
-          assignment_context_window
-        ),
-        component = "context_window"
-      ),
-      error = function(e) NULL
+  if (!is.null(n_tokens_context_window)) {
+    assignment_context_window <- n_tokens_context_window
+  } else {
+    assignment_context_window <- get_context_window_size_in_tokens(
+      provider_model
     )
+    if (is.null(assignment_context_window)) {
+      assignment_context_window <- 2048
+      tryCatch(
+        log_warn(
+          sprintf(
+            "Unknown context window for model '%s'; falling back to %d tokens.",
+            provider_model,
+            assignment_context_window
+          ),
+          component = "context_window"
+        ),
+        error = function(e) NULL
+      )
+    }
   }
 
   assignment_prompt_tokens <- assignment_prompt |>

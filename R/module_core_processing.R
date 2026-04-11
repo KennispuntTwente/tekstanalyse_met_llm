@@ -154,7 +154,8 @@ processing_server <- function(
           research_background = research_background(),
           llm_provider = models$main,
           assign_multiple_categories = assign_multiple_categories(),
-          exclusive_topics = current_exclusive_topics
+          exclusive_topics = current_exclusive_topics,
+          n_tokens_context_window = context_window$n_tokens_context_window
         )
       }
 
@@ -634,7 +635,8 @@ processing_server <- function(
                 candidate_topics,
                 research_background,
                 llm_provider_large,
-                language = lang$get_translation_language()
+                language = lang$get_translation_language(),
+                n_tokens_context_window = n_tokens_context_window
               ),
               error = handle_detailed_error("Topic reduction")
             )
@@ -659,6 +661,7 @@ processing_server <- function(
               mode = mode(),
               handle_detailed_error = handle_detailed_error,
               text_batches = context_window$text_batches,
+              n_tokens_context_window = context_window$n_tokens_context_window,
               lang = lang(),
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
@@ -755,6 +758,9 @@ processing_server <- function(
           llm_provider = models$large,
           assignment_texts = reactive(texts$preprocessed),
           assignment_llm_provider = reactive(models$main),
+          n_tokens_context_window = reactive(
+            context_window$n_tokens_context_window
+          ),
           research_background = research_background,
           assign_multiple_categories = assign_multiple_categories,
           lang = lang
@@ -844,12 +850,7 @@ processing_server <- function(
               )
             }
 
-            assignment_context_window <- get_context_window_size_in_tokens(
-              llm_provider$parameters$model
-            )
-            if (is.null(assignment_context_window)) {
-              assignment_context_window <- 2048
-            }
+            assignment_context_window <- n_tokens_context_window
 
             assignment_prompt_tokens <- assignment_prompt |>
               tidyprompt::construct_prompt_text() |>
@@ -946,6 +947,7 @@ processing_server <- function(
               assign_multiple_categories = assign_multiple_categories(),
               write_paragraphs = write_paragraphs(),
               handle_detailed_error = handle_detailed_error,
+              n_tokens_context_window = context_window$n_tokens_context_window,
               lang = lang(),
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,

@@ -251,7 +251,8 @@ test_that("edit_topics_server: reduce_again applies re-reduced topics and keeps 
     updated_topics,
     research_background,
     llm_provider,
-    language = "nl"
+    language = "nl",
+    n_tokens_context_window = NULL
   ) {
     force(updated_topics)
     force(research_background)

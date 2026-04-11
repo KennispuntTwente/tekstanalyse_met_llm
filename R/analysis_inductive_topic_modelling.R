@@ -448,6 +448,7 @@ reduce_topics <- function(
     "topic_modelling__reduction_max_prompt_batches",
     getOption("topic_modelling__max_groups", 16)
   ),
+  n_tokens_context_window = NULL,
   interrupter = NULL
 ) {
   language <- match.arg(language)
@@ -532,10 +533,12 @@ reduce_topics <- function(
   }
 
   ### context window bookkeeping -------------------------------------------
-  model <- llm_provider$parameters$model
-  n_tokens_context_window <- get_context_window_size_in_tokens(model)
   if (is.null(n_tokens_context_window)) {
-    n_tokens_context_window <- 2048
+    model <- llm_provider$parameters$model
+    n_tokens_context_window <- get_context_window_size_in_tokens(model)
+    if (is.null(n_tokens_context_window)) {
+      n_tokens_context_window <- 2048
+    }
   }
 
   split_into_batches <- function(topics_vec) {

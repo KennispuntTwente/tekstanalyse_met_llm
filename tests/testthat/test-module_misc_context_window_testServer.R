@@ -120,6 +120,86 @@ test_that("topic_assignment_prompt_context_window_check uses the real topic list
   expect_gt(check$prompt_tokens, check$context_window_tokens)
 })
 
+
+test_that("topic_assignment_prompt_context_window_check honours n_tokens_context_window override", {
+  source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
+
+  tidyprompt_ns <- asNamespace("tidyprompt")
+  helper_env <- environment(topic_assignment_prompt_context_window_check)
+
+  old_construct <- get("construct_prompt_text", envir = tidyprompt_ns)
+  old_prompt_category <- get("prompt_category", envir = helper_env)
+  withr::defer({
+    unlockBinding("construct_prompt_text", tidyprompt_ns)
+    assign("construct_prompt_text", old_construct, envir = tidyprompt_ns)
+    lockBinding("construct_prompt_text", tidyprompt_ns)
+    assign("prompt_category", old_prompt_category, envir = helper_env)
+  })
+
+  unlockBinding("construct_prompt_text", tidyprompt_ns)
+  assign(
+    "construct_prompt_text",
+    function(x, ...) paste(unlist(x), collapse = "|"),
+    envir = tidyprompt_ns
+  )
+  lockBinding("construct_prompt_text", tidyprompt_ns)
+
+  assign(
+    "prompt_category",
+    function(text, research_background, categories) {
+      list(text = text, categories = categories)
+    },
+    envir = helper_env
+  )
+
+  old_get_cw <- get("get_context_window_size_in_tokens", envir = helper_env)
+  withr::defer(assign(
+    "get_context_window_size_in_tokens",
+    old_get_cw,
+    envir = helper_env
+  ))
+  assign(
+    "get_context_window_size_in_tokens",
+    function(model) NULL,
+    envir = helper_env
+  )
+
+  # Without override, unknown model falls back to 2048.
+  check_default <- topic_assignment_prompt_context_window_check(
+    texts = c("hello"),
+    topics = c("A", "B"),
+    research_background = "",
+    llm_provider = kwallm_test_llm_provider("unknown-model-xyz"),
+    assign_multiple_categories = FALSE
+  )
+  expect_equal(check_default$context_window_tokens, 2048L)
+
+  # With explicit override of 1, same prompt must not fit.
+  check_override <- topic_assignment_prompt_context_window_check(
+    texts = c("hello"),
+    topics = c("A", "B"),
+    research_background = "",
+    llm_provider = kwallm_test_llm_provider("unknown-model-xyz"),
+    assign_multiple_categories = FALSE,
+    n_tokens_context_window = 1L
+  )
+  expect_equal(check_override$context_window_tokens, 1L)
+  expect_false(check_override$fits)
+
+  # With a very large override, prompt fits.
+  check_large <- topic_assignment_prompt_context_window_check(
+    texts = c("hello"),
+    topics = c("A", "B"),
+    research_background = "",
+    llm_provider = kwallm_test_llm_provider("unknown-model-xyz"),
+    assign_multiple_categories = FALSE,
+    n_tokens_context_window = 999999L
+  )
+  expect_equal(check_large$context_window_tokens, 999999L)
+  expect_true(check_large$fits)
+})
+
+
 test_that("context_window_server: topic mode single-label preflight uses 25 synthetic topics", {
   captured_categories <- NULL
   multi_called <- FALSE
