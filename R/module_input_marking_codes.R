@@ -163,7 +163,6 @@ marking_codes_server <- function(
         if (!isTRUE(number_of_texts_under_maximum())) {
           return()
         }
-        req(isFALSE(context_window$any_fit_problem))
 
         # Verify we have texts available to read
         if (length(texts$preprocessed) == 0) {
