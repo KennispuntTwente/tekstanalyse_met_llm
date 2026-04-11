@@ -121,7 +121,7 @@ generate_codes_by_reading_texts <- function(
 
   # Subtract prompt overhead so chunks don't overflow once the prompt is added
   base_prompt_text <- prompt_candidate_topics(
-    text_batch = c(""),
+    text_batch = character(0),
     research_background = research_background,
     language = language
   ) |>
@@ -135,7 +135,8 @@ generate_codes_by_reading_texts <- function(
     base_prompt_text = base_prompt_text,
     text_formatter = function(text, index) {
       paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
-    }
+    },
+    separator = "\n\n"
   )
 
   if (is.null(batches) || length(batches) == 0) {

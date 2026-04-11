@@ -79,7 +79,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
 
   texts <- build_large_volume_topic_texts(3000)
   base_prompt_text <- prompt_candidate_topics(
-    text_batch = c(""),
+    text_batch = character(0),
     research_background = "",
     language = "en"
   ) |>
@@ -90,7 +90,11 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
     batch_size = 25,
     draws = 1,
     n_tokens_context_window = 1024,
-    base_prompt_text = base_prompt_text
+    base_prompt_text = base_prompt_text,
+    text_formatter = function(text, index) {
+      paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
+    },
+    separator = "\n\n"
   )
 
   expect_false(is.null(text_batches))

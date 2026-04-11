@@ -8,6 +8,9 @@
 #' @param base_prompt_text Text of the base prompt to be used for candidate topic generation.
 #' @param text_formatter Optional function `(text, index)` that returns the
 #'   exact per-item prompt fragment used for token accounting inside a batch.
+#' @param separator Optional character string inserted between consecutive
+#'   formatted text items in the production prompt (e.g. `"\n\n"`).
+#'   Its token cost is added for every item after the first in each batch.
 #'
 #' @return A list of prompt batches, where each batch is a vector of texts.
 #' @export
@@ -17,7 +20,8 @@ create_text_batches <- function(
   draws = 1,
   n_tokens_context_window = 2056,
   base_prompt_text = "",
-  text_formatter = NULL
+  text_formatter = NULL,
+  separator = NULL
 ) {
   stopifnot(
     is.character(texts),
@@ -30,7 +34,8 @@ create_text_batches <- function(
     n_tokens_context_window > 0,
     is.character(base_prompt_text),
     length(base_prompt_text) == 1,
-    is.null(text_formatter) || is.function(text_formatter)
+    is.null(text_formatter) || is.function(text_formatter),
+    is.null(separator) || (is.character(separator) && length(separator) == 1)
   )
 
   if (is.null(text_formatter)) {
@@ -41,6 +46,7 @@ create_text_batches <- function(
   }
 
   n_tokens_base_prompt <- count_tokens(base_prompt_text)
+  n_tokens_separator <- if (!is.null(separator)) count_tokens(separator) else 0L
   allowed_tokens <- n_tokens_context_window - n_tokens_base_prompt
 
   if (allowed_tokens <= 0) {
@@ -85,7 +91,8 @@ create_text_batches <- function(
     source_id <- source_ids[[entry_index]]
     next_batch_index <- length(current_batch) + 1L
     txt_tokens <- token_cost(txt, next_batch_index)
-    new_total <- current_total + txt_tokens
+    sep_tokens <- if (next_batch_index > 1L) n_tokens_separator else 0L
+    new_total <- current_total + txt_tokens + sep_tokens
     source_repeated_in_batch <- source_id %in% current_source_ids
 
     if (

@@ -404,9 +404,11 @@ context_window_server <- function(
         # prompt batches before asking the LLM for candidate topics.
         texts <- texts$preprocessed
 
-        # Based on prompt for candidate topic generation; 600 characters + background
+        # Build the base prompt scaffold without any text blocks so that
+        # per-text tokens are not double-counted; separators between items
+        # are accounted for via the `separator` argument.
         base_prompt_text <- prompt_candidate_topics(
-          text_batch = c(""),
+          text_batch = character(0),
           research_background = research_background(),
           language = lang()$get_translation_language()
         ) |>
@@ -420,7 +422,8 @@ context_window_server <- function(
           base_prompt_text = base_prompt_text,
           text_formatter = function(text, index) {
             paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
-          }
+          },
+          separator = "\n\n"
         )
 
         if (is.null(rv$text_batches)) {
