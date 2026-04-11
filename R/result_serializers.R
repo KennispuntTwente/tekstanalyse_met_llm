@@ -103,6 +103,9 @@ analysis_result_to_metadata_list <- function(analysis_result) {
         multi_label = analysis_result@results@multi_label,
         assignments = .kwallm_df_to_records(
           analysis_result@results@assignments
+        ),
+        response_status = .kwallm_df_to_records(
+          analysis_result@results@response_status
         )
       ),
       scoring = list(
@@ -253,6 +256,11 @@ analysis_result_to_export_sheets <- function(analysis_result) {
   ) {
     sheets$labels <- analysis_result@results@labels
     sheets$assignments <- analysis_result@results@assignments
+  }
+
+  if (inherits(analysis_result@results, "CategorizationResult")) {
+    sheets$categorization_response_status <-
+      analysis_result@results@response_status
   }
 
   if (inherits(analysis_result@results, "ScoringResult")) {

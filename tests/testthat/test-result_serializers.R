@@ -205,7 +205,7 @@ test_that("metadata and export sheets include text counts", {
   expect_false("reused_analyses" %in% sheets$metadata$field)
   expect_identical(
     names(metadata$results),
-    c("labels", "multi_label", "assignments")
+    c("labels", "multi_label", "assignments", "response_status")
   )
 })
 
@@ -531,6 +531,62 @@ test_that("multi-label assignments use explicit analysis unit ids when shuffled"
 
   expect_identical(unname(assigned_labels[["10"]]), "Positive")
   expect_identical(unname(assigned_labels[["20"]]), "Negative")
+})
+
+test_that("categorization response_status flows through builder and serializers", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text 1", "Text 2", "Text 3"),
+    preprocessed = c("Text 1", "Text 2", "Text 3")
+  )
+
+  results_table <- data.frame(
+    text = c("Text 1", "Text 2", "Text 3"),
+    result = c("Theme 1", NA_character_, "Theme 2"),
+    response_status = c("success", "failure", "success"),
+    stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-cat-response-status",
+    mode = "Categorisatie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = c("Theme 1", "Theme 2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  rs <- analysis_result@results@response_status
+  expect_s3_class(rs, "data.frame")
+  expect_equal(nrow(rs), 3)
+  expect_identical(names(rs), c("analysis_unit_id", "response_status"))
+  expect_identical(rs$response_status, c("success", "failure", "success"))
+
+  metadata <- analysis_result_to_metadata_list(analysis_result)
+  expect_true("response_status" %in% names(metadata$results))
+  expect_equal(length(metadata$results$response_status), 3)
+  expect_equal(
+    metadata$results$response_status[[2]]$response_status,
+    "failure"
+  )
+
+  sheets <- analysis_result_to_export_sheets(analysis_result)
+  expect_true("categorization_response_status" %in% names(sheets))
+  expect_equal(nrow(sheets$categorization_response_status), 3)
+  expect_equal(
+    sheets$categorization_response_status$response_status,
+    c("success", "failure", "success")
+  )
 })
 
 test_that("scoring results use explicit analysis unit ids when shuffled", {

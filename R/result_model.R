@@ -380,6 +380,17 @@
   )
 }
 
+# Builds an empty categorization response-status table.
+# We use this to preserve one response status per analysis unit for
+# categorization results.
+.kwallm_empty_categorization_response_status <- function() {
+  data.frame(
+    analysis_unit_id = integer(),
+    response_status = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
 # Builds an empty marking-response table.
 # We use this to preserve one response status per chunk/code combination.
 .kwallm_empty_marking_responses <- function() {
@@ -791,6 +802,14 @@ CategorizationResult <- S7::new_class(
       S7::class_logical,
       default = FALSE,
       validator = .kwallm_validate_scalar_logical
+    ),
+    response_status = S7::new_property(
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_categorization_response_status()),
+      validator = .kwallm_validate_df_columns(c(
+        "analysis_unit_id",
+        "response_status"
+      ))
     )
   ),
   validator = function(self) {
@@ -814,6 +833,12 @@ CategorizationResult <- S7::new_class(
       problems <- c(
         problems,
         "single-label assignments must contain at most one row per analysis_unit_id"
+      )
+    }
+    if (anyDuplicated(self@response_status$analysis_unit_id)) {
+      problems <- c(
+        problems,
+        "response_status$analysis_unit_id must be unique"
       )
     }
     .kwallm_problems_or_null(problems)

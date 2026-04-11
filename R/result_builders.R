@@ -610,10 +610,16 @@ build_analysis_result <- function(
     .kwallm_build_assignments_from_multi(texts_df, results_table, labels_df)
   }
 
+  response_status <- .kwallm_build_categorization_response_status(
+    texts_df,
+    results_table
+  )
+
   CategorizationResult(
     labels = labels_df,
     assignments = assignments,
-    multi_label = isTRUE(multi_label)
+    multi_label = isTRUE(multi_label),
+    response_status = response_status
   )
 }
 
@@ -1180,6 +1186,23 @@ build_analysis_result <- function(
   }
 
   unique(do.call(rbind, rows))
+}
+
+# Builds the per-analysis-unit response status for categorization results.
+# Carries the worker-level response_status column through to the typed payload.
+.kwallm_build_categorization_response_status <- function(texts_df, result_df) {
+  analysis_unit_id <- .kwallm_result_analysis_unit_ids(texts_df, result_df)
+
+  if ("response_status" %in% names(result_df)) {
+    rs <- unique(data.frame(
+      analysis_unit_id = analysis_unit_id,
+      response_status = as.character(result_df$response_status),
+      stringsAsFactors = FALSE
+    ))
+    return(rs)
+  }
+
+  .kwallm_empty_categorization_response_status()
 }
 
 

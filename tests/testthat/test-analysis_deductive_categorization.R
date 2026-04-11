@@ -171,6 +171,7 @@ test_that("categorize_texts returns binary columns for multi-label output", {
   expect_identical(result$text, c("text a", "text b"))
   expect_identical(result$cat1, c(TRUE, TRUE))
   expect_identical(result$cat2, c(FALSE, TRUE))
+  expect_identical(result$response_status, c("success", "success"))
 })
 
 test_that("categorize_texts supports progress, interruption, and early NA", {
@@ -215,6 +216,7 @@ test_that("categorize_texts supports progress, interruption, and early NA", {
   expect_equal(result$text, c("text a", "text b", "text c"))
   # Row 1 succeeded, row 2 failed (NA), row 3 was never processed (NA)
   expect_equal(result$result, c("cat1", NA, NA))
+  expect_equal(result$response_status, c("success", "failure", "failure"))
   expect_equal(call_count, 2)
   expect_equal(interrupt_count, 2)
   expect_length(progress_events, 2)
@@ -244,8 +246,15 @@ test_that("categorize_texts multi-label: early NA produces NA category columns",
   )
 
   expect_false("result" %in% names(result))
+  expect_identical(
+    result$response_status,
+    c("success", "failure", "failure")
+  )
   # All category columns should have NAs for failed rows
-  result_cols <- setdiff(names(result), "text")
+  result_cols <- setdiff(
+    names(result),
+    c("text", "analysis_unit_id", "response_status")
+  )
   expect_true(length(result_cols) > 0)
   expect_true(anyNA(result[result_cols]))
   # First text succeeded so should not be NA
