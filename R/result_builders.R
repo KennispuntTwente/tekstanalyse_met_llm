@@ -595,7 +595,7 @@ build_analysis_result <- function(
       if ("result" %in% names(results_table)) {
         results_table$result
       } else {
-        names(results_table)[setdiff(names(results_table), "text")]
+        setdiff(names(results_table), "text")
       },
     exclusive_values = exclusive_labels
   )

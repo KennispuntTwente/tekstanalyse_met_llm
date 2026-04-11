@@ -1241,3 +1241,46 @@ test_that("download bundle surfaces metadata errors with the correct label", {
     "Metadata file generation error"
   )
 })
+
+# 5 Multi-label fallback (categories = NULL) -----------------------------------
+
+test_that("build_analysis_result infers multi-label categories from column names", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("I liked it", "I disliked it")
+  )
+
+  results_table <- data.frame(
+    text = c("I liked it", "I disliked it"),
+    Positive = c(TRUE, FALSE),
+    Negative = c(FALSE, TRUE),
+    stringsAsFactors = FALSE
+  )
+
+  result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "multi-label-fallback",
+    mode = "Categorisatie",
+    research_background = "bg",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = NULL,
+    assign_multiple_categories = TRUE
+  )
+
+  labels <- result@results@labels
+  assignments <- result@results@assignments
+
+  expect_equal(sort(labels$label_text), c("Negative", "Positive"))
+  expect_equal(nrow(assignments), 2)
+
+  pos_id <- labels$label_id[labels$label_text == "Positive"]
+  neg_id <- labels$label_id[labels$label_text == "Negative"]
+  expect_true(
+    any(assignments$analysis_unit_id == 1L & assignments$label_id == pos_id)
+  )
+  expect_true(
+    any(assignments$analysis_unit_id == 2L & assignments$label_id == neg_id)
+  )
+})
