@@ -87,6 +87,16 @@ test_that("{shinytest2} recording: categorization with paragraph writing", {
     c("Positive feedback", "Negative feedback") %in% colnames(results)
   ))
 
+  # At least one row must have been assigned to multiple categories (both TRUE).
+  # Without this assertion, a parser bug that silently drops all but the first
+  # category would pass the test suite.
+  multi_assigned <- results[["Positive feedback"]] &
+    results[["Negative feedback"]]
+  expect_true(
+    any(multi_assigned, na.rm = TRUE),
+    label = "at least one text assigned to both categories"
+  )
+
   # Expect at least one paragraph was written
   expect_true(length(paragraphs) > 0)
   # Expect correct paragraph structure
@@ -110,6 +120,7 @@ test_that("{shinytest2} recording: categorization with paragraph writing", {
       "results",
       "labels",
       "assignments",
+      "categorization_response_status",
       "paragraphs",
       "paragraph_sources"
     ),

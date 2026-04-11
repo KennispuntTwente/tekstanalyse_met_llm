@@ -123,6 +123,7 @@ test_that("{shinytest2} recording: categorization with split texts and by_column
       "results",
       "labels",
       "assignments",
+      "categorization_response_status",
       "document_groups"
     ),
     expected_results_columns = c("text", "result"),

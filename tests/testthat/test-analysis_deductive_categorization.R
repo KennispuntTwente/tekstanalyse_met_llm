@@ -359,3 +359,117 @@ test_that("prompt_multi_category extraction parses comma-space separated numbers
   result <- extraction_fn("nothing")
   expect_s3_class(result, "llm_feedback")
 })
+
+# Single-label extraction tests ------------------------------------------------
+
+test_that("prompt_category extraction maps valid number to category", {
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  categories <- c("positive", "negative", "neutral")
+  prompt <- prompt_category(
+    text = "test",
+    research_background = "",
+    categories = categories
+  )
+
+  wraps <- prompt$get_prompt_wraps()
+  extraction_fn <- Find(
+    function(w) is.function(w$extraction_fn),
+    wraps
+  )$extraction_fn
+
+  # Simple valid number
+  expect_equal(extraction_fn("1"), "positive")
+  expect_equal(extraction_fn("2"), "negative")
+  expect_equal(extraction_fn("3"), "neutral")
+
+  # Whitespace around the number
+
+  expect_equal(extraction_fn("  2  "), "negative")
+  expect_equal(extraction_fn(" 1\n"), "positive")
+})
+
+test_that("prompt_category extraction rejects multiple numbers with feedback", {
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  categories <- c("positive", "negative", "neutral")
+  prompt <- prompt_category(
+    text = "test",
+    research_background = "",
+    categories = categories
+  )
+
+  wraps <- prompt$get_prompt_wraps()
+  extraction_fn <- Find(
+    function(w) is.function(w$extraction_fn),
+    wraps
+  )$extraction_fn
+
+  # Multiple numbers should trigger feedback (not silently pick the first)
+  result <- extraction_fn("1, 2")
+  expect_s3_class(result, "llm_feedback")
+
+  result <- extraction_fn("1 3")
+  expect_s3_class(result, "llm_feedback")
+
+  result <- extraction_fn("2;3")
+  expect_s3_class(result, "llm_feedback")
+})
+
+test_that("prompt_category extraction returns feedback for invalid input", {
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  categories <- c("positive", "negative")
+  prompt <- prompt_category(
+    text = "test",
+    research_background = "",
+    categories = categories
+  )
+
+  wraps <- prompt$get_prompt_wraps()
+  extraction_fn <- Find(
+    function(w) is.function(w$extraction_fn),
+    wraps
+  )$extraction_fn
+
+  # Non-numeric text
+  result <- extraction_fn("positive")
+  expect_s3_class(result, "llm_feedback")
+
+  # Out-of-range number
+  result <- extraction_fn("5")
+  expect_s3_class(result, "llm_feedback")
+
+  # Zero
+  result <- extraction_fn("0")
+  expect_s3_class(result, "llm_feedback")
+})
+
+test_that("prompt_multi_category extraction enforces exclusive category constraint", {
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  categories <- c("positive", "negative", "unclear")
+  prompt <- prompt_multi_category(
+    text = "test",
+    categories = categories,
+    exclusive_categories = c("unclear")
+  )
+
+  wraps <- prompt$get_prompt_wraps()
+  extraction_fn <- Find(
+    function(w) is.function(w$extraction_fn),
+    wraps
+  )$extraction_fn
+
+  # Selecting exclusive alone is fine
+  result <- extraction_fn("3")
+  expect_equal(result, "unclear")
+
+  # Selecting exclusive + another triggers feedback
+  result <- extraction_fn("1, 3")
+  expect_s3_class(result, "llm_feedback")
+
+  # Non-exclusive multi-select is fine
+  result <- extraction_fn("1, 2")
+  expect_equal(result, c("positive", "negative"))
+})

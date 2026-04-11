@@ -133,6 +133,7 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
       "results",
       "labels",
       "assignments",
+      "categorization_response_status",
       "document_groups"
     ),
     expected_results_columns = c("text", "Positive", "Negative"),

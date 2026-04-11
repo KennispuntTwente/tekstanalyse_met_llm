@@ -103,6 +103,7 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
       "results",
       "labels",
       "assignments",
+      "categorization_response_status",
       "paragraphs",
       "paragraph_sources"
     ),

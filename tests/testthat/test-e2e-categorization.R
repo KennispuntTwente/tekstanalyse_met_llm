@@ -85,7 +85,13 @@ test_that("{shinytest2} recording: standard process - categorization", {
   bundle <- expect_download_bundle(
     app,
     expected_mode_id = "categorization",
-    expected_sheet_names = c("metadata", "results", "labels", "assignments"),
+    expected_sheet_names = c(
+      "metadata",
+      "results",
+      "labels",
+      "assignments",
+      "categorization_response_status"
+    ),
     expected_results_columns = c("text", "Positive", "Negative"),
     expected_result_rows = nrow(results),
     expected_texts = texts,
