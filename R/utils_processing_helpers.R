@@ -783,6 +783,7 @@ write_analysis_result_report_html <- function(
           )
         ),
         output_file = output_file_html,
+        intermediates_dir = temp_dir,
         params = list(
           analysis_result = analysis_result
         ),
