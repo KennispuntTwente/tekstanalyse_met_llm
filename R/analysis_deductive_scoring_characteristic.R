@@ -112,7 +112,8 @@ prompt_score <- function(
 #' @param interrupter Optional object with \code{$execInterrupts()} method for
 #'   cancellation support (e.g., \code{AsyncInterruptor})
 #'
-#' @return A data.frame with columns \code{text} and \code{result} (numeric 0-100).
+#' @return A data.frame with columns \code{analysis_unit_id} (integer),
+#'   \code{text}, and \code{result} (numeric 0-100).
 #'   If a prompt returns \code{NA}, completed rows keep their scores and the
 #'   failing and remaining rows are returned as \code{NA}.
 #' @export
