@@ -359,7 +359,8 @@ test_that("processing_active_blockers detects general blockers", {
   expect_true("no_texts" %in% keys)
   expect_true("models_missing" %in% keys)
   expect_true("context_overflow" %in% keys)
-  expect_true("too_many_batches" %in% keys)
+  # too_many_batches is topic-extraction-only; must NOT block categorization
+  expect_false("too_many_batches" %in% keys)
   expect_true("gliner_pending" %in% keys)
   expect_true("split_in_progress" %in% keys)
 })
@@ -473,4 +474,57 @@ test_that("processing_active_blockers skips mode-specific for other modes", {
   )
 
   expect_length(result, 0L)
+})
+
+test_that("processing_active_blockers: too_many_batches blocks topic extraction only", {
+  lang <- list(t = function(x) x)
+  models <- list(main = "m", large = "l")
+  ctx <- list(any_fit_problem = FALSE, too_many_batches = TRUE)
+  texts <- list(anonymization_requested_mode = "none")
+
+  # Should block topic extraction.
+  result_topic <- processing_active_blockers(
+    n_pre = 3L,
+    models = models,
+    mode = "Onderwerpextractie",
+    context_window = ctx,
+    texts = texts,
+    split_in_progress = FALSE,
+    lang = lang
+  )
+  keys_topic <- vapply(result_topic, `[[`, character(1), "key")
+  expect_true("too_many_batches" %in% keys_topic)
+
+  # Should NOT block categorization, scoring, or marking.
+  for (other_mode in c("Categorisatie", "Scoren", "Markeren")) {
+    result_other <- processing_active_blockers(
+      n_pre = 3L,
+      models = models,
+      mode = other_mode,
+      context_window = ctx,
+      texts = texts,
+      split_in_progress = FALSE,
+      scoring_characteristic = if (other_mode == "Scoren") "trait" else NULL,
+      categories = if (other_mode == "Categorisatie") {
+        list(
+          editing = function() FALSE,
+          unique_non_empty_count = function() 3L,
+          has_duplicates = function() FALSE
+        )
+      },
+      codes = if (other_mode == "Markeren") {
+        list(
+          editing = function() FALSE,
+          unique_non_empty_count = function() 2L,
+          has_duplicates = function() FALSE
+        )
+      },
+      lang = lang
+    )
+    keys_other <- vapply(result_other, `[[`, character(1), "key")
+    expect_false(
+      "too_many_batches" %in% keys_other,
+      info = paste("too_many_batches should not block", other_mode)
+    )
+  }
 })

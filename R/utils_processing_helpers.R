@@ -218,7 +218,10 @@ processing_active_blockers <- function(
     )
   }
 
-  if (isTRUE(context_window$too_many_batches)) {
+  if (
+    identical(mode, "Onderwerpextractie") &&
+      isTRUE(context_window$too_many_batches)
+  ) {
     add(
       "too_many_batches",
       lang$t("Te veel batches voor onderwerpextractie"),
