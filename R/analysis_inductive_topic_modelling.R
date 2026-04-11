@@ -541,13 +541,22 @@ reduce_topics <- function(
     }
   }
 
+  # Format a topic exactly as prompt_reduce_topics does: "<index>: <label>"
+  format_topic_entry <- function(topic, zero_based_index) {
+    paste0(zero_based_index, ": ", topic)
+  }
+
   split_into_batches <- function(topics_vec) {
     batches <- list()
     current <- character()
     cur_tokens <- 0
     for (i in seq_along(topics_vec)) {
       t <- topics_vec[[i]]
-      add_tokens <- count_tokens(t) + 3 # index prefix + colon + space
+      # Use the exact formatted fragment for token accounting
+      formatted <- format_topic_entry(t, length(current))
+      # Each entry after the first adds a "\n" separator
+      add_tokens <- count_tokens(formatted) +
+        if (length(current) > 0) count_tokens("\n") else 0
       if (
         (cur_tokens + add_tokens + base_token_cost) > n_tokens_context_window &&
           length(current) > 0
@@ -555,6 +564,9 @@ reduce_topics <- function(
         batches[[length(batches) + 1]] <- current
         current <- character()
         cur_tokens <- 0
+        # Recompute with index 0 in the new batch
+        formatted <- format_topic_entry(t, 0)
+        add_tokens <- count_tokens(formatted)
       }
       current <- c(current, t)
       cur_tokens <- cur_tokens + add_tokens

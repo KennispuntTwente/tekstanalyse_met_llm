@@ -311,7 +311,7 @@ test_that("reduce_topics aborts before creating a single-topic reduction batch",
     testthat::fail("send_prompt_with_retries should not be called")
   }
   count_tokens <- function(...) 1L
-  get_context_window_size_in_tokens <- function(...) 8L
+  get_context_window_size_in_tokens <- function(...) 2L
   log_info <- function(...) invisible(NULL)
 
   expect_error(
@@ -335,7 +335,7 @@ test_that("reduce_topics uses configurable topic-reduction safety caps by defaul
     list(topics = c("Topic A", "Topic B"))
   }
   count_tokens <- function(...) 1L
-  get_context_window_size_in_tokens <- function(...) 10L
+  get_context_window_size_in_tokens <- function(...) 4L
   log_info <- function(...) invisible(NULL)
 
   old_opts <- options(
@@ -417,7 +417,7 @@ test_that("reduce_topics uses n_tokens_context_window when supplied", {
       llm_provider = create_test_provider(),
       language = "en",
       always_add_not_applicable = FALSE,
-      n_tokens_context_window = 8L
+      n_tokens_context_window = 2L
     ),
     "single-topic batch"
   )
