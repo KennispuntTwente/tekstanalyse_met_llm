@@ -481,7 +481,7 @@ test_that("mark_text_prompt treats whitespace-only text parts as empty", {
 
   expect_s3_class(result, "tbl_df")
   expect_true(is.na(result$marked_text[[1]]))
-  expect_identical(result$response_status[[1]], "matched_all")
+  expect_identical(result$response_status[[1]], "no_match")
 })
 
 test_that("normalize_marking_matches does not invent short raw string matches", {

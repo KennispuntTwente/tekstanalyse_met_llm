@@ -771,7 +771,7 @@ mark_text_prompt <- function(
 
         # Empty handling
         if (length(text_parts) == 0) {
-          return(.kwallm_marking_status_row("matched_all"))
+          return(.kwallm_marking_status_row("no_match"))
         }
 
         # Find matches

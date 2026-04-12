@@ -404,7 +404,7 @@
 
 # Returns the allowed response_status values for marking results.
 .kwallm_marking_response_statuses <- function() {
-  c("matched_all", "partial_after_max_interactions")
+  c("matched_all", "partial_after_max_interactions", "no_match")
 }
 
 # Builds an empty topic-generation settings table.
