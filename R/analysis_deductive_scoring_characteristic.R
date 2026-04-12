@@ -114,8 +114,11 @@ prompt_score <- function(
 #'
 #' @return A data.frame with columns \code{analysis_unit_id} (integer),
 #'   \code{text}, and \code{result} (numeric 0-100).
-#'   If a prompt returns \code{NA}, completed rows keep their scores and the
-#'   failing and remaining rows are returned as \code{NA}.
+#'   If a prompt returns \code{NA}, scoring stops early to save LLM tokens:
+#'   completed rows keep their scores while the failing and remaining rows
+#'   are returned as \code{NA}.  The processing layer treats any \code{NA}
+#'   in the result column as a fatal error, so partial results never reach
+#'   the result builder or reports.
 #' @export
 score_texts <- function(
   texts,
