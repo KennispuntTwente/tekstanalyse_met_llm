@@ -126,11 +126,11 @@ Below table shows statistics of the given scores.
 ```{r results='asis', echo=FALSE, error=TRUE}
 report_df |>
   dplyr::summarise(
-    Mean = round(mean(result), 2),
-    `Standard deviation` = round(sd(result), 2),
-    Minimum = min(result),
-    Maximum = max(result),
-    Median = median(result)
+    Mean = round(mean(result, na.rm = TRUE), 2),
+    `Standard deviation` = round(sd(result, na.rm = TRUE), 2),
+    Minimum = min(result, na.rm = TRUE),
+    Maximum = max(result, na.rm = TRUE),
+    Median = median(result, na.rm = TRUE)
   ) |>
   DT::datatable(
     rownames = FALSE,
