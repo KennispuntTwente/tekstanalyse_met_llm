@@ -168,6 +168,6 @@ test_that("{shinytest2} recording: marking with by_column grouping variable", {
   expect_true("response_status" %in% names(bundle_responses))
 
   # Response statuses are valid
-  valid_statuses <- c("matched_all", "partial_after_max_interactions")
+  valid_statuses <- .kwallm_marking_response_statuses()
   expect_true(all(bundle_responses$response_status %in% valid_statuses))
 })
