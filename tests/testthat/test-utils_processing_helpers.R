@@ -305,6 +305,59 @@ test_that("processing_results_have_invalid_na is mode-aware", {
   )
 })
 
+test_that("processing_results_have_invalid_na rejects NA in all non-marking modes", {
+  # Single-label categorization with NA result
+  single_cat <- data.frame(
+    text = c("a", "b"),
+    result = c("cat_a", NA),
+    stringsAsFactors = FALSE
+  )
+  expect_true(
+    processing_results_have_invalid_na(single_cat, "Categorisatie")
+  )
+
+  # Single-label topic with NA result
+  single_topic <- data.frame(
+    text = c("a", "b"),
+    result = c("topic_a", NA),
+    stringsAsFactors = FALSE
+  )
+  expect_true(
+    processing_results_have_invalid_na(single_topic, "Onderwerpextractie")
+  )
+
+  # Multi-label categorization with response_status present AND NA in label col
+  multi_cat_with_status <- data.frame(
+    text = c("a", "b"),
+    cat_a = c(TRUE, NA),
+    cat_b = c(FALSE, TRUE),
+    response_status = c("success", "failure"),
+    stringsAsFactors = FALSE
+  )
+  expect_true(
+    processing_results_have_invalid_na(
+      multi_cat_with_status,
+      "Categorisatie"
+    )
+  )
+
+  # All-success run must pass
+  all_success <- data.frame(
+    text = c("a", "b"),
+    result = c(50, 75),
+    stringsAsFactors = FALSE
+  )
+  expect_false(
+    processing_results_have_invalid_na(all_success, "Scoren")
+  )
+  expect_false(
+    processing_results_have_invalid_na(all_success, "Categorisatie")
+  )
+  expect_false(
+    processing_results_have_invalid_na(all_success, "Onderwerpextractie")
+  )
+})
+
 
 # processing_active_blockers ------------------------------------------------
 
