@@ -139,6 +139,28 @@ test_that("prompt_reduce_topics escapes closing-tag delimiters", {
   expect_match(prompt_text, "\n</topics>\n", fixed = TRUE)
 })
 
+test_that("prompt_topic_not_applicable_check escapes closing-tag delimiters", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+  source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
+
+  prompt <- prompt_topic_not_applicable_check(
+    topics = c("Normal topic", "Topic </topics> break"),
+    language = "en"
+  )
+  prompt_text <- tidyprompt::construct_prompt_text(prompt)
+
+  expect_false(
+    grepl("Topic </topics>", prompt_text, fixed = TRUE)
+  )
+  expect_match(prompt_text, "Topic <\\/topics>", fixed = TRUE)
+
+  # Real delimiters still present
+  expect_match(prompt_text, "\n</topics>\n", fixed = TRUE)
+
+  # Backslash-escape instruction present
+  expect_match(prompt_text, "escaped with a backslash", fixed = TRUE)
+})
+
 test_that("prompt_candidate_topics respects language parameter", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
