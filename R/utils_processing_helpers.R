@@ -601,9 +601,13 @@ write_grouped_paragraphs <- function(
 #' @param results_table_pre Data frame returned by processing.
 #'   It must contain `analysis_unit_id` for the worker outputs. Multiple
 #'   document rows may share one `analysis_unit_id`.
+#' @param mode Optional processing mode name (e.g. `"Categorisatie"`,
+#'   `"Markeren"`). When supplied and not `"Markeren"`, the function asserts
+#'   that worker results contain exactly one row per `analysis_unit_id`.
+#'   Marking legitimately fans out (chunk x code), so the check is skipped.
 #'
 #' @return A data frame with the current document text restored as `text`.
-join_processing_results <- function(texts_df, results_table_pre) {
+join_processing_results <- function(texts_df, results_table_pre, mode = NULL) {
   stopifnot(is.data.frame(texts_df))
   stopifnot(is.data.frame(results_table_pre))
 
@@ -615,6 +619,24 @@ join_processing_results <- function(texts_df, results_table_pre) {
   worker_results <- results_table_pre
   if ("text" %in% names(worker_results)) {
     worker_results$text <- NULL
+  }
+
+  # Marking legitimately fans out (chunk x code combinations), but all other
+  # modes must return exactly one row per analysis unit from the worker.
+  if (!is.null(mode) && !identical(mode, "Markeren")) {
+    dup_ids <- worker_results$analysis_unit_id[
+      duplicated(worker_results$analysis_unit_id)
+    ]
+    if (length(dup_ids) > 0L) {
+      stop(
+        sprintf(
+          "Worker returned duplicate analysis_unit_id rows for mode '%s': %s",
+          mode,
+          paste(unique(dup_ids), collapse = ", ")
+        ),
+        call. = FALSE
+      )
+    }
   }
 
   # One analysis unit can map back to many document rows, so this join

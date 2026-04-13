@@ -1495,7 +1495,8 @@ processing_server <- function(
 
         result <- join_processing_results(
           texts_df = texts$df,
-          results_table_pre = results_table_pre()
+          results_table_pre = results_table_pre(),
+          mode = mode()
         )
 
         results_table(result)

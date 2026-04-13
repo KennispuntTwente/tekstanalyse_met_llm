@@ -263,6 +263,77 @@ test_that("join_processing_results fans out shared analysis units per document r
 })
 
 
+test_that("join_processing_results errors on duplicate worker rows for non-marking modes", {
+  texts_df <- data.frame(
+    analysis_unit_id = c(1L, 2L),
+    document_text = c("Raw 1", "Raw 2"),
+    preprocessed = c("prep-1", "prep-2"),
+    stringsAsFactors = FALSE
+  )
+  # Worker accidentally emits two rows for unit 1
+  results_dup <- data.frame(
+    analysis_unit_id = c(1L, 1L, 2L),
+    result = c("A", "A-dup", "B"),
+    stringsAsFactors = FALSE
+  )
+
+  expect_error(
+    join_processing_results(texts_df, results_dup, mode = "Categorisatie"),
+    "duplicate analysis_unit_id"
+  )
+  expect_error(
+    join_processing_results(texts_df, results_dup, mode = "Scoren"),
+    "duplicate analysis_unit_id"
+  )
+  expect_error(
+    join_processing_results(texts_df, results_dup, mode = "Onderwerpextractie"),
+    "duplicate analysis_unit_id"
+  )
+})
+
+
+test_that("join_processing_results allows duplicate worker rows for marking mode", {
+  texts_df <- data.frame(
+    analysis_unit_id = c(1L, 2L),
+    document_text = c("Raw 1", "Raw 2"),
+    preprocessed = c("prep-1", "prep-2"),
+    stringsAsFactors = FALSE
+  )
+  # Marking legitimately fans out: chunk x code
+  results_marking <- data.frame(
+    analysis_unit_id = c(1L, 1L, 2L),
+    chunk_text = c("c1", "c2", "c3"),
+    code = c("X", "Y", "X"),
+    stringsAsFactors = FALSE
+  )
+
+  joined <- join_processing_results(
+    texts_df,
+    results_marking,
+    mode = "Markeren"
+  )
+  expect_equal(nrow(joined), 3L)
+})
+
+
+test_that("join_processing_results skips cardinality check when mode is NULL", {
+  texts_df <- data.frame(
+    analysis_unit_id = c(1L, 2L),
+    document_text = c("Raw 1", "Raw 2"),
+    preprocessed = c("prep-1", "prep-2"),
+    stringsAsFactors = FALSE
+  )
+  results_dup <- data.frame(
+    analysis_unit_id = c(1L, 1L, 2L),
+    result = c("A", "A-dup", "B"),
+    stringsAsFactors = FALSE
+  )
+
+  # No mode provided — backward compatible, no assertion
+  expect_no_error(join_processing_results(texts_df, results_dup))
+})
+
+
 test_that("processing_results_have_invalid_na is mode-aware", {
   scoring_results <- data.frame(
     text = c("a", "b"),
