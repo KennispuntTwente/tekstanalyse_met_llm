@@ -4,6 +4,7 @@ library(shinyjs)
 suppressWarnings(library(promises))
 
 testthat::skip_if_not_installed("later")
+testthat::skip_if_not_installed("mirai")
 
 test_that("llm_provider_server: switches modes and fetches OpenAI models (mocked)", {
   # Store original mirai function
