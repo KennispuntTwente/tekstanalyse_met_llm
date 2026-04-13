@@ -272,3 +272,74 @@ test_that("model_server: advanced settings survive provider-mode round-trip", {
     }
   )
 })
+
+test_that("model_server: clearing configured_models invalidates stale model selections", {
+  source(here::here("R", "module_config_model.R"), local = TRUE)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      processing <- reactiveVal(FALSE)
+      mode <- reactiveVal("Categorisatie")
+
+      llm_provider_rv <- reactiveValues(
+        provider_mode = "openai",
+        llm_provider_configured = tidyprompt::llm_provider_openai(
+          url = "https://old.example/v1",
+          api_key = "key-1",
+          parameters = list(model = "placeholder", stream = TRUE),
+          verbose = FALSE
+        ),
+        configured_models = c("gpt-4o", "gpt-4o-mini")
+      )
+
+      models <- model_server(
+        id = "model",
+        preconfigured_llm_provider_model_main = list(),
+        preconfigured_llm_provider_model_large = list(),
+        processing = processing,
+        mode = mode,
+        llm_provider_rv = llm_provider_rv,
+        lang = lang
+      )
+
+      list(
+        models = models,
+        llm_provider_rv = llm_provider_rv
+      )
+    },
+    {
+      # Select a model.
+      session$setInputs(`model-main_model` = "gpt-4o")
+      session$flushReact()
+
+      expect_equal(models$main$parameters$model, "gpt-4o")
+
+      # Simulate the provider clearing the model cache after URL change:
+      # configured_models goes NULL.
+      llm_provider_rv$configured_models <- NULL
+      session$flushReact()
+
+      expect_null(
+        models$main,
+        info = "models$main must be invalidated when configured_models is cleared"
+      )
+
+      # After a new Ping, new models arrive. User selects from new list.
+      llm_provider_rv$configured_models <- c("new-model-a", "new-model-b")
+      llm_provider_rv$llm_provider_configured <- tidyprompt::llm_provider_openai(
+        url = "https://new.example/v1",
+        api_key = "key-2",
+        parameters = list(model = "placeholder", stream = TRUE),
+        verbose = FALSE
+      )
+      session$flushReact()
+
+      session$setInputs(`model-main_model` = "new-model-a")
+      session$flushReact()
+
+      expect_equal(models$main$parameters$model, "new-model-a")
+      expect_equal(models$main$url, "https://new.example/v1")
+    }
+  )
+})

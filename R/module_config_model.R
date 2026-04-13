@@ -466,7 +466,10 @@ model_server <- function(
         )
       })
 
-      # Keep saved selections valid if the configured provider's model list changes
+      # Keep saved selections valid if the configured provider's model list changes.
+      # When the list becomes NULL/empty (e.g., endpoint changed and cache was
+      # cleared), invalidate all live and saved selections so a stale model-id
+      # cannot be sent to a different endpoint.
       observe({
         mode <- current_mode()
         if (mode == "preconfigured") {
@@ -474,7 +477,18 @@ model_server <- function(
         }
 
         choices <- llm_provider_rv$configured_models
-        req(choices)
+
+        if (is.null(choices) || length(choices) == 0) {
+          models$main <- NULL
+          models$large <- NULL
+          cur <- saved[[mode]]
+          cur$main_choice <- NULL
+          cur$main <- NULL
+          cur$large_choice <- NULL
+          cur$large <- NULL
+          saved[[mode]] <- cur
+          return()
+        }
 
         cur <- saved[[mode]]
 

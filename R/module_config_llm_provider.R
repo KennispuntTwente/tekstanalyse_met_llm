@@ -570,6 +570,20 @@ llm_provider_server <- function(
         available_models_ollama = available_models_ollama()
       )
 
+      # Clear discovered model cache when connection details change so that
+      # stale model IDs from a previous endpoint cannot be used.
+      observeEvent(openai_url(), ignoreInit = TRUE, {
+        available_models_openai(NULL)
+      })
+      observeEvent(api_key_input(), ignoreInit = TRUE, {
+        if (identical(llm_provider_rv$provider_mode, "openai")) {
+          available_models_openai(NULL)
+        }
+      })
+      observeEvent(ollama_url(), ignoreInit = TRUE, {
+        available_models_ollama(NULL)
+      })
+
       # Keep track of requests for available models
       last_model_request_time <- reactiveVal(Sys.time() - 10)
 

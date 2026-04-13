@@ -4,9 +4,10 @@ library(shinyjs)
 suppressWarnings(library(promises))
 
 testthat::skip_if_not_installed("later")
-testthat::skip_if_not_installed("mirai")
 
 test_that("llm_provider_server: switches modes and fetches OpenAI models (mocked)", {
+  testthat::skip_if_not_installed("mirai")
+
   # Store original mirai function
   original_mirai <- mirai::mirai
 
@@ -112,6 +113,8 @@ test_that("llm_provider_server: switches modes and fetches OpenAI models (mocked
 
 
 test_that("llm_provider_server: switches modes and fetches Ollama models (mocked)", {
+  testthat::skip_if_not_installed("mirai")
+
   # Store original mirai function
   original_mirai <- mirai::mirai
 
@@ -371,6 +374,75 @@ test_that("llm_provider_server: URL change updates provider immediately without 
         llm_provider_rv$llm_provider_configured$url,
         "http://remote:11434/api/chat",
         info = "Ollama provider URL must update immediately when the input changes"
+      )
+    }
+  )
+})
+
+
+test_that("llm_provider_server: URL change clears discovered model cache", {
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+  source(here::here("R", "component_icon_button.R"), local = TRUE)
+  source(here::here("R", "component_card_header_with_tooltip.R"), local = TRUE)
+  source(here::here("R", "component_description_box.R"), local = TRUE)
+  source(here::here("R", "module_config_llm_provider.R"), local = TRUE)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      processing <- reactiveVal(FALSE)
+
+      llm_provider_rv <- llm_provider_server(
+        id = "llm_provider",
+        processing = processing,
+        has_preconfigured_llm_provider = TRUE,
+        can_configure_oai = TRUE,
+        can_configure_ollama = TRUE,
+        lang = lang
+      )
+
+      list(
+        lang = lang,
+        processing = processing,
+        llm_provider_rv = llm_provider_rv
+      )
+    },
+    {
+      # Switch to OpenAI mode and provide an API key.
+      session$setInputs(`llm_provider-select_openai` = 1)
+      session$flushReact()
+      session$setInputs(`llm_provider-api_key_text` = "test-key")
+      session$flushReact()
+
+      # No models have been pinged yet.
+      expect_null(
+        llm_provider_rv$configured_models,
+        info = "Initially no models discovered"
+      )
+
+      # Changing URL should keep configured_models NULL (no stale models).
+      session$setInputs(
+        `llm_provider-openai_url` = "https://new-endpoint.example.com/v1"
+      )
+      session$flushReact()
+
+      expect_null(
+        llm_provider_rv$configured_models,
+        info = "configured_models must be NULL after URL change without Ping"
+      )
+
+      # Switch to Ollama and verify the same.
+      session$setInputs(`llm_provider-select_ollama` = 1)
+      session$flushReact()
+
+      session$setInputs(
+        `llm_provider-ollama_url` = "http://remote:11434/api/chat"
+      )
+      session$flushReact()
+
+      expect_null(
+        llm_provider_rv$configured_models,
+        info = "Ollama configured_models must be NULL after URL change"
       )
     }
   )
