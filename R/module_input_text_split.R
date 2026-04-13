@@ -90,12 +90,21 @@ text_split_server <- function(
     input_rows_version <- reactiveVal(0L)
 
     # Upon observing new document texts, reset the split texts and message.
+    # Also cancel any in-flight split so the UI is not stuck behind a stale
+    # worker (the version guard in the promise callbacks will discard the
+    # result once the old worker settles).
     observeEvent(input_rows(), {
       input_rows_version(input_rows_version() + 1L)
       split_document_texts(NULL)
       split_rows(NULL)
       source_document_texts(NULL)
       semchunk_message("...")
+
+      if (isTRUE(split_in_progress())) {
+        split_in_progress(FALSE)
+        shinyjs::enable("split_texts")
+        queue$consumer$stop()
+      }
     })
 
     # Chunked current-document texts created by this module.

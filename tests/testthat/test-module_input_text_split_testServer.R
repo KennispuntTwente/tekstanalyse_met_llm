@@ -275,10 +275,12 @@ test_that("text_split_server ignores stale async split results after source text
 
       texts <- split_result$texts
       source_document_texts <- split_result$source_document_texts
+      split_in_progress <- split_result$split_in_progress
 
       list(
         texts = texts,
         source_document_texts = source_document_texts,
+        split_in_progress = split_in_progress,
         document_texts = document_texts,
         lang = lang
       )
@@ -293,17 +295,30 @@ test_that("text_split_server ignores stale async split results after source text
       session$setInputs(`split-split_texts` = 1)
       session$flushReact()
 
+      # While the async worker is running, texts are NULL and split_in_progress
+      # is TRUE.
       expect_null(texts())
+      expect_true(split_in_progress())
 
+      # Changing the source texts while the split is running should immediately
+      # unblock: split_in_progress must go FALSE so analysis launch is no longer
+      # gated, and the input texts should be available.
+      document_texts(c("gamma"))
+      session$flushReact()
+
+      expect_false(
+        split_in_progress(),
+        info = "split_in_progress should be cleared when source texts change"
+      )
+      expect_identical(texts(), c("gamma"))
+
+      # When the stale worker eventually resolves, the result must be ignored.
       stale_result <- split_texts_with_semchunk(
         texts = c("alpha", "beta"),
         source_document_ids = c(1L, 2L),
         source_document_texts = c("alpha", "beta"),
         chunk_size = 5
       )
-
-      document_texts(c("gamma"))
-      session$flushReact()
 
       deferred$resolve(stale_result)
       later::run_now(0.25)
