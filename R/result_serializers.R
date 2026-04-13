@@ -22,6 +22,7 @@ analysis_result_to_metadata_list <- function(analysis_result) {
     language = analysis_result@metadata@language,
     timestamp = .kwallm_timestamp_string(analysis_result@metadata@timestamp),
     research_background = analysis_result@metadata@research_background,
+    analysis_name = analysis_result@metadata@analysis_name,
     app_version = analysis_result@metadata@app_version,
     text_counts = .kwallm_analysis_result_text_counts(analysis_result),
     input = list(
@@ -187,6 +188,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         "language",
         "timestamp",
         "research_background",
+        "analysis_name",
         "app_version",
         "source_documents",
         "documents",
@@ -199,6 +201,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         analysis_result@metadata@language,
         .kwallm_timestamp_string(analysis_result@metadata@timestamp),
         analysis_result@metadata@research_background,
+        analysis_result@metadata@analysis_name,
         .kwallm_excel_scalar(analysis_result@metadata@app_version),
         .kwallm_excel_scalar(text_counts$source_documents),
         .kwallm_excel_scalar(text_counts$documents),

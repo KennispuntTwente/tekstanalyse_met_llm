@@ -37,6 +37,17 @@ source(here::here("R", "utils_quotes.R"), local = TRUE)
 source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+analysis_name <- analysis_result@metadata@analysis_name
+if (nzchar(analysis_name)) {
+  cat(paste0(
+    "<h3 style='color: #666; margin-top: -0.5em;'>",
+    htmltools::htmlEscape(analysis_name),
+    "</h3>\n"
+  ))
+}
+```
+
 ## Method
 
 `r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to assign `r if (assign_multiple_categories) "one or more of" else "one of"` the following `r length(categories)` categories to each text:

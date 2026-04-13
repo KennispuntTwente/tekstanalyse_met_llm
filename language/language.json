@@ -1608,6 +1608,18 @@
       {
         "nl": "Laden...",
         "en": "Loading..."
+      },
+      {
+        "nl": "Naam van analyse",
+        "en": "Analysis name"
+      },
+      {
+        "nl": "Geef een naam aan deze analyse. De naam wordt opgenomen in het rapport en de bestandsnaam van de download.",
+        "en": "Give this analysis a name. The name will be included in the report and the download file name."
+      },
+      {
+        "nl": "Bijv. Interviews Klanttevredenheid 2026",
+        "en": "E.g. Customer Satisfaction Interviews 2026"
       }
   ]
 }

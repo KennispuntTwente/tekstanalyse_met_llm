@@ -55,7 +55,8 @@ processing_server <- function(
   upload_info = reactiveVal(list()),
   split_in_progress = reactiveVal(FALSE),
   layout_view = reactiveVal("vertical"),
-  lang = default_lang()
+  lang = default_lang(),
+  analysis_name = reactiveVal("")
 ) {
   ns <- NS(id)
 
@@ -1387,7 +1388,8 @@ processing_server <- function(
           candidate_topics = candidate_topics_generated(),
           reduced_topics = reduced_topics_generated(),
           topics_were_edited = topics_were_edited(),
-          irr_sample = irr_sample()
+          irr_sample = irr_sample(),
+          analysis_name = analysis_name()
         )
 
         expected_paragraph_subjects <-
@@ -1682,7 +1684,12 @@ processing_server <- function(
 
         output$download_results <- downloadHandler(
           filename = function() {
-            paste0(uuid, ".zip")
+            safe_name <- sanitize_filename(analysis_name())
+            if (nzchar(safe_name)) {
+              paste0(safe_name, "_", uuid, ".zip")
+            } else {
+              paste0(uuid, ".zip")
+            }
           },
           content = function(file) {
             zip_bytes <- tryCatch(file.size(zip_file()), error = function(e) {

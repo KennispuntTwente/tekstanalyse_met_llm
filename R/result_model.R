@@ -454,6 +454,11 @@ AnalysisMetadata <- S7::new_class(
       default = "",
       validator = .kwallm_validate_scalar_string(allow_empty = TRUE)
     ),
+    analysis_name = S7::new_property(
+      S7::class_character,
+      default = "",
+      validator = .kwallm_validate_scalar_string(allow_empty = TRUE)
+    ),
     app_version = S7::new_property(
       NULL | S7::class_character,
       default = NULL,

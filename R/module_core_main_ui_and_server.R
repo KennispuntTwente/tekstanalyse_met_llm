@@ -528,7 +528,7 @@ main_server <- function(
               interrater_toggle_ui("interrater_toggle"),
               human_in_the_loop_toggle_ui("human_in_the_loop_toggle"),
               write_paragraphs_toggle_ui("write_paragraphs_toggle"),
-              div()
+              analysis_name_ui("analysis_name")
             ),
             uiOutput("kwallm_processing_global"),
             div(style = "height: 75px;"),
@@ -643,6 +643,13 @@ main_server <- function(
     # Obtain research background
     research_background <- research_background_server(
       "research_background",
+      processing = processing,
+      lang = lang
+    )
+
+    # Obtain analysis name
+    analysis_name <- analysis_name_server(
+      "analysis_name",
       processing = processing,
       lang = lang
     )
@@ -779,7 +786,8 @@ main_server <- function(
       upload_info = upload_info,
       split_in_progress = split_in_progress,
       layout_view = last_layout_view,
-      lang = lang
+      lang = lang,
+      analysis_name = analysis_name
     )
 
     # Processing UI placement ------------------------------------------------

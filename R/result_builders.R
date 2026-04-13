@@ -110,7 +110,8 @@ build_analysis_result <- function(
   candidate_topics = character(),
   reduced_topics = character(),
   topics_were_edited = FALSE,
-  irr_sample = NULL
+  irr_sample = NULL,
+  analysis_name = ""
 ) {
   stopifnot(is.data.frame(texts_df))
   stopifnot(is.data.frame(results_table))
@@ -151,6 +152,7 @@ build_analysis_result <- function(
     language = language,
     timestamp = Sys.time(),
     research_background = as.character(research_background %||% ""),
+    analysis_name = as.character(analysis_name %||% ""),
     app_version = if (is.null(app_version) || !nzchar(app_version)) {
       NULL
     } else {

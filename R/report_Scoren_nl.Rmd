@@ -30,6 +30,17 @@ source(here::here("R", "style_datatable_config.R"), local = TRUE)
 source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+analysis_name <- analysis_result@metadata@analysis_name
+if (nzchar(analysis_name)) {
+  cat(paste0(
+    "<h3 style='color: #666; margin-top: -0.5em;'>",
+    htmltools::htmlEscape(analysis_name),
+    "</h3>\n"
+  ))
+}
+```
+
 ## Methode
 
 `r .kwallm_report_text_count_summary(analysis_result)` Het LLM (model: `r htmltools::htmlEscape(main_model)`) kreeg de vraag om een score (0-100) te geven voor
