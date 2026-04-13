@@ -1340,3 +1340,184 @@ test_that("build_analysis_result infers multi-label categories from column names
     any(assignments$analysis_unit_id == 2L & assignments$label_id == neg_id)
   )
 })
+
+
+# -- analysis_name property tests ---------------------------------------------
+
+test_that("AnalysisMetadata stores analysis_name and defaults to empty", {
+  meta <- AnalysisMetadata(
+    run_id = "test-run",
+    mode_id = "categorization",
+    language = "en"
+  )
+  expect_equal(meta@analysis_name, "")
+})
+
+test_that("AnalysisMetadata accepts a non-empty analysis_name", {
+  meta <- AnalysisMetadata(
+    run_id = "test-run",
+    mode_id = "scoring",
+    language = "nl",
+    analysis_name = "My Test Analysis"
+  )
+  expect_equal(meta@analysis_name, "My Test Analysis")
+})
+
+test_that("build_analysis_result stores analysis_name in metadata", {
+  texts_df <- .make_result_texts_df(document_text = c("Doc A", "Doc B"))
+  results_table <- data.frame(
+    text = c("Doc A", "Doc B"),
+    result = c("Cat 1", "Cat 2"),
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-name-test",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = c("Cat 1", "Cat 2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt"),
+    analysis_name = "Customer Satisfaction 2026"
+  )
+
+  expect_equal(ar@metadata@analysis_name, "Customer Satisfaction 2026")
+})
+
+test_that("build_analysis_result defaults analysis_name to empty string", {
+  texts_df <- .make_result_texts_df(document_text = "Doc A")
+  results_table <- data.frame(
+    text = "Doc A",
+    result = "Cat 1",
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-no-name",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = "Cat 1",
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  expect_equal(ar@metadata@analysis_name, "")
+})
+
+test_that("analysis_name appears in metadata JSON output", {
+  texts_df <- .make_result_texts_df(document_text = "Doc A")
+  results_table <- data.frame(
+    text = "Doc A",
+    result = "Cat 1",
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-json",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = "Cat 1",
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt"),
+    analysis_name = "JSON Test Name"
+  )
+
+  metadata_list <- analysis_result_to_metadata_list(ar)
+  expect_equal(metadata_list$analysis_name, "JSON Test Name")
+})
+
+test_that("analysis_name appears in Excel metadata sheet", {
+  texts_df <- .make_result_texts_df(document_text = "Doc A")
+  results_table <- data.frame(
+    text = "Doc A",
+    result = "Cat 1",
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-excel",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = "Cat 1",
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt"),
+    analysis_name = "Excel Test Name"
+  )
+
+  sheets <- analysis_result_to_export_sheets(ar)
+  metadata_values <- stats::setNames(
+    sheets$metadata$value,
+    sheets$metadata$field
+  )
+
+  expect_true("analysis_name" %in% sheets$metadata$field)
+  expect_equal(metadata_values[["analysis_name"]], "Excel Test Name")
+})
+
+test_that("empty analysis_name appears as empty string in metadata JSON", {
+  texts_df <- .make_result_texts_df(document_text = "Doc A")
+  results_table <- data.frame(
+    text = "Doc A",
+    result = "Cat 1",
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-empty-name",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = "Cat 1",
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  metadata_list <- analysis_result_to_metadata_list(ar)
+  expect_equal(metadata_list$analysis_name, "")
+
+  sheets <- analysis_result_to_export_sheets(ar)
+  metadata_values <- stats::setNames(
+    sheets$metadata$value,
+    sheets$metadata$field
+  )
+  expect_equal(metadata_values[["analysis_name"]], "")
+})
