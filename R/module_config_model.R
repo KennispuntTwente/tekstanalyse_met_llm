@@ -281,6 +281,9 @@ model_server <- function(
 
             models[[which]] <- clone_with_params(models[[which]], p)
 
+            # persist advanced settings into saved state
+            save_selection(which)
+
             # keep preview + UI in sync
             touch_provider_updated(
               which,
@@ -486,6 +489,86 @@ model_server <- function(
         saved[[mode]] <- cur
       })
 
+      # Resync URL and API key on existing models when the configured
+      # provider changes (e.g., user edits URL or API key after selecting
+      # a model).  Guarded: only touches models whose model-id belongs to
+      # the current provider's configured_models list, so preconfigured
+      # models that haven't been replaced yet are left alone.
+      observeEvent(
+        llm_provider_rv$llm_provider_configured,
+        {
+          mode <- current_mode()
+          if (!(mode %in% c("openai", "ollama"))) {
+            return()
+          }
+
+          prov <- llm_provider_rv$llm_provider_configured
+          if (is.null(prov)) {
+            return()
+          }
+
+          configured <- llm_provider_rv$configured_models
+
+          for (which in c("main", "large")) {
+            m <- models[[which]]
+            if (is.null(m)) {
+              next
+            }
+
+            m_model <- m$parameters$model
+            if (
+              is.null(configured) ||
+                is.null(m_model) ||
+                !(m_model %in% configured)
+            ) {
+              next
+            }
+
+            needs_update <- !identical(m$url, prov$url) ||
+              !identical(m$api_key %||% NULL, prov$api_key %||% NULL)
+
+            if (needs_update) {
+              updated <- m$clone(deep = TRUE)
+              updated$url <- prov$url
+              if (!is.null(prov$api_key)) {
+                updated$api_key <- prov$api_key
+              }
+              models[[which]] <- updated
+
+              cur <- saved[[mode]]
+              cur[[which]] <- updated
+              saved[[mode]] <- cur
+            }
+          }
+        },
+        ignoreInit = TRUE
+      )
+
+      # Helper: build or restore a model for openai/ollama selection.
+      # If saved state contains a model with the same model-id, restore
+      # it (preserving advanced settings like temperature, top_p, etc.)
+      # while resyncing connection details from the live provider.
+      restore_or_clone_model <- function(which, model_id) {
+        mode <- current_mode()
+        saved_model <- saved[[mode]][[which]]
+        prov <- llm_provider_rv$llm_provider_configured
+
+        if (
+          !is.null(saved_model) &&
+            identical(saved_model$parameters$model, model_id)
+        ) {
+          restored <- saved_model$clone(deep = TRUE)
+          restored$url <- prov$url
+          if (!is.null(prov$api_key)) {
+            restored$api_key <- prov$api_key
+          }
+          return(restored)
+        }
+
+        cloned <- prov$clone()
+        cloned$set_parameters(list(model = model_id))
+      }
+
       # When main/large model is selected or changed
       observeEvent(input$main_model, {
         req(input$main_model)
@@ -496,10 +579,7 @@ model_server <- function(
             input$main_model
           ]]
         } else {
-          models$main <- llm_provider_rv$llm_provider_configured$clone()
-          models$main <- models$main$set_parameters(list(
-            model = input$main_model
-          ))
+          models$main <- restore_or_clone_model("main", input$main_model)
         }
 
         save_selection("main")
@@ -522,10 +602,7 @@ model_server <- function(
             input$large_model
           ]]
         } else {
-          models$large <- llm_provider_rv$llm_provider_configured$clone()
-          models$large <- models$large$set_parameters(list(
-            model = input$large_model
-          ))
+          models$large <- restore_or_clone_model("large", input$large_model)
         }
 
         save_selection("large")
@@ -1005,6 +1082,7 @@ model_server <- function(
         prov <- models$main$clone(deep = TRUE)
         prov$json_type <- input$main_json_mode
         models$main <- prov
+        save_selection("main")
         main_provider_updated(Sys.time())
         update_json_mode_ui("main")
         update_temperature_ui(session, input, models, "main")
@@ -1021,6 +1099,7 @@ model_server <- function(
         prov <- models$large$clone(deep = TRUE)
         prov$json_type <- input$large_json_mode
         models$large <- prov
+        save_selection("large")
         large_provider_updated(Sys.time())
         update_json_mode_ui("large")
         update_temperature_ui(session, input, models, "large")
