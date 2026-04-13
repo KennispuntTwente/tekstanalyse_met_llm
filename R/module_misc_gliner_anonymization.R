@@ -337,7 +337,7 @@ gliner_server <- function(
             )
           )
 
-          ## 2 Switch the modal to the “running” state
+          ## 2 Switch the modal to the "running" state
           module_state("running")
 
           # Log GLiNER start with configured labels
@@ -414,7 +414,7 @@ gliner_server <- function(
             )
           ) %...>%
             {
-              ## SUCCESS ─ tidy predictions & then set state to “evaluating”
+              ## SUCCESS ─ tidy predictions & then set state to "evaluating"
               preds <- .
 
               # ── clean up the raw list into a data frame
@@ -476,7 +476,7 @@ gliner_server <- function(
               queue$consumer$stop()
             } %...!%
             {
-              ## ERROR ─ notify the user and set state to “error”
+              ## ERROR ─ notify the user and set state to "error"
               err <- .
               progress$close()
               queue$consumer$stop()

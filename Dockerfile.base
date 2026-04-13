@@ -46,14 +46,19 @@ ENV TZ=Europe/Amsterdam \
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
       dirmngr gnupg ca-certificates wget curl \
-      libcurl4 libssl3 libxml2 pandoc cmake unzip tzdata \
+      libcurl4 libssl3 libxml2 pandoc cmake unzip tzdata locales \
       libblas3 liblapack3 libopenblas0-pthread libgfortran5 libpcre2-8-0 \
       libdeflate0 libgomp1 libpng16-16 libcairo2 libcairo2-dev \
       libxt-dev libpng-dev libtiff-dev libpangocairo-* \
       python3.12-dev libnode-dev libwebp-dev && \
     ln -fs /usr/share/zoneinfo/Europe/Amsterdam /etc/localtime && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
+    sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen en_US.UTF-8 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ENV LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
 
 # Create non-root user
 RUN useradd -ms /bin/bash appuser

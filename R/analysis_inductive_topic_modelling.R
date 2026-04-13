@@ -414,7 +414,7 @@ prompt_topic_not_applicable_check <- function(
 #' @param desired_number_type Either "max" or "goal" (see docs).
 #' @param language Either "nl" or "en" — affects the returned topic language.
 #' @param always_add_not_applicable Logical; automatically append the generic
-#'   “Unknown/not applicable” topic when missing.
+#'   "Unknown/not applicable" topic when missing.
 #' @param max_iterations Maximum number of batch-reduce cycles (default = 4).
 #' @return A character vector of reduced topics.
 #' @export
