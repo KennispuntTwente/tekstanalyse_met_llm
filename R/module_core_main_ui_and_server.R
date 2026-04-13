@@ -30,7 +30,6 @@ main_ui <- function() {
 main_server <- function(
   preconfigured_main_models = NULL,
   preconfigured_large_models = NULL,
-  azure_auth = FALSE,
   gliner_model = NULL
 ) {
   server <- function(input, output, session) {
@@ -430,7 +429,6 @@ main_server <- function(
             )
           ),
           hr(),
-          uiOutput("azure_auth_unauthorized_ui"),
           div(
             class = "card-container",
             div(
@@ -556,19 +554,6 @@ main_server <- function(
         )
       )
     })
-
-    # 0 Authentication -----------------------------------------------
-
-    # When deploying to server, you could implement, e.g.,
-    #   Azure AD authentication here
-    # See for example R/azure_auth.R
-
-    if (azure_auth) {
-      user_info <- get_azure_auth(session, output)
-      if (is.null(user_info)) {
-        return()
-      }
-    }
 
     # 1 Text management ----------------------------------------------
 
