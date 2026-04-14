@@ -647,8 +647,8 @@ join_processing_results <- function(texts_df, results_table_pre, mode = NULL) {
       by = "analysis_unit_id",
       relationship = "many-to-many"
     ) |>
-    dplyr::select(-preprocessed) |>
-    dplyr::rename(text = document_text)
+    dplyr::select(-document_text) |>
+    dplyr::rename(text = preprocessed)
 
   results_table
 }

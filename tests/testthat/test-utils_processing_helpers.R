@@ -234,9 +234,9 @@ test_that("join_processing_results restores document texts without paragraph sid
   joined <- join_processing_results(texts_df, results_table_pre)
 
   expect_true(is.data.frame(joined))
-  expect_identical(joined$text, c("Raw 1", "Raw 2"))
+  expect_identical(joined$text, c("prep-1", "prep-2"))
   expect_identical(joined$result, c("A", "B"))
-  expect_false("preprocessed" %in% names(joined))
+  expect_false("document_text" %in% names(joined))
   expect_null(attr(joined, "paragraphs", exact = TRUE))
 })
 
@@ -258,7 +258,7 @@ test_that("join_processing_results fans out shared analysis units per document r
   joined <- join_processing_results(texts_df, results_table_pre)
 
   expect_identical(joined$analysis_unit_id, c(1L, 1L, 2L))
-  expect_identical(joined$text, c("Raw 1", "Raw 2", "Raw 3"))
+  expect_identical(joined$text, c("prep-shared", "prep-shared", "prep-3"))
   expect_identical(joined$result, c("A", "A", "B"))
 })
 
@@ -331,6 +331,26 @@ test_that("join_processing_results skips cardinality check when mode is NULL", {
 
   # No mode provided — backward compatible, no assertion
   expect_no_error(join_processing_results(texts_df, results_dup))
+})
+
+
+test_that("join_processing_results uses preprocessed text not raw document text", {
+  texts_df <- data.frame(
+    analysis_unit_id = c(1L, 2L),
+    document_text = c("Raw PII 1", "Raw PII 2"),
+    preprocessed = c("Anonymized 1", "Anonymized 2"),
+    stringsAsFactors = FALSE
+  )
+  results_table_pre <- data.frame(
+    analysis_unit_id = c(1L, 2L),
+    result = c("A", "B"),
+    stringsAsFactors = FALSE
+  )
+  joined <- join_processing_results(texts_df, results_table_pre)
+
+  expect_identical(joined$text, c("Anonymized 1", "Anonymized 2"))
+  expect_false("document_text" %in% names(joined))
+  expect_false(any(grepl("Raw PII", joined$text)))
 })
 
 

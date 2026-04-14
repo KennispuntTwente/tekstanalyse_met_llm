@@ -1521,3 +1521,174 @@ test_that("empty analysis_name appears as empty string in metadata JSON", {
   )
   expect_equal(metadata_values[["analysis_name"]], "")
 })
+
+
+# 9. Preprocessed text in results (privacy) -----------------------------------
+
+test_that("report results use preprocessed text not raw document text for categorization", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("I live at 12345 Amsterdam", "Raw PII text 2"),
+    preprocessed = c("I live at <<removed>>", "Anonymized text 2")
+  )
+
+  results_table <- data.frame(
+    text = c("I live at <<removed>>", "Anonymized text 2"),
+    result = c("Theme 1", "Theme 2"),
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-privacy-cat",
+    mode = "Categorisatie",
+    research_background = "bg",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = c("Theme 1", "Theme 2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  report_df <- .kwallm_report_results_df(ar)
+  expect_identical(
+    report_df$text,
+    c("I live at <<removed>>", "Anonymized text 2")
+  )
+  expect_false(any(grepl("12345", report_df$text)))
+
+  sheets <- analysis_result_to_export_sheets(ar)
+  expect_identical(sheets$results$text, report_df$text)
+})
+
+test_that("report results use preprocessed text not raw document text for multi-label categorization", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Raw PII text"),
+    preprocessed = c("Anonymized text")
+  )
+
+  results_table <- data.frame(
+    text = "Anonymized text",
+    Cat1 = TRUE,
+    Cat2 = FALSE,
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-privacy-cat-multi",
+    mode = "Categorisatie",
+    research_background = "bg",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = c("Cat1", "Cat2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = TRUE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  report_df <- .kwallm_report_results_df(ar)
+  expect_identical(report_df$text, "Anonymized text")
+  expect_false(any(grepl("Raw PII", report_df$text)))
+})
+
+test_that("report results use preprocessed text not raw document text for scoring", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Raw PII text"),
+    preprocessed = c("Anonymized text")
+  )
+
+  results_table <- data.frame(
+    text = "Anonymized text",
+    result = 75,
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-privacy-scoring",
+    mode = "Scoren",
+    research_background = "bg",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    scoring_characteristic = "empathy",
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(scoring = "prompt")
+  )
+
+  report_df <- .kwallm_report_results_df(ar)
+  expect_identical(report_df$text, "Anonymized text")
+  expect_false(any(grepl("Raw PII", report_df$text)))
+
+  sheets <- analysis_result_to_export_sheets(ar)
+  expect_identical(sheets$results$text, report_df$text)
+})
+
+test_that("report results use preprocessed text not raw document text for marking", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("I live at 12345 Amsterdam"),
+    preprocessed = c("I live at <<removed>>")
+  )
+
+  results_table <- data.frame(
+    analysis_unit_id = 1L,
+    chunk_id = 1L,
+    chunk_index = 1L,
+    text = "I live at <<removed>>",
+    chunk_text = "I live at <<removed>>",
+    code = "Address",
+    marked_text = "<<removed>>",
+    source_marked_text = "<<removed>>",
+    match_start = 11L,
+    match_end = 21L,
+    match_distance = 0L,
+    match_method = "exact",
+    response_status = "matched_all",
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-privacy-marking",
+    mode = "Markeren",
+    research_background = "bg",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    codes = "Address",
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(marking = "prompt")
+  )
+
+  report_df <- .kwallm_report_results_df(ar)
+  expect_identical(report_df$text, "I live at <<removed>>")
+  expect_false(any(grepl("12345", report_df$text)))
+
+  sheets <- analysis_result_to_export_sheets(ar)
+  expect_identical(sheets$results$text, report_df$text)
+})

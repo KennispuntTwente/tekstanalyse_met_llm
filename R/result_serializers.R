@@ -389,14 +389,14 @@ write_analysis_result_metadata_json <- function(
       all.x = TRUE,
       all.y = FALSE
     )
-    out <- merged[c("document_id", "document_text", "result")]
+    out <- merged[c("document_id", "preprocessed_text", "result")]
     names(out) <- c("document_id", "text", "result")
     return(out)
   }
 
   out <- data.frame(
     document_id = base$document_id,
-    text = base$document_text,
+    text = base$preprocessed_text,
     stringsAsFactors = FALSE
   )
   for (label in result@labels$label_text) {
@@ -431,7 +431,7 @@ write_analysis_result_metadata_json <- function(
     all.y = FALSE
   )
 
-  out <- merged[c("document_id", "document_text", "score")]
+  out <- merged[c("document_id", "preprocessed_text", "score")]
   names(out) <- c("document_id", "text", "result")
   out
 }
@@ -457,14 +457,14 @@ write_analysis_result_metadata_json <- function(
 
   chunk_docs <- merge(
     result@chunks,
-    base[c("analysis_unit_id", "document_id", "document_text")],
+    base[c("analysis_unit_id", "document_id", "preprocessed_text")],
     by = "analysis_unit_id",
     all.x = TRUE,
     all.y = FALSE
   )
 
   if (!nrow(result@codes)) {
-    out <- chunk_docs[c("document_id", "document_text", "chunk_text")]
+    out <- chunk_docs[c("document_id", "preprocessed_text", "chunk_text")]
     out$code <- character(nrow(out))
     out$marked_text <- NA_character_
     out$response_status <- NA_character_
@@ -502,7 +502,7 @@ write_analysis_result_metadata_json <- function(
 
   out <- merged[c(
     "document_id",
-    "document_text",
+    "preprocessed_text",
     "chunk_text",
     "code",
     "marked_text",
@@ -701,13 +701,22 @@ write_analysis_result_metadata_json <- function(
   .kwallm_scalar_or_null(value)
 }
 
-# Joins document rows to analysis-unit ids.
+# Joins document rows to analysis-unit ids and their preprocessed text.
 # We use this as the shared base table when reconstructing report result frames.
+# The preprocessed_text column is the text after any anonymization/preprocessing
+# and is the text the LLM actually analyzed.
 .kwallm_document_unit_map <- function(analysis_result) {
-  merge(
+  doc_units <- merge(
     analysis_result@text_lineage@documents,
     analysis_result@text_lineage@document_units,
     by = "document_id",
+    all.x = TRUE,
+    all.y = FALSE
+  )
+  merge(
+    doc_units,
+    analysis_result@text_lineage@analysis_units,
+    by = "analysis_unit_id",
     all.x = TRUE,
     all.y = FALSE
   )
