@@ -77,8 +77,8 @@ test_that("{shinytest2} recording: categorization with paragraph writing", {
   paragraphs <- app$get_value(export = "processing-paragraph_entries")
 
   # Expect that all texts are present in column 'text'
-  texts <- readLines(
-    here::here("tests", "testthat", "test_texts.txt")
+  texts <- app$get_value(
+    export = "text_management-texts__preprocessed"
   )
   expect_true(all(texts %in% results$text))
 

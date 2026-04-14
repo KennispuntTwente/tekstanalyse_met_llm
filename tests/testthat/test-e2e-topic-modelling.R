@@ -87,9 +87,9 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     fixed = TRUE
   )))
 
-  expect_true(all(texts %in% results$text))
+  expect_true(all(preprocessed_texts %in% results$text))
   expect_true(all.equal(
-    table(texts),
+    table(preprocessed_texts),
     table(results$text),
     check.attributes = FALSE
   ))
@@ -127,8 +127,8 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     ),
     expected_results_columns = c("text"),
     expected_result_rows = nrow(results),
-    expected_texts = texts,
-    expected_text_count = length(texts)
+    expected_texts = preprocessed_texts,
+    expected_text_count = length(preprocessed_texts)
   )
 
   expect_true(isTRUE(bundle$metadata$mode_config$write_paragraphs))
