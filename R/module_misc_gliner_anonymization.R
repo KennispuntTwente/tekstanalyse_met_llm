@@ -308,7 +308,8 @@ gliner_server <- function(
 
           ## 1 Parse & validate labels
           labels <- strsplit(input$pii_labels, ",")[[1]] |> trimws()
-          if (length(labels) < 2 || all(labels == "")) {
+          labels <- labels[nzchar(labels)]
+          if (length(labels) < 2) {
             # Need at least 2 labels, otherwise model won't function
             # Not sure why 1 label is not enough, but it isn't;
             #   bug (feature?) in the GLiNER package/model?
