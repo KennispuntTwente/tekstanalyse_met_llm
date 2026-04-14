@@ -7,8 +7,11 @@ requires-python = "==3.12.*"
 dependencies = [
   "tiktoken>=0.1.1",
   "semchunk>=3.2.2",
-  "gliner>=0.2.5",
+  # v0.2.25+ rewrote from_pretrained to be self-contained, fixing
+  # compatibility with huggingface_hub >=1.0 and transformers >=5.
+  "gliner>=0.2.25",
   "torch>=2.8.0",
+  "transformers>=4",
 ]
 [tool.uv.sources]
 torch = [
