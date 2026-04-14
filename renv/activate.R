@@ -3,13 +3,10 @@ local({
 
   # the requested version of renv
   version <- "1.2.0"
-  attr(version, "md5") <- "55a999ab1366249f2dd6c52e0d2489f6"
   attr(version, "sha") <- NULL
 
   # the project directory
-  project <- Sys.getenv("RENV_PROJECT")
-  if (!nzchar(project))
-    project <- getwd()
+  project <- getwd()
 
   # use start-up diagnostics if enabled
   diagnostics <- Sys.getenv("RENV_STARTUP_DIAGNOSTICS", unset = "FALSE")
@@ -34,16 +31,8 @@ local({
     if (!is.null(override))
       return(override)
 
-    # if we're being run in a context where R_LIBS is already set,
-    # don't load -- presumably we're being run as a sub-process and
-    # the parent process has already set up library paths for us
-    rcmd <- Sys.getenv("R_CMD", unset = NA)
-    rlibs <- Sys.getenv("R_LIBS", unset = NA)
-    if (!is.na(rlibs) && !is.na(rcmd))
-      return(FALSE)
-
     # next, check environment variables
-    # prefer using the configuration one in the future
+    # TODO: prefer using the configuration one in the future
     envvars <- c(
       "RENV_CONFIG_AUTOLOADER_ENABLED",
       "RENV_AUTOLOADER_ENABLED",
@@ -61,21 +50,8 @@ local({
 
   })
 
-  # bail if we're not enabled
-  if (!enabled) {
-
-    # if we're not enabled, we might still need to manually load
-    # the user profile here
-    profile <- Sys.getenv("R_PROFILE_USER", unset = "~/.Rprofile")
-    if (file.exists(profile)) {
-      cfg <- Sys.getenv("RENV_CONFIG_USER_PROFILE", unset = "TRUE")
-      if (tolower(cfg) %in% c("true", "t", "1"))
-        sys.source(profile, envir = globalenv())
-    }
-
+  if (!enabled)
     return(FALSE)
-
-  }
 
   # avoid recursion
   if (identical(getOption("renv.autoloader.running"), TRUE)) {
@@ -99,66 +75,6 @@ local({
     unloadNamespace("renv")
 
   # load bootstrap tools   
-  ansify <- function(text) {
-    if (renv_ansify_enabled())
-      renv_ansify_enhanced(text)
-    else
-      renv_ansify_default(text)
-  }
-  
-  renv_ansify_enabled <- function() {
-  
-    override <- Sys.getenv("RENV_ANSIFY_ENABLED", unset = NA)
-    if (!is.na(override))
-      return(as.logical(override))
-  
-    pane <- Sys.getenv("RSTUDIO_CHILD_PROCESS_PANE", unset = NA)
-    if (identical(pane, "build"))
-      return(FALSE)
-  
-    testthat <- Sys.getenv("TESTTHAT", unset = "false")
-    if (tolower(testthat) %in% "true")
-      return(FALSE)
-  
-    iderun <- Sys.getenv("R_CLI_HAS_HYPERLINK_IDE_RUN", unset = "false")
-    if (tolower(iderun) %in% "false")
-      return(FALSE)
-  
-    TRUE
-  
-  }
-  
-  renv_ansify_default <- function(text) {
-    text
-  }
-  
-  renv_ansify_enhanced <- function(text) {
-  
-    # R help links
-    pattern <- "`\\?(renv::(?:[^`])+)`"
-    replacement <- "`\033]8;;x-r-help:\\1\a?\\1\033]8;;\a`"
-    text <- gsub(pattern, replacement, text, perl = TRUE)
-  
-    # runnable code
-    pattern <- "`(renv::(?:[^`])+)`"
-    replacement <- "`\033]8;;x-r-run:\\1\a\\1\033]8;;\a`"
-    text <- gsub(pattern, replacement, text, perl = TRUE)
-  
-    # return ansified text
-    text
-  
-  }
-  
-  renv_ansify_init <- function() {
-  
-    envir <- renv_envir_self()
-    if (renv_ansify_enabled())
-      assign("ansify", renv_ansify_enhanced, envir = envir)
-    else
-      assign("ansify", renv_ansify_default, envir = envir)
-  
-  }
-  
   `%||%` <- function(x, y) {
     if (is.null(x)) y else x
   }
@@ -167,16 +83,6 @@ local({
   
     quiet <- getOption("renv.bootstrap.quiet", default = FALSE)
     if (quiet)
-      return(invisible())
-  
-    # also check for config environment variables that should suppress messages
-    # https://github.com/rstudio/renv/issues/2214
-    enabled <- Sys.getenv("RENV_CONFIG_STARTUP_QUIET", unset = NA)
-    if (!is.na(enabled) && tolower(enabled) %in% c("true", "1"))
-      return(invisible())
-  
-    enabled <- Sys.getenv("RENV_CONFIG_SYNCHRONIZED_CHECK", unset = NA)
-    if (!is.na(enabled) && tolower(enabled) %in% c("false", "0"))
       return(invisible())
   
     msg <- sprintf(fmt, ...)
@@ -202,22 +108,8 @@ local({
   
   }
   
-  heredoc <- function(text, leave = 0) {
-  
-    # remove leading, trailing whitespace
-    trimmed <- gsub("^\\s*\\n|\\n\\s*$", "", text)
-  
-    # split into lines
-    lines <- strsplit(trimmed, "\n", fixed = TRUE)[[1L]]
-  
-    # compute common indent
-    indent <- regexpr("[^[:space:]]", lines)
-    common <- min(setdiff(indent, -1L)) - leave
-    text <- paste(substring(lines, common), collapse = "\n")
-  
-    # substitute in ANSI links for executable renv code
-    ansify(text)
-  
+  startswith <- function(string, prefix) {
+    substring(string, 1, nchar(prefix)) == prefix
   }
   
   bootstrap <- function(version, library) {
@@ -225,20 +117,6 @@ local({
     friendly <- renv_bootstrap_version_friendly(version)
     section <- header(sprintf("Bootstrapping renv %s", friendly))
     catf(section)
-  
-    # ensure the target library path exists; required for file.copy(..., recursive = TRUE)
-    dir.create(library, showWarnings = FALSE, recursive = TRUE)
-  
-    # try to install renv from cache
-    md5 <- attr(version, "md5", exact = TRUE)
-    if (length(md5)) {
-      pkgpath <- renv_bootstrap_find(version)
-      if (length(pkgpath) && file.exists(pkgpath)) {
-        ok <- file.copy(pkgpath, library, recursive = TRUE)
-        if (isTRUE(ok))
-          return(invisible())
-      }
-    }
   
     # attempt to download renv
     catf("- Downloading renv ... ", appendLF = FALSE)
@@ -265,6 +143,7 @@ local({
   
     # add empty line to break up bootstrapping from normal output
     catf("")
+  
     return(invisible())
   }
   
@@ -281,20 +160,12 @@ local({
     repos <- Sys.getenv("RENV_CONFIG_REPOS_OVERRIDE", unset = NA)
     if (!is.na(repos)) {
   
-      # split on ';' if present
-      parts <- strsplit(repos, ";", fixed = TRUE)[[1L]]
+      # check for RSPM; if set, use a fallback repository for renv
+      rspm <- Sys.getenv("RSPM", unset = NA)
+      if (identical(rspm, repos))
+        repos <- c(RSPM = rspm, CRAN = cran)
   
-      # split into named repositories if present
-      idx <- regexpr("=", parts, fixed = TRUE)
-      keys <- substring(parts, 1L, idx - 1L)
-      vals <- substring(parts, idx + 1L)
-      names(vals) <- keys
-  
-      # if we have a single unnamed repository, call it CRAN
-      if (length(vals) == 1L && identical(keys, ""))
-        names(vals) <- "CRAN"
-  
-      return(vals)
+      return(repos)
   
     }
   
@@ -396,11 +267,8 @@ local({
       quiet    = TRUE
     )
   
-    if ("headers" %in% names(formals(utils::download.file))) {
-      headers <- renv_bootstrap_download_custom_headers(url)
-      if (length(headers) && is.character(headers))
-        args$headers <- headers
-    }
+    if ("headers" %in% names(formals(utils::download.file)))
+      args$headers <- renv_bootstrap_download_custom_headers(url)
   
     do.call(utils::download.file, args)
   
@@ -479,21 +347,10 @@ local({
     for (type in types) {
       for (repos in renv_bootstrap_repos()) {
   
-        # build arguments for utils::available.packages() call
-        args <- list(type = type, repos = repos)
-  
-        # add custom headers if available -- note that
-        # utils::available.packages() will pass this to download.file()
-        if ("headers" %in% names(formals(utils::download.file))) {
-          headers <- renv_bootstrap_download_custom_headers(repos)
-          if (length(headers) && is.character(headers))
-            args$headers <- headers
-        }
-  
         # retrieve package database
         db <- tryCatch(
           as.data.frame(
-            do.call(utils::available.packages, args),
+            utils::available.packages(type = type, repos = repos),
             stringsAsFactors = FALSE
           ),
           error = identity
@@ -543,51 +400,6 @@ local({
   
   }
   
-  renv_bootstrap_find <- function(version) {
-  
-    path <- renv_bootstrap_find_cache(version)
-    if (length(path) && file.exists(path)) {
-      catf("- Using renv %s from global package cache", version)
-      return(path)
-    }
-  
-  }
-  
-  renv_bootstrap_find_cache <- function(version) {
-  
-    md5 <- attr(version, "md5", exact = TRUE)
-    if (is.null(md5))
-      return()
-  
-    # infer path to renv cache
-    cache <- Sys.getenv("RENV_PATHS_CACHE", unset = "")
-    if (!nzchar(cache)) {
-      root <- Sys.getenv("RENV_PATHS_ROOT", unset = NA)
-      if (!is.na(root))
-        cache <- file.path(root, "cache")
-    }
-  
-    if (!nzchar(cache)) {
-      tools <- asNamespace("tools")
-      if (is.function(tools$R_user_dir)) {
-        root <- tools$R_user_dir("renv", "cache")
-        cache <- file.path(root, "cache")
-      }
-    }
-  
-    # start completing path to cache
-    file.path(
-      cache,
-      renv_bootstrap_cache_version(),
-      renv_bootstrap_platform_prefix(),
-      "renv",
-      version,
-      md5,
-      "renv"
-    )
-  
-  }
-  
   renv_bootstrap_download_tarball <- function(version) {
   
     # if the user has provided the path to a tarball via
@@ -620,14 +432,6 @@ local({
   
   }
   
-  renv_bootstrap_github_token <- function() {
-    for (envvar in c("GITHUB_TOKEN", "GITHUB_PAT", "GH_TOKEN")) {
-      envval <- Sys.getenv(envvar, unset = NA)
-      if (!is.na(envval))
-        return(envval)
-    }
-  }
-  
   renv_bootstrap_download_github <- function(version) {
   
     enabled <- Sys.getenv("RENV_BOOTSTRAP_FROM_GITHUB", unset = "TRUE")
@@ -635,19 +439,16 @@ local({
       return(FALSE)
   
     # prepare download options
-    token <- renv_bootstrap_github_token()
-    if (is.null(token))
-      token <- ""
-  
-    if (nzchar(Sys.which("curl")) && nzchar(token)) {
+    pat <- Sys.getenv("GITHUB_PAT")
+    if (nzchar(Sys.which("curl")) && nzchar(pat)) {
       fmt <- "--location --fail --header \"Authorization: token %s\""
-      extra <- sprintf(fmt, token)
+      extra <- sprintf(fmt, pat)
       saved <- options("download.file.method", "download.file.extra")
       options(download.file.method = "curl", download.file.extra = extra)
       on.exit(do.call(base::options, saved), add = TRUE)
-    } else if (nzchar(Sys.which("wget")) && nzchar(token)) {
+    } else if (nzchar(Sys.which("wget")) && nzchar(pat)) {
       fmt <- "--header=\"Authorization: token %s\""
-      extra <- sprintf(fmt, token)
+      extra <- sprintf(fmt, pat)
       saved <- options("download.file.method", "download.file.extra")
       options(download.file.method = "wget", download.file.extra = extra)
       on.exit(do.call(base::options, saved), add = TRUE)
@@ -772,19 +573,11 @@ local({
   
   }
   
-  renv_bootstrap_platform_prefix_default <- function() {
+  renv_bootstrap_platform_prefix <- function() {
   
-    # read version component
-    version <- Sys.getenv("RENV_PATHS_VERSION", unset = "R-%v")
-  
-    # expand placeholders
-    placeholders <- list(
-      list("%v", format(getRversion()[1, 1:2])),
-      list("%V", format(getRversion()[1, 1:3]))
-    )
-  
-    for (placeholder in placeholders)
-      version <- gsub(placeholder[[1L]], placeholder[[2L]], version, fixed = TRUE)
+    # construct version prefix
+    version <- paste(R.version$major, R.version$minor, sep = ".")
+    prefix <- paste("R", numeric_version(version)[1, 1:2], sep = "-")
   
     # include SVN revision for development versions of R
     # (to avoid sharing platform-specific artefacts with released versions of R)
@@ -793,19 +586,10 @@ local({
       identical(R.version[["nickname"]], "Unsuffered Consequences")
   
     if (devel)
-      version <- paste(version, R.version[["svn rev"]], sep = "-r")
-  
-    version
-  
-  }
-  
-  renv_bootstrap_platform_prefix <- function() {
-  
-    # construct version prefix
-    version <- renv_bootstrap_platform_prefix_default()
+      prefix <- paste(prefix, R.version[["svn rev"]], sep = "-r")
   
     # build list of path components
-    components <- c(version, R.version$platform)
+    components <- c(prefix, R.version$platform)
   
     # include prefix if provided by user
     prefix <- renv_bootstrap_platform_prefix_impl()
@@ -826,9 +610,6 @@ local({
   
     # if the user has requested an automatic prefix, generate it
     auto <- Sys.getenv("RENV_PATHS_PREFIX_AUTO", unset = NA)
-    if (is.na(auto) && getRversion() >= "4.4.0")
-      auto <- "TRUE"
-  
     if (auto %in% c("TRUE", "True", "true", "1"))
       return(renv_bootstrap_platform_prefix_auto())
   
@@ -1020,23 +801,24 @@ local({
   
     # the loaded version of renv doesn't match the requested version;
     # give the user instructions on how to proceed
-    dev <- identical(description[["RemoteType"]], "github")
-    remote <- if (dev)
+    remote <- if (!is.null(description[["RemoteSha"]])) {
       paste("rstudio/renv", description[["RemoteSha"]], sep = "@")
-    else
+    } else {
       paste("renv", description[["Version"]], sep = "@")
+    }
   
     # display both loaded version + sha if available
     friendly <- renv_bootstrap_version_friendly(
       version = description[["Version"]],
-      sha     = if (dev) description[["RemoteSha"]]
+      sha     = description[["RemoteSha"]]
     )
   
-    fmt <- heredoc("
-      renv %1$s was loaded from project library, but this project is configured to use renv %2$s.
-      - Use `renv::record(\"%3$s\")` to record renv %1$s in the lockfile.
-      - Use `renv::restore(packages = \"renv\")` to install renv %2$s into the project library.
-    ")
+    fmt <- paste(
+      "renv %1$s was loaded from project library, but this project is configured to use renv %2$s.",
+      "- Use `renv::record(\"%3$s\")` to record renv %1$s in the lockfile.",
+      "- Use `renv::restore(packages = \"renv\")` to install renv %2$s into the project library.",
+      sep = "\n"
+    )
     catf(fmt, friendly, renv_bootstrap_version_friendly(version), remote)
   
     FALSE
@@ -1044,19 +826,13 @@ local({
   }
   
   renv_bootstrap_validate_version_dev <- function(version, description) {
-  
     expected <- description[["RemoteSha"]]
-    if (!is.character(expected))
-      return(FALSE)
-  
-    pattern <- sprintf("^\\Q%s\\E", version)
-    grepl(pattern, expected, perl = TRUE)
-  
+    is.character(expected) && startswith(expected, version)
   }
   
   renv_bootstrap_validate_version_release <- function(version, description) {
     expected <- description[["Version"]]
-    is.character(expected) && identical(c(expected), c(version))
+    is.character(expected) && identical(expected, version)
   }
   
   renv_bootstrap_hash_text <- function(text) {
@@ -1231,25 +1007,10 @@ local({
   
   renv_bootstrap_exec <- function(project, libpath, version) {
     if (!renv_bootstrap_load(project, libpath, version))
-      renv_bootstrap_run(project, libpath, version)
+      renv_bootstrap_run(version, libpath)
   }
   
-  renv_bootstrap_run <- function(project, libpath, version) {
-    tryCatch(
-      renv_bootstrap_run_impl(project, libpath, version),
-      error = function(e) {
-        msg <- paste(
-          "failed to bootstrap renv: the project will not be loaded.",
-          paste("Reason:", conditionMessage(e)),
-          "Use `renv::activate()` to re-initialize the project.",
-          sep = "\n"
-        )
-        warning(msg, call. = FALSE)
-      }
-    )
-  }
-  
-  renv_bootstrap_run_impl <- function(project, libpath, version) {
+  renv_bootstrap_run <- function(version, libpath) {
   
     # perform bootstrap
     bootstrap(version, libpath)
@@ -1260,7 +1021,7 @@ local({
   
     # try again to load
     if (requireNamespace("renv", lib.loc = libpath, quietly = TRUE)) {
-      return(renv::load(project = project))
+      return(renv::load(project = getwd()))
     }
   
     # failed to download or load renv; warn the user
@@ -1273,18 +1034,6 @@ local({
   
   }
   
-  renv_bootstrap_cache_version <- function() {
-    # NOTE: users should normally not override the cache version;
-    # this is provided just to make testing easier
-    Sys.getenv("RENV_CACHE_VERSION", unset = "v5")
-  }
-  
-  renv_bootstrap_cache_version_previous <- function() {
-    version <- renv_bootstrap_cache_version()
-    number <- as.integer(substring(version, 2L))
-    paste("v", number - 1L, sep = "")
-  }
-  
   renv_json_read <- function(file = NULL, text = NULL) {
   
     jlerr <- NULL
@@ -1292,7 +1041,7 @@ local({
     # if jsonlite is loaded, use that instead
     if ("jsonlite" %in% loadedNamespaces()) {
   
-      json <- tryCatch(renv_json_read_jsonlite(file, text), error = identity)
+      json <- catch(renv_json_read_jsonlite(file, text))
       if (!inherits(json, "error"))
         return(json)
   
@@ -1301,7 +1050,7 @@ local({
     }
   
     # otherwise, fall back to the default JSON reader
-    json <- tryCatch(renv_json_read_default(file, text), error = identity)
+    json <- catch(renv_json_read_default(file, text))
     if (!inherits(json, "error"))
       return(json)
   
@@ -1314,109 +1063,102 @@ local({
   }
   
   renv_json_read_jsonlite <- function(file = NULL, text = NULL) {
-    text <- paste(text %||% readLines(file, warn = FALSE), collapse = "\n")
+    text <- paste(text %||% read(file), collapse = "\n")
     jsonlite::fromJSON(txt = text, simplifyVector = FALSE)
-  }
-  
-  renv_json_read_patterns <- function() {
-  
-    list(
-  
-      # objects
-      list("{", "\t\n\tobject(\t\n\t", TRUE),
-      list("}", "\t\n\t)\t\n\t",       TRUE),
-  
-      # arrays
-      list("[", "\t\n\tarray(\t\n\t", TRUE),
-      list("]", "\n\t\n)\n\t\n",      TRUE),
-  
-      # maps
-      list(":", "\t\n\t=\t\n\t", TRUE),
-  
-      # newlines
-      list("\\u000a", "\n", FALSE)
-  
-    )
-  
-  }
-  
-  renv_json_read_envir <- function() {
-  
-    envir <- new.env(parent = emptyenv())
-  
-    envir[["+"]] <- `+`
-    envir[["-"]] <- `-`
-  
-    envir[["object"]] <- function(...) {
-      result <- list(...)
-      names(result) <- as.character(names(result))
-      result
-    }
-  
-    envir[["array"]] <- list
-  
-    envir[["true"]]  <- TRUE
-    envir[["false"]] <- FALSE
-    envir[["null"]]  <- NULL
-  
-    envir
-  
-  }
-  
-  renv_json_read_remap <- function(object, patterns) {
-  
-    # repair names if necessary
-    if (!is.null(names(object))) {
-  
-      nms <- names(object)
-      for (pattern in patterns)
-        nms <- gsub(pattern[[2L]], pattern[[1L]], nms, fixed = TRUE)
-      names(object) <- nms
-  
-    }
-  
-    # repair strings if necessary
-    if (is.character(object)) {
-      for (pattern in patterns)
-        object <- gsub(pattern[[2L]], pattern[[1L]], object, fixed = TRUE)
-    }
-  
-    # recurse for other objects
-    if (is.recursive(object))
-      for (i in seq_along(object))
-        object[i] <- list(renv_json_read_remap(object[[i]], patterns))
-  
-    # return remapped object
-    object
-  
   }
   
   renv_json_read_default <- function(file = NULL, text = NULL) {
   
-    # read json text
-    text <- paste(text %||% readLines(file, warn = FALSE), collapse = "\n")
+    # find strings in the JSON
+    text <- paste(text %||% read(file), collapse = "\n")
+    pattern <- '["](?:(?:\\\\.)|(?:[^"\\\\]))*?["]'
+    locs <- gregexpr(pattern, text, perl = TRUE)[[1]]
   
-    # convert into something the R parser will understand
-    patterns <- renv_json_read_patterns()
-    transformed <- text
-    for (pattern in patterns)
-      transformed <- gsub(pattern[[1L]], pattern[[2L]], transformed, fixed = TRUE)
+    # if any are found, replace them with placeholders
+    replaced <- text
+    strings <- character()
+    replacements <- character()
+  
+    if (!identical(c(locs), -1L)) {
+  
+      # get the string values
+      starts <- locs
+      ends <- locs + attr(locs, "match.length") - 1L
+      strings <- substring(text, starts, ends)
+  
+      # only keep those requiring escaping
+      strings <- grep("[[\\]{}:]", strings, perl = TRUE, value = TRUE)
+  
+      # compute replacements
+      replacements <- sprintf('"\032%i\032"', seq_along(strings))
+  
+      # replace the strings
+      mapply(function(string, replacement) {
+        replaced <<- sub(string, replacement, replaced, fixed = TRUE)
+      }, strings, replacements)
+  
+    }
+  
+    # transform the JSON into something the R parser understands
+    transformed <- replaced
+    transformed <- gsub("{}", "`names<-`(list(), character())", transformed, fixed = TRUE)
+    transformed <- gsub("[[{]", "list(", transformed, perl = TRUE)
+    transformed <- gsub("[]}]", ")", transformed, perl = TRUE)
+    transformed <- gsub(":", "=", transformed, fixed = TRUE)
+    text <- paste(transformed, collapse = "\n")
   
     # parse it
-    rfile <- tempfile("renv-json-", fileext = ".R")
-    on.exit(unlink(rfile), add = TRUE)
-    writeLines(transformed, con = rfile)
-    json <- parse(rfile, keep.source = FALSE, srcfile = NULL)[[1L]]
+    json <- parse(text = text, keep.source = FALSE, srcfile = NULL)[[1L]]
   
-    # evaluate in safe environment
-    result <- eval(json, envir = renv_json_read_envir())
+    # construct map between source strings, replaced strings
+    map <- as.character(parse(text = strings))
+    names(map) <- as.character(parse(text = replacements))
   
-    # fix up strings if necessary -- do so only with reversible patterns
-    patterns <- Filter(function(pattern) pattern[[3L]], patterns)
-    renv_json_read_remap(result, patterns)
+    # convert to list
+    map <- as.list(map)
+  
+    # remap strings in object
+    remapped <- renv_json_remap(json, map)
+  
+    # evaluate
+    eval(remapped, envir = baseenv())
   
   }
   
+  renv_json_remap <- function(json, map) {
+  
+    # fix names
+    if (!is.null(names(json))) {
+      lhs <- match(names(json), names(map), nomatch = 0L)
+      rhs <- match(names(map), names(json), nomatch = 0L)
+      names(json)[rhs] <- map[lhs]
+    }
+  
+    # fix values
+    if (is.character(json))
+      return(map[[json]] %||% json)
+  
+    # handle true, false, null
+    if (is.name(json)) {
+      text <- as.character(json)
+      if (text == "true")
+        return(TRUE)
+      else if (text == "false")
+        return(FALSE)
+      else if (text == "null")
+        return(NULL)
+    }
+  
+    # recurse
+    if (is.recursive(json)) {
+      for (i in seq_along(json)) {
+        json[i] <- list(renv_json_remap(json[[i]], map))
+      }
+    }
+  
+    json
+  
+  }
 
   # load the renv profile, if any
   renv_bootstrap_profile_load(project)
