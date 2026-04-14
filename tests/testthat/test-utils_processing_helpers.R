@@ -218,7 +218,7 @@ test_that("processing_normalize_reduced_topics preserves reduction_summary", {
 })
 
 
-test_that("join_processing_results restores document texts without paragraph side channel", {
+test_that("join_processing_results uses preprocessed texts without paragraph side channel", {
   texts_df <- data.frame(
     analysis_unit_id = c(1L, 2L),
     document_text = c("Raw 1", "Raw 2"),

@@ -1481,7 +1481,8 @@ processing_server <- function(
       ### 2.8.1 Processing results ---------------------------------------------
 
       # Handles the first result coming back from processing.
-      # This restores raw texts, finishes the UI, and starts IRR when needed.
+      # Joins worker outputs back to preprocessed texts, finishes the UI,
+      # and starts IRR when needed.
 
       observeEvent(results_table_pre(), {
         req(results_table_pre())

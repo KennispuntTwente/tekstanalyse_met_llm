@@ -590,11 +590,13 @@ write_grouped_paragraphs <- function(
 
 # 3 Result assembly helpers ----------------------------------------------------
 
-#' Join worker results back to the original uploaded texts
+#' Join worker results back to the uploaded texts
 #'
 #' Used after async processing completes in `module_core_processing`.
-#' Workers operate on deduplicated analysis units, while the UI and downloads
-#' should use the current document text again.
+#' Workers operate on deduplicated analysis units; this function fans results
+#' back out to document rows.  The `preprocessed` (i.e. anonymized / cleaned)
+#' text becomes the `text` column — raw `document_text` is dropped so that
+#' PII-stripped text is what appears in the UI, reports, and downloads.
 #'
 #' @param texts_df Data frame with at least `document_text`, `preprocessed`, and
 #'   `analysis_unit_id` columns.
@@ -606,7 +608,7 @@ write_grouped_paragraphs <- function(
 #'   that worker results contain exactly one row per `analysis_unit_id`.
 #'   Marking legitimately fans out (chunk x code), so the check is skipped.
 #'
-#' @return A data frame with the current document text restored as `text`.
+#' @return A data frame with the preprocessed text exposed as `text`.
 join_processing_results <- function(texts_df, results_table_pre, mode = NULL) {
   stopifnot(is.data.frame(texts_df))
   stopifnot(is.data.frame(results_table_pre))
