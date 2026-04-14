@@ -272,16 +272,18 @@ for (i in seq_len(nrow(paragraphs_df))) {
     analysis_result,
     paragraph_row$paragraph_id[[1]]
   )
-  if (!length(supporting_texts)) {
+  if (!length(supporting_texts) && isTRUE(paragraph_row$prompt_fits[[1]])) {
     next
   }
   #### 1 Verify quotes on presence in supporting texts ####
-  paragraph_text <- verify_and_decorate_quotes(
-    paragraph_text = paragraph_text,
-    supporting_texts = supporting_texts,
-    lang = "en",
-    escape_html = FALSE
-  )
+  if (length(supporting_texts)) {
+    paragraph_text <- verify_and_decorate_quotes(
+      paragraph_text = paragraph_text,
+      supporting_texts = supporting_texts,
+      lang = "en",
+      escape_html = FALSE
+    )
+  }
   
   #### 2 Check if paragraph has attribute about prompt not fitting in context window ####
   

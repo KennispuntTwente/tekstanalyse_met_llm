@@ -560,6 +560,127 @@ test_that("Topic reports render updated batching wording and provenance details"
 })
 
 
+test_that("overflow warning renders even without supporting texts", {
+  testthat::skip_if_not_installed("rmarkdown")
+  testthat::skip_if_not_installed("knitr")
+  testthat::skip_if_not_installed("here")
+  testthat::skip_if_not_installed("htmltools")
+  testthat::skip_if_not_installed("bslib")
+  testthat::skip_if_not_installed("DT")
+  testthat::skip_if_not_installed("dplyr")
+  testthat::skip_if_not_installed("tidyr")
+  testthat::skip_if_not_installed("stringr")
+  testthat::skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+
+  expected_warnings <- list(
+    en = "The prompt for the summary of this topic did",
+    nl = "De prompt voor de samenvatting van dit onderwerp paste"
+  )
+
+  out_dir <- withr::local_tempdir()
+  report_paths <- list.files(
+    here::here("R"),
+    pattern = "^report_Onderwerpextractie_.*\\.Rmd$",
+    full.names = TRUE
+  )
+  expect_true(length(report_paths) > 0)
+
+  withr::with_dir(here::here(), {
+    for (report_path in report_paths) {
+      language <- .report_language_from_path(report_path)
+
+      texts_df <- .make_smoke_texts_df(
+        document_text = c("Text 1", "Text 2")
+      )
+      results_table <- data.frame(
+        text = c("Text 1", "Text 2"),
+        result = c("Topic A", "Topic B"),
+        stringsAsFactors = FALSE
+      )
+      # Paragraph with prompt_fits = FALSE and NO supporting texts
+      paragraph_entries <- list(list(
+        topic = "Topic A",
+        paragraph = "",
+        texts = character(0),
+        analysis_unit_ids = integer(0),
+        prompt_fits = FALSE
+      ))
+
+      ar <- build_analysis_result(
+        texts_df = texts_df,
+        results_table = results_table,
+        paragraph_entries = paragraph_entries,
+        uuid = paste0("overflow-no-sources-", language),
+        mode = "Onderwerpextractie",
+        research_background = "",
+        style_prompt = NULL,
+        irr_result = NULL,
+        language = language,
+        by_column_name = NULL,
+        by_column_lookup = NULL,
+        models = .render_test_models(),
+        topics = c("Topic A", "Topic B"),
+        exclusive_topics = character(),
+        assign_multiple_categories = FALSE,
+        human_in_the_loop = FALSE,
+        write_paragraphs = TRUE,
+        context_window = list(
+          batch_size = 25,
+          draws = 2,
+          n_batches = 2,
+          n_tokens_context_window = 1000
+        ),
+        stage_prompt_previews = list(
+          topic_candidate_generation = "prompt",
+          topic_reduction = "prompt",
+          topic_assignment = "prompt",
+          paragraph_generation = "prompt"
+        ),
+        candidate_topics = c("Topic A", "Topic B"),
+        reduced_topics = c("Topic A", "Topic B")
+      )
+
+      out_file <- file.path(
+        out_dir,
+        paste0("overflow-no-sources-", basename(report_path), ".html")
+      )
+
+      res <- try(
+        rmarkdown::render(
+          input = report_path,
+          output_file = out_file,
+          params = list(analysis_result = ar),
+          quiet = TRUE,
+          envir = .report_render_env(environment())
+        ),
+        silent = TRUE
+      )
+
+      if (inherits(res, "try-error")) {
+        stop(paste0(
+          "Render failed for ",
+          basename(report_path),
+          ": ",
+          as.character(res)
+        ))
+      }
+
+      html <- paste(readLines(out_file, warn = FALSE), collapse = "\n")
+      expect_match(
+        html,
+        expected_warnings[[language]],
+        fixed = TRUE,
+        label = paste0(
+          "overflow warning in ",
+          basename(report_path),
+          " (no supporting texts)"
+        )
+      )
+    }
+  })
+})
+
+
 test_that("Categorisatie report renders with by_column_* set", {
   testthat::skip_if_not_installed("rmarkdown")
   testthat::skip_if_not_installed("knitr")
