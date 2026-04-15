@@ -1,4 +1,6 @@
 name: (0) Test app
+permissions:
+  contents: read
 
 # This workflow runs the full testthat suite in parallel shards.
 # A setup job installs all dependencies once and warms the renv & uv caches;
