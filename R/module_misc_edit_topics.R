@@ -17,6 +17,7 @@ edit_topics_server <- function(
   assignment_texts = reactive(character()),
   assignment_llm_provider = reactive(NULL),
   n_tokens_context_window = reactive(NULL),
+  n_tokens_context_window_reduction = reactive(NULL),
   lang = default_lang()
 ) {
   moduleServer(
@@ -487,7 +488,8 @@ edit_topics_server <- function(
               updated_topics = updated_topics,
               research_background = research_background(),
               llm_provider = llm_provider,
-              n_tokens_context_window_val = n_tokens_context_window(),
+              n_tokens_context_window_val = n_tokens_context_window_reduction() %||%
+                n_tokens_context_window(),
               lang = lang()
             ),
             kwallm_worker_bootstrap_globals()

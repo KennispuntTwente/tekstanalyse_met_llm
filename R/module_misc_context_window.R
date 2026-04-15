@@ -269,6 +269,19 @@ context_window_server <- function(
         rv$context_window_known <- context_window_known
       })
 
+      # Obtain context window size for the reduction model (models$large)
+      observe({
+        req(models$large)
+        size <- get_context_window_size_in_tokens(
+          models$large$parameters$model
+        )
+        rv$n_tokens_context_window_reduction <- ifelse(
+          is.null(size),
+          2048,
+          size
+        )
+      })
+
       # Enable/disable input based on if context window is known -----
       # observe({
       #   req(models$main)

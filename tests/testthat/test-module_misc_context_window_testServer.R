@@ -712,3 +712,61 @@ test_that("context_window_server: multi-label uses actual exclusive_texts, not f
     }
   )
 })
+
+
+test_that("context_window_server: reduction CW tracks models$large independently", {
+  shiny::testServer(
+    function(input, output, session) {
+      mode <- reactiveVal("Onderwerpextractie")
+      lang <- make_test_lang("nl")
+
+      models <- reactiveValues(
+        main = list(parameters = list(model = "kwallm-fake-main-1024")),
+        large = list(parameters = list(model = "kwallm-fake-reducer-320"))
+      )
+
+      categories <- list(
+        texts = reactiveVal(character()),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(0),
+        exclusive_texts = reactiveVal(character())
+      )
+
+      codes <- list(
+        texts = reactiveVal(character()),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(0)
+      )
+
+      texts <- reactiveValues(
+        preprocessed = c("some text"),
+        document_text = character()
+      )
+
+      rv <- context_window_server(
+        id = "cw",
+        mode = mode,
+        models = models,
+        categories = categories,
+        scoring_characteristic = reactiveVal(""),
+        codes = codes,
+        research_background = reactiveVal("background"),
+        assign_multiple_categories = reactiveVal(FALSE),
+        texts = texts,
+        processing = reactiveVal(FALSE),
+        lang = lang
+      )
+
+      list(rv = rv)
+    },
+    {
+      for (i in 1:10) {
+        session$flushReact()
+      }
+
+      # Main model has 1024 tokens, reduction model has 320 tokens.
+      expect_equal(rv$n_tokens_context_window, 1024)
+      expect_equal(rv$n_tokens_context_window_reduction, 320)
+    }
+  )
+})

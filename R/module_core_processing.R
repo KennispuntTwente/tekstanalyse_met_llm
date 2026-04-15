@@ -677,7 +677,7 @@ processing_server <- function(
                 research_background,
                 llm_provider_large,
                 language = lang$get_translation_language(),
-                n_tokens_context_window = n_tokens_context_window
+                n_tokens_context_window = n_tokens_context_window_reduction
               ),
               error = handle_detailed_error("Topic reduction")
             )
@@ -703,6 +703,8 @@ processing_server <- function(
               handle_detailed_error = handle_detailed_error,
               text_batches = context_window$text_batches,
               n_tokens_context_window = context_window$n_tokens_context_window,
+              n_tokens_context_window_reduction = context_window$n_tokens_context_window_reduction %||%
+                context_window$n_tokens_context_window,
               lang = lang(),
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
@@ -801,6 +803,10 @@ processing_server <- function(
           assignment_llm_provider = reactive(models$main),
           n_tokens_context_window = reactive(
             context_window$n_tokens_context_window
+          ),
+          n_tokens_context_window_reduction = reactive(
+            context_window$n_tokens_context_window_reduction %||%
+              context_window$n_tokens_context_window
           ),
           research_background = research_background,
           assign_multiple_categories = assign_multiple_categories,

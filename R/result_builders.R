@@ -721,7 +721,9 @@ build_analysis_result <- function(
       batch_size = context_window$batch_size %||% NULL,
       draws = context_window$draws %||% NULL,
       n_batches = context_window$n_batches %||% NULL,
-      context_window_tokens = context_window$n_tokens_context_window %||% NULL
+      context_window_tokens = context_window$n_tokens_context_window_reduction %||%
+        context_window$n_tokens_context_window %||%
+        NULL
     )
   )
 }
