@@ -187,6 +187,12 @@ prompt_candidate_topics <- function(
         "Please list the topics in Dutch.",
         sep = "\n"
       )
+  } else if (language == "en") {
+    prompt <- prompt |>
+      tidyprompt::add_text(
+        "Please list the topics in English.",
+        sep = "\n"
+      )
   }
 
   prompt <- prompt |>
@@ -321,6 +327,12 @@ prompt_reduce_topics <- function(
     prompt <- tidyprompt::add_text(
       prompt,
       "Please list the topics in Dutch.",
+      sep = "\n"
+    )
+  } else if (language == "en") {
+    prompt <- tidyprompt::add_text(
+      prompt,
+      "Please list the topics in English.",
       sep = "\n"
     )
   }

@@ -172,6 +172,36 @@ test_that("prompt_candidate_topics respects language parameter", {
 
   prompt_text <- tidyprompt::construct_prompt_text(prompt_nl)
   expect_match(prompt_text, "Dutch")
+
+  prompt_en <- prompt_candidate_topics(
+    text_batch = c("test"),
+    research_background = "",
+    language = "en"
+  )
+
+  prompt_text_en <- tidyprompt::construct_prompt_text(prompt_en)
+  expect_match(prompt_text_en, "English")
+  expect_no_match(prompt_text_en, "Dutch")
+})
+
+test_that("prompt_reduce_topics respects language parameter", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  prompt_nl <- prompt_reduce_topics(
+    candidate_topics = c("Topic A", "Topic B"),
+    research_background = "",
+    language = "nl"
+  )
+  expect_match(tidyprompt::construct_prompt_text(prompt_nl), "Dutch")
+
+  prompt_en <- prompt_reduce_topics(
+    candidate_topics = c("Topic A", "Topic B"),
+    research_background = "",
+    language = "en"
+  )
+  prompt_text_en <- tidyprompt::construct_prompt_text(prompt_en)
+  expect_match(prompt_text_en, "English")
+  expect_no_match(prompt_text_en, "Dutch")
 })
 
 test_that("create_candidate_topics supports progress and interruption", {
