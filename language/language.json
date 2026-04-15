@@ -662,8 +662,8 @@
         "en": "Codes must be unique."
       },
       {
-        "nl": "Je moet minimaal 2 onderwerpen opgeven.",
-        "en": "You must specify at least 2 topics."
+        "nl": "Je moet minimaal 1 onderwerp opgeven.",
+        "en": "You must specify at least 1 topic."
       },
       {
         "nl": "Je moet minimaal 2 onderwerpen opgeven om te reduceren.",

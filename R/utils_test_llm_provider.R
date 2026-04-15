@@ -341,9 +341,8 @@ kwallm_test_llm_reduce_topics_json <- function(prompt_text) {
     character(1)
   ))
 
-  if (length(reduced_topics) < 2) {
-    reduced_topics <- c(reduced_topics, "General feedback")
-    reduced_topics <- unique(reduced_topics)
+  if (length(reduced_topics) < 1) {
+    reduced_topics <- c("General feedback")
   }
 
   jsonlite::toJSON(

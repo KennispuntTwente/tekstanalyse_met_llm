@@ -496,6 +496,228 @@ test_that("processing_server: auto-confirm drops blank reduced topics", {
 })
 
 
+test_that("processing_server: one reduced topic still reaches topic assignment", {
+  source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  progress_bar_server <- stub_progress_bar_server
+  llm_streaming_server <- stub_llm_streaming_server
+
+  processing_texts_under_maximum <- function(...) TRUE
+  processing_split_ready <- function(...) TRUE
+  processing_anonymization_ready <- function(...) TRUE
+  processing_has_pending_gliner_anonymization <- function(...) FALSE
+
+  log_action <- function(...) invisible(NULL)
+  log_analysis_start <- function(...) invisible(NULL)
+  log_context_capture <- function(...) list()
+  log_context_apply <- function(...) invisible(NULL)
+  log_info <- function(...) invisible(NULL)
+  log_debug <- function(...) invisible(NULL)
+  log_warn <- function(...) invisible(NULL)
+
+  handle_detailed_error <- function(...) {
+    function(err) stop(err)
+  }
+
+  app_error <- function(error, ...) stop(error)
+
+  .kwallm__prompt_execution_reset <- function(...) invisible(NULL)
+  .kwallm__prompt_execution_get <- function(...) NULL
+
+  create_candidate_topics <- function(...) "Candidate 1"
+  reduce_topics <- function(...) "Topic A"
+
+  captured_fit_topics <- NULL
+  captured_assignment_topics <- NULL
+  edit_topics_started <- FALSE
+
+  topic_assignment_prompt_context_window_check <- function(
+    texts,
+    topics,
+    research_background,
+    llm_provider,
+    assign_multiple_categories,
+    exclusive_topics,
+    n_tokens_context_window = NULL
+  ) {
+    force(texts)
+    force(research_background)
+    force(llm_provider)
+    force(assign_multiple_categories)
+    force(exclusive_topics)
+    force(n_tokens_context_window)
+    captured_fit_topics <<- topics
+    list(fits = TRUE, prompt_tokens = 10L, context_window_tokens = 100L)
+  }
+
+  edit_topics_server <- function(...) {
+    edit_topics_started <<- TRUE
+    shiny::reactiveVal(NULL)
+  }
+
+  count_tokens <- function(x) {
+    if (length(x) > 1) {
+      return(rep(1L, length(x)))
+    }
+
+    1L
+  }
+  get_context_window_size_in_tokens <- function(...) 1000L
+
+  assign_topics <- function(
+    texts,
+    analysis_unit_ids,
+    topics,
+    research_background,
+    llm_provider,
+    assign_multiple_categories,
+    exclusive_topics,
+    ...
+  ) {
+    force(research_background)
+    force(llm_provider)
+    force(assign_multiple_categories)
+    force(exclusive_topics)
+    captured_assignment_topics <<- topics
+
+    data.frame(
+      analysis_unit_id = analysis_unit_ids,
+      text = texts,
+      result = rep(topics[[1]], length(texts)),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  join_processing_results <- function(texts_df, results_table_pre, ...) {
+    force(texts_df)
+    results_table_pre
+  }
+  processing_results_have_invalid_na <- function(...) FALSE
+  analysis_result_expected_paragraph_subject_count <- function(...) 0L
+  interrater_server <- function(...) {
+    list(
+      start = function() invisible(NULL),
+      done = shiny::reactiveVal(FALSE),
+      result = NULL,
+      sample = NULL
+    )
+  }
+  .kwallm_report_results_df <- function(...) {
+    data.frame(stringsAsFactors = FALSE)
+  }
+  build_analysis_result <- function(...) structure(list(), class = "Mock")
+  create_analysis_result_download_bundle <- function(...) {
+    path <- tempfile(fileext = ".zip")
+    file.create(path)
+    path
+  }
+
+  showNotification <- function(...) invisible(NULL)
+  kwallm_worker_bootstrap <- make_worker_bootstrap_stub(environment())
+  kwallm_worker_bootstrap_globals <- function(...) {
+    list(kwallm_worker_bootstrap = kwallm_worker_bootstrap)
+  }
+
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+
+  mirai_ns <- asNamespace("mirai")
+  old_mirai_fn <- get("mirai", envir = mirai_ns)
+  withr::defer({
+    if (bindingIsLocked("mirai", mirai_ns)) {
+      unlockBinding("mirai", mirai_ns)
+    }
+    assign("mirai", old_mirai_fn, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  if (bindingIsLocked("mirai", mirai_ns)) {
+    unlockBinding("mirai", mirai_ns)
+  }
+  assign("mirai", mirai_sync_stub, envir = mirai_ns)
+  lockBinding("mirai", mirai_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+
+      texts <- shiny::reactiveValues(
+        preprocessed = c("first text", "second text"),
+        analysis_units = data.frame(analysis_unit_id = c(1L, 2L)),
+        df = data.frame(
+          document_text = c("first text", "second text"),
+          stringsAsFactors = FALSE
+        )
+      )
+
+      models <- shiny::reactiveValues(
+        main = kwallm_test_llm_provider("kwallm-fake-main-1024"),
+        large = kwallm_test_llm_provider("kwallm-fake-reducer-320")
+      )
+
+      categories <- list(
+        texts = shiny::reactiveVal(character()),
+        exclusive_texts = shiny::reactiveVal(character()),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(0)
+      )
+
+      codes <- list(
+        texts = shiny::reactiveVal(character()),
+        editing = shiny::reactiveVal(FALSE),
+        unique_non_empty_count = shiny::reactiveVal(0)
+      )
+
+      context_window <- shiny::reactiveValues(
+        any_fit_problem = FALSE,
+        too_many_batches = FALSE,
+        n_tokens_context_window = 100000L,
+        text_batches = list(c("first text", "second text"))
+      )
+
+      processing_server(
+        id = "processing",
+        mode = shiny::reactiveVal("Onderwerpextractie"),
+        interrater_reliability_toggle = shiny::reactiveVal(FALSE),
+        texts = texts,
+        llm_provider_rv = shiny::reactiveValues(),
+        models = models,
+        categories = categories,
+        scoring_characteristic = shiny::reactiveVal(""),
+        codes = codes,
+        research_background = shiny::reactiveVal("Background"),
+        style_prompt = shiny::reactiveVal(""),
+        human_in_the_loop = shiny::reactiveVal(FALSE),
+        assign_multiple_categories = shiny::reactiveVal(FALSE),
+        write_paragraphs = shiny::reactiveVal(FALSE),
+        context_window = context_window,
+        lang = lang
+      )
+
+      NULL
+    },
+    {
+      session$setInputs(`processing-process` = 1)
+
+      for (i in seq_len(20)) {
+        later::run_now(timeout = 0)
+        session$flushReact()
+
+        if (!is.null(captured_assignment_topics)) {
+          break
+        }
+      }
+
+      expect_false(edit_topics_started)
+      expect_identical(captured_fit_topics, "Topic A")
+      expect_identical(captured_assignment_topics, "Topic A")
+    }
+  )
+})
+
+
 test_that("processing_server: reduced topics keep reduction_summary for result building", {
   source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
   source(here::here("R", "utils_processing_helpers.R"), local = TRUE)

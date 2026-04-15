@@ -274,6 +274,65 @@ test_that("assign_topics returns binary columns for multi-label output", {
   expect_identical(result[["Topic B"]], c(FALSE, TRUE))
 })
 
+test_that("assign_topics supports a single topic in single-label mode", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  analysis_unit_ids <- c(41L, 42L)
+
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
+    force(prompt)
+    force(llm_provider)
+    "Only topic"
+  }
+
+  result <- assign_topics(
+    texts = c("text a", "text b"),
+    analysis_unit_ids = analysis_unit_ids,
+    topics = c("Only topic"),
+    llm_provider = create_test_provider(),
+    assign_multiple_categories = FALSE
+  )
+
+  expect_identical(result$analysis_unit_id, analysis_unit_ids)
+  expect_identical(result$text, c("text a", "text b"))
+  expect_identical(result$result, c("Only topic", "Only topic"))
+})
+
+test_that("assign_topics supports a single topic in multi-label mode", {
+  source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  analysis_unit_ids <- c(51L, 52L)
+
+  send_prompt_with_retries <- function(prompt, llm_provider, ...) {
+    prompt_text <- tidyprompt::construct_prompt_text(prompt)
+    force(llm_provider)
+
+    if (grepl("text a", prompt_text, fixed = TRUE)) {
+      return("Only topic")
+    }
+
+    NA_character_
+  }
+
+  result <- assign_topics(
+    texts = c("text a", "text b"),
+    analysis_unit_ids = analysis_unit_ids,
+    topics = c("Only topic"),
+    llm_provider = create_test_provider(),
+    assign_multiple_categories = TRUE,
+    exclusive_topics = c("Only topic")
+  )
+
+  expect_false("result" %in% names(result))
+  expect_identical(result$analysis_unit_id, analysis_unit_ids)
+  expect_identical(result$text, c("text a", "text b"))
+  expect_identical(result[["Only topic"]], c(TRUE, NA))
+})
+
 test_that("assign_topics supports progress, interruption, and early NA", {
   source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
@@ -358,19 +417,73 @@ test_that("reduce_topics drops empty topic labels", {
   expect_identical(as.vector(result), c("Alpha", "Beta"))
 })
 
-test_that("reduce_topics requires at least two non-empty topics", {
+test_that("reduce_topics returns single topic without reduction when < 2 topics", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
 
-  expect_error(
-    reduce_topics(
-      candidate_topics = c("  only topic  ", "", NA_character_, "   "),
-      research_background = "",
-      llm_provider = create_test_provider(),
-      language = "en",
-      always_add_not_applicable = FALSE
-    ),
-    "at least two non-empty topics"
+  log_info <- function(...) invisible(NULL)
+  send_prompt_with_retries <- function(...) {
+    testthat::fail("send_prompt_with_retries should not be called")
+  }
+
+  result <- reduce_topics(
+    candidate_topics = c("  only topic  ", "", NA_character_, "   "),
+    research_background = "",
+    llm_provider = create_test_provider(),
+    language = "en",
+    always_add_not_applicable = FALSE
   )
+
+  # Single topic should be sentence-cased and returned as-is (no LLM call)
+  expect_identical(as.vector(result), "Only topic")
+  expect_equal(attr(result, "reduction_summary")$reduction_iterations, 0L)
+})
+
+test_that("reduce_topics with single topic adds 'not applicable' when configured", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  not_applicable_check_called <- FALSE
+  send_prompt_with_retries <- function(...) {
+    not_applicable_check_called <<- TRUE
+    FALSE
+  }
+  log_info <- function(...) invisible(NULL)
+
+  result <- reduce_topics(
+    candidate_topics = c("  only topic  "),
+    research_background = "",
+    llm_provider = create_test_provider(),
+    language = "en",
+    always_add_not_applicable = TRUE
+  )
+
+  expect_true(not_applicable_check_called)
+  expect_true("Unknown/not applicable" %in% result)
+  expect_true(attr(result, "reduction_summary")$auto_added_not_applicable)
+  expect_true(attr(result, "reduction_summary")$not_applicable_check_performed)
+})
+
+test_that("reduce_topics with single topic does not add 'not applicable' when already implied", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  not_applicable_check_called <- FALSE
+  send_prompt_with_retries <- function(...) {
+    not_applicable_check_called <<- TRUE
+    TRUE
+  }
+  log_info <- function(...) invisible(NULL)
+
+  result <- reduce_topics(
+    candidate_topics = c("Only topic"),
+    research_background = "",
+    llm_provider = create_test_provider(),
+    language = "en",
+    always_add_not_applicable = TRUE
+  )
+
+  expect_true(not_applicable_check_called)
+  expect_false("Unknown/not applicable" %in% result)
+  expect_false(attr(result, "reduction_summary")$auto_added_not_applicable)
+  expect_true(attr(result, "reduction_summary")$not_applicable_check_performed)
 })
 
 test_that("reduce_topics aborts before creating a single-topic reduction batch", {

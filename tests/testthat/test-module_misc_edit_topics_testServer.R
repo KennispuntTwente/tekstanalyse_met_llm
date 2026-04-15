@@ -161,7 +161,67 @@ test_that("edit_topics_server: confirm sets edited topics and updates exclusive 
 })
 
 
-test_that("edit_topics_server: whitespace-only rows do not satisfy the minimum topic count", {
+test_that("edit_topics_server: whitespace-only rows are ignored and single topic can be confirmed", {
+  hot_ns <- asNamespace("rhandsontable")
+  old_hot_to_r <- get("hot_to_r", envir = hot_ns)
+  withr::defer({
+    unlockBinding("hot_to_r", hot_ns)
+    assign("hot_to_r", old_hot_to_r, envir = hot_ns)
+    lockBinding("hot_to_r", hot_ns)
+  })
+
+  unlockBinding("hot_to_r", hot_ns)
+  assign(
+    "hot_to_r",
+    function(...) {
+      data.frame(
+        topic = c("Topic 1", "   "),
+        exclusive = c(FALSE, FALSE),
+        stringsAsFactors = FALSE
+      )
+    },
+    envir = hot_ns
+  )
+  lockBinding("hot_to_r", hot_ns)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+
+      topics <- reactiveVal(c("Topic 1", "Topic 2"))
+      exclusive <- reactiveVal(character())
+
+      edited <- edit_topics_server(
+        id = "edit",
+        topics = topics,
+        exclusive_topics = exclusive,
+        research_background = reactiveVal("bg"),
+        assign_multiple_categories = reactiveVal(TRUE),
+        llm_provider = list(parameters = list(model = "unit-test")),
+        assignment_texts = reactive(c("short text")),
+        assignment_llm_provider = reactive(list(
+          parameters = list(model = "unit-test")
+        )),
+        lang = lang
+      )
+
+      list(edited = edited)
+    },
+    {
+      session$flushReact()
+
+      session$setInputs(`edit-topics_table` = list(dummy = TRUE))
+      session$flushReact()
+      session$setInputs(`edit-confirm_topics` = 1)
+      session$flushReact()
+
+      expect_identical(edited(), "Topic 1")
+    }
+  )
+})
+
+
+test_that("edit_topics_server: empty rows still fail the minimum topic count", {
   hot_ns <- asNamespace("rhandsontable")
   shiny_ns <- asNamespace("shiny")
   old_hot_to_r <- get("hot_to_r", envir = hot_ns)
@@ -180,7 +240,7 @@ test_that("edit_topics_server: whitespace-only rows do not satisfy the minimum t
     "hot_to_r",
     function(...) {
       data.frame(
-        topic = c("Topic 1", "   "),
+        topic = c("   ", ""),
         exclusive = c(FALSE, FALSE),
         stringsAsFactors = FALSE
       )
@@ -239,7 +299,47 @@ test_that("edit_topics_server: whitespace-only rows do not satisfy the minimum t
       expect_null(edited())
       expect_false(is.null(last_notification))
       expect_identical(last_notification$type, "error")
-      expect_match(last_notification$ui, "minimaal 2 onderwerpen")
+      expect_match(last_notification$ui, "minimaal 1 onderwerp")
+    }
+  )
+})
+
+
+test_that("edit_topics_server: reduce_again ignores single-topic input", {
+  reduce_topics <<- function(...) {
+    testthat::fail("reduce_topics should not be called for a single topic")
+  }
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+
+      topics <- reactiveVal("Topic 1")
+      exclusive <- reactiveVal(character())
+
+      edited <- edit_topics_server(
+        id = "edit",
+        topics = topics,
+        exclusive_topics = exclusive,
+        research_background = reactiveVal("bg"),
+        assign_multiple_categories = reactiveVal(TRUE),
+        llm_provider = list(parameters = list(model = "unit-test")),
+        assignment_texts = reactive(c("short text")),
+        assignment_llm_provider = reactive(list(
+          parameters = list(model = "unit-test")
+        )),
+        lang = lang
+      )
+
+      list(edited = edited)
+    },
+    {
+      session$flushReact()
+
+      session$setInputs(`edit-reduce_again` = 1)
+      session$flushReact()
+
+      expect_null(edited())
     }
   )
 })

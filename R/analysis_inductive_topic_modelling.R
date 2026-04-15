@@ -340,9 +340,9 @@ prompt_reduce_topics <- function(
     tidyprompt::prompt_wrap(
       extraction_fn = function(result) {
         result$topics <- .kwallm_normalize_topic_labels(result$topics)
-        if (length(result$topics) < 2) {
+        if (length(result$topics) < 1) {
           return(tidyprompt::llm_feedback(
-            "Provide an array of at least two valid topics."
+            "Provide an array of at least one valid topic."
           ))
         }
         result
@@ -501,10 +501,80 @@ reduce_topics <- function(
       "reduce_topics(): 'candidate_topics' must contain at least one non-empty topic."
     )
   }
-  if (length(candidate_topics) < 2) {
-    stop(
-      "reduce_topics(): 'candidate_topics' must contain at least two non-empty topics."
+
+  finalize_topics <- function(current_topics, iteration, skipped = FALSE) {
+    current_topics <- stringr::str_to_sentence(current_topics)
+
+    auto_added_not_applicable <- FALSE
+    not_applicable_check_performed <- FALSE
+
+    if (always_add_not_applicable) {
+      not_applicable_topic <- ifelse(
+        language == "nl",
+        "Onbekend/niet van toepassing",
+        "Unknown/not applicable"
+      )
+
+      if (!(not_applicable_topic %in% current_topics)) {
+        not_applicable_check_performed <- TRUE
+        is_present <- with_execution_stage(
+          "topic_not_applicable_check",
+          prompt_topic_not_applicable_check(
+            topics = current_topics,
+            language = language
+          ) |>
+            send_prompt_with_retries(
+              llm_provider,
+              execution_scope = list(
+                kind = "topic_value_set",
+                topic_values = as.character(current_topics)
+              )
+            )
+        )
+
+        if (!is_present) {
+          current_topics <- c(current_topics, not_applicable_topic)
+          auto_added_not_applicable <- TRUE
+        }
+      }
+    }
+
+    tryCatch(
+      if (isTRUE(skipped)) {
+        log_info(
+          sprintf(
+            "Topic reduction skipped (single topic): n_input=%d, n_output=%d",
+            length(candidate_topics),
+            length(current_topics)
+          ),
+          component = "topics"
+        )
+      } else {
+        log_info(
+          sprintf(
+            "Topic reduction complete: n_input=%d, n_output=%d, iterations=%d",
+            length(candidate_topics),
+            length(current_topics),
+            iteration
+          ),
+          component = "topics"
+        )
+      },
+      error = function(e) NULL
     )
+
+    attr(current_topics, "reduction_summary") <- list(
+      not_applicable_requested = isTRUE(always_add_not_applicable),
+      auto_added_not_applicable = auto_added_not_applicable,
+      not_applicable_check_performed = not_applicable_check_performed,
+      reduction_iterations = as.integer(iteration)
+    )
+
+    current_topics
+  }
+
+  if (length(candidate_topics) < 2) {
+    return(finalize_topics(candidate_topics, iteration = 0L, skipped = TRUE))
   }
 
   base_token_cost <- prompt_reduce_topics(
@@ -679,68 +749,7 @@ reduce_topics <- function(
     current_topics <- combined # otherwise iterate again
   }
 
-  ### post-processing -------------------------------------------------------
-
-  # Set to sentence case
-  current_topics <- stringr::str_to_sentence(current_topics)
-
-  auto_added_not_applicable <- FALSE
-  not_applicable_check_performed <- FALSE
-
-  if (always_add_not_applicable) {
-    not_applicable_topic <- ifelse(
-      language == "nl",
-      "Onbekend/niet van toepassing",
-      "Unknown/not applicable"
-    )
-
-    # Check if we have literal match already in one of the topics
-    if (!(not_applicable_topic %in% current_topics)) {
-      not_applicable_check_performed <- TRUE
-      is_present <- with_execution_stage(
-        "topic_not_applicable_check",
-        prompt_topic_not_applicable_check(
-          topics = current_topics,
-          language = language
-        ) |>
-          send_prompt_with_retries(
-            llm_provider,
-            execution_scope = list(
-              kind = "topic_value_set",
-              topic_values = as.character(current_topics)
-            )
-          )
-      )
-
-      if (!is_present) {
-        current_topics <- c(current_topics, not_applicable_topic)
-        auto_added_not_applicable <- TRUE
-      }
-    }
-  }
-
-  # Log final topic reduction result
-  tryCatch(
-    log_info(
-      sprintf(
-        "Topic reduction complete: n_input=%d, n_output=%d, iterations=%d",
-        length(candidate_topics),
-        length(current_topics),
-        iteration
-      ),
-      component = "topics"
-    ),
-    error = function(e) NULL
-  )
-
-  attr(current_topics, "reduction_summary") <- list(
-    not_applicable_requested = isTRUE(always_add_not_applicable),
-    auto_added_not_applicable = auto_added_not_applicable,
-    not_applicable_check_performed = not_applicable_check_performed,
-    reduction_iterations = as.integer(iteration)
-  )
-
-  return(current_topics)
+  return(finalize_topics(current_topics, iteration = iteration))
 }
 
 

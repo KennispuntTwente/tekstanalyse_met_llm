@@ -54,7 +54,7 @@ edit_topics_server <- function(
         req(topics_table_data())
 
         current_topics <- normalize_topic_values(topics_table_data()$topic)
-        if (length(current_topics) < 2) {
+        if (length(current_topics) < 1) {
           return(list(
             fits = TRUE,
             prompt_tokens = NA_integer_,
@@ -339,9 +339,9 @@ edit_topics_server <- function(
           )
           return()
         }
-        if (length(updated_topics) < 2) {
+        if (length(updated_topics) < 1) {
           shiny::showNotification(
-            lang()$t("Je moet minimaal 2 onderwerpen opgeven."),
+            lang()$t("Je moet minimaal 1 onderwerp opgeven."),
             type = "error"
           )
           return()
@@ -379,10 +379,8 @@ edit_topics_server <- function(
         updated_topics <- normalize_topic_values(topics_table_data()$topic)
 
         if (length(updated_topics) < 2) {
-          shiny::showNotification(
-            lang()$t("Je moet minimaal 2 onderwerpen opgeven om te reduceren."),
-            type = "error"
-          )
+          # Cannot reduce a single topic — button should be disabled,
+          # but guard defensively anyway.
           return()
         }
 
@@ -437,7 +435,7 @@ edit_topics_server <- function(
           )
         ) %...>%
           (function(reduced_topics) {
-            if (length(reduced_topics) < 2 || anyDuplicated(reduced_topics)) {
+            if (length(reduced_topics) < 1 || anyDuplicated(reduced_topics)) {
               app_error(
                 lang()$t(
                   "Re-reductie mislukt of ongeldige onderwerpen gegenereerd"
@@ -495,12 +493,19 @@ edit_topics_server <- function(
           "add_topic",
           "delete_empty",
           "reset_topics",
-          "confirm_topics",
-          "reduce_again"
+          "confirm_topics"
         )
         lapply(
           ids,
           function(btn) shinyjs::toggleState(btn, !reduction_in_progress())
+        )
+        # Re-reduce needs at least 2 topics and must not be running already
+        n_topics <- length(
+          normalize_topic_values(topics_table_data()$topic)
+        )
+        shinyjs::toggleState(
+          "reduce_again",
+          !reduction_in_progress() && n_topics >= 2
         )
       })
 
