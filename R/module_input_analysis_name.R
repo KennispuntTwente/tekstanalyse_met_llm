@@ -41,10 +41,10 @@ analysis_name_server <- function(
             textInput(
               ns("analysis_name"),
               NULL,
-              value = "",
+              value = isolate(input$analysis_name) %||% analysis_name(),
               width = "100%",
               placeholder = lang()$t(
-                "Bijv. Interviews Klanttevredenheid 2026"
+                "Vul een naam in (optioneel)..."
               )
             )
           )

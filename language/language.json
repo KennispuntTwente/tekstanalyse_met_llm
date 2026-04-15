@@ -1618,8 +1618,8 @@
         "en": "Give this analysis a name. The name will be included in the report and the download file name."
       },
       {
-        "nl": "Bijv. Interviews Klanttevredenheid 2026",
-        "en": "E.g. Customer Satisfaction Interviews 2026"
+        "nl": "Vul een naam in (optioneel)...",
+        "en": "Enter a name (optional)..."
       }
   ]
 }
