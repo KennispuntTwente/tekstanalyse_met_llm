@@ -340,7 +340,7 @@ model_server <- function(
         }
 
         # Otherwise, show URL of chosen LLM providers (preconfigured)
-        if (mode() == "Onderwerpextractie") {
+        if (isTRUE(mode() == "Onderwerpextractie")) {
           if (
             !is.null(models$main$url) &&
               isTRUE(models$main$url == models$large$url)

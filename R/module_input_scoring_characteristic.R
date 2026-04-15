@@ -31,7 +31,7 @@ score_server <- function(
 
       # Render scoring UI
       output$scoring <- renderUI({
-        if (mode() == "Scoren") {
+        if (isTRUE(mode() == "Scoren")) {
           bslib::card(
             class = "card",
             card_header_with_tooltip(

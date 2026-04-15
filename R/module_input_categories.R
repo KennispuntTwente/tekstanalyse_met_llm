@@ -43,7 +43,7 @@ categories_server <- function(
 
     ## UI: Card wrapper ####
     output$categories <- renderUI({
-      if (mode() == "Categorisatie") {
+      if (isTRUE(mode() == "Categorisatie")) {
         bslib::card(
           class = "card",
           card_header_with_tooltip(

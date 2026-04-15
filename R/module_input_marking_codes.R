@@ -42,7 +42,7 @@ marking_codes_server <- function(
 
     ## UI: Card wrapper with code generation ####
     output$codes <- renderUI({
-      if (mode() == "Markeren") {
+      if (isTRUE(mode() == "Markeren")) {
         bslib::card(
           class = "card",
           card_header_with_tooltip(
