@@ -692,10 +692,16 @@ build_analysis_result <- function(
     .kwallm_build_assignments_from_multi(texts_df, results_table, labels_df)
   }
 
+  response_status <- .kwallm_build_categorization_response_status(
+    texts_df,
+    results_table
+  )
+
   TopicResult(
     labels = labels_df,
     assignments = assignments,
     multi_label = isTRUE(multi_label),
+    response_status = response_status,
     topic_provenance = TopicProvenance(
       candidate_topics = as.character(candidate_topics %||% character()),
       reduced_topics = as.character(reduced_topics %||% character()),

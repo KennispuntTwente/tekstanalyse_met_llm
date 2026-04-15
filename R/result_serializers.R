@@ -141,6 +141,9 @@ analysis_result_to_metadata_list <- function(analysis_result) {
         multi_label = analysis_result@results@multi_label,
         assignments = .kwallm_df_to_records(
           analysis_result@results@assignments
+        ),
+        response_status = .kwallm_df_to_records(
+          analysis_result@results@response_status
         )
       ),
       marking = list(
@@ -310,6 +313,10 @@ analysis_result_to_export_sheets <- function(analysis_result) {
       ),
       stringsAsFactors = FALSE
     )
+  }
+
+  if (inherits(analysis_result@results, "TopicResult")) {
+    sheets$topic_response_status <- analysis_result@results@response_status
   }
 
   if (!is.null(analysis_result@reliability)) {

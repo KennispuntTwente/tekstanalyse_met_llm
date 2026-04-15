@@ -885,6 +885,11 @@ assign_topics <- function(
       )
     }
 
+    results_df$response_status <- purrr::map_chr(
+      normalized_results,
+      ~ if (length(.x) == 1 && is.na(.x)) "failure" else "success"
+    )
+
     return(results_df)
   }
 
@@ -895,6 +900,7 @@ assign_topics <- function(
     analysis_unit_id = as.integer(analysis_unit_ids),
     text = texts,
     result = results,
+    response_status = ifelse(is.na(results), "failure", "success"),
     stringsAsFactors = FALSE
   )
 }

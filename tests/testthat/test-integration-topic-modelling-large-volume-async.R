@@ -208,7 +208,10 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
   expect_identical(results$analysis_unit_id, seq_along(texts))
   expect_identical(sort(results$text), sort(texts))
   expect_true(ncol(results) >= 5)
-  topic_columns <- setdiff(names(results), c("analysis_unit_id", "text"))
+  topic_columns <- setdiff(
+    names(results),
+    c("analysis_unit_id", "text", "response_status")
+  )
   expect_true(all(vapply(results[topic_columns], is.logical, logical(1))))
   expect_true(all(rowSums(results[topic_columns]) > 0))
 

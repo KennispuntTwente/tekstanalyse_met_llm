@@ -930,6 +930,14 @@ TopicResult <- S7::new_class(
       default = FALSE,
       validator = .kwallm_validate_scalar_logical
     ),
+    response_status = S7::new_property(
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_categorization_response_status()),
+      validator = .kwallm_validate_df_columns(c(
+        "analysis_unit_id",
+        "response_status"
+      ))
+    ),
     topic_provenance = S7::new_property(TopicProvenance)
   ),
   validator = function(self) {
@@ -959,6 +967,12 @@ TopicResult <- S7::new_class(
       problems <- c(
         problems,
         "labels$label_text must be represented in topic_provenance@final_topics"
+      )
+    }
+    if (anyDuplicated(self@response_status$analysis_unit_id)) {
+      problems <- c(
+        problems,
+        "response_status$analysis_unit_id must be unique"
       )
     }
     .kwallm_problems_or_null(problems)

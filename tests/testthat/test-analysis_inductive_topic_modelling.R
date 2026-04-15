@@ -302,6 +302,7 @@ test_that("assign_topics returns binary columns for multi-label output", {
   expect_identical(result$text, c("text a", "text b"))
   expect_identical(result[["Topic A"]], c(TRUE, TRUE))
   expect_identical(result[["Topic B"]], c(FALSE, TRUE))
+  expect_identical(result$response_status, c("success", "success"))
 })
 
 test_that("assign_topics supports progress, interruption, and early NA", {
@@ -347,6 +348,10 @@ test_that("assign_topics supports progress, interruption, and early NA", {
   expect_equal(result$text, c("text a", "text b", "text c"))
   # Row 1 succeeded, row 2 failed (NA), row 3 was never processed (NA)
   expect_equal(result$result, c("Topic A", NA, NA))
+  expect_equal(
+    result$response_status,
+    c("success", "failure", "failure")
+  )
   expect_equal(call_count, 2)
   expect_equal(interrupt_count, 2)
   expect_length(progress_events, 2)

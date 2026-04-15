@@ -927,7 +927,13 @@ test_that("topic metadata includes candidate and reduced topics", {
   expect_equal(metadata$results$topic_provenance$reduction_iterations, 0L)
   expect_identical(
     names(metadata$results),
-    c("topic_provenance", "labels", "multi_label", "assignments")
+    c(
+      "topic_provenance",
+      "labels",
+      "multi_label",
+      "assignments",
+      "response_status"
+    )
   )
   expect_equal(
     sheets$topic_generation_settings$value[
