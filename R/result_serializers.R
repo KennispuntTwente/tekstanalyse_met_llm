@@ -129,6 +129,7 @@ analysis_result_to_metadata_list <- function(analysis_result) {
           human_edited = analysis_result@results@topic_provenance@human_edited,
           not_applicable_requested = analysis_result@results@topic_provenance@not_applicable_requested,
           auto_added_not_applicable = analysis_result@results@topic_provenance@auto_added_not_applicable,
+          single_topic_fallback_applied = analysis_result@results@topic_provenance@single_topic_fallback_applied,
           not_applicable_check_performed = analysis_result@results@topic_provenance@not_applicable_check_performed,
           reduction_iterations = analysis_result@results@topic_provenance@reduction_iterations,
           batch_size = analysis_result@results@topic_provenance@batch_size,
@@ -283,6 +284,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         "human_edited",
         "not_applicable_requested",
         "auto_added_not_applicable",
+        "single_topic_fallback_applied",
         "not_applicable_check_performed",
         "reduction_iterations",
         "batch_size",
@@ -290,17 +292,22 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         "n_batches",
         "context_window_tokens"
       ),
-      value = as.character(c(
-        analysis_result@results@topic_provenance@human_edited,
-        analysis_result@results@topic_provenance@not_applicable_requested,
-        analysis_result@results@topic_provenance@auto_added_not_applicable,
-        analysis_result@results@topic_provenance@not_applicable_check_performed,
-        analysis_result@results@topic_provenance@reduction_iterations,
-        analysis_result@results@topic_provenance@batch_size,
-        analysis_result@results@topic_provenance@draws,
-        analysis_result@results@topic_provenance@n_batches,
-        analysis_result@results@topic_provenance@context_window_tokens
-      )),
+      value = vapply(
+        list(
+          analysis_result@results@topic_provenance@human_edited,
+          analysis_result@results@topic_provenance@not_applicable_requested,
+          analysis_result@results@topic_provenance@auto_added_not_applicable,
+          analysis_result@results@topic_provenance@single_topic_fallback_applied,
+          analysis_result@results@topic_provenance@not_applicable_check_performed,
+          analysis_result@results@topic_provenance@reduction_iterations,
+          analysis_result@results@topic_provenance@batch_size,
+          analysis_result@results@topic_provenance@draws,
+          analysis_result@results@topic_provenance@n_batches,
+          analysis_result@results@topic_provenance@context_window_tokens
+        ),
+        .kwallm_excel_scalar,
+        character(1)
+      ),
       stringsAsFactors = FALSE
     )
   }

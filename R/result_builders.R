@@ -667,6 +667,15 @@ build_analysis_result <- function(
     exact = TRUE
   ) %||%
     list()
+  single_topic_fallback_applied <- isTRUE(
+    reduction_summary$single_topic_fallback_applied %||% FALSE
+  ) ||
+    isTRUE(
+      attr(reduced_topics, "single_topic_fallback_applied", exact = TRUE)
+    ) ||
+    isTRUE(
+      attr(topics, "single_topic_fallback_applied", exact = TRUE)
+    )
 
   labels_df <- .kwallm_build_labels(
     values = topics,
@@ -698,6 +707,7 @@ build_analysis_result <- function(
       auto_added_not_applicable = isTRUE(
         reduction_summary$auto_added_not_applicable %||% FALSE
       ),
+      single_topic_fallback_applied = single_topic_fallback_applied,
       not_applicable_check_performed = isTRUE(
         reduction_summary$not_applicable_check_performed %||% FALSE
       ),

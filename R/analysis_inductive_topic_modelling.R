@@ -506,6 +506,7 @@ reduce_topics <- function(
     current_topics <- stringr::str_to_sentence(current_topics)
 
     auto_added_not_applicable <- FALSE
+    single_topic_fallback_applied <- FALSE
     not_applicable_check_performed <- FALSE
 
     if (always_add_not_applicable) {
@@ -516,25 +517,31 @@ reduce_topics <- function(
       )
 
       if (!(not_applicable_topic %in% current_topics)) {
-        not_applicable_check_performed <- TRUE
-        is_present <- with_execution_stage(
-          "topic_not_applicable_check",
-          prompt_topic_not_applicable_check(
-            topics = current_topics,
-            language = language
-          ) |>
-            send_prompt_with_retries(
-              llm_provider,
-              execution_scope = list(
-                kind = "topic_value_set",
-                topic_values = as.character(current_topics)
-              )
-            )
-        )
-
-        if (!is_present) {
+        if (length(current_topics) == 1L) {
           current_topics <- c(current_topics, not_applicable_topic)
           auto_added_not_applicable <- TRUE
+          single_topic_fallback_applied <- TRUE
+        } else {
+          not_applicable_check_performed <- TRUE
+          is_present <- with_execution_stage(
+            "topic_not_applicable_check",
+            prompt_topic_not_applicable_check(
+              topics = current_topics,
+              language = language
+            ) |>
+              send_prompt_with_retries(
+                llm_provider,
+                execution_scope = list(
+                  kind = "topic_value_set",
+                  topic_values = as.character(current_topics)
+                )
+              )
+          )
+
+          if (!is_present) {
+            current_topics <- c(current_topics, not_applicable_topic)
+            auto_added_not_applicable <- TRUE
+          }
         }
       }
     }
@@ -566,9 +573,12 @@ reduce_topics <- function(
     attr(current_topics, "reduction_summary") <- list(
       not_applicable_requested = isTRUE(always_add_not_applicable),
       auto_added_not_applicable = auto_added_not_applicable,
+      single_topic_fallback_applied = single_topic_fallback_applied,
       not_applicable_check_performed = not_applicable_check_performed,
       reduction_iterations = as.integer(iteration)
     )
+    attr(current_topics, "single_topic_fallback_applied") <-
+      single_topic_fallback_applied
 
     current_topics
   }
@@ -794,9 +804,10 @@ assign_topics <- function(
   stage_options <- options(kwallm__prompt_execution_stage = "topic_assignment")
   on.exit(options(stage_options), add = TRUE)
 
+  n <- length(texts)
+
   llm_provider <- llm_provider$clone()
   llm_provider$verbose <- verbose
-  n <- length(texts)
   results <- vector("list", n)
 
   for (i in seq_along(texts)) {

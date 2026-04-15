@@ -736,6 +736,11 @@ TopicProvenance <- S7::new_class(
       default = FALSE,
       validator = .kwallm_validate_scalar_logical
     ),
+    single_topic_fallback_applied = S7::new_property(
+      S7::class_logical,
+      default = FALSE,
+      validator = .kwallm_validate_scalar_logical
+    ),
     not_applicable_check_performed = S7::new_property(
       S7::class_logical,
       default = FALSE,

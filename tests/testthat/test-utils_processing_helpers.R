@@ -204,9 +204,11 @@ test_that("processing_normalize_reduced_topics preserves reduction_summary", {
   attr(reduced_topics, "reduction_summary") <- list(
     not_applicable_requested = TRUE,
     auto_added_not_applicable = FALSE,
+    single_topic_fallback_applied = FALSE,
     not_applicable_check_performed = TRUE,
     reduction_iterations = 2L
   )
+  attr(reduced_topics, "single_topic_fallback_applied") <- FALSE
 
   normalized_topics <- processing_normalize_reduced_topics(reduced_topics)
 

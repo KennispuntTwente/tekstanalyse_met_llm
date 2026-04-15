@@ -50,10 +50,49 @@ edit_topics_server <- function(
         normalized
       }
 
-      topic_assignment_fit_info <- reactive({
-        req(topics_table_data())
+      ensure_assignment_choice_topics <- function(
+        topic_values,
+        exclusive_values = character()
+      ) {
+        normalized_topics <- normalize_topic_values(topic_values)
+        normalized_exclusive <- normalize_topic_values(
+          exclusive_values,
+          unique_only = TRUE
+        )
+        not_applicable_topic <- lang()$t("Onbekend/niet van toepassing")
 
-        current_topics <- normalize_topic_values(topics_table_data()$topic)
+        if (
+          length(normalized_topics) == 1L &&
+            !(not_applicable_topic %in% normalized_topics)
+        ) {
+          normalized_topics <- c(normalized_topics, not_applicable_topic)
+          normalized_exclusive <- unique(c(
+            normalized_exclusive,
+            not_applicable_topic
+          ))
+        }
+
+        normalized_exclusive <- normalized_exclusive[
+          normalized_exclusive %in% normalized_topics
+        ]
+
+        list(
+          topics = normalized_topics,
+          exclusive = normalized_exclusive
+        )
+      }
+
+      compute_topic_assignment_fit_info <- function(
+        topic_values,
+        exclusive_values = character()
+      ) {
+        current_selection <- ensure_assignment_choice_topics(
+          topic_values,
+          exclusive_values
+        )
+        current_topics <- current_selection$topics
+        current_exclusive <- current_selection$exclusive
+
         if (length(current_topics) < 1) {
           return(list(
             fits = TRUE,
@@ -72,6 +111,21 @@ edit_topics_server <- function(
           ))
         }
 
+        topic_assignment_prompt_context_window_check(
+          texts = assignment_text_values,
+          topics = current_topics,
+          research_background = research_background(),
+          llm_provider = assignment_provider,
+          assign_multiple_categories = assign_multiple_categories(),
+          exclusive_topics = current_exclusive,
+          n_tokens_context_window = n_tokens_context_window()
+        )
+      }
+
+      topic_assignment_fit_info <- reactive({
+        req(topics_table_data())
+
+        current_topics <- normalize_topic_values(topics_table_data()$topic)
         current_exclusive <- if ("exclusive" %in% names(topics_table_data())) {
           normalize_topic_values(
             topics_table_data()$topic[topics_table_data()$exclusive %in% TRUE],
@@ -81,14 +135,9 @@ edit_topics_server <- function(
           character()
         }
 
-        topic_assignment_prompt_context_window_check(
-          texts = assignment_text_values,
-          topics = current_topics,
-          research_background = research_background(),
-          llm_provider = assignment_provider,
-          assign_multiple_categories = assign_multiple_categories(),
-          exclusive_topics = current_exclusive,
-          n_tokens_context_window = n_tokens_context_window()
+        compute_topic_assignment_fit_info(
+          current_topics,
+          current_exclusive
         )
       })
 
@@ -347,7 +396,17 @@ edit_topics_server <- function(
           return()
         }
 
-        fit_info <- topic_assignment_fit_info()
+        updated_selection <- ensure_assignment_choice_topics(
+          updated_topics,
+          updated_exclusive
+        )
+        updated_topics <- updated_selection$topics
+        updated_exclusive <- updated_selection$exclusive
+
+        fit_info <- compute_topic_assignment_fit_info(
+          updated_topics,
+          updated_exclusive
+        )
         if (!isTRUE(fit_info$fits)) {
           shiny::showNotification(
             topic_assignment_fit_message(fit_info),

@@ -145,13 +145,53 @@ processing_server <- function(
         unique(normalized[nzchar(normalized)])
       }
 
+      ensure_topic_assignment_choice <- function(topic_values) {
+        normalized_topics <- normalize_topic_labels(topic_values)
+        not_applicable_topic <- lang()$t("Onbekend/niet van toepassing")
+        reduction_summary <- attr(
+          topic_values,
+          "reduction_summary",
+          exact = TRUE
+        )
+        single_topic_fallback_applied <- isTRUE(
+          attr(topic_values, "single_topic_fallback_applied", exact = TRUE)
+        ) ||
+          isTRUE(
+            reduction_summary$single_topic_fallback_applied %||% FALSE
+          )
+
+        if (
+          length(normalized_topics) == 1L &&
+            !(not_applicable_topic %in% normalized_topics)
+        ) {
+          normalized_topics <- c(normalized_topics, not_applicable_topic)
+          single_topic_fallback_applied <- TRUE
+
+          if (!is.null(reduction_summary)) {
+            reduction_summary$not_applicable_requested <- TRUE
+            reduction_summary$auto_added_not_applicable <- TRUE
+            reduction_summary$single_topic_fallback_applied <- TRUE
+            reduction_summary$not_applicable_check_performed <-
+              isTRUE(reduction_summary$not_applicable_check_performed)
+            attr(normalized_topics, "reduction_summary") <- reduction_summary
+          }
+        } else if (!is.null(reduction_summary)) {
+          attr(normalized_topics, "reduction_summary") <- reduction_summary
+        }
+
+        attr(normalized_topics, "single_topic_fallback_applied") <-
+          single_topic_fallback_applied
+
+        normalized_topics
+      }
+
       topic_assignment_fit_info <- function(
         current_topics,
         current_exclusive_topics = exclusive_topics() %||% character()
       ) {
         topic_assignment_prompt_context_window_check(
           texts = texts$preprocessed,
-          topics = current_topics,
+          topics = unname(as.character(current_topics)),
           research_background = research_background(),
           llm_provider = models$main,
           assign_multiple_categories = assign_multiple_categories(),
@@ -674,9 +714,9 @@ processing_server <- function(
         bind_async_result(
           promise = promise,
           setter = function(value) {
-            normalized_topics <- normalize_topic_labels(value$topics)
-            normalized_reduced_topics <- processing_normalize_reduced_topics(
-              value$topics
+            normalized_topics <- ensure_topic_assignment_choice(value$topics)
+            normalized_reduced_topics <- ensure_topic_assignment_choice(
+              processing_normalize_reduced_topics(value$topics)
             )
             append_stage_execution_rows(value$stage_execution_rows)
             candidate_topics_generated(value$candidate_topics)
@@ -776,7 +816,7 @@ processing_server <- function(
                 normalize_topic_labels(reduced_topics_generated())
               )
             )
-            topics(edited_topics())
+            topics(ensure_topic_assignment_choice(edited_topics()))
             topics_definitive(TRUE)
           },
           ignoreInit = TRUE,
@@ -876,7 +916,7 @@ processing_server <- function(
                 results <- assign_topics(
                   texts = texts,
                   analysis_unit_ids = analysis_unit_ids,
-                  topics = topics,
+                  topics = unname(as.character(topics)),
                   research_background = research_background,
                   llm_provider = llm_provider,
                   assign_multiple_categories = assign_multiple_categories,

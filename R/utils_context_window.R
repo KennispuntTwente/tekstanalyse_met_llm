@@ -103,11 +103,6 @@ topic_assignment_prompt_context_window_check <- function(
   exclusive_topics = character(),
   n_tokens_context_window = NULL
 ) {
-  provider_model <- tryCatch(
-    llm_provider$parameters$model,
-    error = function(e) NULL
-  )
-
   stopifnot(
     is.character(texts),
     length(texts) > 0,
@@ -115,10 +110,18 @@ topic_assignment_prompt_context_window_check <- function(
     length(topics) > 0,
     is.character(research_background),
     length(research_background) == 1,
+    all(exclusive_topics %in% topics)
+  )
+
+  provider_model <- tryCatch(
+    llm_provider$parameters$model,
+    error = function(e) NULL
+  )
+
+  stopifnot(
     !is.null(provider_model),
     is.character(provider_model),
-    length(provider_model) == 1,
-    all(exclusive_topics %in% topics)
+    length(provider_model) == 1
   )
 
   longest_text <- texts[[which.max(count_tokens(texts))]]

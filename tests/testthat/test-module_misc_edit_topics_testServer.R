@@ -215,7 +215,10 @@ test_that("edit_topics_server: whitespace-only rows are ignored and single topic
       session$setInputs(`edit-confirm_topics` = 1)
       session$flushReact()
 
-      expect_identical(edited(), "Topic 1")
+      expect_identical(
+        edited(),
+        c("Topic 1", "Onbekend/niet van toepassing")
+      )
     }
   )
 })

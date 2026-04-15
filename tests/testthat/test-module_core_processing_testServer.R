@@ -354,6 +354,11 @@ test_that("processing_server: auto-confirm drops blank reduced topics", {
     1L
   }
   get_context_window_size_in_tokens <- function(...) 1000L
+  prompt_category <- function(...) {
+    testthat::fail(
+      "prompt_category should not be called for deterministic topic assignment"
+    )
+  }
 
   assign_topics <- function(
     texts,
@@ -528,7 +533,7 @@ test_that("processing_server: one reduced topic still reaches topic assignment",
   .kwallm__prompt_execution_get <- function(...) NULL
 
   create_candidate_topics <- function(...) "Candidate 1"
-  reduce_topics <- function(...) "Topic A"
+  reduce_topics <- function(...) c("Topic A", "Unknown/not applicable")
 
   captured_fit_topics <- NULL
   captured_assignment_topics <- NULL
@@ -711,8 +716,14 @@ test_that("processing_server: one reduced topic still reaches topic assignment",
       }
 
       expect_false(edit_topics_started)
-      expect_identical(captured_fit_topics, "Topic A")
-      expect_identical(captured_assignment_topics, "Topic A")
+      expect_identical(
+        captured_fit_topics,
+        c("Topic A", "Unknown/not applicable")
+      )
+      expect_identical(
+        captured_assignment_topics,
+        c("Topic A", "Unknown/not applicable")
+      )
     }
   )
 })
@@ -756,6 +767,7 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
     attr(reduced_topics, "reduction_summary") <- list(
       not_applicable_requested = TRUE,
       auto_added_not_applicable = FALSE,
+      single_topic_fallback_applied = FALSE,
       not_applicable_check_performed = TRUE,
       reduction_iterations = 1L
     )
@@ -910,6 +922,7 @@ test_that("processing_server: reduced topics keep reduction_summary for result b
         list(
           not_applicable_requested = TRUE,
           auto_added_not_applicable = FALSE,
+          single_topic_fallback_applied = FALSE,
           not_applicable_check_performed = TRUE,
           reduction_iterations = 1L
         )

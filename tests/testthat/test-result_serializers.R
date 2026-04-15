@@ -849,16 +849,18 @@ test_that("topic metadata includes candidate and reduced topics", {
 
   results_table <- data.frame(
     text = c("Text 1", "Text 2"),
-    result = c("Topic A", "Topic B"),
+    result = c("Topic A", "Unknown/not applicable"),
     stringsAsFactors = FALSE
   )
-  reduced_topics <- c("Topic A", "Topic B")
+  reduced_topics <- c("Topic A", "Unknown/not applicable")
   attr(reduced_topics, "reduction_summary") <- list(
     not_applicable_requested = TRUE,
     auto_added_not_applicable = TRUE,
-    not_applicable_check_performed = TRUE,
-    reduction_iterations = 2L
+    single_topic_fallback_applied = TRUE,
+    not_applicable_check_performed = FALSE,
+    reduction_iterations = 0L
   )
+  attr(reduced_topics, "single_topic_fallback_applied") <- TRUE
 
   analysis_result <- build_analysis_result(
     texts_df = texts_df,
@@ -872,8 +874,8 @@ test_that("topic metadata includes candidate and reduced topics", {
     by_column_name = NULL,
     by_column_lookup = NULL,
     models = .test_models(),
-    topics = c("Topic A", "Topic B"),
-    exclusive_topics = "Topic B",
+    topics = c("Topic A", "Unknown/not applicable"),
+    exclusive_topics = "Unknown/not applicable",
     assign_multiple_categories = FALSE,
     human_in_the_loop = TRUE,
     write_paragraphs = FALSE,
@@ -889,12 +891,13 @@ test_that("topic metadata includes candidate and reduced topics", {
       topic_not_applicable_check = "not applicable prompt",
       topic_assignment = "assignment prompt"
     ),
-    candidate_topics = c("Topic A", "Topic B", "Topic C"),
+    candidate_topics = c("Topic A"),
     reduced_topics = reduced_topics,
     topics_were_edited = TRUE
   )
 
   metadata <- analysis_result_to_metadata_list(analysis_result)
+  sheets <- analysis_result_to_export_sheets(analysis_result)
   reduction_model <- .kwallm_get_stage_model_id(
     analysis_result,
     c("topic_reduction", "topic_not_applicable_check")
@@ -902,11 +905,11 @@ test_that("topic metadata includes candidate and reduced topics", {
 
   expect_equal(
     metadata$results$topic_provenance$candidate_topics,
-    c("Topic A", "Topic B", "Topic C")
+    c("Topic A")
   )
   expect_equal(
     metadata$results$topic_provenance$reduced_topics,
-    c("Topic A", "Topic B")
+    c("Topic A", "Unknown/not applicable")
   )
   expect_true(isTRUE(metadata$results$topic_provenance$human_edited))
   expect_true(isTRUE(
@@ -916,18 +919,82 @@ test_that("topic metadata includes candidate and reduced topics", {
     metadata$results$topic_provenance$auto_added_not_applicable
   ))
   expect_true(isTRUE(
-    metadata$results$topic_provenance$not_applicable_check_performed
+    metadata$results$topic_provenance$single_topic_fallback_applied
   ))
-  expect_equal(metadata$results$topic_provenance$reduction_iterations, 2L)
+  expect_true(isTRUE(
+    !metadata$results$topic_provenance$not_applicable_check_performed
+  ))
+  expect_equal(metadata$results$topic_provenance$reduction_iterations, 0L)
   expect_identical(
     names(metadata$results),
     c("topic_provenance", "labels", "multi_label", "assignments")
   )
   expect_equal(
-    metadata$stage_models$topic_not_applicable_check$model_id,
-    "large-model"
+    sheets$topic_generation_settings$value[
+      sheets$topic_generation_settings$setting ==
+        "single_topic_fallback_applied"
+    ],
+    "TRUE"
+  )
+  expect_equal(
+    metadata$stage_models$topic_not_applicable_check,
+    NULL
   )
   expect_equal(reduction_model, "large-model")
+})
+
+test_that("topic metadata captures one-topic fallback applied after editing", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text 1", "Text 2"),
+    preprocessed = c("Text 1", "Text 2")
+  )
+
+  results_table <- data.frame(
+    text = c("Text 1", "Text 2"),
+    result = c("Topic A", "Unknown/not applicable"),
+    stringsAsFactors = FALSE
+  )
+  reduced_topics <- c("Topic A", "Topic B")
+  attr(reduced_topics, "reduction_summary") <- list(
+    not_applicable_requested = TRUE,
+    auto_added_not_applicable = FALSE,
+    single_topic_fallback_applied = FALSE,
+    not_applicable_check_performed = TRUE,
+    reduction_iterations = 1L
+  )
+  final_topics <- c("Topic A", "Unknown/not applicable")
+  attr(final_topics, "single_topic_fallback_applied") <- TRUE
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-3b",
+    mode = "Onderwerpextractie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    topics = final_topics,
+    exclusive_topics = "Unknown/not applicable",
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = TRUE,
+    write_paragraphs = FALSE,
+    candidate_topics = c("Topic A", "Topic B"),
+    reduced_topics = reduced_topics,
+    topics_were_edited = TRUE
+  )
+
+  metadata <- analysis_result_to_metadata_list(analysis_result)
+
+  expect_true(isTRUE(
+    metadata$results$topic_provenance$single_topic_fallback_applied
+  ))
+  expect_false(isTRUE(
+    metadata$results$topic_provenance$auto_added_not_applicable
+  ))
 })
 
 test_that("input provenance and irr sample are serialized", {
