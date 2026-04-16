@@ -39,7 +39,7 @@ test_that("{shinytest2} recording: standard process - scoring", {
   )
 
   # Set scoring characteristic
-  app$set_inputs(`mode-mode` = "Scoring")
+  app$set_inputs(`mode-mode` = "Scoren")
   app$set_inputs(`scoring-scoring_characteristic` = "Positive sentiment")
 
   set_fake_models(app)

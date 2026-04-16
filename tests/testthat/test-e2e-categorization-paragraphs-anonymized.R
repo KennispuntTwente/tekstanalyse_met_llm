@@ -46,7 +46,7 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
     timeout = 30000
   )
   app$set_inputs(`model-main_model` = "kwallm-fake-main-1024")
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "Yes")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "true")
 
   document_texts <- app$get_value(
     export = "text_management-texts__document_text"

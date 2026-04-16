@@ -19,11 +19,27 @@ mode_server <- function(
     id,
     function(input, output, session) {
       ns <- session$ns
+      mode_values <- c(
+        "Categorisatie",
+        "Scoren",
+        "Onderwerpextractie",
+        "Markeren"
+      )
 
       mode <- reactiveVal("Categorisatie")
       shiny::exportTestValues(mode = mode())
 
       output$card <- renderUI({
+        mode_choices <- stats::setNames(
+          mode_values,
+          c(
+            lang()$t("Categorisatie"),
+            lang()$t("Scoren"),
+            lang()$t("Onderwerpextractie"),
+            lang()$t("Markeren")
+          )
+        )
+
         bslib::card(
           class = "card",
           card_header_with_tooltip(
@@ -38,13 +54,8 @@ mode_server <- function(
               shinyWidgets::radioGroupButtons(
                 ns("mode"),
                 NULL,
-                choices = c(
-                  lang()$t("Categorisatie"),
-                  lang()$t("Scoren"),
-                  lang()$t("Onderwerpextractie"),
-                  lang()$t("Markeren")
-                ),
-                selected = lang()$t("Categorisatie"),
+                choices = mode_choices,
+                selected = mode(),
                 size = "sm"
               )
             ),
@@ -87,20 +98,12 @@ mode_server <- function(
 
       # When selecting input, update reactiveVal
       observeEvent(input$mode, {
-        new_mode <- NULL
+        req(input$mode %in% mode_values)
 
-        if (input$mode == lang()$t("Categorisatie")) {
-          new_mode <- "Categorisatie"
-        } else if (input$mode == lang()$t("Scoren")) {
-          new_mode <- "Scoren"
-        } else if (input$mode == lang()$t("Onderwerpextractie")) {
-          new_mode <- "Onderwerpextractie"
-        } else if (input$mode == lang()$t("Markeren")) {
-          new_mode <- "Markeren"
+        if (!identical(mode(), input$mode)) {
+          mode(input$mode)
+          log_action("mode_changed", details = input$mode)
         }
-
-        mode(new_mode)
-        log_action("mode_changed", details = new_mode)
       })
 
       # When processing, disable the mode selection

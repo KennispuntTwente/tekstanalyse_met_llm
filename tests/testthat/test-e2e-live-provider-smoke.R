@@ -32,7 +32,7 @@ test_that("{shinytest2} live provider smoke: categorization workflow", {
   chosen_model <- configure_live_openai_model(app, timeout = 60000)
   expect_true(is.character(chosen_model) && nzchar(chosen_model))
 
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
   wait_for_enabled_element(app, "processing-process", timeout = 30000)
   app$click("processing-process")
   app$wait_for_value(export = "processing-success", timeout = 60000)
@@ -64,7 +64,7 @@ test_that("{shinytest2} live provider smoke: marking workflow", {
   app$upload_file(`text_upload-text_file` = temp_txt)
 
   app$set_inputs(`research_background-research_background` = "Live smoke test")
-  app$set_inputs(`mode-mode` = "Mark")
+  app$set_inputs(`mode-mode` = "Markeren")
   chosen_model <- configure_live_openai_model(app, timeout = 60000)
   expect_true(is.character(chosen_model) && nzchar(chosen_model))
 

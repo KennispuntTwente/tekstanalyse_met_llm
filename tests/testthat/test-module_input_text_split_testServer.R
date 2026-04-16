@@ -1,5 +1,6 @@
 library(testthat)
 library(shiny)
+library(bslib)
 suppressWarnings(library(promises))
 
 # Keep these tests deterministic and avoid requiring the full app wiring.
@@ -118,8 +119,8 @@ test_that("text_split_server: returns document texts when toggle is off", {
       expect_equal(texts(), document_texts())
       expect_null(source_document_texts())
 
-      # Explicitly set toggle to "Nee" (default) to ensure stability.
-      session$setInputs(`split-toggle` = lang()$t("Nee"))
+      # Explicitly set toggle to off (default) to ensure stability.
+      session$setInputs(`split-toggle` = "false")
       session$flushReact()
 
       expect_equal(texts(), document_texts())
@@ -191,7 +192,7 @@ test_that("text_split_server: clicking split produces split texts (sync-mocked m
     },
     {
       # Turn splitting on.
-      session$setInputs(`split-toggle` = lang()$t("Ja"))
+      session$setInputs(`split-toggle` = "true")
       session$flushReact()
 
       expect_equal(texts(), document_texts())
@@ -286,7 +287,7 @@ test_that("text_split_server ignores stale async split results after source text
       )
     },
     {
-      session$setInputs(`split-toggle` = lang()$t("Ja"))
+      session$setInputs(`split-toggle` = "true")
       session$flushReact()
 
       session$setInputs(`split-max_tokens` = 5)
@@ -386,7 +387,7 @@ test_that("text_split_server passes worker setup globals for semchunk async work
       list(split_result = split_result, lang = lang)
     },
     {
-      session$setInputs(`split-toggle` = lang()$t("Ja"))
+      session$setInputs(`split-toggle` = "true")
       session$flushReact()
 
       session$setInputs(`split-max_tokens` = 5)
@@ -404,6 +405,49 @@ test_that("text_split_server passes worker setup globals for semchunk async work
         ) %in%
           names(captured$args)
       ))
+    }
+  )
+})
+
+
+test_that("text_split_server preserves toggle and numeric values across language re-render", {
+  shiny::testServer(
+    function(input, output, session) {
+      document_texts <- reactiveVal(c("alpha"))
+      processing <- reactiveVal(FALSE)
+      lang <- make_test_lang("nl")
+
+      split_result <- text_split_server(
+        id = "split",
+        document_texts = document_texts,
+        processing = processing,
+        lang = lang,
+        enabled = TRUE
+      )
+
+      list(split_result = split_result, lang = lang)
+    },
+    {
+      session$setInputs(`split-toggle` = "true")
+      session$flushReact()
+
+      session$setInputs(`split-max_tokens` = 64)
+      session$setInputs(`split-overlap` = 4)
+      session$flushReact()
+
+      lang(make_test_lang("en")())
+      session$flushReact()
+
+      expect_true(split_result$split_settings()$enabled)
+      expect_equal(split_result$split_settings()$chunk_size, 64)
+      expect_equal(split_result$split_settings()$overlap, 4)
+      expect_match(
+        output$`split-card`$html,
+        'value="true" checked="checked"',
+        fixed = TRUE
+      )
+      expect_match(output$`split-split_ui`$html, 'value="64"', fixed = TRUE)
+      expect_match(output$`split-split_ui`$html, 'value="4"', fixed = TRUE)
     }
   )
 })
@@ -466,7 +510,7 @@ test_that("text_split_server ignores manual splitting in marking mode", {
       )
     },
     {
-      session$setInputs(`split-toggle` = lang()$t("Ja"))
+      session$setInputs(`split-toggle` = "true")
       session$flushReact()
 
       expect_identical(texts(), document_texts())

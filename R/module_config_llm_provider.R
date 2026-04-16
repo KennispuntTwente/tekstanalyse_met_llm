@@ -470,6 +470,8 @@ llm_provider_server <- function(
 
         ns_api <- ns("api_key_text")
         ns_btn <- ns("toggle_api_key_visibility")
+        preserve_user_key <- isTRUE(user_entered_api_key())
+        current_api_key <- api_key_input() %||% ""
 
         tagList(
           shinyjs::useShinyjs(),
@@ -488,8 +490,10 @@ llm_provider_server <- function(
                   id = ns_api,
                   type = "password",
                   class = "form-control",
-                  value = "",
-                  placeholder = if (nchar(env_api_key) > 0) {
+                  value = if (preserve_user_key) current_api_key else "",
+                  placeholder = if (
+                    !preserve_user_key && nchar(env_api_key) > 0
+                  ) {
                     "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (env)"
                   } else {
                     ""
@@ -566,6 +570,11 @@ llm_provider_server <- function(
 
       # Expose model lists for automated tests (reactive, so they update)
       shiny::exportTestValues(
+        provider_mode = llm_provider_rv$provider_mode,
+        openai_url = openai_url(),
+        ollama_url = ollama_url(),
+        api_key_has_value = nchar(api_key_input() %||% "") > 0,
+        user_entered_api_key = user_entered_api_key(),
         available_models_openai = available_models_openai(),
         available_models_ollama = available_models_ollama()
       )

@@ -47,8 +47,8 @@ test_that("{shinytest2} recording: categorization with paragraph writing", {
   set_fake_models(app)
 
   # IMPORTANT: Enable paragraph writing - this is what this test specifically covers
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "Yes")
-  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "Yes")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "true")
+  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "true")
 
   # Start processing
   wait_for_bound_input(app, "processing-process")

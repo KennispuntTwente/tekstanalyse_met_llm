@@ -31,7 +31,7 @@ test_that("{shinytest2} recording: standard process - marking", {
   )
 
   # Set mode
-  app$set_inputs(`mode-mode` = "Mark")
+  app$set_inputs(`mode-mode` = "Markeren")
 
   set_fake_models(app)
 

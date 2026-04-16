@@ -305,10 +305,75 @@ test_that("llm_provider_server: env OPENAI_API_KEY is never rendered into the br
         info = "Placeholder should indicate an env key is configured"
       )
 
+      lang(make_test_lang("en")())
+      session$flushReact()
+
+      rendered_html_en <- output$`llm_provider-api_key_input`$html
+      expect_false(
+        grepl(secret, rendered_html_en, fixed = TRUE),
+        info = "Language re-render must not expose the env key in HTML"
+      )
+
       # A user-entered key should override the env key.
       session$setInputs(`llm_provider-api_key_text` = "user-provided-key")
       session$flushReact()
       expect_true(!is.null(llm_provider_rv$llm_provider_configured))
+    }
+  )
+})
+
+
+test_that("llm_provider_server: language re-render preserves user-entered API key", {
+  source(here::here("R", "module_core_processing.R"), local = TRUE)
+  source(here::here("R", "component_icon_button.R"), local = TRUE)
+  source(here::here("R", "component_card_header_with_tooltip.R"), local = TRUE)
+  source(here::here("R", "component_description_box.R"), local = TRUE)
+  source(here::here("R", "module_config_llm_provider.R"), local = TRUE)
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      processing <- reactiveVal(FALSE)
+
+      llm_provider_rv <- llm_provider_server(
+        id = "llm_provider",
+        processing = processing,
+        has_preconfigured_llm_provider = TRUE,
+        can_configure_oai = TRUE,
+        can_configure_ollama = TRUE,
+        lang = lang
+      )
+
+      list(
+        lang = lang,
+        processing = processing,
+        llm_provider_rv = llm_provider_rv
+      )
+    },
+    {
+      session$setInputs(`llm_provider-select_openai` = 1)
+      session$flushReact()
+
+      session$setInputs(`llm_provider-api_key_text` = "user-provided-key")
+      session$flushReact()
+
+      expect_equal(
+        llm_provider_rv$llm_provider_configured$api_key,
+        "user-provided-key"
+      )
+
+      lang(make_test_lang("en")())
+      session$flushReact()
+
+      expect_equal(
+        llm_provider_rv$llm_provider_configured$api_key,
+        "user-provided-key"
+      )
+      expect_match(
+        output$`llm_provider-api_key_input`$html,
+        "user-provided-key",
+        fixed = TRUE
+      )
     }
   )
 })

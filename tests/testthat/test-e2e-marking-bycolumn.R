@@ -68,7 +68,7 @@ test_that("{shinytest2} recording: marking with by_column grouping variable", {
   )
 
   # Set mode to Mark
-  app$set_inputs(`mode-mode` = "Mark")
+  app$set_inputs(`mode-mode` = "Markeren")
 
   set_fake_models(app)
 
@@ -83,7 +83,7 @@ test_that("{shinytest2} recording: marking with by_column grouping variable", {
   )
 
   # Disable paragraphs for faster test
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
 
   # Start processing
   wait_for_enabled_element(app, "processing-process")

@@ -49,7 +49,8 @@ score_server <- function(
               textAreaInput(
                 ns("scoring_characteristic"),
                 NULL,
-                value = "",
+                value = isolate(input$scoring_characteristic) %||%
+                  scoring_characteristic(),
                 rows = 1,
                 width = "100%"
               )

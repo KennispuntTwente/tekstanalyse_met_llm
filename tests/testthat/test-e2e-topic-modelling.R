@@ -31,7 +31,7 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   )
 
   # Set mode
-  app$set_inputs(`mode-mode` = "Topic extraction")
+  app$set_inputs(`mode-mode` = "Onderwerpextractie")
 
   # Set deterministic fake models
   set_fake_models(
@@ -41,11 +41,11 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   )
 
   # Set analysis options
-  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "Yes")
-  app$set_inputs(`human_in_the_loop_toggle-toggle` = "Yes")
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
-  app$set_inputs(`interrater_toggle-toggle` = "No")
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "Yes")
+  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "true")
+  app$set_inputs(`human_in_the_loop_toggle-toggle` = "true")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
+  app$set_inputs(`interrater_toggle-toggle` = "false")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "true")
 
   # Start processing
   app$click("processing-process")

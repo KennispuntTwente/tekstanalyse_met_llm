@@ -40,7 +40,7 @@ test_that("{shinytest2} recording: standard process - categorization", {
   set_fake_models(app)
 
   # Set writing paragraphs toggle
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
 
   # Start processing
   wait_for_bound_input(app, "processing-process")
