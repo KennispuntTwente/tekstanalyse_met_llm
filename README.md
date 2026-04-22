@@ -138,7 +138,7 @@ Suggestions or ideas for the app?
 [Open an issue on GitHub](https://github.com/KennispuntTwente/KWALLM/issues/new).
 
 Kennispunt Twente is a (Dutch) non-profit organization focused on data, insights, and knowledge. Interested in what we can do for your organization, for example in generative AI?
-Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our developers](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
+Visit [our website](https://www.kennispunttwente.nl), or [get in touch with our developers](mailto:koningluka@gmail.com,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
 
 ### Name & logo of the app
 
@@ -150,8 +150,13 @@ The name also includes 'kwal' (Dutch for: jellyfish), which is the logo of the a
 
 ### Contact
 
-- Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)  
+- Luka Koning – [koningluka@gmail.com](mailto:koningluka@gmail.com)  
 - Tjark van de Merwe – [t.vandemerwe@kennispunttwente.nl](mailto:t.vandemerwe@kennispunttwente.nl)  
+- Kennispunt Twente - [info@kennispunttwente.nl](mailto:info@kennispunttwente.nl)
+
+Luka Koning has left Kennispunt Twente per May 2026, but still maintains this app
+on personal title. For questions about the app, you can contact Luka or Tjark;
+for organizational questions about Kennispunt Twente, please contact Tjark.
 
 ---
 
@@ -364,7 +369,7 @@ Ideeën of verbeterpunten voor de app?
 
 Kennispunt Twente is een non-profit organisatie voor data, inzicht en kennis. 
 Geïnteresseerd in wat Kennispunt Twente voor jouw organisatie kan doen, bijvoorbeeld op gebied van generatieve AI?
-Bezoek [onze website](https://www.kennispunttwente.nl) of [neem contact op met onze ontwikkelaars](mailto:l.koning@kennispunttwente.nl,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
+Bezoek [onze website](https://www.kennispunttwente.nl) of [neem contact op met onze ontwikkelaars](mailto:koningluka@gmail.com,t.vandemerwe@kennispunttwente.nl?cc=info@kennispunttwente.nl).
 
 ### Naam & logo van de app
 
@@ -376,8 +381,13 @@ Omdat 'kwal' in de naam voorkomt, is het logo van de app een kwal.
 
 ### Contact
 
-- Luka Koning – [l.koning@kennispunttwente.nl](mailto:l.koning@kennispunttwente.nl)  
+- Luka Koning – [koningluka@gmail.com](mailto:koningluka@gmail.com)  
 - Tjark van de Merwe – [t.vandemerwe@kennispunttwente.nl](mailto:t.vandemerwe@kennispunttwente.nl)  
+- Kennispunt Twente - [info@kennispunttwente.nl](mailto:info@kennispunttwente.nl)
+
+Luka Koning verlaat Kennispunt Twente per mei 2026, maar blijft deze app
+onder persoonlijke titel beheren. Voor vragen over de app kan je contact opnemen met Luka of Tjark;
+voor organisatorische vragen over Kennispunt Twente kan je contact opnemen met Tjark.
 
 ---
 
