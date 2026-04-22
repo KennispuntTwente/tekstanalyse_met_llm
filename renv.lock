@@ -3047,53 +3047,9 @@
     },
     "tidyprompt": {
       "Package": "tidyprompt",
-      "Version": "0.3.0",
+      "Version": "0.4.0",
       "Source": "Repository",
-      "Title": "Prompt Large Language Models and Enhance Their Functionality",
-      "Authors@R": "c(person(given = \"Luka\", family = \"Koning\", role = c(\"aut\", \"cre\", \"cph\"), email = \"l.koning@kennispunttwente.nl\"), person(given = \"Tjark\", family = \"Van de Merwe\", role = c(\"aut\", \"cph\"), email = \"t.vandemerwe@kennispunttwente.nl\"), person(given = \"Kennispunt Twente\", role = \"fnd\", email = \"info@kennispunttwente.nl\"))",
-      "Description": "Easily construct prompts and associated logic for interacting with  large language models (LLMs).  'tidyprompt' introduces the concept of prompt wraps, which are building blocks that you can use to quickly turn a simple prompt into a complex one. Prompt wraps do not just modify the prompt text, but also add extraction and validation functions that will be applied to the response of the LLM. This ensures that the user gets the desired output. 'tidyprompt' can add various features to prompts and their evaluation by LLMs, such as structured output, automatic feedback, retries, reasoning modes, autonomous R function calling, and R code generation and evaluation. It is designed to be compatible with any LLM provider that offers chat completion.",
-      "License": "GPL (>= 3) | file LICENSE",
-      "Encoding": "UTF-8",
-      "RoxygenNote": "7.3.3",
-      "URL": "https://github.com/KennispuntTwente/tidyprompt, https://KennispuntTwente.github.io/tidyprompt/",
-      "BugReports": "https://github.com/KennispuntTwente/tidyprompt/issues",
-      "Depends": [
-        "R (>= 4.1.0)"
-      ],
-      "Suggests": [
-        "knitr",
-        "rmarkdown",
-        "testthat (>= 3.0.0)",
-        "here",
-        "callr",
-        "skimr",
-        "jsonvalidate",
-        "DBI",
-        "ellmer (>= 0.3.0)",
-        "coro",
-        "ggplot2",
-        "mcptools",
-        "grid"
-      ],
-      "VignetteBuilder": "knitr",
-      "Imports": [
-        "dplyr",
-        "glue",
-        "httr2",
-        "jsonlite",
-        "stringr",
-        "utils",
-        "cli",
-        "R6",
-        "rlang",
-        "S7",
-        "methods"
-      ],
-      "Config/testthat/edition": "3",
-      "NeedsCompilation": "no",
-      "Author": "Luka Koning [aut, cre, cph], Tjark Van de Merwe [aut, cph], Kennispunt Twente [fnd]",
-      "Maintainer": "Luka Koning <l.koning@kennispunttwente.nl>",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "tidyr": {
       "Package": "tidyr",
