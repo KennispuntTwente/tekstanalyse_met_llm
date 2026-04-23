@@ -1,6 +1,7 @@
 # This script tests the fuzzy matching which is performed in R/analys_marking.R
 
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"))
 source(here::here("R", "analysis_marking.R"))
 
 # Deterministic k-substitution mutator used in “property-like” tests
@@ -18,7 +19,8 @@ mutate_k_subs <- function(s, k) {
 }
 
 test_that("fuzzy_threshold math matches spec", {
-  expect_equal(fuzzy_threshold(1), 2) # max(2, ceil(0.12))
+  expect_equal(fuzzy_threshold(1), 0) # short snippets require exact match only
+  expect_equal(fuzzy_threshold(3), 0) # short snippets require exact match only
   expect_equal(fuzzy_threshold(10), 2) # max(2, ceil(1.2))
   expect_equal(fuzzy_threshold(20), 3) # max(2, ceil(2.4))
   expect_equal(fuzzy_threshold(50), 6) # max(2, ceil(6.0))
@@ -100,6 +102,17 @@ test_that("empty and NA needles return NA matches", {
   expect_true(all(is.na(res$distance)))
 })
 
+test_that("short snippets only match exactly", {
+  exact <- find_matches("abc", "a")
+  fuzzy_single <- find_matches("abc", "x")
+  fuzzy_three <- find_matches("abc", "abd")
+
+  expect_identical(exact$match[[1]], "a")
+  expect_equal(exact$distance[[1]], 0L)
+  expect_true(is.na(fuzzy_single$match[[1]]))
+  expect_true(is.na(fuzzy_three$match[[1]]))
+})
+
 test_that("too-short haystack relative to min window returns NA", {
   hay <- "tiny"
   nd <- "a much longer needle"
@@ -125,4 +138,91 @@ test_that("changing step_div does not change correctness (only iteration granula
   expect_equal(r1$match, r2$match)
   expect_equal(r1$start, r2$start)
   expect_equal(r1$end, r2$end)
+})
+
+
+# Repeated identical needles -----------------------------------------------
+
+test_that("find_matches resolves repeated identical needles to distinct spans", {
+  hay <- "the cat sat on the mat and the cat sat on the floor"
+  nds <- c("the cat sat", "the cat sat")
+  res <- find_matches(hay, nds)
+
+  expect_equal(nrow(res), 2)
+  # Both should match
+
+  expect_false(is.na(res$match[1]))
+  expect_false(is.na(res$match[2]))
+  # They should point to different positions
+  expect_true(res$start[1] != res$start[2])
+})
+
+test_that("find_matches returns NA for extra duplicates beyond available occurrences", {
+  hay <- "hello world"
+  nds <- c("hello", "hello")
+  res <- find_matches(hay, nds)
+
+  expect_equal(nrow(res), 2)
+  expect_false(is.na(res$match[1]))
+  # Only one occurrence in haystack, second should be NA
+  expect_true(is.na(res$match[2]))
+})
+
+test_that("best_literal_substring min_start skips earlier exact matches", {
+  hay <- "abc def abc ghi"
+  r1 <- best_literal_substring("abc", hay)
+  expect_equal(r1$start, 1L)
+
+  r2 <- best_literal_substring("abc", hay, min_start = 2L)
+  expect_equal(r2$start, 9L)
+  expect_equal(r2$match, "abc")
+})
+
+test_that("best_literal_substring min_start works on normalized path", {
+  hay <- "Hello World, Hello Again"
+  r1 <- best_literal_substring("hello", hay)
+  expect_equal(r1$start, 1L)
+
+  r2 <- best_literal_substring("hello", hay, min_start = 6L)
+  expect_equal(r2$start, 14L)
+  expect_equal(r2$distance, 0L)
+})
+
+test_that("best_literal_substring min_start works on fuzzy path", {
+  # "abcdefghij" at two positions, with slight mutation in second
+  hay <- "prefix abcdefghij middle abcxefghij suffix"
+  needle <- "abcdefghij"
+  r1 <- best_literal_substring(needle, hay)
+  expect_equal(r1$start, 8L)
+
+  # Skip past first occurrence - should find the fuzzy match
+  r2 <- best_literal_substring(needle, hay, min_start = 18L)
+  expect_false(is.na(r2$match))
+  expect_true(r2$start >= 18L)
+})
+
+test_that("find_matches with three identical needles resolves to three spans", {
+  hay <- "yes no yes no yes no"
+  nds <- c("yes", "yes", "yes")
+  res <- find_matches(hay, nds)
+
+  expect_equal(nrow(res), 3)
+  matched <- res[!is.na(res$match), ]
+  expect_equal(nrow(matched), 3)
+  # All at distinct positions
+  expect_equal(length(unique(matched$start)), 3)
+})
+
+test_that("find_matches mixed distinct and duplicate needles work together", {
+  hay <- "alpha beta gamma alpha delta"
+  nds <- c("alpha", "beta", "alpha")
+  res <- find_matches(hay, nds)
+
+  expect_equal(nrow(res), 3)
+  # First alpha -> position 1
+  expect_equal(res$start[1], 1L)
+  # beta -> position 7
+  expect_equal(res$match[2], "beta")
+  # Second alpha -> position 18
+  expect_equal(res$start[3], 18L)
 })

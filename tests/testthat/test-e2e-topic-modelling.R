@@ -31,7 +31,7 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   )
 
   # Set mode
-  app$set_inputs(`mode-mode` = "Topic extraction")
+  app$set_inputs(`mode-mode` = "Onderwerpextractie")
 
   # Set deterministic fake models
   set_fake_models(
@@ -41,11 +41,11 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   )
 
   # Set analysis options
-  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "Yes")
-  app$set_inputs(`human_in_the_loop_toggle-toggle` = "Yes")
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
-  app$set_inputs(`interrater_toggle-interrater_reliability` = "No")
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "Yes")
+  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "true")
+  app$set_inputs(`human_in_the_loop_toggle-toggle` = "true")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
+  app$set_inputs(`interrater_toggle-toggle` = "false")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "true")
 
   # Start processing
   app$click("processing-process")
@@ -87,9 +87,9 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     fixed = TRUE
   )))
 
-  expect_true(all(texts %in% results$text))
+  expect_true(all(preprocessed_texts %in% results$text))
   expect_true(all.equal(
-    table(texts),
+    table(preprocessed_texts),
     table(results$text),
     check.attributes = FALSE
   ))
@@ -127,8 +127,8 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     ),
     expected_results_columns = c("text"),
     expected_result_rows = nrow(results),
-    expected_texts = texts,
-    expected_text_count = length(texts)
+    expected_texts = preprocessed_texts,
+    expected_text_count = length(preprocessed_texts)
   )
 
   expect_true(isTRUE(bundle$metadata$mode_config$write_paragraphs))

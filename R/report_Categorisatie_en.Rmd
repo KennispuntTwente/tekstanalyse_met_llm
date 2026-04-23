@@ -37,9 +37,20 @@ source(here::here("R", "utils_quotes.R"), local = TRUE)
 source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+analysis_name <- analysis_result@metadata@analysis_name
+if (nzchar(analysis_name)) {
+  cat(paste0(
+    "<h3 style='color: #666; margin-top: -0.5em;'>",
+    htmltools::htmlEscape(analysis_name),
+    "</h3>\n"
+  ))
+}
+```
+
 ## Method
 
-`r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to assign one of the following `r length(categories)` categories to each text:
+`r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to assign `r if (assign_multiple_categories) "one or more of" else "one of"` the following `r length(categories)` categories to each text:
 
 ```{r echo=FALSE, results='asis', error=TRUE}
 cat("<blockquote>")
@@ -60,9 +71,9 @@ if (assign_multiple_categories) {
 ```{r echo=FALSE, results='asis', error=TRUE}
 if (has_paragraphs) {
   cat(paste0(
-    "With the texts to which subjects were added, a language model ",
+    "With the texts to which categories were assigned, a language model ",
   "(", htmltools::htmlEscape(main_model), ") finally wrote a report.", "\n",
-    "For each subject, a summary was created with quotes summarizing what was said."
+    "For each category, a summary was created with quotes summarizing what was said."
   ))
 }
 ```
@@ -89,7 +100,8 @@ if (!is.null(reliability_summary)) {
     "### Reliability\n",
     "The inter-rater reliability between the language model and a human rater was calculated. ",
     "A random sample of ",
-    reliability_summary$subjects, " texts was taken.",
+    reliability_summary$subjects,
+    if (assign_multiple_categories) " text-category decisions was taken." else " texts was taken.",
     " The calculated inter-rater reliability is ",
     round(reliability_summary$value, 3), " (", reliability_summary$irr.name, "; ", reliability_summary$stat.name, " = ",
     round(reliability_summary$statistic, 3), ", p = ", round(reliability_summary$p.value, 3), ").",
@@ -219,7 +231,7 @@ output <- list()
 
 output <- append(output, list(
   htmltools::HTML("<h3>Report</h3>"),
-  htmltools::HTML("<p>The following paragraphs are the summaries of the texts per topic.</p>"),
+  htmltools::HTML("<p>The following paragraphs are the summaries of the texts per category.</p>"),
   htmltools::div(
     class = "d-flex justify-content-center",
     htmltools::div(
@@ -260,16 +272,18 @@ for (i in seq_len(nrow(paragraphs_df))) {
     analysis_result,
     paragraph_row$paragraph_id[[1]]
   )
-  if (!length(supporting_texts)) {
+  if (!length(supporting_texts) && isTRUE(paragraph_row$prompt_fits[[1]])) {
     next
   }
   #### 1 Verify quotes on presence in supporting texts ####
-  paragraph_text <- verify_and_decorate_quotes(
-    paragraph_text = paragraph_text,
-    supporting_texts = supporting_texts,
-    lang = "en",
-    escape_html = TRUE
-  )
+  if (length(supporting_texts)) {
+    paragraph_text <- verify_and_decorate_quotes(
+      paragraph_text = paragraph_text,
+      supporting_texts = supporting_texts,
+      lang = "en",
+      escape_html = FALSE
+    )
+  }
   
   #### 2 Check if paragraph has attribute about prompt not fitting in context window ####
   

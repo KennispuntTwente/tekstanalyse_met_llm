@@ -31,7 +31,7 @@ test_that("{shinytest2} recording: standard process - marking", {
   )
 
   # Set mode
-  app$set_inputs(`mode-mode` = "Mark")
+  app$set_inputs(`mode-mode` = "Markeren")
 
   set_fake_models(app)
 
@@ -84,8 +84,8 @@ test_that("{shinytest2} recording: standard process - marking", {
   )))
 
   # Expect that all texts are present in column 'text'
-  texts <- readLines(
-    here::here("tests", "testthat", "test_texts.txt")
+  texts <- app$get_value(
+    export = "text_management-texts__preprocessed"
   )
   expect_true(all(texts %in% results$text))
 

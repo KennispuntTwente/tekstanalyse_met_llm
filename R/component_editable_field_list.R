@@ -104,7 +104,8 @@ editable_field_list_server <- function(
         ns("toggleEdit"),
         label = tagList(button_label, ""),
         class = "btn btn-primary",
-        style = "min-width: 75px;"
+        style = "min-width: 75px;",
+        `aria-label` = if (isEditing()) "Save" else "Edit"
       )
 
       if (isTRUE(processing())) {
@@ -121,13 +122,15 @@ editable_field_list_server <- function(
         ns("addField"),
         label = icon("plus"),
         class = "btn btn-success category-button",
-        style = "min-width: 75px;"
+        style = "min-width: 75px;",
+        `aria-label` = "Add"
       )
       remove_button <- actionButton(
         ns("removeField"),
         label = icon("minus"),
         class = "btn btn-danger category-button",
-        style = "min-width: 75px;"
+        style = "min-width: 75px;",
+        `aria-label` = "Remove"
       )
 
       if (buttons_disabled) {
@@ -325,19 +328,29 @@ editable_field_list_server <- function(
       length(nonEmptyTexts())
     })
 
+    hasDuplicates <- reactive({
+      vals <- txt_in_fields()
+      trimmed <- trimws(vals)
+      trimmed <- trimmed[nzchar(trimmed)]
+      length(trimmed) != length(unique(trimmed))
+    })
+
     # Exclusive flags (respects show_exclusive)
     exclusive_flags <- reactive({
       show_excl <- isTRUE(show_exclusive()) || identical(show_exclusive, TRUE)
       if (!show_excl) {
-        rep(TRUE, n_fields())
+        rep(FALSE, n_fields())
       } else {
         exclusive_vals()
       }
     })
 
-    # Texts that are marked exclusive
+    # Texts that are marked exclusive (trimmed + deduplicated like texts())
     exclusive_texts <- reactive({
-      txt_in_fields()[exclusive_flags()]
+      raw <- txt_in_fields()[exclusive_flags()]
+      trimmed <- trimws(raw)
+      trimmed <- trimmed[nzchar(trimmed)]
+      unique(trimmed)
     })
 
     # Method to programmatically set field values (e.g., after code generation)
@@ -365,6 +378,7 @@ editable_field_list_server <- function(
       texts = nonEmptyTexts,
       editing = isEditing,
       unique_non_empty_count = nonEmptyUniqueCount,
+      has_duplicates = hasDuplicates,
       exclusive_texts = exclusive_texts,
       set_values = set_values
     ))

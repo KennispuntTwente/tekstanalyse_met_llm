@@ -42,7 +42,7 @@ marking_codes_server <- function(
 
     ## UI: Card wrapper with code generation ####
     output$codes <- renderUI({
-      if (mode() == "Markeren") {
+      if (isTRUE(mode() == "Markeren")) {
         bslib::card(
           class = "card",
           card_header_with_tooltip(
@@ -163,7 +163,6 @@ marking_codes_server <- function(
         if (!isTRUE(number_of_texts_under_maximum())) {
           return()
         }
-        req(isFALSE(context_window$any_fit_problem))
 
         # Verify we have texts available to read
         if (length(texts$preprocessed) == 0) {
@@ -346,7 +345,8 @@ marking_codes_server <- function(
     return(list(
       texts = fields$texts,
       editing = fields$editing,
-      unique_non_empty_count = fields$unique_non_empty_count
+      unique_non_empty_count = fields$unique_non_empty_count,
+      has_duplicates = fields$has_duplicates
     ))
   })
 }

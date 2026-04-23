@@ -133,3 +133,87 @@ test_that("gliner_server passes worker setup globals for async model loading", {
     }
   )
 })
+
+
+test_that("gliner_server rejects labels with trailing/leading blank entries", {
+  testthat::skip_if_not_installed("mirai")
+
+  mirai_ns <- asNamespace("mirai")
+
+  old_mirai <- get("mirai", envir = mirai_ns)
+  captured <- new.env(parent = emptyenv())
+
+  withr::defer({
+    unlockBinding("mirai", mirai_ns)
+    assign("mirai", old_mirai, envir = mirai_ns)
+    lockBinding("mirai", mirai_ns)
+  })
+
+  unlockBinding("mirai", mirai_ns)
+  assign(
+    "mirai",
+    function(
+      .expr,
+      ...,
+      .args = list(),
+      .timeout = NULL,
+      .compute = NULL
+    ) {
+      force(.timeout)
+      force(.compute)
+
+      captured$args <- c(list(...), .args)
+
+      promises::promise(function(resolve, reject) {
+        captured$resolve <- resolve
+        captured$reject <- reject
+      })
+    },
+    envir = mirai_ns
+  )
+  lockBinding("mirai", mirai_ns)
+
+  withr::local_options(list(anonymization__gliner_model = TRUE))
+
+  # Each input below has at most one non-blank label after splitting on comma.
+  bad_inputs <- c("name,", ",email", ",", "  ,  ", "single")
+
+  for (bad_input in bad_inputs) {
+    captured$args <- NULL
+
+    shiny::testServer(
+      function(input, output, session) {
+        lang <- make_test_lang("nl")
+        pii_texts <- reactiveVal(c("Alice works at Example Corp."))
+
+        gliner <- gliner_server(
+          id = "gliner",
+          pii_texts = pii_texts,
+          lang = lang,
+          gliner_model = NULL
+        )
+
+        list(gliner = gliner, lang = lang)
+      },
+      {
+        gliner$start()
+        session$flushReact()
+
+        session$setInputs(`gliner-pii_labels` = bad_input)
+        session$flushReact()
+
+        session$setInputs(`gliner-start_anonymization` = 1)
+        session$flushReact()
+
+        expect_null(
+          captured$args,
+          label = paste0(
+            "mirai should not be called for input: '",
+            bad_input,
+            "'"
+          )
+        )
+      }
+    )
+  }
+})

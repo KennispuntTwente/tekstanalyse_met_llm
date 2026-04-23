@@ -34,7 +34,7 @@ test_that("assign_multiple_categories_toggle_server: defaults TRUE and responds 
     {
       expect_true(toggle())
 
-      session$setInputs(`amc-toggle` = lang()$t("Nee"))
+      session$setInputs(`amc-toggle` = "false")
       session$flushReact()
 
       expect_false(toggle())
@@ -89,7 +89,7 @@ test_that("interrater_toggle_server: shown for Categorisatie/Scoren/Onderwerpext
       # Default is FALSE.
       expect_false(toggle())
 
-      session$setInputs(`irr-toggle` = lang()$t("Ja"))
+      session$setInputs(`irr-toggle` = "true")
       session$flushReact()
 
       expect_true(toggle())
@@ -120,7 +120,7 @@ test_that("write_paragraphs_toggle_server: wrapper returns FALSE when mode not e
       expect_true(res$write_paragraphs())
       expect_true(is.character(res$style_prompt()))
 
-      session$setInputs(`wp-toggle` = lang()$t("Nee"))
+      session$setInputs(`wp-toggle` = "false")
       session$flushReact()
       expect_false(res$write_paragraphs())
 

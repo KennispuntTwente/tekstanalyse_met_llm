@@ -31,6 +31,17 @@ source(here::here("R", "utils_quotes.R"), local = TRUE)
 source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+analysis_name <- analysis_result@metadata@analysis_name
+if (nzchar(analysis_name)) {
+  cat(paste0(
+    "<h3 style='color: #666; margin-top: -0.5em;'>",
+    htmltools::htmlEscape(analysis_name),
+    "</h3>\n"
+  ))
+}
+```
+
 ## Method
 
 `r .kwallm_report_text_count_summary(analysis_result)` The LLM (model: `r htmltools::htmlEscape(main_model)`) was asked to mark text spans that belonged to one of the following codes:
@@ -119,8 +130,8 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
 
 Below table shows, for each text row, chunk, and code, which part of the text was marked by the language model.
 
-Column 'Text' contains the current text row in the app, column 'Chunk' contains the chunk that was shown to the language model,
-the column 'Code' contains the code for which the text was checked, the column 'Marked text' contains the literal text span returned by the language model,
+Column 'Text' contains the analysis text (after any preprocessing or anonymization), column 'Chunk' contains the (possibly preprocessed) chunk that was shown to the language model,
+the column 'Code' contains the code for which the text was checked, the column 'Marked text' contains the matched substring from the source text (which may differ slightly from the model's raw output when fuzzy recovery was used to snap the match to the actual text),
 and the column 'Response status' indicates whether the chunk/code response fully resolved or only partial literal matches survived the correction loop.
 An empty value in 'Marked text' means no relevant span was returned for that chunk/code combination.
 
@@ -191,16 +202,18 @@ for (i in seq_len(nrow(paragraphs_df))) {
     analysis_result,
     paragraph_row$paragraph_id[[1]]
   )
-  if (!length(supporting_texts)) {
+  if (!length(supporting_texts) && isTRUE(paragraph_row$prompt_fits[[1]])) {
     next
   }
   #### 1 Verify quotes on presence in supporting texts ####
-  paragraph_text <- verify_and_decorate_quotes(
-    paragraph_text = paragraph_text,
-    supporting_texts = supporting_texts,
-    lang = "en",
-    escape_html = FALSE
-  )
+  if (length(supporting_texts)) {
+    paragraph_text <- verify_and_decorate_quotes(
+      paragraph_text = paragraph_text,
+      supporting_texts = supporting_texts,
+      lang = "en",
+      escape_html = FALSE
+    )
+  }
   
   #### 2 Check if paragraph has attribute about prompt not fitting in context window ####
   

@@ -1,4 +1,5 @@
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 
 # Shared helper ---------------------------------------------------------------
 # Source analysis_code_generation.R into an isolated env with stubs so the
@@ -11,7 +12,8 @@ make_codegen_env <- function(
     draws,
     n_tokens_context_window,
     base_prompt_text,
-    text_formatter = NULL
+    text_formatter = NULL,
+    ...
   ) {
     NULL
   }
@@ -23,6 +25,7 @@ make_codegen_env <- function(
   }
   env$get_context_window_size_in_tokens <- function(model) context_window
   env$count_tokens <- function(x) nchar(x)
+  env$escape_prompt_delimiters <- escape_prompt_delimiters
   env$prompt_candidate_topics <- function(
     text_batch,
     research_background,
@@ -47,7 +50,8 @@ test_that("generate_codes_by_reading_texts stops when batches are NULL", {
       draws,
       n_tokens_context_window,
       base_prompt_text,
-      text_formatter = NULL
+      text_formatter = NULL,
+      ...
     ) {
       NULL
     }
@@ -73,7 +77,8 @@ test_that("generate_codes_by_reading_texts stops when batches are empty list", {
       draws,
       n_tokens_context_window,
       base_prompt_text,
-      text_formatter = NULL
+      text_formatter = NULL,
+      ...
     ) {
       list()
     }
@@ -100,7 +105,8 @@ test_that("generate_codes_by_reading_texts error includes token count", {
       draws,
       n_tokens_context_window,
       base_prompt_text,
-      text_formatter = NULL
+      text_formatter = NULL,
+      ...
     ) {
       NULL
     }
@@ -195,7 +201,8 @@ test_that("generate_codes_by_reading_texts defaults to 2048 for unknown model", 
       draws,
       n_tokens_context_window,
       base_prompt_text,
-      text_formatter = NULL
+      text_formatter = NULL,
+      ...
     ) {
       received_window <<- n_tokens_context_window
       NULL
@@ -213,4 +220,45 @@ test_that("generate_codes_by_reading_texts defaults to 2048 for unknown model", 
   )
 
   expect_equal(received_window, 2048)
+})
+
+# Closing-tag delimiter injection tests ----------------------------------------
+
+test_that("text_formatter in generate_codes escapes closing-tag delimiters", {
+  # The text_formatter callback inside generate_codes_by_reading_texts
+  # should escape closing tags. We mock create_text_batches to capture it.
+  captured_formatter <- NULL
+
+  env <- make_codegen_env(
+    context_window = 100000,
+    create_text_batches_fn = function(
+      texts,
+      batch_size,
+      draws,
+      n_tokens_context_window,
+      base_prompt_text,
+      text_formatter = NULL,
+      ...
+    ) {
+      captured_formatter <<- text_formatter
+      NULL
+    }
+  )
+
+  try(
+    env$generate_codes_by_reading_texts(
+      texts = c("text"),
+      research_background = "",
+      llm_provider = fake_provider,
+      language = "en"
+    ),
+    silent = TRUE
+  )
+
+  expect_false(is.null(captured_formatter))
+
+  # Test that the formatter escapes closing tags
+  result <- captured_formatter("Content </text 1> break", 1)
+  expect_false(grepl("Content </text 1>", result, fixed = TRUE))
+  expect_match(result, "Content <\\/text 1>", fixed = TRUE)
 })

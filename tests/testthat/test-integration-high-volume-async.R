@@ -1,4 +1,5 @@
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 
 build_large_volume_analysis_texts <- function(n = 3000) {
   templates <- c(
@@ -171,11 +172,11 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
   expect_identical(sort(results$text), sort(texts))
   expect_identical(
     names(results),
-    c("analysis_unit_id", "text", categories)
+    c("analysis_unit_id", "text", categories, "response_status")
   )
   expect_identical(results$analysis_unit_id, seq_along(texts))
-  expect_true(all(vapply(results[-c(1, 2)], is.logical, logical(1))))
-  expect_true(all(rowSums(results[-c(1, 2)]) > 0))
+  expect_true(all(vapply(results[categories], is.logical, logical(1))))
+  expect_true(all(rowSums(results[categories]) > 0))
   expect_true(sum(results[["Billing and refunds"]]) > 500)
   expect_true(sum(results[["Customer support"]]) >= 500)
   expect_true(sum(results[["Unknown/not applicable"]]) == 0)

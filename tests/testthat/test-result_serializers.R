@@ -205,7 +205,7 @@ test_that("metadata and export sheets include text counts", {
   expect_false("reused_analyses" %in% sheets$metadata$field)
   expect_identical(
     names(metadata$results),
-    c("labels", "multi_label", "assignments")
+    c("labels", "multi_label", "assignments", "response_status")
   )
 })
 
@@ -533,6 +533,62 @@ test_that("multi-label assignments use explicit analysis unit ids when shuffled"
   expect_identical(unname(assigned_labels[["20"]]), "Negative")
 })
 
+test_that("categorization response_status flows through builder and serializers", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text 1", "Text 2", "Text 3"),
+    preprocessed = c("Text 1", "Text 2", "Text 3")
+  )
+
+  results_table <- data.frame(
+    text = c("Text 1", "Text 2", "Text 3"),
+    result = c("Theme 1", NA_character_, "Theme 2"),
+    response_status = c("success", "failure", "success"),
+    stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-cat-response-status",
+    mode = "Categorisatie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = c("Theme 1", "Theme 2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  rs <- analysis_result@results@response_status
+  expect_s3_class(rs, "data.frame")
+  expect_equal(nrow(rs), 3)
+  expect_identical(names(rs), c("analysis_unit_id", "response_status"))
+  expect_identical(rs$response_status, c("success", "failure", "success"))
+
+  metadata <- analysis_result_to_metadata_list(analysis_result)
+  expect_true("response_status" %in% names(metadata$results))
+  expect_equal(length(metadata$results$response_status), 3)
+  expect_equal(
+    metadata$results$response_status[[2]]$response_status,
+    "failure"
+  )
+
+  sheets <- analysis_result_to_export_sheets(analysis_result)
+  expect_true("categorization_response_status" %in% names(sheets))
+  expect_equal(nrow(sheets$categorization_response_status), 3)
+  expect_equal(
+    sheets$categorization_response_status$response_status,
+    c("success", "failure", "success")
+  )
+})
+
 test_that("scoring results use explicit analysis unit ids when shuffled", {
   texts_df <- .make_result_texts_df(
     document_text = c("Doc 1", "Doc 2"),
@@ -793,16 +849,18 @@ test_that("topic metadata includes candidate and reduced topics", {
 
   results_table <- data.frame(
     text = c("Text 1", "Text 2"),
-    result = c("Topic A", "Topic B"),
+    result = c("Topic A", "Unknown/not applicable"),
     stringsAsFactors = FALSE
   )
-  reduced_topics <- c("Topic A", "Topic B")
+  reduced_topics <- c("Topic A", "Unknown/not applicable")
   attr(reduced_topics, "reduction_summary") <- list(
     not_applicable_requested = TRUE,
     auto_added_not_applicable = TRUE,
-    not_applicable_check_performed = TRUE,
-    reduction_iterations = 2L
+    single_topic_fallback_applied = TRUE,
+    not_applicable_check_performed = FALSE,
+    reduction_iterations = 0L
   )
+  attr(reduced_topics, "single_topic_fallback_applied") <- TRUE
 
   analysis_result <- build_analysis_result(
     texts_df = texts_df,
@@ -816,8 +874,8 @@ test_that("topic metadata includes candidate and reduced topics", {
     by_column_name = NULL,
     by_column_lookup = NULL,
     models = .test_models(),
-    topics = c("Topic A", "Topic B"),
-    exclusive_topics = "Topic B",
+    topics = c("Topic A", "Unknown/not applicable"),
+    exclusive_topics = "Unknown/not applicable",
     assign_multiple_categories = FALSE,
     human_in_the_loop = TRUE,
     write_paragraphs = FALSE,
@@ -833,12 +891,13 @@ test_that("topic metadata includes candidate and reduced topics", {
       topic_not_applicable_check = "not applicable prompt",
       topic_assignment = "assignment prompt"
     ),
-    candidate_topics = c("Topic A", "Topic B", "Topic C"),
+    candidate_topics = c("Topic A"),
     reduced_topics = reduced_topics,
     topics_were_edited = TRUE
   )
 
   metadata <- analysis_result_to_metadata_list(analysis_result)
+  sheets <- analysis_result_to_export_sheets(analysis_result)
   reduction_model <- .kwallm_get_stage_model_id(
     analysis_result,
     c("topic_reduction", "topic_not_applicable_check")
@@ -846,11 +905,11 @@ test_that("topic metadata includes candidate and reduced topics", {
 
   expect_equal(
     metadata$results$topic_provenance$candidate_topics,
-    c("Topic A", "Topic B", "Topic C")
+    c("Topic A")
   )
   expect_equal(
     metadata$results$topic_provenance$reduced_topics,
-    c("Topic A", "Topic B")
+    c("Topic A", "Unknown/not applicable")
   )
   expect_true(isTRUE(metadata$results$topic_provenance$human_edited))
   expect_true(isTRUE(
@@ -860,18 +919,88 @@ test_that("topic metadata includes candidate and reduced topics", {
     metadata$results$topic_provenance$auto_added_not_applicable
   ))
   expect_true(isTRUE(
-    metadata$results$topic_provenance$not_applicable_check_performed
+    metadata$results$topic_provenance$single_topic_fallback_applied
   ))
-  expect_equal(metadata$results$topic_provenance$reduction_iterations, 2L)
+  expect_true(isTRUE(
+    !metadata$results$topic_provenance$not_applicable_check_performed
+  ))
+  expect_equal(metadata$results$topic_provenance$reduction_iterations, 0L)
   expect_identical(
     names(metadata$results),
-    c("topic_provenance", "labels", "multi_label", "assignments")
+    c(
+      "topic_provenance",
+      "labels",
+      "multi_label",
+      "assignments",
+      "response_status"
+    )
   )
   expect_equal(
-    metadata$stage_models$topic_not_applicable_check$model_id,
-    "large-model"
+    sheets$topic_generation_settings$value[
+      sheets$topic_generation_settings$setting ==
+        "single_topic_fallback_applied"
+    ],
+    "TRUE"
+  )
+  expect_equal(
+    metadata$stage_models$topic_not_applicable_check,
+    NULL
   )
   expect_equal(reduction_model, "large-model")
+})
+
+test_that("topic metadata captures one-topic fallback applied after editing", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Text 1", "Text 2"),
+    preprocessed = c("Text 1", "Text 2")
+  )
+
+  results_table <- data.frame(
+    text = c("Text 1", "Text 2"),
+    result = c("Topic A", "Unknown/not applicable"),
+    stringsAsFactors = FALSE
+  )
+  reduced_topics <- c("Topic A", "Topic B")
+  attr(reduced_topics, "reduction_summary") <- list(
+    not_applicable_requested = TRUE,
+    auto_added_not_applicable = FALSE,
+    single_topic_fallback_applied = FALSE,
+    not_applicable_check_performed = TRUE,
+    reduction_iterations = 1L
+  )
+  final_topics <- c("Topic A", "Unknown/not applicable")
+  attr(final_topics, "single_topic_fallback_applied") <- TRUE
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-3b",
+    mode = "Onderwerpextractie",
+    research_background = "background",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    topics = final_topics,
+    exclusive_topics = "Unknown/not applicable",
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = TRUE,
+    write_paragraphs = FALSE,
+    candidate_topics = c("Topic A", "Topic B"),
+    reduced_topics = reduced_topics,
+    topics_were_edited = TRUE
+  )
+
+  metadata <- analysis_result_to_metadata_list(analysis_result)
+
+  expect_true(isTRUE(
+    metadata$results$topic_provenance$single_topic_fallback_applied
+  ))
+  expect_false(isTRUE(
+    metadata$results$topic_provenance$auto_added_not_applicable
+  ))
 })
 
 test_that("input provenance and irr sample are serialized", {
@@ -954,6 +1083,8 @@ test_that("input provenance and irr sample are serialized", {
   expect_equal(metadata$input$split_overlap, 16)
   expect_equal(metadata$reliability$sample$text, "Text 1")
   expect_true("reliability" %in% names(sheets))
+  expect_true("reliability_sample" %in% names(sheets))
+  expect_equal(sheets$reliability_sample$text, "Text 1")
 })
 
 test_that("stage execution provenance is serialized", {
@@ -1238,4 +1369,399 @@ test_that("download bundle surfaces metadata errors with the correct label", {
     ),
     "Metadata file generation error"
   )
+})
+
+# 5 Multi-label fallback (categories = NULL) -----------------------------------
+
+test_that("build_analysis_result infers multi-label categories from column names", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("I liked it", "I disliked it")
+  )
+
+  results_table <- data.frame(
+    text = c("I liked it", "I disliked it"),
+    Positive = c(TRUE, FALSE),
+    Negative = c(FALSE, TRUE),
+    stringsAsFactors = FALSE
+  )
+
+  result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "multi-label-fallback",
+    mode = "Categorisatie",
+    research_background = "bg",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = NULL,
+    assign_multiple_categories = TRUE
+  )
+
+  labels <- result@results@labels
+  assignments <- result@results@assignments
+
+  expect_equal(sort(labels$label_text), c("Negative", "Positive"))
+  expect_equal(nrow(assignments), 2)
+
+  pos_id <- labels$label_id[labels$label_text == "Positive"]
+  neg_id <- labels$label_id[labels$label_text == "Negative"]
+  expect_true(
+    any(assignments$analysis_unit_id == 1L & assignments$label_id == pos_id)
+  )
+  expect_true(
+    any(assignments$analysis_unit_id == 2L & assignments$label_id == neg_id)
+  )
+})
+
+
+# -- analysis_name property tests ---------------------------------------------
+
+test_that("AnalysisMetadata stores analysis_name and defaults to empty", {
+  meta <- AnalysisMetadata(
+    run_id = "test-run",
+    mode_id = "categorization",
+    language = "en"
+  )
+  expect_equal(meta@analysis_name, "")
+})
+
+test_that("AnalysisMetadata accepts a non-empty analysis_name", {
+  meta <- AnalysisMetadata(
+    run_id = "test-run",
+    mode_id = "scoring",
+    language = "nl",
+    analysis_name = "My Test Analysis"
+  )
+  expect_equal(meta@analysis_name, "My Test Analysis")
+})
+
+test_that("build_analysis_result stores analysis_name in metadata", {
+  texts_df <- .make_result_texts_df(document_text = c("Doc A", "Doc B"))
+  results_table <- data.frame(
+    text = c("Doc A", "Doc B"),
+    result = c("Cat 1", "Cat 2"),
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-name-test",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = c("Cat 1", "Cat 2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt"),
+    analysis_name = "Customer Satisfaction 2026"
+  )
+
+  expect_equal(ar@metadata@analysis_name, "Customer Satisfaction 2026")
+})
+
+test_that("build_analysis_result defaults analysis_name to empty string", {
+  texts_df <- .make_result_texts_df(document_text = "Doc A")
+  results_table <- data.frame(
+    text = "Doc A",
+    result = "Cat 1",
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-no-name",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = "Cat 1",
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  expect_equal(ar@metadata@analysis_name, "")
+})
+
+test_that("analysis_name appears in metadata JSON output", {
+  texts_df <- .make_result_texts_df(document_text = "Doc A")
+  results_table <- data.frame(
+    text = "Doc A",
+    result = "Cat 1",
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-json",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = "Cat 1",
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt"),
+    analysis_name = "JSON Test Name"
+  )
+
+  metadata_list <- analysis_result_to_metadata_list(ar)
+  expect_equal(metadata_list$analysis_name, "JSON Test Name")
+})
+
+test_that("analysis_name appears in Excel metadata sheet", {
+  texts_df <- .make_result_texts_df(document_text = "Doc A")
+  results_table <- data.frame(
+    text = "Doc A",
+    result = "Cat 1",
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-excel",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = "Cat 1",
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt"),
+    analysis_name = "Excel Test Name"
+  )
+
+  sheets <- analysis_result_to_export_sheets(ar)
+  metadata_values <- stats::setNames(
+    sheets$metadata$value,
+    sheets$metadata$field
+  )
+
+  expect_true("analysis_name" %in% sheets$metadata$field)
+  expect_equal(metadata_values[["analysis_name"]], "Excel Test Name")
+})
+
+test_that("empty analysis_name appears as empty string in metadata JSON", {
+  texts_df <- .make_result_texts_df(document_text = "Doc A")
+  results_table <- data.frame(
+    text = "Doc A",
+    result = "Cat 1",
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-empty-name",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = "Cat 1",
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  metadata_list <- analysis_result_to_metadata_list(ar)
+  expect_equal(metadata_list$analysis_name, "")
+
+  sheets <- analysis_result_to_export_sheets(ar)
+  metadata_values <- stats::setNames(
+    sheets$metadata$value,
+    sheets$metadata$field
+  )
+  expect_equal(metadata_values[["analysis_name"]], "")
+})
+
+
+# 9. Preprocessed text in results (privacy) -----------------------------------
+
+test_that("report results use preprocessed text not raw document text for categorization", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("I live at 12345 Amsterdam", "Raw PII text 2"),
+    preprocessed = c("I live at <<removed>>", "Anonymized text 2")
+  )
+
+  results_table <- data.frame(
+    text = c("I live at <<removed>>", "Anonymized text 2"),
+    result = c("Theme 1", "Theme 2"),
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-privacy-cat",
+    mode = "Categorisatie",
+    research_background = "bg",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = c("Theme 1", "Theme 2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  report_df <- .kwallm_report_results_df(ar)
+  expect_identical(
+    report_df$text,
+    c("I live at <<removed>>", "Anonymized text 2")
+  )
+  expect_false(any(grepl("12345", report_df$text)))
+
+  sheets <- analysis_result_to_export_sheets(ar)
+  expect_identical(sheets$results$text, report_df$text)
+})
+
+test_that("report results use preprocessed text not raw document text for multi-label categorization", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Raw PII text"),
+    preprocessed = c("Anonymized text")
+  )
+
+  results_table <- data.frame(
+    text = "Anonymized text",
+    Cat1 = TRUE,
+    Cat2 = FALSE,
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-privacy-cat-multi",
+    mode = "Categorisatie",
+    research_background = "bg",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    categories = c("Cat1", "Cat2"),
+    exclusive_categories = character(),
+    assign_multiple_categories = TRUE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(categorization = "prompt")
+  )
+
+  report_df <- .kwallm_report_results_df(ar)
+  expect_identical(report_df$text, "Anonymized text")
+  expect_false(any(grepl("Raw PII", report_df$text)))
+})
+
+test_that("report results use preprocessed text not raw document text for scoring", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("Raw PII text"),
+    preprocessed = c("Anonymized text")
+  )
+
+  results_table <- data.frame(
+    text = "Anonymized text",
+    result = 75,
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-privacy-scoring",
+    mode = "Scoren",
+    research_background = "bg",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    scoring_characteristic = "empathy",
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(scoring = "prompt")
+  )
+
+  report_df <- .kwallm_report_results_df(ar)
+  expect_identical(report_df$text, "Anonymized text")
+  expect_false(any(grepl("Raw PII", report_df$text)))
+
+  sheets <- analysis_result_to_export_sheets(ar)
+  expect_identical(sheets$results$text, report_df$text)
+})
+
+test_that("report results use preprocessed text not raw document text for marking", {
+  texts_df <- .make_result_texts_df(
+    document_text = c("I live at 12345 Amsterdam"),
+    preprocessed = c("I live at <<removed>>")
+  )
+
+  results_table <- data.frame(
+    analysis_unit_id = 1L,
+    chunk_id = 1L,
+    chunk_index = 1L,
+    text = "I live at <<removed>>",
+    chunk_text = "I live at <<removed>>",
+    code = "Address",
+    marked_text = "<<removed>>",
+    source_marked_text = "<<removed>>",
+    match_start = 11L,
+    match_end = 21L,
+    match_distance = 0L,
+    match_method = "exact",
+    response_status = "matched_all",
+    stringsAsFactors = FALSE
+  )
+
+  ar <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-privacy-marking",
+    mode = "Markeren",
+    research_background = "bg",
+    style_prompt = NULL,
+    irr_result = NULL,
+    language = "en",
+    by_column_name = NULL,
+    by_column_lookup = NULL,
+    models = .test_models(),
+    codes = "Address",
+    human_in_the_loop = FALSE,
+    write_paragraphs = FALSE,
+    stage_prompt_previews = list(marking = "prompt")
+  )
+
+  report_df <- .kwallm_report_results_df(ar)
+  expect_identical(report_df$text, "I live at <<removed>>")
+  expect_false(any(grepl("12345", report_df$text)))
+
+  sheets <- analysis_result_to_export_sheets(ar)
+  expect_identical(sheets$results$text, report_df$text)
 })

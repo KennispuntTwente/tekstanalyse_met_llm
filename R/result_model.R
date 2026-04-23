@@ -380,6 +380,17 @@
   )
 }
 
+# Builds an empty categorization response-status table.
+# We use this to preserve one response status per analysis unit for
+# categorization results.
+.kwallm_empty_categorization_response_status <- function() {
+  data.frame(
+    analysis_unit_id = integer(),
+    response_status = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
 # Builds an empty marking-response table.
 # We use this to preserve one response status per chunk/code combination.
 .kwallm_empty_marking_responses <- function() {
@@ -389,6 +400,11 @@
     response_status = character(),
     stringsAsFactors = FALSE
   )
+}
+
+# Returns the allowed response_status values for marking results.
+.kwallm_marking_response_statuses <- function() {
+  c("matched_all", "partial_after_max_interactions", "no_match")
 }
 
 # Builds an empty topic-generation settings table.
@@ -434,6 +450,11 @@ AnalysisMetadata <- S7::new_class(
       validator = .kwallm_validate_posixct_scalar
     ),
     research_background = S7::new_property(
+      S7::class_character,
+      default = "",
+      validator = .kwallm_validate_scalar_string(allow_empty = TRUE)
+    ),
+    analysis_name = S7::new_property(
       S7::class_character,
       default = "",
       validator = .kwallm_validate_scalar_string(allow_empty = TRUE)
@@ -715,6 +736,11 @@ TopicProvenance <- S7::new_class(
       default = FALSE,
       validator = .kwallm_validate_scalar_logical
     ),
+    single_topic_fallback_applied = S7::new_property(
+      S7::class_logical,
+      default = FALSE,
+      validator = .kwallm_validate_scalar_logical
+    ),
     not_applicable_check_performed = S7::new_property(
       S7::class_logical,
       default = FALSE,
@@ -786,6 +812,14 @@ CategorizationResult <- S7::new_class(
       S7::class_logical,
       default = FALSE,
       validator = .kwallm_validate_scalar_logical
+    ),
+    response_status = S7::new_property(
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_categorization_response_status()),
+      validator = .kwallm_validate_df_columns(c(
+        "analysis_unit_id",
+        "response_status"
+      ))
     )
   ),
   validator = function(self) {
@@ -809,6 +843,12 @@ CategorizationResult <- S7::new_class(
       problems <- c(
         problems,
         "single-label assignments must contain at most one row per analysis_unit_id"
+      )
+    }
+    if (anyDuplicated(self@response_status$analysis_unit_id)) {
+      problems <- c(
+        problems,
+        "response_status$analysis_unit_id must be unique"
       )
     }
     .kwallm_problems_or_null(problems)
@@ -890,6 +930,14 @@ TopicResult <- S7::new_class(
       default = FALSE,
       validator = .kwallm_validate_scalar_logical
     ),
+    response_status = S7::new_property(
+      S7::class_data.frame,
+      default = quote(.kwallm_empty_categorization_response_status()),
+      validator = .kwallm_validate_df_columns(c(
+        "analysis_unit_id",
+        "response_status"
+      ))
+    ),
     topic_provenance = S7::new_property(TopicProvenance)
   ),
   validator = function(self) {
@@ -919,6 +967,12 @@ TopicResult <- S7::new_class(
       problems <- c(
         problems,
         "labels$label_text must be represented in topic_provenance@final_topics"
+      )
+    }
+    if (anyDuplicated(self@response_status$analysis_unit_id)) {
+      problems <- c(
+        problems,
+        "response_status$analysis_unit_id must be unique"
       )
     }
     .kwallm_problems_or_null(problems)
@@ -1011,6 +1065,38 @@ MarkingResult <- S7::new_class(
         !all(self@markings$code_id %in% self@codes$code_id)
     ) {
       problems <- c(problems, "markings$code_id must reference codes")
+    }
+    # Validate response_status values
+    allowed <- .kwallm_marking_response_statuses()
+    if (nrow(self@responses) > 0) {
+      vals <- self@responses$response_status[
+        !is.na(self@responses$response_status)
+      ]
+      bad <- setdiff(vals, allowed)
+      if (length(bad)) {
+        problems <- c(
+          problems,
+          paste0(
+            "responses$response_status contains invalid values: ",
+            paste(shQuote(bad), collapse = ", ")
+          )
+        )
+      }
+    }
+    if (nrow(self@markings) > 0) {
+      vals <- self@markings$response_status[
+        !is.na(self@markings$response_status)
+      ]
+      bad <- setdiff(vals, allowed)
+      if (length(bad)) {
+        problems <- c(
+          problems,
+          paste0(
+            "markings$response_status contains invalid values: ",
+            paste(shQuote(bad), collapse = ", ")
+          )
+        )
+      }
     }
     .kwallm_problems_or_null(problems)
   }

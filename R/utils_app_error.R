@@ -133,7 +133,7 @@ app_error <- function(
     }
 
     showModal(modalDialog(
-      title = "Error",
+      title = lang$t("Fout"),
       tagList(
         tags$div(
           style = "display:none;",

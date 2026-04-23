@@ -22,7 +22,7 @@ test_that("research_background_server: default empty and updates from input", {
         lang = lang
       )
 
-      list(rb = rb)
+      list(rb = rb, lang = lang)
     },
     {
       expect_equal(rb(), "")
@@ -33,6 +33,16 @@ test_that("research_background_server: default empty and updates from input", {
       session$flushReact()
 
       expect_equal(rb(), "My background")
+
+      lang(make_test_lang("en")())
+      session$flushReact()
+
+      expect_equal(rb(), "My background")
+      expect_match(
+        output$`research_background-card`$html,
+        "My background",
+        fixed = TRUE
+      )
     }
   )
 })

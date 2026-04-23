@@ -105,12 +105,12 @@ interrater_server <- function(
       # Render the UI for the absolute count input
       output$abs_count_input_ui_module <- renderUI({
         max_items <- nrow(rating_data)
-        default_val <- min(10, max(1, max_items))
+        default_val <- min(10, max(2, max_items))
         numericInput(
           ns("sample_abs"),
           lang()$t("Aantal:"),
           value = default_val,
-          min = 1,
+          min = 2,
           max = max_items,
           step = 1
         )
@@ -131,7 +131,7 @@ interrater_server <- function(
         if (sample_type == "perc") {
           req(input$sample_perc)
           perc <- input$sample_perc / 100
-          n <- max(1, ceiling(total_n * perc))
+          n <- max(2, ceiling(total_n * perc))
         } else if (sample_type == "abs") {
           req(input$sample_abs) # Ensure absolute input exists
           n <- input$sample_abs
@@ -317,7 +317,7 @@ interrater_server <- function(
                   class = "d-flex justify-content-center justify-content-md-start",
                   actionButton(
                     ns("reset_module"),
-                    "Reset",
+                    lang()$t("Reset"),
                     icon = icon("undo"),
                     class = "btn-warning"
                   )
@@ -656,6 +656,7 @@ interrater_server <- function(
                 }
 
                 summary_stats <- list(
+                  subjects = length(user_scores),
                   user_mean = mean(user_scores, na.rm = TRUE),
                   user_sd = sd(user_scores, na.rm = TRUE),
                   llm_mean = mean(original_scores, na.rm = TRUE),
@@ -765,7 +766,7 @@ interrater_server <- function(
               # Return a standardized error structure
               app_error(
                 e,
-                when = "during Kappa calculation",
+                when = "during IRR calculation",
                 fatal = FALSE,
                 lang = lang()
               )

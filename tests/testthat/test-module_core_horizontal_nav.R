@@ -287,47 +287,80 @@ test_that("layout toggle: processing state controls enable/disable", {
 
 
 # 5 UI Structure Tests ------------------------------------------------------
-# Test that the main_ui generates the expected navigation structure
+# Verify that the rendered main_ui output contains the expected navigation
+# DOM elements by inspecting the actual source of module_core_main_ui_and_server.R.
+# This catches regressions where IDs are renamed, removed, or miswired.
 
-test_that("main_ui generates expected section navigation elements", {
-  # main_ui() returns a page structure; we can inspect its HTML
-  ui <- main_ui()
-
-  # Convert to HTML and check for expected IDs
-  html <- as.character(ui)
-
-  # Check that the UI references shinyjs (required for navigation)
-  # Note: shinyjs is included via useShinyjs() which adds the necessary JS
-  expect_true(length(html) > 0)
-})
-
-test_that("section IDs follow expected naming convention", {
-  # Verify the naming convention used in main_ui (lines 487-524)
-  n_sections <- 5L
-  expected_ids <- paste0("kwallm_section_", seq_len(n_sections))
-
-  # All section IDs should follow the pattern kwallm_section_N
-  for (id in expected_ids) {
-    expect_match(id, "^kwallm_section_[1-5]$")
-  }
-
-  # The nav element ID should follow the pattern
-
-  expect_match("kwallm_sections_nav", "kwallm_sections_nav")
-})
-
-test_that("navigation buttons have expected IDs", {
-  # Button IDs from main_ui (lines 475-484)
-  expected_button_ids <- c(
-    "kwallm_sections_prev",
-    "kwallm_sections_next",
-    "kwallm_sections_step" # The radio group
+test_that("main_ui renderUI contains section div IDs for all 5 sections", {
+  src <- paste(
+    readLines(here::here("R", "module_core_main_ui_and_server.R")),
+    collapse = "\n"
   )
 
-  for (id in expected_button_ids) {
-    # Verify the naming convention is consistent
-    expect_match(id, "^kwallm_sections_")
+  for (i in 1:5) {
+    id <- paste0("kwallm_section_", i)
+    expect_true(
+      grepl(sprintf('id\\s*=\\s*"%s"', id), src, perl = TRUE),
+      info = sprintf("renderUI must contain div with id = \"%s\"", id)
+    )
   }
+})
+
+test_that("main_ui renderUI contains navigation control IDs", {
+  src <- paste(
+    readLines(here::here("R", "module_core_main_ui_and_server.R")),
+    collapse = "\n"
+  )
+
+  nav_ids <- c(
+    "kwallm_sections_nav",
+    "kwallm_sections_step",
+    "kwallm_sections_prev",
+    "kwallm_sections_next",
+    "kwallm_sections_progress_bar",
+    "kwallm_sections_progress_text",
+    "kwallm_layout_view"
+  )
+
+  for (id in nav_ids) {
+    expect_true(
+      grepl(id, src, fixed = TRUE),
+      info = sprintf("renderUI must reference navigation element \"%s\"", id)
+    )
+  }
+})
+
+test_that("prev/next observers guard on section bounds", {
+  src <- readLines(here::here("R", "module_core_main_ui_and_server.R"))
+  src_text <- paste(src, collapse = "\n")
+
+  # Prev button observer must check cur <= 1L
+  expect_true(
+    grepl("cur\\s*<=\\s*1L", src_text, perl = TRUE),
+    info = "prev observer must guard on cur <= 1L"
+  )
+
+  # Next button observer must check cur >= n_sections
+  expect_true(
+    grepl("cur\\s*>=\\s*n_sections", src_text, perl = TRUE),
+    info = "next observer must guard on cur >= n_sections"
+  )
+})
+
+test_that("layout toggle is disabled during processing", {
+  src <- paste(
+    readLines(here::here("R", "module_core_main_ui_and_server.R")),
+    collapse = "\n"
+  )
+
+  expect_true(
+    grepl('disable("kwallm_layout_view")', src, fixed = TRUE),
+    info = "layout toggle must be disabled during processing"
+  )
+  expect_true(
+    grepl('enable("kwallm_layout_view")', src, fixed = TRUE),
+    info = "layout toggle must be re-enabled after processing"
+  )
 })
 
 

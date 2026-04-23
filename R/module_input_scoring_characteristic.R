@@ -31,7 +31,7 @@ score_server <- function(
 
       # Render scoring UI
       output$scoring <- renderUI({
-        if (mode() == "Scoren") {
+        if (isTRUE(mode() == "Scoren")) {
           bslib::card(
             class = "card",
             card_header_with_tooltip(
@@ -49,7 +49,8 @@ score_server <- function(
               textAreaInput(
                 ns("scoring_characteristic"),
                 NULL,
-                value = "",
+                value = isolate(input$scoring_characteristic) %||%
+                  scoring_characteristic(),
                 rows = 1,
                 width = "100%"
               )

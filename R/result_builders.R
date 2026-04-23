@@ -110,7 +110,8 @@ build_analysis_result <- function(
   candidate_topics = character(),
   reduced_topics = character(),
   topics_were_edited = FALSE,
-  irr_sample = NULL
+  irr_sample = NULL,
+  analysis_name = ""
 ) {
   stopifnot(is.data.frame(texts_df))
   stopifnot(is.data.frame(results_table))
@@ -151,6 +152,7 @@ build_analysis_result <- function(
     language = language,
     timestamp = Sys.time(),
     research_background = as.character(research_background %||% ""),
+    analysis_name = as.character(analysis_name %||% ""),
     app_version = if (is.null(app_version) || !nzchar(app_version)) {
       NULL
     } else {
@@ -595,7 +597,7 @@ build_analysis_result <- function(
       if ("result" %in% names(results_table)) {
         results_table$result
       } else {
-        names(results_table)[setdiff(names(results_table), "text")]
+        setdiff(names(results_table), "text")
       },
     exclusive_values = exclusive_labels
   )
@@ -610,10 +612,16 @@ build_analysis_result <- function(
     .kwallm_build_assignments_from_multi(texts_df, results_table, labels_df)
   }
 
+  response_status <- .kwallm_build_categorization_response_status(
+    texts_df,
+    results_table
+  )
+
   CategorizationResult(
     labels = labels_df,
     assignments = assignments,
-    multi_label = isTRUE(multi_label)
+    multi_label = isTRUE(multi_label),
+    response_status = response_status
   )
 }
 
@@ -659,6 +667,15 @@ build_analysis_result <- function(
     exact = TRUE
   ) %||%
     list()
+  single_topic_fallback_applied <- isTRUE(
+    reduction_summary$single_topic_fallback_applied %||% FALSE
+  ) ||
+    isTRUE(
+      attr(reduced_topics, "single_topic_fallback_applied", exact = TRUE)
+    ) ||
+    isTRUE(
+      attr(topics, "single_topic_fallback_applied", exact = TRUE)
+    )
 
   labels_df <- .kwallm_build_labels(
     values = topics,
@@ -675,10 +692,16 @@ build_analysis_result <- function(
     .kwallm_build_assignments_from_multi(texts_df, results_table, labels_df)
   }
 
+  response_status <- .kwallm_build_categorization_response_status(
+    texts_df,
+    results_table
+  )
+
   TopicResult(
     labels = labels_df,
     assignments = assignments,
     multi_label = isTRUE(multi_label),
+    response_status = response_status,
     topic_provenance = TopicProvenance(
       candidate_topics = as.character(candidate_topics %||% character()),
       reduced_topics = as.character(reduced_topics %||% character()),
@@ -690,6 +713,7 @@ build_analysis_result <- function(
       auto_added_not_applicable = isTRUE(
         reduction_summary$auto_added_not_applicable %||% FALSE
       ),
+      single_topic_fallback_applied = single_topic_fallback_applied,
       not_applicable_check_performed = isTRUE(
         reduction_summary$not_applicable_check_performed %||% FALSE
       ),
@@ -703,7 +727,9 @@ build_analysis_result <- function(
       batch_size = context_window$batch_size %||% NULL,
       draws = context_window$draws %||% NULL,
       n_batches = context_window$n_batches %||% NULL,
-      context_window_tokens = context_window$n_tokens_context_window %||% NULL
+      context_window_tokens = context_window$n_tokens_context_window_reduction %||%
+        context_window$n_tokens_context_window %||%
+        NULL
     )
   )
 }
@@ -1180,6 +1206,23 @@ build_analysis_result <- function(
   }
 
   unique(do.call(rbind, rows))
+}
+
+# Builds the per-analysis-unit response status for categorization results.
+# Carries the worker-level response_status column through to the typed payload.
+.kwallm_build_categorization_response_status <- function(texts_df, result_df) {
+  analysis_unit_id <- .kwallm_result_analysis_unit_ids(texts_df, result_df)
+
+  if ("response_status" %in% names(result_df)) {
+    rs <- unique(data.frame(
+      analysis_unit_id = analysis_unit_id,
+      response_status = as.character(result_df$response_status),
+      stringsAsFactors = FALSE
+    ))
+    return(rs)
+  }
+
+  .kwallm_empty_categorization_response_status()
 }
 
 

@@ -24,7 +24,7 @@ test_that("score_server: default empty and updates from input", {
         lang = lang
       )
 
-      list(scoring = scoring)
+      list(scoring = scoring, lang = lang)
     },
     {
       expect_equal(scoring(), "")
@@ -33,6 +33,16 @@ test_that("score_server: default empty and updates from input", {
       session$flushReact()
 
       expect_equal(scoring(), "emotionele lading")
+
+      lang(make_test_lang("en")())
+      session$flushReact()
+
+      expect_equal(scoring(), "emotionele lading")
+      expect_match(
+        output$`score-scoring`$html,
+        "emotionele lading",
+        fixed = TRUE
+      )
     }
   )
 })

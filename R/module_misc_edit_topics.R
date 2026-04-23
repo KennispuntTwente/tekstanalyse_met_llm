@@ -16,6 +16,8 @@ edit_topics_server <- function(
   llm_provider,
   assignment_texts = reactive(character()),
   assignment_llm_provider = reactive(NULL),
+  n_tokens_context_window = reactive(NULL),
+  n_tokens_context_window_reduction = reactive(NULL),
   lang = default_lang()
 ) {
   moduleServer(
@@ -40,12 +42,59 @@ edit_topics_server <- function(
         )
       }
 
-      topic_assignment_fit_info <- reactive({
-        req(topics_table_data())
+      normalize_topic_values <- function(values, unique_only = FALSE) {
+        normalized <- trimws(as.character(values %||% character()))
+        normalized <- normalized[!is.na(normalized) & nzchar(normalized)]
+        if (isTRUE(unique_only)) {
+          normalized <- unique(normalized)
+        }
+        normalized
+      }
 
-        current_topics <- trimws(topics_table_data()$topic)
-        current_topics <- current_topics[nzchar(current_topics)]
-        if (length(current_topics) < 2) {
+      ensure_assignment_choice_topics <- function(
+        topic_values,
+        exclusive_values = character()
+      ) {
+        normalized_topics <- normalize_topic_values(topic_values)
+        normalized_exclusive <- normalize_topic_values(
+          exclusive_values,
+          unique_only = TRUE
+        )
+        not_applicable_topic <- lang()$t("Onbekend/niet van toepassing")
+
+        if (
+          length(normalized_topics) == 1L &&
+            !(not_applicable_topic %in% normalized_topics)
+        ) {
+          normalized_topics <- c(normalized_topics, not_applicable_topic)
+          normalized_exclusive <- unique(c(
+            normalized_exclusive,
+            not_applicable_topic
+          ))
+        }
+
+        normalized_exclusive <- normalized_exclusive[
+          normalized_exclusive %in% normalized_topics
+        ]
+
+        list(
+          topics = normalized_topics,
+          exclusive = normalized_exclusive
+        )
+      }
+
+      compute_topic_assignment_fit_info <- function(
+        topic_values,
+        exclusive_values = character()
+      ) {
+        current_selection <- ensure_assignment_choice_topics(
+          topic_values,
+          exclusive_values
+        )
+        current_topics <- current_selection$topics
+        current_exclusive <- current_selection$exclusive
+
+        if (length(current_topics) < 1) {
           return(list(
             fits = TRUE,
             prompt_tokens = NA_integer_,
@@ -63,19 +112,33 @@ edit_topics_server <- function(
           ))
         }
 
-        current_exclusive <- trimws(
-          topics_table_data()$topic[
-            topics_table_data()$exclusive & nzchar(topics_table_data()$topic)
-          ]
-        )
-
         topic_assignment_prompt_context_window_check(
           texts = assignment_text_values,
           topics = current_topics,
           research_background = research_background(),
           llm_provider = assignment_provider,
           assign_multiple_categories = assign_multiple_categories(),
-          exclusive_topics = current_exclusive
+          exclusive_topics = current_exclusive,
+          n_tokens_context_window = n_tokens_context_window()
+        )
+      }
+
+      topic_assignment_fit_info <- reactive({
+        req(topics_table_data())
+
+        current_topics <- normalize_topic_values(topics_table_data()$topic)
+        current_exclusive <- if ("exclusive" %in% names(topics_table_data())) {
+          normalize_topic_values(
+            topics_table_data()$topic[topics_table_data()$exclusive %in% TRUE],
+            unique_only = TRUE
+          )
+        } else {
+          character()
+        }
+
+        compute_topic_assignment_fit_info(
+          current_topics,
+          current_exclusive
         )
       })
 
@@ -165,7 +228,7 @@ edit_topics_server <- function(
             modal_footer_buttons(
               left = actionButton(
                 ns("reset_topics"),
-                "Reset",
+                lang()$t("Reset"),
                 icon = icon("undo"),
                 class = "btn-warning"
               ),
@@ -300,8 +363,15 @@ edit_topics_server <- function(
         req(!reduction_in_progress())
         df <- topics_table_data()
 
-        updated_topics <- trimws(df$topic[df$topic != ""])
-        updated_exclusive <- trimws(df$topic[df$exclusive & df$topic != ""])
+        updated_topics <- normalize_topic_values(df$topic)
+        updated_exclusive <- if ("exclusive" %in% names(df)) {
+          normalize_topic_values(
+            df$topic[df$exclusive %in% TRUE],
+            unique_only = TRUE
+          )
+        } else {
+          character()
+        }
 
         log_action(
           "topics_confirmed",
@@ -319,15 +389,25 @@ edit_topics_server <- function(
           )
           return()
         }
-        if (length(updated_topics) < 2) {
+        if (length(updated_topics) < 1) {
           shiny::showNotification(
-            lang()$t("Je moet minimaal 2 onderwerpen opgeven."),
+            lang()$t("Je moet minimaal 1 onderwerp opgeven."),
             type = "error"
           )
           return()
         }
 
-        fit_info <- topic_assignment_fit_info()
+        updated_selection <- ensure_assignment_choice_topics(
+          updated_topics,
+          updated_exclusive
+        )
+        updated_topics <- updated_selection$topics
+        updated_exclusive <- updated_selection$exclusive
+
+        fit_info <- compute_topic_assignment_fit_info(
+          updated_topics,
+          updated_exclusive
+        )
         if (!isTRUE(fit_info$fits)) {
           shiny::showNotification(
             topic_assignment_fit_message(fit_info),
@@ -356,14 +436,11 @@ edit_topics_server <- function(
       # re-reduce  ----------------------------------------------------
       observeEvent(input$reduce_again, {
         req(!reduction_in_progress())
-        updated_topics <- trimws(topics_table_data()$topic)
-        updated_topics <- updated_topics[updated_topics != ""]
+        updated_topics <- normalize_topic_values(topics_table_data()$topic)
 
         if (length(updated_topics) < 2) {
-          shiny::showNotification(
-            lang()$t("Je moet minimaal 2 onderwerpen opgeven om te reduceren."),
-            type = "error"
-          )
+          # Cannot reduce a single topic — button should be disabled,
+          # but guard defensively anyway.
           return()
         }
 
@@ -399,7 +476,8 @@ edit_topics_server <- function(
               updated_topics,
               research_background,
               llm_provider,
-              language = lang$get_translation_language()
+              language = lang$get_translation_language(),
+              n_tokens_context_window = n_tokens_context_window_val
             )
           },
           .args = c(
@@ -410,13 +488,15 @@ edit_topics_server <- function(
               updated_topics = updated_topics,
               research_background = research_background(),
               llm_provider = llm_provider,
+              n_tokens_context_window_val = n_tokens_context_window_reduction() %||%
+                n_tokens_context_window(),
               lang = lang()
             ),
             kwallm_worker_bootstrap_globals()
           )
         ) %...>%
           (function(reduced_topics) {
-            if (length(reduced_topics) < 2 || anyDuplicated(reduced_topics)) {
+            if (length(reduced_topics) < 1 || anyDuplicated(reduced_topics)) {
               app_error(
                 lang()$t(
                   "Re-reductie mislukt of ongeldige onderwerpen gegenereerd"
@@ -474,12 +554,19 @@ edit_topics_server <- function(
           "add_topic",
           "delete_empty",
           "reset_topics",
-          "confirm_topics",
-          "reduce_again"
+          "confirm_topics"
         )
         lapply(
           ids,
           function(btn) shinyjs::toggleState(btn, !reduction_in_progress())
+        )
+        # Re-reduce needs at least 2 topics and must not be running already
+        n_topics <- length(
+          normalize_topic_values(topics_table_data()$topic)
+        )
+        shinyjs::toggleState(
+          "reduce_again",
+          !reduction_in_progress() && n_topics >= 2
         )
       })
 

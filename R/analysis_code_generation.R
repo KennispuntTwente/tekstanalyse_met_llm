@@ -57,7 +57,27 @@ generate_codes_by_reading_texts <- function(
     }
   }
 
-  print_message("Loading semantic chunker...")
+  # Translate progress messages using shiny.i18n, same pattern as mark_texts.
+  translate <- local({
+    lang <- tryCatch(
+      {
+        tr <- shiny.i18n::Translator$new(
+          translation_json_path = "language/language.json"
+        )
+        tr$set_translation_language(language)
+        tr
+      },
+      error = function(e) NULL
+    )
+    function(text) {
+      if (is.null(lang)) {
+        return(text)
+      }
+      lang$t(text)
+    }
+  })
+
+  print_message(translate("Semantische chunker laden..."))
   chunker_name <- paste0("semchunker_", text_size_tokens)
   if (!exists(chunker_name)) {
     semchunker <- semchunk_load_chunker(chunk_size = text_size_tokens)
@@ -77,15 +97,16 @@ generate_codes_by_reading_texts <- function(
     unlist()
 
   if (length(split_texts) == length(texts)) {
-    print_message("No splitting needed, using original texts...")
-  } else {
-    print_message(paste0(
-      "Split ",
-      length(texts),
-      " texts into ",
-      length(split_texts),
-      " smaller texts..."
+    print_message(translate(
+      "Geen splitsing nodig, originele teksten worden gebruikt..."
     ))
+  } else {
+    msg <- translate(
+      "{n_texts} teksten gesplitst in {n_split} kleinere teksten..."
+    )
+    msg <- gsub("{n_texts}", length(texts), msg, fixed = TRUE)
+    msg <- gsub("{n_split}", length(split_texts), msg, fixed = TRUE)
+    print_message(msg)
   }
 
   if (!is.null(interrupter)) {
@@ -100,7 +121,7 @@ generate_codes_by_reading_texts <- function(
 
   # Subtract prompt overhead so chunks don't overflow once the prompt is added
   base_prompt_text <- prompt_candidate_topics(
-    text_batch = c(""),
+    text_batch = character(0),
     research_background = research_background,
     language = language
   ) |>
@@ -113,8 +134,13 @@ generate_codes_by_reading_texts <- function(
     n_tokens_context_window = n_tokens_context_window,
     base_prompt_text = base_prompt_text,
     text_formatter = function(text, index) {
-      paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
-    }
+      escaped <- escape_prompt_delimiters(
+        text,
+        c("text", "texts", "research_background")
+      )
+      paste0("<text ", index, ">\n", escaped, "\n</text ", index, ">")
+    },
+    separator = "\n\n"
   )
 
   if (is.null(batches) || length(batches) == 0) {
@@ -127,11 +153,13 @@ generate_codes_by_reading_texts <- function(
     )
   }
 
-  print_message(paste0(
-    "Created ",
-    length(batches),
-    " text batch(es) from the texts..."
-  ))
+  {
+    msg <- translate(
+      "{n_batches} tekstbatch(es) aangemaakt van de teksten..."
+    )
+    msg <- gsub("{n_batches}", length(batches), msg, fixed = TRUE)
+    print_message(msg)
+  }
 
   candidate_topics <- unique(create_candidate_topics(
     text_batches = batches,
@@ -140,24 +168,24 @@ generate_codes_by_reading_texts <- function(
     language = language,
     on_progress = function(i, n, batch, result) {
       force(batch)
-      print_message(paste0(
-        "Read batch ",
-        i,
-        " of ",
-        n,
-        " (",
-        length(result),
-        " candidate codes)"
-      ))
+      msg <- translate(
+        "Batch {i} van {n} gelezen ({n_codes} kandidaat-codes)"
+      )
+      msg <- gsub("{i}", i, msg, fixed = TRUE)
+      msg <- gsub("{n}", n, msg, fixed = TRUE)
+      msg <- gsub("{n_codes}", length(result), msg, fixed = TRUE)
+      print_message(msg)
     },
     interrupter = interrupter
   ))
 
-  print_message(paste0(
-    "Created ",
-    length(candidate_topics),
-    " candidate codes, reducing to final list..."
-  ))
+  {
+    msg <- translate(
+      "{n_candidates} kandidaat-codes aangemaakt, reduceren naar definitieve lijst..."
+    )
+    msg <- gsub("{n_candidates}", length(candidate_topics), msg, fixed = TRUE)
+    print_message(msg)
+  }
 
   final_topics <- reduce_topics(
     candidate_topics = candidate_topics,
@@ -168,10 +196,11 @@ generate_codes_by_reading_texts <- function(
     language = language
   )
 
-  print_message(
-    paste0("Generated ", length(final_topics), " codes"),
-    type = "success"
-  )
+  {
+    msg <- translate("{n_codes} codes gegenereerd")
+    msg <- gsub("{n_codes}", length(final_topics), msg, fixed = TRUE)
+    print_message(msg, type = "success")
+  }
 
   final_topics
 }

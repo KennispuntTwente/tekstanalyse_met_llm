@@ -22,6 +22,8 @@ test_that("kwallm_worker_capture_options keeps only configured worker options", 
     app__mode = "test",
     logger__level = "DEBUG",
     send_prompt_with_retries__max_tries = 5L,
+    topic_modelling__reduction_max_prompt_batches = 24L,
+    topic_modelling__reduction_max_iterations = 3L,
     kwallm__worker_task = "ignore-me"
   )
   withr::defer(options(old_opts), testthat::teardown_env())
@@ -31,6 +33,8 @@ test_that("kwallm_worker_capture_options keeps only configured worker options", 
   expect_identical(captured$app__mode, "test")
   expect_identical(captured$logger__level, "DEBUG")
   expect_identical(captured$send_prompt_with_retries__max_tries, 5L)
+  expect_identical(captured$topic_modelling__reduction_max_prompt_batches, 24L)
+  expect_identical(captured$topic_modelling__reduction_max_iterations, 3L)
   expect_false("kwallm__worker_task" %in% names(captured))
 })
 

@@ -22,6 +22,7 @@ analysis_result_to_metadata_list <- function(analysis_result) {
     language = analysis_result@metadata@language,
     timestamp = .kwallm_timestamp_string(analysis_result@metadata@timestamp),
     research_background = analysis_result@metadata@research_background,
+    analysis_name = analysis_result@metadata@analysis_name,
     app_version = analysis_result@metadata@app_version,
     text_counts = .kwallm_analysis_result_text_counts(analysis_result),
     input = list(
@@ -103,6 +104,9 @@ analysis_result_to_metadata_list <- function(analysis_result) {
         multi_label = analysis_result@results@multi_label,
         assignments = .kwallm_df_to_records(
           analysis_result@results@assignments
+        ),
+        response_status = .kwallm_df_to_records(
+          analysis_result@results@response_status
         )
       ),
       scoring = list(
@@ -125,6 +129,7 @@ analysis_result_to_metadata_list <- function(analysis_result) {
           human_edited = analysis_result@results@topic_provenance@human_edited,
           not_applicable_requested = analysis_result@results@topic_provenance@not_applicable_requested,
           auto_added_not_applicable = analysis_result@results@topic_provenance@auto_added_not_applicable,
+          single_topic_fallback_applied = analysis_result@results@topic_provenance@single_topic_fallback_applied,
           not_applicable_check_performed = analysis_result@results@topic_provenance@not_applicable_check_performed,
           reduction_iterations = analysis_result@results@topic_provenance@reduction_iterations,
           batch_size = analysis_result@results@topic_provenance@batch_size,
@@ -136,6 +141,9 @@ analysis_result_to_metadata_list <- function(analysis_result) {
         multi_label = analysis_result@results@multi_label,
         assignments = .kwallm_df_to_records(
           analysis_result@results@assignments
+        ),
+        response_status = .kwallm_df_to_records(
+          analysis_result@results@response_status
         )
       ),
       marking = list(
@@ -184,6 +192,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         "language",
         "timestamp",
         "research_background",
+        "analysis_name",
         "app_version",
         "source_documents",
         "documents",
@@ -196,6 +205,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         analysis_result@metadata@language,
         .kwallm_timestamp_string(analysis_result@metadata@timestamp),
         analysis_result@metadata@research_background,
+        analysis_result@metadata@analysis_name,
         .kwallm_excel_scalar(analysis_result@metadata@app_version),
         .kwallm_excel_scalar(text_counts$source_documents),
         .kwallm_excel_scalar(text_counts$documents),
@@ -255,6 +265,11 @@ analysis_result_to_export_sheets <- function(analysis_result) {
     sheets$assignments <- analysis_result@results@assignments
   }
 
+  if (inherits(analysis_result@results, "CategorizationResult")) {
+    sheets$categorization_response_status <-
+      analysis_result@results@response_status
+  }
+
   if (inherits(analysis_result@results, "ScoringResult")) {
     sheets$scores <- analysis_result@results@scores
   }
@@ -272,6 +287,7 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         "human_edited",
         "not_applicable_requested",
         "auto_added_not_applicable",
+        "single_topic_fallback_applied",
         "not_applicable_check_performed",
         "reduction_iterations",
         "batch_size",
@@ -279,19 +295,28 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         "n_batches",
         "context_window_tokens"
       ),
-      value = as.character(c(
-        analysis_result@results@topic_provenance@human_edited,
-        analysis_result@results@topic_provenance@not_applicable_requested,
-        analysis_result@results@topic_provenance@auto_added_not_applicable,
-        analysis_result@results@topic_provenance@not_applicable_check_performed,
-        analysis_result@results@topic_provenance@reduction_iterations,
-        analysis_result@results@topic_provenance@batch_size,
-        analysis_result@results@topic_provenance@draws,
-        analysis_result@results@topic_provenance@n_batches,
-        analysis_result@results@topic_provenance@context_window_tokens
-      )),
+      value = vapply(
+        list(
+          analysis_result@results@topic_provenance@human_edited,
+          analysis_result@results@topic_provenance@not_applicable_requested,
+          analysis_result@results@topic_provenance@auto_added_not_applicable,
+          analysis_result@results@topic_provenance@single_topic_fallback_applied,
+          analysis_result@results@topic_provenance@not_applicable_check_performed,
+          analysis_result@results@topic_provenance@reduction_iterations,
+          analysis_result@results@topic_provenance@batch_size,
+          analysis_result@results@topic_provenance@draws,
+          analysis_result@results@topic_provenance@n_batches,
+          analysis_result@results@topic_provenance@context_window_tokens
+        ),
+        .kwallm_excel_scalar,
+        character(1)
+      ),
       stringsAsFactors = FALSE
     )
+  }
+
+  if (inherits(analysis_result@results, "TopicResult")) {
+    sheets$topic_response_status <- analysis_result@results@response_status
   }
 
   if (!is.null(analysis_result@reliability)) {
@@ -310,6 +335,9 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         )
       }
     )
+    if (is.data.frame(analysis_result@reliability@sample)) {
+      sheets$reliability_sample <- analysis_result@reliability@sample
+    }
   }
 
   Filter(function(x) is.data.frame(x), sheets)
@@ -375,14 +403,14 @@ write_analysis_result_metadata_json <- function(
       all.x = TRUE,
       all.y = FALSE
     )
-    out <- merged[c("document_id", "document_text", "result")]
+    out <- merged[c("document_id", "preprocessed_text", "result")]
     names(out) <- c("document_id", "text", "result")
     return(out)
   }
 
   out <- data.frame(
     document_id = base$document_id,
-    text = base$document_text,
+    text = base$preprocessed_text,
     stringsAsFactors = FALSE
   )
   for (label in result@labels$label_text) {
@@ -417,7 +445,7 @@ write_analysis_result_metadata_json <- function(
     all.y = FALSE
   )
 
-  out <- merged[c("document_id", "document_text", "score")]
+  out <- merged[c("document_id", "preprocessed_text", "score")]
   names(out) <- c("document_id", "text", "result")
   out
 }
@@ -443,14 +471,14 @@ write_analysis_result_metadata_json <- function(
 
   chunk_docs <- merge(
     result@chunks,
-    base[c("analysis_unit_id", "document_id", "document_text")],
+    base[c("analysis_unit_id", "document_id", "preprocessed_text")],
     by = "analysis_unit_id",
     all.x = TRUE,
     all.y = FALSE
   )
 
   if (!nrow(result@codes)) {
-    out <- chunk_docs[c("document_id", "document_text", "chunk_text")]
+    out <- chunk_docs[c("document_id", "preprocessed_text", "chunk_text")]
     out$code <- character(nrow(out))
     out$marked_text <- NA_character_
     out$response_status <- NA_character_
@@ -488,7 +516,7 @@ write_analysis_result_metadata_json <- function(
 
   out <- merged[c(
     "document_id",
-    "document_text",
+    "preprocessed_text",
     "chunk_text",
     "code",
     "marked_text",
@@ -687,13 +715,22 @@ write_analysis_result_metadata_json <- function(
   .kwallm_scalar_or_null(value)
 }
 
-# Joins document rows to analysis-unit ids.
+# Joins document rows to analysis-unit ids and their preprocessed text.
 # We use this as the shared base table when reconstructing report result frames.
+# The preprocessed_text column is the text after any anonymization/preprocessing
+# and is the text the LLM actually analyzed.
 .kwallm_document_unit_map <- function(analysis_result) {
-  merge(
+  doc_units <- merge(
     analysis_result@text_lineage@documents,
     analysis_result@text_lineage@document_units,
     by = "document_id",
+    all.x = TRUE,
+    all.y = FALSE
+  )
+  merge(
+    doc_units,
+    analysis_result@text_lineage@analysis_units,
+    by = "analysis_unit_id",
     all.x = TRUE,
     all.y = FALSE
   )

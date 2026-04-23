@@ -29,6 +29,7 @@ test_that("{shinytest2} recording: standard process - categorization", {
   app$set_inputs(`research_background-research_background` = "no clue!")
   app$set_inputs(`categories-fields-field1` = "Positive")
   app$set_inputs(`categories-fields-field2` = "Negative")
+  wait_for_bound_input(app, "categories-fields-toggleEdit")
   app$click("categories-fields-toggleEdit")
   app$wait_for_value(
     export = "categories-fields-isEditing",
@@ -39,9 +40,10 @@ test_that("{shinytest2} recording: standard process - categorization", {
   set_fake_models(app)
 
   # Set writing paragraphs toggle
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
 
   # Start processing
+  wait_for_bound_input(app, "processing-process")
   wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
   app$wait_for_value(
@@ -53,8 +55,8 @@ test_that("{shinytest2} recording: standard process - categorization", {
   results <- app$get_value(export = "processing-results_table")
 
   # Expect that all texts are present in column 'text'
-  texts <- readLines(
-    here::here("tests", "testthat", "test_texts.txt")
+  texts <- app$get_value(
+    export = "text_management-texts__preprocessed"
   )
   expect_true(all(texts %in% results$text))
   expect_true(all.equal(
@@ -76,14 +78,20 @@ test_that("{shinytest2} recording: standard process - categorization", {
   results_by_text <- results[match(texts, results$text), , drop = FALSE]
   expect_identical(
     results_by_text$Negative,
-    c(FALSE, TRUE, FALSE, FALSE, FALSE)
+    c(FALSE, TRUE, FALSE, FALSE, FALSE, TRUE)
   )
   expect_true(all(rowSums(results[c("Positive", "Negative")]) > 0))
 
   bundle <- expect_download_bundle(
     app,
     expected_mode_id = "categorization",
-    expected_sheet_names = c("metadata", "results", "labels", "assignments"),
+    expected_sheet_names = c(
+      "metadata",
+      "results",
+      "labels",
+      "assignments",
+      "categorization_response_status"
+    ),
     expected_results_columns = c("text", "Positive", "Negative"),
     expected_result_rows = nrow(results),
     expected_texts = texts,

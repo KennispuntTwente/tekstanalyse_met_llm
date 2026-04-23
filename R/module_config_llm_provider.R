@@ -41,15 +41,24 @@ llm_provider_server <- function(
             "
             .llm-icon {
               padding: 2px;
+              border: none;
+              background: transparent;
+              outline: none;
+              appearance: none;
               border-radius: 2px;
               transition: all 0.2s ease;
               cursor: pointer;
             }
 
-            .llm-icon:hover {
+            .llm-icon:hover:not(:disabled) {
               background-color: #f0f0f0;
               box-shadow: 0 0 5px rgba(0,0,0,0.15);
               transform: scale(1.05);
+            }
+
+            .llm-icon:disabled {
+              opacity: 0.4;
+              cursor: not-allowed;
             }
 
             .llm-icon-active {
@@ -343,7 +352,7 @@ llm_provider_server <- function(
                   )
                 )
               ),
-              value = openai_url(),
+              value = isolate(openai_url()),
               width = "100%"
             )
           ))
@@ -354,13 +363,30 @@ llm_provider_server <- function(
             textInput(
               ns("ollama_url"),
               lang()$t("Ollama-API endpoint URL:"),
-              value = ollama_url(),
+              value = isolate(ollama_url()),
               width = "100%"
             )
           ))
         }
         return(NULL)
       })
+
+      # Keep URL reactiveVals in sync with the text inputs so the
+      # configured provider updates immediately, not only on Ping.
+      observeEvent(
+        input$openai_url,
+        {
+          openai_url(input$openai_url)
+        },
+        ignoreInit = TRUE
+      )
+      observeEvent(
+        input$ollama_url,
+        {
+          ollama_url(input$ollama_url)
+        },
+        ignoreInit = TRUE
+      )
 
       # Mode description UI ----------------------------------------------------
 
@@ -444,6 +470,8 @@ llm_provider_server <- function(
 
         ns_api <- ns("api_key_text")
         ns_btn <- ns("toggle_api_key_visibility")
+        preserve_user_key <- isTRUE(user_entered_api_key())
+        current_api_key <- api_key_input() %||% ""
 
         tagList(
           shinyjs::useShinyjs(),
@@ -462,8 +490,10 @@ llm_provider_server <- function(
                   id = ns_api,
                   type = "password",
                   class = "form-control",
-                  value = "",
-                  placeholder = if (nchar(env_api_key) > 0) {
+                  value = if (preserve_user_key) current_api_key else "",
+                  placeholder = if (
+                    !preserve_user_key && nchar(env_api_key) > 0
+                  ) {
                     "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022 (env)"
                   } else {
                     ""
@@ -474,6 +504,7 @@ llm_provider_server <- function(
                   id = ns_btn,
                   type = "button",
                   class = "btn btn-outline-secondary",
+                  `aria-label` = "Toggle password visibility",
                   onclick = sprintf(
                     "Shiny.setInputValue('%s', Math.random())",
                     ns_btn
@@ -539,9 +570,28 @@ llm_provider_server <- function(
 
       # Expose model lists for automated tests (reactive, so they update)
       shiny::exportTestValues(
+        provider_mode = llm_provider_rv$provider_mode,
+        openai_url = openai_url(),
+        ollama_url = ollama_url(),
+        api_key_has_value = nchar(api_key_input() %||% "") > 0,
+        user_entered_api_key = user_entered_api_key(),
         available_models_openai = available_models_openai(),
         available_models_ollama = available_models_ollama()
       )
+
+      # Clear discovered model cache when connection details change so that
+      # stale model IDs from a previous endpoint cannot be used.
+      observeEvent(openai_url(), ignoreInit = TRUE, {
+        available_models_openai(NULL)
+      })
+      observeEvent(api_key_input(), ignoreInit = TRUE, {
+        if (identical(llm_provider_rv$provider_mode, "openai")) {
+          available_models_openai(NULL)
+        }
+      })
+      observeEvent(ollama_url(), ignoreInit = TRUE, {
+        available_models_ollama(NULL)
+      })
 
       # Keep track of requests for available models
       last_model_request_time <- reactiveVal(Sys.time() - 10)
@@ -574,14 +624,7 @@ llm_provider_server <- function(
         last_model_request_time(now)
         provider_mode <- llm_provider_rv$provider_mode
 
-        # Update reactive values for URL only when button is clicked
         if (provider_mode == "openai") {
-          openai_url(input$openai_url)
-          log_action(
-            "llm_url_changed",
-            details = sprintf("provider=openai, url=%s", input$openai_url)
-          )
-
           api_key_len <- nchar(api_key_input() %||% "")
           log_action(
             "api_key_used_for_models_ping",
@@ -590,12 +633,6 @@ llm_provider_server <- function(
               api_key_len > 0,
               api_key_len
             )
-          )
-        } else if (provider_mode == "ollama") {
-          ollama_url(input$ollama_url)
-          log_action(
-            "llm_url_changed",
-            details = sprintf("provider=ollama, url=%s", input$ollama_url)
           )
         }
 

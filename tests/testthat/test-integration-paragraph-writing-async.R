@@ -1,4 +1,5 @@
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 
 
 test_that("categorization async integration writes paragraphs in a real mirai worker", {

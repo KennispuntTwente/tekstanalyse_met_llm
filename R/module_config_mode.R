@@ -1,4 +1,4 @@
-# Module for selecting mode; categorization/scoring/topic modelling
+# Module for selecting mode; categorization/scoring/topic extraction
 
 # 1 UI ---------------------------------------------------------------
 mode_ui <- function(id) {
@@ -19,17 +19,33 @@ mode_server <- function(
     id,
     function(input, output, session) {
       ns <- session$ns
+      mode_values <- c(
+        "Categorisatie",
+        "Scoren",
+        "Onderwerpextractie",
+        "Markeren"
+      )
 
       mode <- reactiveVal("Categorisatie")
       shiny::exportTestValues(mode = mode())
 
       output$card <- renderUI({
+        mode_choices <- stats::setNames(
+          mode_values,
+          c(
+            lang()$t("Categorisatie"),
+            lang()$t("Scoren"),
+            lang()$t("Onderwerpextractie"),
+            lang()$t("Markeren")
+          )
+        )
+
         bslib::card(
           class = "card",
           card_header_with_tooltip(
             lang()$t("Modus"),
             lang()$t(
-              "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren."
+              "Kies de gewenste analysemethode: categoriseren, scoren, onderwerpen extraheren of markeren."
             )
           ),
           card_body(
@@ -38,13 +54,8 @@ mode_server <- function(
               shinyWidgets::radioGroupButtons(
                 ns("mode"),
                 NULL,
-                choices = c(
-                  lang()$t("Categorisatie"),
-                  lang()$t("Scoren"),
-                  lang()$t("Onderwerpextractie"),
-                  lang()$t("Markeren")
-                ),
-                selected = lang()$t("Categorisatie"),
+                choices = mode_choices,
+                selected = mode(),
                 size = "sm"
               )
             ),
@@ -77,7 +88,7 @@ mode_server <- function(
               " Deze modus is met name bedoeld voor langere teksten, zoals interviews. Het is bij deze modus niet nodig om teksten gesplitst te hebben naar kleinere stukken; dat gebeurt automatisch tijdens de analyse."
             ),
             lang()$t(
-              " (Let op: deze modus is nog in ontwikkeling, en kan nog bugs bevatten. De vorm van de rapportage wordt op termijn nog verbeterd.)"
+              " Het resultaat bevat een databestand, rapport en optioneel samenvattende alinea's."
             )
           )
         )
@@ -87,20 +98,12 @@ mode_server <- function(
 
       # When selecting input, update reactiveVal
       observeEvent(input$mode, {
-        new_mode <- NULL
+        req(input$mode %in% mode_values)
 
-        if (input$mode == lang()$t("Categorisatie")) {
-          new_mode <- "Categorisatie"
-        } else if (input$mode == lang()$t("Scoren")) {
-          new_mode <- "Scoren"
-        } else if (input$mode == lang()$t("Onderwerpextractie")) {
-          new_mode <- "Onderwerpextractie"
-        } else if (input$mode == lang()$t("Markeren")) {
-          new_mode <- "Markeren"
+        if (!identical(mode(), input$mode)) {
+          mode(input$mode)
+          log_action("mode_changed", details = input$mode)
         }
-
-        mode(new_mode)
-        log_action("mode_changed", details = new_mode)
       })
 
       # When processing, disable the mode selection

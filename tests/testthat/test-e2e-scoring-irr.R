@@ -35,13 +35,13 @@ test_that("{shinytest2} recording: scoring with inter-rater reliability", {
     description = "anonymization mode none"
   )
 
-  app$set_inputs(`mode-mode` = "Scoring")
+  app$set_inputs(`mode-mode` = "Scoren")
   app$set_inputs(`scoring-scoring_characteristic` = "Positive sentiment")
 
   set_fake_models(app)
 
   wait_for_bound_input(app, "interrater_toggle-toggle")
-  app$set_inputs(`interrater_toggle-toggle` = "Yes")
+  app$set_inputs(`interrater_toggle-toggle` = "true")
 
   wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
@@ -107,4 +107,12 @@ test_that("{shinytest2} recording: scoring with inter-rater reliability", {
     sheet = "reliability"
   )
   expect_gt(nrow(bundle_reliability), 0)
+  expect_true(
+    "subjects" %in% names(bundle_reliability),
+    label = "reliability sheet must contain subjects column"
+  )
+  expect_true(
+    !anyNA(bundle_reliability$subjects),
+    label = "subjects must not be NA"
+  )
 })

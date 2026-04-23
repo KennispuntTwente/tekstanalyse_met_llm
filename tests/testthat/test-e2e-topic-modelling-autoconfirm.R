@@ -31,7 +31,7 @@ test_that("{shinytest2} recording: topic modelling auto-confirms in single-label
   app$set_inputs(
     `research_background-research_background` = "Topic auto-confirm test"
   )
-  app$set_inputs(`mode-mode` = "Topic extraction")
+  app$set_inputs(`mode-mode` = "Onderwerpextractie")
 
   set_fake_models(
     app,
@@ -39,10 +39,10 @@ test_that("{shinytest2} recording: topic modelling auto-confirms in single-label
     large = "kwallm-fake-reducer-320"
   )
 
-  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "No")
-  app$set_inputs(`human_in_the_loop_toggle-toggle` = "No")
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
-  app$set_inputs(`interrater_toggle-toggle` = "No")
+  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "false")
+  app$set_inputs(`human_in_the_loop_toggle-toggle` = "false")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
+  app$set_inputs(`interrater_toggle-toggle` = "false")
 
   wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")

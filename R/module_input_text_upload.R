@@ -325,9 +325,9 @@ text_upload_server <- function(
     current_txt_split_lines <- reactive({
       if (
         !is.null(input$txt_split_lines) &&
-          input$txt_split_lines %in% c(lang()$t("Nee"), lang()$t("Ja"))
+          input$txt_split_lines %in% c("false", "true")
       ) {
-        identical(input$txt_split_lines, lang()$t("Ja"))
+        identical(input$txt_split_lines, "true")
       } else {
         txt_split_lines_choice()
       }
@@ -493,8 +493,8 @@ text_upload_server <- function(
     observeEvent(
       input$txt_split_lines,
       {
-        req(input$txt_split_lines %in% c(lang()$t("Nee"), lang()$t("Ja")))
-        split_lines <- identical(input$txt_split_lines, lang()$t("Ja"))
+        req(input$txt_split_lines %in% c("false", "true"))
+        split_lines <- identical(input$txt_split_lines, "true")
 
         if (!identical(txt_split_lines_choice(), split_lines)) {
           txt_split_lines_choice(split_lines)
@@ -707,11 +707,14 @@ text_upload_server <- function(
           shinyWidgets::radioGroupButtons(
             ns("txt_split_lines"),
             NULL,
-            choices = c(lang()$t("Nee"), lang()$t("Ja")),
+            choices = stats::setNames(
+              c("false", "true"),
+              c(lang()$t("Nee"), lang()$t("Ja"))
+            ),
             selected = if (isTRUE(txt_split_lines_choice())) {
-              lang()$t("Ja")
+              "true"
             } else {
-              lang()$t("Nee")
+              "false"
             },
             size = "sm"
           )
@@ -751,6 +754,7 @@ text_upload_server <- function(
         {
           df <- readxl::read_excel(file_info$datapath, sheet = selected_sheet())
           uploaded_data(ensure_source_document_id(df))
+          filter_spec(NULL)
         },
         error = function(e) {
           showNotification(

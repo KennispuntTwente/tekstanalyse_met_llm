@@ -121,6 +121,196 @@ test_that("topic_assignment_prompt_context_window_check uses the real topic list
 })
 
 
+test_that("topic_assignment_prompt_context_window_check honours n_tokens_context_window override", {
+  source(here::here("R", "utils_test_llm_provider.R"), local = TRUE)
+
+  tidyprompt_ns <- asNamespace("tidyprompt")
+  helper_env <- environment(topic_assignment_prompt_context_window_check)
+
+  old_construct <- get("construct_prompt_text", envir = tidyprompt_ns)
+  old_prompt_category <- get("prompt_category", envir = helper_env)
+  withr::defer({
+    unlockBinding("construct_prompt_text", tidyprompt_ns)
+    assign("construct_prompt_text", old_construct, envir = tidyprompt_ns)
+    lockBinding("construct_prompt_text", tidyprompt_ns)
+    assign("prompt_category", old_prompt_category, envir = helper_env)
+  })
+
+  unlockBinding("construct_prompt_text", tidyprompt_ns)
+  assign(
+    "construct_prompt_text",
+    function(x, ...) paste(unlist(x), collapse = "|"),
+    envir = tidyprompt_ns
+  )
+  lockBinding("construct_prompt_text", tidyprompt_ns)
+
+  assign(
+    "prompt_category",
+    function(text, research_background, categories) {
+      list(text = text, categories = categories)
+    },
+    envir = helper_env
+  )
+
+  old_get_cw <- get("get_context_window_size_in_tokens", envir = helper_env)
+  withr::defer(assign(
+    "get_context_window_size_in_tokens",
+    old_get_cw,
+    envir = helper_env
+  ))
+  assign(
+    "get_context_window_size_in_tokens",
+    function(model) NULL,
+    envir = helper_env
+  )
+
+  # Without override, unknown model falls back to 2048.
+  check_default <- topic_assignment_prompt_context_window_check(
+    texts = c("hello"),
+    topics = c("A", "B"),
+    research_background = "",
+    llm_provider = kwallm_test_llm_provider("unknown-model-xyz"),
+    assign_multiple_categories = FALSE
+  )
+  expect_equal(check_default$context_window_tokens, 2048L)
+
+  # With explicit override of 1, same prompt must not fit.
+  check_override <- topic_assignment_prompt_context_window_check(
+    texts = c("hello"),
+    topics = c("A", "B"),
+    research_background = "",
+    llm_provider = kwallm_test_llm_provider("unknown-model-xyz"),
+    assign_multiple_categories = FALSE,
+    n_tokens_context_window = 1L
+  )
+  expect_equal(check_override$context_window_tokens, 1L)
+  expect_false(check_override$fits)
+
+  # With a very large override, prompt fits.
+  check_large <- topic_assignment_prompt_context_window_check(
+    texts = c("hello"),
+    topics = c("A", "B"),
+    research_background = "",
+    llm_provider = kwallm_test_llm_provider("unknown-model-xyz"),
+    assign_multiple_categories = FALSE,
+    n_tokens_context_window = 999999L
+  )
+  expect_equal(check_large$context_window_tokens, 999999L)
+  expect_true(check_large$fits)
+})
+
+
+test_that("context_window_server: topic mode single-label preflight uses 25 synthetic topics", {
+  captured_categories <- NULL
+  multi_called <- FALSE
+
+  module_env <- environment(context_window_server)
+  old_prompt_category <- get("prompt_category", envir = module_env)
+  old_prompt_multi_category <- get("prompt_multi_category", envir = module_env)
+  withr::defer({
+    assign("prompt_category", old_prompt_category, envir = module_env)
+    assign(
+      "prompt_multi_category",
+      old_prompt_multi_category,
+      envir = module_env
+    )
+  })
+
+  assign(
+    "prompt_category",
+    function(text, research_background, categories) {
+      captured_categories <<- categories
+      list(prompt = "category")
+    },
+    envir = module_env
+  )
+  assign(
+    "prompt_multi_category",
+    function(...) {
+      multi_called <<- TRUE
+      list(prompt = "multi_category")
+    },
+    envir = module_env
+  )
+
+  tidyprompt_ns <- asNamespace("tidyprompt")
+  old_construct <- get("construct_prompt_text", envir = tidyprompt_ns)
+  withr::defer({
+    unlockBinding("construct_prompt_text", tidyprompt_ns)
+    assign("construct_prompt_text", old_construct, envir = tidyprompt_ns)
+    lockBinding("construct_prompt_text", tidyprompt_ns)
+  })
+
+  unlockBinding("construct_prompt_text", tidyprompt_ns)
+  assign(
+    "construct_prompt_text",
+    function(x, ...) "PROMPT",
+    envir = tidyprompt_ns
+  )
+  lockBinding("construct_prompt_text", tidyprompt_ns)
+
+  old_get_cw <- get_context_window_size_in_tokens
+  withr::defer({
+    get_context_window_size_in_tokens <<- old_get_cw
+  })
+  get_context_window_size_in_tokens <<- function(model) 100
+
+  shiny::testServer(
+    function(input, output, session) {
+      mode <- reactiveVal("Onderwerpextractie")
+      lang <- make_test_lang("nl")
+
+      models <- reactiveValues(
+        main = list(parameters = list(model = "unit-test-model")),
+        large = NULL
+      )
+
+      categories <- list(
+        texts = reactiveVal(c("CatA")),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(1),
+        exclusive_texts = reactiveVal(character())
+      )
+
+      codes <- list(
+        texts = reactiveVal(c("Code1")),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(1)
+      )
+
+      texts <- reactiveValues(
+        preprocessed = c("some text"),
+        document_text = character()
+      )
+
+      rv <- context_window_server(
+        id = "cw",
+        mode = mode,
+        models = models,
+        categories = categories,
+        scoring_characteristic = reactiveVal("X"),
+        codes = codes,
+        research_background = reactiveVal("background"),
+        assign_multiple_categories = reactiveVal(FALSE),
+        texts = texts,
+        processing = reactiveVal(FALSE),
+        lang = lang
+      )
+
+      list(rv = rv)
+    },
+    {
+      for (i in 1:10) {
+        session$flushReact()
+      }
+
+      expect_identical(captured_categories, paste0("Topic ", seq_len(25)))
+      expect_false(multi_called)
+    }
+  )
+})
+
+
 test_that("context_window_server: fit flag flips based on context window size", {
   # Monkeypatch tidyprompt::construct_prompt_text without pkgload/devtools.
   tidyprompt_ns <- asNamespace("tidyprompt")
@@ -519,6 +709,64 @@ test_that("context_window_server: multi-label uses actual exclusive_texts, not f
       # The module must have called prompt_multi_category with the real
       # exclusive texts, not a fabricated every-second-category vector.
       expect_identical(captured_exclusive, c("CatA"))
+    }
+  )
+})
+
+
+test_that("context_window_server: reduction CW tracks models$large independently", {
+  shiny::testServer(
+    function(input, output, session) {
+      mode <- reactiveVal("Onderwerpextractie")
+      lang <- make_test_lang("nl")
+
+      models <- reactiveValues(
+        main = list(parameters = list(model = "kwallm-fake-main-1024")),
+        large = list(parameters = list(model = "kwallm-fake-reducer-320"))
+      )
+
+      categories <- list(
+        texts = reactiveVal(character()),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(0),
+        exclusive_texts = reactiveVal(character())
+      )
+
+      codes <- list(
+        texts = reactiveVal(character()),
+        editing = reactiveVal(FALSE),
+        unique_non_empty_count = reactiveVal(0)
+      )
+
+      texts <- reactiveValues(
+        preprocessed = c("some text"),
+        document_text = character()
+      )
+
+      rv <- context_window_server(
+        id = "cw",
+        mode = mode,
+        models = models,
+        categories = categories,
+        scoring_characteristic = reactiveVal(""),
+        codes = codes,
+        research_background = reactiveVal("background"),
+        assign_multiple_categories = reactiveVal(FALSE),
+        texts = texts,
+        processing = reactiveVal(FALSE),
+        lang = lang
+      )
+
+      list(rv = rv)
+    },
+    {
+      for (i in 1:10) {
+        session$flushReact()
+      }
+
+      # Main model has 1024 tokens, reduction model has 320 tokens.
+      expect_equal(rv$n_tokens_context_window, 1024)
+      expect_equal(rv$n_tokens_context_window_reduction, 320)
     }
   )
 })

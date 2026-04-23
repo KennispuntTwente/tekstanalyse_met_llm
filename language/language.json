@@ -254,8 +254,8 @@
         "en": "Model for topic reduction"
       },
       {
-        "nl": "Kies de gewenste analysemethode: categoriseren, scoren of onderwerpen extraheren.",
-        "en": "Choose the desired analysis method: categorization, scoring, or topic extraction."
+        "nl": "Kies de gewenste analysemethode: categoriseren, scoren, onderwerpen extraheren of markeren.",
+        "en": "Choose the desired analysis method: categorization, scoring, topic extraction, or marking."
       },
       {
         "nl": "Modus",
@@ -598,6 +598,10 @@
         "en": "You must specify at least 2 categories."
       },
       {
+        "nl": "Categorieen moeten uniek zijn.",
+        "en": "Categories must be unique."
+      },
+      {
         "nl": "Geef een karakteristiek op.",
         "en": "Please specify a characteristic."
       },
@@ -658,8 +662,8 @@
         "en": "Codes must be unique."
       },
       {
-        "nl": "Je moet minimaal 2 onderwerpen opgeven.",
-        "en": "You must specify at least 2 topics."
+        "nl": "Je moet minimaal 1 onderwerp opgeven.",
+        "en": "You must specify at least 1 topic."
       },
       {
         "nl": "Je moet minimaal 2 onderwerpen opgeven om te reduceren.",
@@ -780,6 +784,14 @@
       {
         "nl": "Klik hier deze foutmelding te rapporteren als GitHub issue. Bedankt!",
         "en": "Click here to report this error message as a GitHub issue. Thank you!"
+      },
+      {
+        "nl": "Fout",
+        "en": "Error"
+      },
+      {
+        "nl": "Open GLiNER",
+        "en": "Open GLiNER"
       },
       {
         "nl": "Trek als:",
@@ -1246,10 +1258,6 @@
         "en": "The model will mark relevant parts in the texts for each specified code. For example, with the code 'color', the model would mark 'yellow' in the text 'the sun is yellow'."
       },
       {
-        "nl": " (Let op: deze modus is nog in ontwikkeling. Je krijgt voorlopig alleen een databestand met de gemarkeerde teksten terug. De modus kan nog bugs bevatten.)",
-        "en": " (Note: this mode is still under development. For now, you will only receive a data file with the marked texts back. The mode may still contain bugs.)"
-      },
-      {
         "nl": "Voer de codes in waarvoor het taalmodel relevante delen van de teksten zal markeren.",
         "en": "Enter the codes for which the language model will mark relevant parts of the texts."
       },
@@ -1310,8 +1318,8 @@
         "en": " This mode is particularly intended for longer texts, such as interviews. It is not necessary to have split texts into smaller pieces in this mode; that happens automatically during the analysis."
       },
       {
-        "nl": " (Let op: deze modus is nog in ontwikkeling, en kan nog bugs bevatten. De vorm van de rapportage wordt op termijn nog verbeterd.)",
-        "en": " (Note: this mode is still under development and may contain bugs. The format of the report will be improved in the future.)"
+        "nl": " Het resultaat bevat een databestand, rapport en optioneel samenvattende alinea's.",
+        "en": " The result includes a data file, report, and optionally summary paragraphs."
       },
       {
         "nl": "Er is nog geen LLM provider ingesteld",
@@ -1478,6 +1486,10 @@
         "en": "Splitting did not result in more texts"
       },
       {
+        "nl": "Instellingen gewijzigd - splits de teksten opnieuw",
+        "en": "Settings changed - split the texts again"
+      },
+      {
         "nl": "Verticaal",
         "en": "Vertical"
       },
@@ -1504,6 +1516,110 @@
       {
         "nl": "Sectie",
         "en": "Section"
+      },
+      {
+        "nl": "Semantische chunker laden...",
+        "en": "Loading semantic chunker..."
+      },
+      {
+        "nl": "Geen splitsing nodig, originele teksten worden gebruikt...",
+        "en": "No splitting needed, using original texts..."
+      },
+      {
+        "nl": "{n_texts} teksten gesplitst in {n_split} kleinere teksten...",
+        "en": "Split {n_texts} texts into {n_split} smaller texts..."
+      },
+      {
+        "nl": "{n_batches} tekstbatch(es) aangemaakt van de teksten...",
+        "en": "Created {n_batches} text batch(es) from the texts..."
+      },
+      {
+        "nl": "Batch {i} van {n} gelezen ({n_codes} kandidaat-codes)",
+        "en": "Read batch {i} of {n} ({n_codes} candidate codes)"
+      },
+      {
+        "nl": "{n_candidates} kandidaat-codes aangemaakt, reduceren naar definitieve lijst...",
+        "en": "Created {n_candidates} candidate codes, reducing to final list..."
+      },
+      {
+        "nl": "{n_codes} codes gegenereerd",
+        "en": "Generated {n_codes} codes"
+      },
+      {
+        "nl": "Geen teksten geüpload",
+        "en": "No texts uploaded"
+      },
+      {
+        "nl": "Geen model geselecteerd",
+        "en": "No model selected"
+      },
+      {
+        "nl": "Sommige teksten overschrijden het context-window",
+        "en": "Some texts exceed the context window"
+      },
+      {
+        "nl": "Te veel batches voor onderwerpextractie",
+        "en": "Too many batches for topic extraction"
+      },
+      {
+        "nl": "GLiNER-anonimisering nog niet voltooid",
+        "en": "GLiNER anonymization not yet completed"
+      },
+      {
+        "nl": "Teksten worden gesplitst",
+        "en": "Text splitting in progress"
+      },
+      {
+        "nl": "Sla de categorieën eerst op",
+        "en": "Save the categories first"
+      },
+      {
+        "nl": "Minimaal 2 categorieën vereist",
+        "en": "At least 2 categories required"
+      },
+      {
+        "nl": "Verwijder dubbele categorieën",
+        "en": "Remove duplicate categories"
+      },
+      {
+        "nl": "Vul een scoringskenmerk in",
+        "en": "Enter a scoring characteristic"
+      },
+      {
+        "nl": "Sla de codes eerst op",
+        "en": "Save the codes first"
+      },
+      {
+        "nl": "Minimaal 1 code vereist",
+        "en": "At least 1 code required"
+      },
+      {
+        "nl": "Verwijder dubbele codes",
+        "en": "Remove duplicate codes"
+      },
+      {
+        "nl": "Provider testen...",
+        "en": "Testing provider..."
+      },
+      {
+        "nl": "Provider heeft geantwoord (succes):",
+        "en": "Provider responded (success):"
+      },
+      {
+        "nl": "Laden...",
+        "en": "Loading..."
+      },
+      {
+        "nl": "Naam van analyse",
+        "en": "Analysis name"
+      },
+      {
+        "nl": "Geef een naam aan deze analyse. De naam wordt opgenomen in het rapport en de bestandsnaam van de download.",
+        "en": "Give this analysis a name. The name will be included in the report and the download file name."
+      },
+      {
+        "nl": "Vul een naam in (optioneel)...",
+        "en": "Enter a name (optional)..."
       }
   ]
 }

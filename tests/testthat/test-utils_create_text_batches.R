@@ -1,4 +1,5 @@
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 
 # Source locally so we can stub count_tokens without loading reticulate/tiktoken.
 source(here::here("R", "utils_create_text_batches.R"), local = TRUE)
@@ -142,4 +143,102 @@ test_that("create_text_batches: draws replicates texts", {
     function(batch) all(table(batch) <= 1),
     logical(1)
   )))
+})
+
+
+test_that("create_text_batches: separator tokens counted between items", {
+  # With separator "||" (2 chars / 2 tokens under nchar),
+  # each text is 1 token, separator adds 2.
+  # Budget = 5 => can fit: text(1) + sep(2) + text(1) = 4 <= 5 (2 items)
+  #              but not:  4 + sep(2) + text(1) = 7 > 5
+
+  texts <- c("a", "b", "c", "d")
+
+  batches <- create_text_batches(
+    texts = texts,
+    batch_size = 10,
+    draws = 1,
+    n_tokens_context_window = 5,
+    base_prompt_text = "",
+    separator = "||"
+  )
+
+  expect_true(is.list(batches))
+  expect_true(all(lengths(batches) <= 2))
+  flat <- unlist(batches, use.names = FALSE)
+  expect_equal(sort(flat), sort(texts))
+})
+
+
+test_that("create_text_batches: no separator means no inter-item overhead", {
+  texts <- c("a", "b", "c")
+
+  batches <- create_text_batches(
+    texts = texts,
+    batch_size = 10,
+    draws = 1,
+    n_tokens_context_window = 3,
+    base_prompt_text = ""
+  )
+
+  # Without separator overhead, all 3 one-char texts fit in 3 tokens.
+  expect_equal(length(batches), 1)
+  expect_equal(length(batches[[1]]), 3)
+})
+
+
+test_that("create_text_batches: batch estimate matches production prompt tokens", {
+  # This test constructs a real prompt_candidate_topics prompt and verifies
+
+  # that the batcher's token accounting matches the fully-built prompt.
+  source(here::here("R", "load_dependencies.R"), local = FALSE)
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  texts <- c("cats are great", "dogs are loyal", "fish swim fast")
+
+  base_prompt_text <- prompt_candidate_topics(
+    text_batch = character(0),
+    research_background = "",
+    language = "en"
+  ) |>
+    tidyprompt::construct_prompt_text()
+
+  formatter <- function(text, index) {
+    paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
+  }
+
+  # Build a single batch with all texts
+  batches <- create_text_batches(
+    texts = texts,
+    batch_size = 100,
+    draws = 1,
+    n_tokens_context_window = 100000,
+    base_prompt_text = base_prompt_text,
+    text_formatter = formatter,
+    separator = "\n\n"
+  )
+
+  expect_equal(length(batches), 1)
+  batch <- batches[[1]]
+
+  # Compute the batcher's estimate: base + per-text + separators
+  base_tokens <- count_tokens(base_prompt_text)
+  per_text_tokens <- sum(vapply(
+    seq_along(batch),
+    function(i) count_tokens(formatter(batch[[i]], i)),
+    numeric(1)
+  ))
+  sep_tokens <- (length(batch) - 1L) * count_tokens("\n\n")
+  batcher_estimate <- base_tokens + per_text_tokens + sep_tokens
+
+  # Build the actual production prompt and count its tokens
+  real_prompt_text <- prompt_candidate_topics(
+    text_batch = batch,
+    research_background = "",
+    language = "en"
+  ) |>
+    tidyprompt::construct_prompt_text()
+  real_tokens <- count_tokens(real_prompt_text)
+
+  expect_equal(batcher_estimate, real_tokens)
 })

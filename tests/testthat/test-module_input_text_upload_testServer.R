@@ -52,7 +52,7 @@ test_that("text_upload_server: txt split-lines mode preserves non-empty lines", 
       path <- withr::local_tempfile(fileext = ".txt")
       writeLines(txt, path, useBytes = TRUE)
 
-      session$setInputs(`text_upload-txt_split_lines` = lang()$t("Ja"))
+      session$setInputs(`text_upload-txt_split_lines` = "true")
       session$flushReact()
 
       session$setInputs(
@@ -96,7 +96,7 @@ test_that("text_upload_server: txt single-text mode returns one combined text", 
       path <- withr::local_tempfile(fileext = ".txt")
       writeLines(txt, path, useBytes = TRUE)
 
-      session$setInputs(`text_upload-txt_split_lines` = lang()$t("Nee"))
+      session$setInputs(`text_upload-txt_split_lines` = "false")
       session$flushReact()
 
       session$setInputs(
@@ -108,6 +108,52 @@ test_that("text_upload_server: txt single-text mode returns one combined text", 
       expect_equal(length(raw_texts()), 1)
       expect_true(grepl("a", raw_texts()[[1]], fixed = TRUE))
       expect_true(grepl("b", raw_texts()[[1]], fixed = TRUE))
+    }
+  )
+})
+
+
+test_that("text_upload_server: txt split-lines choice survives language re-render", {
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      processing <- reactiveVal(FALSE)
+
+      upload_result <- text_upload_server(
+        id = "text_upload",
+        processing = processing,
+        lang = lang
+      )
+
+      list(upload_result = upload_result, lang = lang)
+    },
+    {
+      txt <- "a\n\n b\n"
+      path <- withr::local_tempfile(fileext = ".txt")
+      writeLines(txt, path, useBytes = TRUE)
+
+      session$setInputs(
+        `text_upload-text_file` = make_fileinput_df(path, "texts.txt")
+      )
+      session$flushReact()
+
+      session$setInputs(`text_upload-txt_split_lines` = "false")
+      session$flushReact()
+
+      expect_false(upload_result$upload_info()$txt_split_lines)
+      expect_equal(length(upload_result$texts()), 1)
+
+      lang(make_test_lang("en")())
+      session$flushReact()
+
+      expect_false(upload_result$upload_info()$txt_split_lines)
+      expect_equal(length(upload_result$texts()), 1)
+      expect_match(
+        output$`text_upload-txt_mode_ui`$html,
+        'value="false" checked="checked"',
+        fixed = TRUE
+      )
+      expect_match(output$`text_upload-txt_mode_ui`$html, "No", fixed = TRUE)
     }
   )
 })

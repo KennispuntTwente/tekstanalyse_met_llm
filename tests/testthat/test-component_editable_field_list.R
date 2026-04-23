@@ -42,8 +42,8 @@ test_that("editable_field_list_server: default state and save/edit behavior", {
       expect_equal(sort(fields$texts()), sort(c("A", "B")))
       expect_equal(fields$unique_non_empty_count(), 2)
 
-      # Exclusive texts should include only the exclusive one
-      expect_equal(fields$exclusive_texts(), "  A  ")
+      # Exclusive texts should include only the exclusive one (trimmed)
+      expect_equal(fields$exclusive_texts(), "A")
 
       # Back to edit mode
       session$setInputs(`fields-toggleEdit` = 2)

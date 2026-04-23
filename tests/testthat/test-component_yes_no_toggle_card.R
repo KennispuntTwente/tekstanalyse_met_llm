@@ -1,5 +1,7 @@
 library(testthat)
 library(shiny)
+library(shinyWidgets)
+library(bslib)
 
 source(here::here("R", "component_card_header_with_tooltip.R"))
 source(here::here("R", "component_icon_button.R"))
@@ -28,13 +30,51 @@ test_that("yes_no_toggle_card_server: default value and toggle mapping", {
     {
       expect_false(result())
 
-      session$setInputs(`yn-toggle` = lang()$t("Ja"))
+      session$setInputs(`yn-toggle` = "true")
       session$flushReact()
       expect_true(result())
 
-      session$setInputs(`yn-toggle` = lang()$t("Nee"))
+      session$setInputs(`yn-toggle` = "false")
       session$flushReact()
       expect_false(result())
+    }
+  )
+})
+
+
+test_that("yes_no_toggle_card_server preserves selection across language re-render", {
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      processing <- reactiveVal(FALSE)
+
+      result <- yes_no_toggle_card_server(
+        id = "yn",
+        title = "Title",
+        tooltip_text = "Tooltip",
+        question_text = "Question",
+        default_value = FALSE,
+        show_when = reactive(TRUE),
+        processing = processing,
+        lang = lang
+      )
+
+      list(result = result, lang = lang)
+    },
+    {
+      session$setInputs(`yn-toggle` = "true")
+      session$flushReact()
+
+      lang(make_test_lang("en")())
+      session$flushReact()
+
+      expect_true(result())
+      expect_match(
+        output$`yn-ui_toggle`$html,
+        'value="true" checked="checked"',
+        fixed = TRUE
+      )
+      expect_match(output$`yn-ui_toggle`$html, "Yes", fixed = TRUE)
     }
   )
 })

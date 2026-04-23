@@ -45,7 +45,7 @@ processing_server <- function(
   codes,
   research_background,
   style_prompt,
-  human_in_the_loop = reactiveVal(TRUE),
+  human_in_the_loop = reactiveVal(FALSE),
   assign_multiple_categories = reactiveVal(TRUE),
   write_paragraphs = reactiveVal(TRUE),
   context_window,
@@ -54,7 +54,9 @@ processing_server <- function(
   split_settings = reactiveVal(list()),
   upload_info = reactiveVal(list()),
   split_in_progress = reactiveVal(FALSE),
-  lang = default_lang()
+  layout_view = reactiveVal("vertical"),
+  lang = default_lang(),
+  analysis_name = reactiveVal("")
 ) {
   ns <- NS(id)
 
@@ -143,17 +145,58 @@ processing_server <- function(
         unique(normalized[nzchar(normalized)])
       }
 
+      ensure_topic_assignment_choice <- function(topic_values) {
+        normalized_topics <- normalize_topic_labels(topic_values)
+        not_applicable_topic <- lang()$t("Onbekend/niet van toepassing")
+        reduction_summary <- attr(
+          topic_values,
+          "reduction_summary",
+          exact = TRUE
+        )
+        single_topic_fallback_applied <- isTRUE(
+          attr(topic_values, "single_topic_fallback_applied", exact = TRUE)
+        ) ||
+          isTRUE(
+            reduction_summary$single_topic_fallback_applied %||% FALSE
+          )
+
+        if (
+          length(normalized_topics) == 1L &&
+            !(not_applicable_topic %in% normalized_topics)
+        ) {
+          normalized_topics <- c(normalized_topics, not_applicable_topic)
+          single_topic_fallback_applied <- TRUE
+
+          if (!is.null(reduction_summary)) {
+            reduction_summary$not_applicable_requested <- TRUE
+            reduction_summary$auto_added_not_applicable <- TRUE
+            reduction_summary$single_topic_fallback_applied <- TRUE
+            reduction_summary$not_applicable_check_performed <-
+              isTRUE(reduction_summary$not_applicable_check_performed)
+            attr(normalized_topics, "reduction_summary") <- reduction_summary
+          }
+        } else if (!is.null(reduction_summary)) {
+          attr(normalized_topics, "reduction_summary") <- reduction_summary
+        }
+
+        attr(normalized_topics, "single_topic_fallback_applied") <-
+          single_topic_fallback_applied
+
+        normalized_topics
+      }
+
       topic_assignment_fit_info <- function(
         current_topics,
         current_exclusive_topics = exclusive_topics() %||% character()
       ) {
         topic_assignment_prompt_context_window_check(
           texts = texts$preprocessed,
-          topics = current_topics,
+          topics = unname(as.character(current_topics)),
           research_background = research_background(),
           llm_provider = models$main,
           assign_multiple_categories = assign_multiple_categories(),
-          exclusive_topics = current_exclusive_topics
+          exclusive_topics = current_exclusive_topics,
+          n_tokens_context_window = context_window$n_tokens_context_window
         )
       }
 
@@ -218,6 +261,8 @@ processing_server <- function(
 
         shinyjs::disable("process")
         shinyjs::addClass("process", "loading")
+
+        log_context_capture(is_async = TRUE)
       }
 
       # Connects a `mirai` promise to a reactive setter plus shared error
@@ -325,6 +370,13 @@ processing_server <- function(
         if (categories$unique_non_empty_count() < 2) {
           shiny::showNotification(
             lang()$t("Je moet minimaal 2 categorieen opgeven."),
+            type = "error"
+          )
+          return()
+        }
+        if (isTRUE(categories$has_duplicates())) {
+          shiny::showNotification(
+            lang()$t("Categorieen moeten uniek zijn."),
             type = "error"
           )
           return()
@@ -456,7 +508,7 @@ processing_server <- function(
         ) {
           return()
         }
-        if (isTRUE(nchar(scoring_characteristic()) < 1)) {
+        if (isTRUE(nchar(trimws(scoring_characteristic())) < 1)) {
           shiny::showNotification(
             lang()$t("Geef een karakteristiek op."),
             type = "error"
@@ -624,7 +676,8 @@ processing_server <- function(
                 candidate_topics,
                 research_background,
                 llm_provider_large,
-                language = lang$get_translation_language()
+                language = lang$get_translation_language(),
+                n_tokens_context_window = n_tokens_context_window_reduction
               ),
               error = handle_detailed_error("Topic reduction")
             )
@@ -649,6 +702,9 @@ processing_server <- function(
               mode = mode(),
               handle_detailed_error = handle_detailed_error,
               text_batches = context_window$text_batches,
+              n_tokens_context_window = context_window$n_tokens_context_window,
+              n_tokens_context_window_reduction = context_window$n_tokens_context_window_reduction %||%
+                context_window$n_tokens_context_window,
               lang = lang(),
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
@@ -660,9 +716,9 @@ processing_server <- function(
         bind_async_result(
           promise = promise,
           setter = function(value) {
-            normalized_topics <- normalize_topic_labels(value$topics)
-            normalized_reduced_topics <- processing_normalize_reduced_topics(
-              value$topics
+            normalized_topics <- ensure_topic_assignment_choice(value$topics)
+            normalized_reduced_topics <- ensure_topic_assignment_choice(
+              processing_normalize_reduced_topics(value$topics)
             )
             append_stage_execution_rows(value$stage_execution_rows)
             candidate_topics_generated(value$candidate_topics)
@@ -745,6 +801,13 @@ processing_server <- function(
           llm_provider = models$large,
           assignment_texts = reactive(texts$preprocessed),
           assignment_llm_provider = reactive(models$main),
+          n_tokens_context_window = reactive(
+            context_window$n_tokens_context_window
+          ),
+          n_tokens_context_window_reduction = reactive(
+            context_window$n_tokens_context_window_reduction %||%
+              context_window$n_tokens_context_window
+          ),
           research_background = research_background,
           assign_multiple_categories = assign_multiple_categories,
           lang = lang
@@ -759,7 +822,7 @@ processing_server <- function(
                 normalize_topic_labels(reduced_topics_generated())
               )
             )
-            topics(edited_topics())
+            topics(ensure_topic_assignment_choice(edited_topics()))
             topics_definitive(TRUE)
           },
           ignoreInit = TRUE,
@@ -778,10 +841,6 @@ processing_server <- function(
       # paragraphs.
       start_topic_assignment <- function() {
         req(topics())
-        if (!assign_multiple_categories()) {
-          # If not assigning multiple categories, set each topic is exclusive
-          exclusive_topics(topics())
-        }
 
         log_info(
           sprintf(
@@ -838,12 +897,7 @@ processing_server <- function(
               )
             }
 
-            assignment_context_window <- get_context_window_size_in_tokens(
-              llm_provider$parameters$model
-            )
-            if (is.null(assignment_context_window)) {
-              assignment_context_window <- 2048
-            }
+            assignment_context_window <- n_tokens_context_window
 
             assignment_prompt_tokens <- assignment_prompt |>
               tidyprompt::construct_prompt_text() |>
@@ -868,7 +922,7 @@ processing_server <- function(
                 results <- assign_topics(
                   texts = texts,
                   analysis_unit_ids = analysis_unit_ids,
-                  topics = topics,
+                  topics = unname(as.character(topics)),
                   research_background = research_background,
                   llm_provider = llm_provider,
                   assign_multiple_categories = assign_multiple_categories,
@@ -940,6 +994,7 @@ processing_server <- function(
               assign_multiple_categories = assign_multiple_categories(),
               write_paragraphs = write_paragraphs(),
               handle_detailed_error = handle_detailed_error,
+              n_tokens_context_window = context_window$n_tokens_context_window,
               lang = lang(),
               progress_primary = progress_primary$async,
               progress_secondary = progress_secondary$async,
@@ -1040,7 +1095,7 @@ processing_server <- function(
           )
           return()
         }
-        if (length(unique(codes$texts())) < length(codes$texts())) {
+        if (isTRUE(codes$has_duplicates())) {
           shiny::showNotification(
             lang()$t("Codes moeten uniek zijn."),
             type = "error"
@@ -1379,7 +1434,8 @@ processing_server <- function(
           candidate_topics = candidate_topics_generated(),
           reduced_topics = reduced_topics_generated(),
           topics_were_edited = topics_were_edited(),
-          irr_sample = irr_sample()
+          irr_sample = irr_sample(),
+          analysis_name = analysis_name()
         )
 
         expected_paragraph_subjects <-
@@ -1471,7 +1527,8 @@ processing_server <- function(
       ### 2.8.1 Processing results ---------------------------------------------
 
       # Handles the first result coming back from processing.
-      # This restores raw texts, finishes the UI, and starts IRR when needed.
+      # Joins worker outputs back to preprocessed texts, finishes the UI,
+      # and starts IRR when needed.
 
       observeEvent(results_table_pre(), {
         req(results_table_pre())
@@ -1485,7 +1542,8 @@ processing_server <- function(
 
         result <- join_processing_results(
           texts_df = texts$df,
-          results_table_pre = results_table_pre()
+          results_table_pre = results_table_pre(),
+          mode = mode()
         )
 
         results_table(result)
@@ -1590,7 +1648,7 @@ processing_server <- function(
             tags$div(
               class = "spinner-border",
               role = "status",
-              tags$span(class = "visually-hidden", "Loading...")
+              tags$span(class = "visually-hidden", lang()$t("Laden..."))
             ),
             br(),
             p(lang()$t("Download wordt voorbereid..."))
@@ -1674,7 +1732,12 @@ processing_server <- function(
 
         output$download_results <- downloadHandler(
           filename = function() {
-            paste0(uuid, ".zip")
+            safe_name <- sanitize_filename(analysis_name())
+            if (nzchar(safe_name)) {
+              paste0(safe_name, "_", uuid, ".zip")
+            } else {
+              paste0(uuid, ".zip")
+            }
           },
           content = function(file) {
             zip_bytes <- tryCatch(file.size(zip_file()), error = function(e) {
@@ -1829,20 +1892,55 @@ processing_server <- function(
           paste0(lang()$t("Verwerk"), " (", n_pre, ")")
         )
 
-        # Disable if no texts OR if there is a context-window fit problem
-        disable_flag <- (n_pre == 0) ||
-          !processing_models_ready(models, mode()) ||
-          isTRUE(context_window$any_fit_problem) ||
-          isTRUE(context_window$too_many_batches) ||
-          isTRUE(processing_has_pending_gliner_anonymization(texts)) ||
-          isTRUE(split_in_progress())
+        # Compute active blockers that prevent processing from starting.
+        blockers <- processing_active_blockers(
+          n_pre = n_pre,
+          models = models,
+          mode = mode(),
+          context_window = context_window,
+          texts = texts,
+          split_in_progress = split_in_progress(),
+          categories = categories,
+          scoring_characteristic = scoring_characteristic(),
+          codes = codes,
+          lang = lang()
+        )
 
-        actionButton(
+        disable_flag <- length(blockers) > 0L
+
+        btn <- actionButton(
           ns("process"),
           label = btn_label,
           class = "btn btn-primary btn-lg snake-btn",
           disabled = disable_flag
         )
+
+        if (!disable_flag) {
+          return(btn)
+        }
+
+        # Build inline guidance listing the active blockers.
+        is_sections <- identical(layout_view(), "sections")
+        section_label <- if (is_sections) lang()$t("Sectie") else NULL
+
+        items <- lapply(blockers, function(b) {
+          msg <- b$message
+          if (is_sections && !is.null(section_label)) {
+            msg <- paste0(msg, " (", section_label, " ", b$section, ")")
+          }
+          tags$li(msg)
+        })
+
+        blocker_ui <- div(
+          class = "alert alert-info mt-3 text-start",
+          style = "max-width: 500px; margin-left: auto; margin-right: auto;",
+          tags$ul(
+            class = "mb-0 ps-3",
+            items
+          )
+        )
+
+        tagList(btn, blocker_ui)
       })
 
       ### 2.9.4 Interruption & cancel ------------------------------------------

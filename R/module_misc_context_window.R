@@ -269,6 +269,19 @@ context_window_server <- function(
         rv$context_window_known <- context_window_known
       })
 
+      # Obtain context window size for the reduction model (models$large)
+      observe({
+        req(models$large)
+        size <- get_context_window_size_in_tokens(
+          models$large$parameters$model
+        )
+        rv$n_tokens_context_window_reduction <- ifelse(
+          is.null(size),
+          2048,
+          size
+        )
+      })
+
       # Enable/disable input based on if context window is known -----
       # observe({
       #   req(models$main)
@@ -310,13 +323,22 @@ context_window_server <- function(
             }
           },
           "Onderwerpextractie" = {
-            # Approximate categories (as they are not known yet; assume a long list of 50)
-            prompt_multi_category(
-              text = "",
-              research_background = research_background(),
-              categories = paste0("Category ", seq(1, 50)),
-              exclusive_categories = paste0("Category ", seq(2, 50, by = 2))
-            )
+            approx_topics <- paste0("Topic ", seq_len(25))
+
+            if (assign_multiple_categories()) {
+              prompt_multi_category(
+                text = "",
+                research_background = research_background(),
+                categories = approx_topics,
+                exclusive_categories = approx_topics[seq(2, 25, by = 2)]
+              )
+            } else {
+              prompt_category(
+                text = "",
+                research_background = research_background(),
+                categories = approx_topics
+              )
+            }
           },
           "Scoren" = {
             req(scoring_characteristic())
@@ -395,9 +417,11 @@ context_window_server <- function(
         # prompt batches before asking the LLM for candidate topics.
         texts <- texts$preprocessed
 
-        # Based on prompt for candidate topic generation; 600 characters + background
+        # Build the base prompt scaffold without any text blocks so that
+        # per-text tokens are not double-counted; separators between items
+        # are accounted for via the `separator` argument.
         base_prompt_text <- prompt_candidate_topics(
-          text_batch = c(""),
+          text_batch = character(0),
           research_background = research_background(),
           language = lang()$get_translation_language()
         ) |>
@@ -411,7 +435,8 @@ context_window_server <- function(
           base_prompt_text = base_prompt_text,
           text_formatter = function(text, index) {
             paste0("<text ", index, ">\n", text, "\n</text ", index, ">")
-          }
+          },
+          separator = "\n\n"
         )
 
         if (is.null(rv$text_batches)) {

@@ -30,7 +30,6 @@ main_ui <- function() {
 main_server <- function(
   preconfigured_main_models = NULL,
   preconfigured_large_models = NULL,
-  azure_auth = FALSE,
   gliner_model = NULL
 ) {
   server <- function(input, output, session) {
@@ -326,7 +325,8 @@ main_server <- function(
                 style = "display: flex; justify-content: center; align-items: center; gap: 10px;",
                 img(
                   src = "www/logo.png",
-                  style = "width: 3rem; height: 3rem"
+                  style = "width: 3rem; height: 3rem",
+                  alt = ""
                 ),
                 h1(
                   style = "margin: 0; text-align: center;",
@@ -334,7 +334,8 @@ main_server <- function(
                 ),
                 img(
                   src = "www/logo.png",
-                  style = "width: 3rem; height: 3rem; transform: scaleX(-1);"
+                  style = "width: 3rem; height: 3rem; transform: scaleX(-1);",
+                  alt = ""
                 )
               ),
               tags$hr(
@@ -428,7 +429,6 @@ main_server <- function(
             )
           ),
           hr(),
-          uiOutput("azure_auth_unauthorized_ui"),
           div(
             class = "card-container",
             div(
@@ -526,7 +526,7 @@ main_server <- function(
               interrater_toggle_ui("interrater_toggle"),
               human_in_the_loop_toggle_ui("human_in_the_loop_toggle"),
               write_paragraphs_toggle_ui("write_paragraphs_toggle"),
-              div()
+              analysis_name_ui("analysis_name")
             ),
             uiOutput("kwallm_processing_global"),
             div(style = "height: 75px;"),
@@ -554,19 +554,6 @@ main_server <- function(
         )
       )
     })
-
-    # 0 Authentication -----------------------------------------------
-
-    # When deploying to server, you could implement, e.g.,
-    #   Azure AD authentication here
-    # See for example R/azure_auth.R
-
-    if (azure_auth) {
-      user_info <- get_azure_auth(session, output)
-      if (is.null(user_info)) {
-        return()
-      }
-    }
 
     # 1 Text management ----------------------------------------------
 
@@ -641,6 +628,13 @@ main_server <- function(
     # Obtain research background
     research_background <- research_background_server(
       "research_background",
+      processing = processing,
+      lang = lang
+    )
+
+    # Obtain analysis name
+    analysis_name <- analysis_name_server(
+      "analysis_name",
       processing = processing,
       lang = lang
     )
@@ -776,7 +770,9 @@ main_server <- function(
       split_settings = split_settings,
       upload_info = upload_info,
       split_in_progress = split_in_progress,
-      lang = lang
+      layout_view = last_layout_view,
+      lang = lang,
+      analysis_name = analysis_name
     )
 
     # Processing UI placement ------------------------------------------------

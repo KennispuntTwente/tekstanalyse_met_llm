@@ -3,6 +3,7 @@
 
 library(testthat)
 
+source(here::here("R", "utils_prompt_sanitization.R"))
 source(here::here("R", "analysis_marking.R"))
 
 # Tests for best_literal_substring helper
@@ -239,4 +240,78 @@ test_that(".kwallm_marking_build_highlighted_excerpt only highlights the matched
   )
 
   expect_identical(excerpt, "alpha **beta** gamma beta")
+})
+
+
+# Repeated identical spans ------------------------------------------------
+
+test_that(".kwallm_marking_clean_results preserves distinct occurrences of the same marked text", {
+  # Two matches for "beta" at different absolute positions should both survive
+  df_result <- data.frame(
+    analysis_unit_id = c(1L, 1L),
+    analysis_unit_text = c(
+      "alpha beta gamma beta delta",
+      "alpha beta gamma beta delta"
+    ),
+    chunk_id = c(1L, 1L),
+    chunk_index = c(1L, 1L),
+    chunk_text = c(
+      "alpha beta gamma beta delta",
+      "alpha beta gamma beta delta"
+    ),
+    code = c("Topic", "Topic"),
+    source_marked_text = c("beta", "beta"),
+    marked_text = c("beta", "beta"),
+    match_start = c(7L, 18L),
+    match_end = c(10L, 21L),
+    match_distance = c(0L, 0L),
+    match_method = c("exact", "exact"),
+    response_status = c("matched_all", "matched_all"),
+    stringsAsFactors = FALSE
+  )
+
+  cleaned <- .kwallm_marking_clean_results(df_result)
+
+  matched <- cleaned[
+    !is.na(cleaned$marked_text) & nzchar(cleaned$marked_text),
+  ]
+  expect_equal(nrow(matched), 2)
+  expect_true(all(matched$marked_text == "beta"))
+  # Absolute spans should be distinct
+  expect_true(
+    matched$absolute_match_start[1] != matched$absolute_match_start[2]
+  )
+})
+
+test_that(".kwallm_marking_clean_results ranks chunk occurrence across all chunks, not just matched", {
+  # Two identical chunks "alpha beta gamma"; chunk 1 has no match, chunk 2 does.
+  # The match in chunk 2 should resolve to the *second* occurrence in the full text.
+  full_text <- "alpha beta gamma. alpha beta gamma."
+  chunk <- "alpha beta gamma"
+  df_result <- data.frame(
+    analysis_unit_id = c(1L, 1L),
+    analysis_unit_text = c(full_text, full_text),
+    chunk_id = c(1L, 2L),
+    chunk_index = c(1L, 2L),
+    chunk_text = c(chunk, chunk),
+    code = c("Topic", "Topic"),
+    source_marked_text = c(NA_character_, "beta"),
+    marked_text = c(NA_character_, "beta"),
+    match_start = c(NA_integer_, 7L),
+    match_end = c(NA_integer_, 10L),
+    match_distance = c(NA_integer_, 0L),
+    match_method = c(NA_character_, "exact"),
+    response_status = c("no_match", "matched_all"),
+    stringsAsFactors = FALSE
+  )
+
+  cleaned <- .kwallm_marking_clean_results(df_result)
+
+  matched <- cleaned[
+    !is.na(cleaned$marked_text) & nzchar(cleaned$marked_text),
+  ]
+  expect_equal(nrow(matched), 1)
+  # "beta" in the second occurrence of the chunk starts at position 25
+  expect_equal(matched$absolute_match_start, 25L)
+  expect_equal(matched$absolute_match_end, 28L)
 })

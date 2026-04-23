@@ -10,13 +10,19 @@
 #' @return A card_header element
 #' @export
 card_header_with_tooltip <- function(title, tooltip_text, extra = NULL) {
+  info_icon <- tags$span(
+    role = "img",
+    `aria-label` = tooltip_text,
+    bsicons::bs_icon("info-circle")
+  )
+
   header_content <- if (!is.null(extra)) {
     div(
       class = "d-flex justify-content-between align-items-center w-100",
       span(
         title,
         bslib::tooltip(
-          bsicons::bs_icon("info-circle"),
+          info_icon,
           tooltip_text
         )
       ),
@@ -26,7 +32,7 @@ card_header_with_tooltip <- function(title, tooltip_text, extra = NULL) {
     tagList(
       title,
       bslib::tooltip(
-        bsicons::bs_icon("info-circle"),
+        info_icon,
         tooltip_text
       )
     )

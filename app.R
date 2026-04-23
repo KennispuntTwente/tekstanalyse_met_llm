@@ -197,7 +197,7 @@ options(
   # - If a topic 'unknown/not applicable' should always be added
   #   to to the list of candiate topics during topic modelling;
   #   this may be useful to avoid LLM failure in the topic assignment process;
-  #     see R/topic_modelling.R
+  #     see R/analysis_inductive_topic_modelling.R
   topic_modelling__always_add_not_applicable = TRUE,
   # - Parameters for topic batching;
   #     see R/module_misc_context_window.R
@@ -206,6 +206,17 @@ options(
   topic_modelling__number_of_batches_limit = getOption(
     "topic_modelling__number_of_batches_limit",
     50
+  ),
+  # - Safety caps for topic reduction;
+  #   these apply only while reducing the candidate-topic list, not while
+  #   generating the initial text batches above.
+  topic_modelling__reduction_max_prompt_batches = getOption(
+    "topic_modelling__reduction_max_prompt_batches",
+    16
+  ),
+  topic_modelling__reduction_max_iterations = getOption(
+    "topic_modelling__reduction_max_iterations",
+    4
   ),
   topic_modelling__draws_default = 1,
   topic_modelling__draws_limit = 5,

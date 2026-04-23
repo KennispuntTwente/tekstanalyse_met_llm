@@ -34,6 +34,7 @@ AsyncInterruptor <- list(
 
 source(here::here("R", "component_editable_field_list.R"))
 source(here::here("R", "component_card_header_with_tooltip.R"))
+source(here::here("R", "utils_prompt_sanitization.R"))
 source(here::here("R", "analysis_code_generation.R"))
 source(here::here("R", "module_input_marking_codes.R"))
 

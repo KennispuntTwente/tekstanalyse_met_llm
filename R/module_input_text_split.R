@@ -73,16 +73,14 @@ text_split_server <- function(
     })
 
     # If text splitting is activated
+    split_toggle <- reactiveVal(FALSE)
+
     splitting <- reactive({
       if (isTRUE(active_marking_mode())) {
         return(FALSE)
       }
 
-      if (isTRUE(input$toggle == lang()$t("Ja")) && isTRUE(enabled)) {
-        TRUE
-      } else {
-        FALSE
-      }
+      isTRUE(split_toggle()) && isTRUE(enabled)
     })
 
     # If right now we are running the splitting process
@@ -90,12 +88,21 @@ text_split_server <- function(
     input_rows_version <- reactiveVal(0L)
 
     # Upon observing new document texts, reset the split texts and message.
+    # Also cancel any in-flight split so the UI is not stuck behind a stale
+    # worker (the version guard in the promise callbacks will discard the
+    # result once the old worker settles).
     observeEvent(input_rows(), {
       input_rows_version(input_rows_version() + 1L)
       split_document_texts(NULL)
       split_rows(NULL)
       source_document_texts(NULL)
       semchunk_message("...")
+
+      if (isTRUE(split_in_progress())) {
+        split_in_progress(FALSE)
+        shinyjs::enable("split_texts")
+        queue$consumer$stop()
+      }
     })
 
     # Chunked current-document texts created by this module.
@@ -129,6 +136,7 @@ text_split_server <- function(
 
     # Export test values
     shiny::exportTestValues(
+      split_toggle = split_toggle(),
       splitting = splitting(),
       split_in_progress = split_in_progress(),
       split_document_texts = split_document_texts(),
@@ -181,11 +189,11 @@ text_split_server <- function(
               shinyWidgets::radioGroupButtons(
                 ns("toggle"),
                 NULL,
-                choices = c(
-                  lang()$t("Nee"),
-                  lang()$t("Ja")
+                choices = stats::setNames(
+                  c("false", "true"),
+                  c(lang()$t("Nee"), lang()$t("Ja"))
                 ),
-                selected = lang()$t("Nee"),
+                selected = if (isTRUE(split_toggle())) "true" else "false",
                 size = "sm"
               )
             ),
@@ -244,9 +252,9 @@ text_split_server <- function(
               placement = "bottom"
             )
           ),
-          value = 0,
+          value = isolate(overlap_val()),
           min = 0,
-          step = 1
+          step = 0.1
         ),
         # Button to split texts
         div(
@@ -266,6 +274,11 @@ text_split_server <- function(
     })
 
     # Listen for user inputs ---------------------------------------
+
+    observeEvent(input$toggle, {
+      req(input$toggle %in% c("false", "true"))
+      split_toggle(identical(input$toggle, "true"))
+    })
 
     observeEvent(input$split_texts, {
       req(input_rows())
@@ -489,6 +502,21 @@ text_split_server <- function(
       processing,
       c("toggle", "max_tokens", "overlap", "split_texts")
     )
+
+    # Invalidate stale chunks when settings change -----------------
+    observe({
+      max_tokens_val()
+      overlap_val()
+
+      if (isTRUE(splitting()) && !is.null(isolate(split_rows()))) {
+        split_rows(NULL)
+        split_document_texts(NULL)
+        source_document_texts(NULL)
+        semchunk_message(
+          lang()$t("Instellingen gewijzigd - splits de teksten opnieuw")
+        )
+      }
+    })
 
     split_settings <- reactive({
       list(

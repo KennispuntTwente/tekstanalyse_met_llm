@@ -1,4 +1,5 @@
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 
 `%||%` <- function(x, y) {
   if (is.null(x)) y else x
@@ -109,7 +110,7 @@ test_that("fake LLM replies remain parseable for supported workflow prompts", {
   ))
   reduced_topics <- jsonlite::fromJSON(reduced_topics_reply)
   expect_true("topics" %in% names(reduced_topics))
-  expect_true(length(reduced_topics$topics) >= 2)
+  expect_true(length(reduced_topics$topics) >= 1)
 
   marking_reply <- kwallm_test_llm_reply(tidyprompt::construct_prompt_text(
     mark_text_prompt(

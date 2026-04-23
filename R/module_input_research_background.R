@@ -55,7 +55,8 @@ research_background_server <- function(
             textAreaInput(
               ns("research_background"),
               NULL,
-              value = "",
+              value = isolate(input$research_background) %||%
+                research_background(),
               rows = 3,
               width = "100%"
             )

@@ -48,7 +48,7 @@ test_that("{shinytest2} recording: categorization with split texts and by_column
   app$set_inputs(`text_upload-by_column` = "group")
 
   wait_for_bound_input(app, "text_split-toggle")
-  app$set_inputs(`text_split-toggle` = "Yes")
+  app$set_inputs(`text_split-toggle` = "true")
   wait_for_bound_input(app, "text_split-max_tokens")
   app$set_inputs(
     `text_split-max_tokens` = 16,
@@ -80,9 +80,9 @@ test_that("{shinytest2} recording: categorization with split texts and by_column
 
   set_fake_models(app)
 
-  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "No")
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
-  app$set_inputs(`interrater_toggle-toggle` = "No")
+  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "false")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
+  app$set_inputs(`interrater_toggle-toggle` = "false")
 
   wait_for_enabled_element(app, "processing-process", timeout = 30000)
   app$click("processing-process")
@@ -123,6 +123,7 @@ test_that("{shinytest2} recording: categorization with split texts and by_column
       "results",
       "labels",
       "assignments",
+      "categorization_response_status",
       "document_groups"
     ),
     expected_results_columns = c("text", "result"),

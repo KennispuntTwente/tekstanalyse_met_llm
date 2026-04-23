@@ -308,7 +308,8 @@ gliner_server <- function(
 
           ## 1 Parse & validate labels
           labels <- strsplit(input$pii_labels, ",")[[1]] |> trimws()
-          if (length(labels) < 2 || all(labels == "")) {
+          labels <- labels[nzchar(labels)]
+          if (length(labels) < 2) {
             # Need at least 2 labels, otherwise model won't function
             # Not sure why 1 label is not enough, but it isn't;
             #   bug (feature?) in the GLiNER package/model?
@@ -337,7 +338,7 @@ gliner_server <- function(
             )
           )
 
-          ## 2 Switch the modal to the “running” state
+          ## 2 Switch the modal to the "running" state
           module_state("running")
 
           # Log GLiNER start with configured labels
@@ -414,7 +415,7 @@ gliner_server <- function(
             )
           ) %...>%
             {
-              ## SUCCESS ─ tidy predictions & then set state to “evaluating”
+              ## SUCCESS ─ tidy predictions & then set state to "evaluating"
               preds <- .
 
               # ── clean up the raw list into a data frame
@@ -476,7 +477,7 @@ gliner_server <- function(
               queue$consumer$stop()
             } %...!%
             {
-              ## ERROR ─ notify the user and set state to “error”
+              ## ERROR ─ notify the user and set state to "error"
               err <- .
               progress$close()
               queue$consumer$stop()
@@ -558,7 +559,7 @@ gliner_server <- function(
           div(
             style = "max-height: 80%; overflow-y: auto; overflow-x: hidden; max-width: 100%;",
             class = "pii-entities-table-container",
-            DTOutput(ns("pii_entities_table"))
+            DT::DTOutput(ns("pii_entities_table"))
           )
         )
       })

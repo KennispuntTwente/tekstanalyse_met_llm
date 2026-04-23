@@ -46,7 +46,7 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
     timeout = 30000
   )
   app$set_inputs(`model-main_model` = "kwallm-fake-main-1024")
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "Yes")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "true")
 
   document_texts <- app$get_value(
     export = "text_management-texts__document_text"
@@ -79,10 +79,7 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
   results <- app$get_value(export = "processing-results_table")
   paragraphs <- app$get_value(export = "processing-paragraph_entries")
 
-  texts <- readLines(
-    here::here("tests", "testthat", "test_texts.txt")
-  )
-  expect_true(all(texts %in% results$text))
+  expect_true(all(preprocessed_texts %in% results$text))
   expect_true(length(paragraphs) > 0)
   expect_true(is.character(paragraphs[[1]]$paragraph))
   expect_true(is.logical(paragraphs[[1]]$prompt_fits))
@@ -103,13 +100,14 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
       "results",
       "labels",
       "assignments",
+      "categorization_response_status",
       "paragraphs",
       "paragraph_sources"
     ),
     expected_results_columns = c("text"),
     expected_result_rows = nrow(results),
-    expected_texts = texts,
-    expected_text_count = length(texts)
+    expected_texts = preprocessed_texts,
+    expected_text_count = length(preprocessed_texts)
   )
 
   expect_identical(bundle$metadata$input$anonymization_applied_mode, "regex")

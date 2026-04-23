@@ -203,11 +203,14 @@ yes_no_toggle_card_server <- function(
               toggle_buttons <- shinyWidgets::radioGroupButtons(
                 ns("toggle"),
                 NULL,
-                choices = c(lang()$t("Nee"), lang()$t("Ja")),
+                choices = stats::setNames(
+                  c("false", "true"),
+                  c(lang()$t("Nee"), lang()$t("Ja"))
+                ),
                 selected = if (isTRUE(toggle())) {
-                  lang()$t("Ja")
+                  "true"
                 } else {
-                  lang()$t("Nee")
+                  "false"
                 },
                 size = "sm"
               )
@@ -225,7 +228,8 @@ yes_no_toggle_card_server <- function(
 
     # Observe toggle
     observeEvent(input$toggle, {
-      new_value <- input$toggle == lang()$t("Ja")
+      req(input$toggle %in% c("false", "true"))
+      new_value <- identical(input$toggle, "true")
       toggle(new_value)
       log_action(
         "toggle_changed",

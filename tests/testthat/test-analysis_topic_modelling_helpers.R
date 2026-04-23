@@ -2,6 +2,7 @@
 # Tests prompt construction and batching logic (not LLM calls)
 
 library(testthat)
+source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
 
 test_that("prompt_reduce_topics (via reduce_topics logic) creates valid prompt", {
   source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)

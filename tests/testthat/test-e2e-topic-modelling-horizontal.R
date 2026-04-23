@@ -46,7 +46,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   )
 
   # Set mode
-  app$set_inputs(`mode-mode` = "Topic extraction")
+  app$set_inputs(`mode-mode` = "Onderwerpextractie")
 
   # Navigate to section 3 using step button directly
   app$set_inputs(kwallm_sections_step = "3")
@@ -56,7 +56,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   expect_equal(app$get_value(input = "kwallm_sections_step"), "3")
 
   # Set analysis options
-  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "Yes")
+  app$set_inputs(`assign_multiple_categories_toggle-toggle` = "true")
 
   # Navigate to section 4 using next button
   app$click("kwallm_sections_next")
@@ -85,10 +85,10 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   expect_equal(app$get_value(input = "kwallm_sections_step"), "5")
 
   # Set remaining options
-  app$set_inputs(`human_in_the_loop_toggle-toggle` = "Yes")
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "No")
-  app$set_inputs(`interrater_toggle-interrater_reliability` = "No")
-  app$set_inputs(`write_paragraphs_toggle-toggle` = "Yes")
+  app$set_inputs(`human_in_the_loop_toggle-toggle` = "true")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
+  app$set_inputs(`interrater_toggle-toggle` = "false")
+  app$set_inputs(`write_paragraphs_toggle-toggle` = "true")
 
   # Start processing
   app$click("processing-process")
@@ -112,8 +112,8 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   paragraphs <- app$get_value(export = "processing-paragraph_entries")
 
   # Expect that all texts are present in column 'text'
-  texts <- readLines(
-    here::here("tests", "testthat", "test_texts.txt")
+  texts <- app$get_value(
+    export = "text_management-texts__preprocessed"
   )
   expect_true(all(texts %in% results$text))
   expect_true(all.equal(

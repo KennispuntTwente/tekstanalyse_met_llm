@@ -31,6 +31,17 @@ source(here::here("R", "utils_quotes.R"), local = TRUE)
 source(here::here("R", "report_grouped_frequencies.R"), local = TRUE)
 ```
 
+```{r echo=FALSE, results='asis', error=TRUE}
+analysis_name <- analysis_result@metadata@analysis_name
+if (nzchar(analysis_name)) {
+  cat(paste0(
+    "<h3 style='color: #666; margin-top: -0.5em;'>",
+    htmltools::htmlEscape(analysis_name),
+    "</h3>\n"
+  ))
+}
+```
+
 ## Methode
 
 `r .kwallm_report_text_count_summary(analysis_result)` Het LLM (model: `r htmltools::htmlEscape(main_model)`) kreeg de vraag om tekstfragmenten te markeren die hoorden bij één van de volgende codes:
@@ -118,9 +129,9 @@ if (!is.null(by_column_name) && !is.null(group_lookup)) {
 
 Onderstaande tabel toont per tekstrij, chunk en code welk deel van de tekst is gemarkeerd door het taalmodel.
 
-Kolom 'Tekst' bevat de huidige tekstrij in de app, kolom 'Chunk' bevat de chunk die aan het taalmodel is getoond,
-de kolom 'Code' bevat de code waarvoor de tekst is gecontroleerd, de kolom 'Gemarkeerde tekst' bevat het letterlijke tekstdeel dat door het taalmodel is teruggegeven,
-en de kolom 'Responsestatus' geeft aan of de chunk/code-respons volledig is opgelost of dat alleen partiele letterlijke matches overbleven na de correctielus.
+Kolom 'Tekst' bevat de analysetekst (na eventuele voorbewerking of anonimisering), kolom 'Chunk' bevat de (mogelijk voorbewerkte) chunk die aan het taalmodel is getoond,
+de kolom 'Code' bevat de code waarvoor de tekst is gecontroleerd, de kolom 'Gemarkeerde tekst' bevat de overeenkomende deelstring uit de brontekst (die licht kan afwijken van de ruwe modeluitvoer wanneer fuzzy-herstel is gebruikt om de match op de werkelijke tekst te laten aansluiten),
+en de kolom 'Responsestatus' geeft aan of de chunk/code-respons volledig is opgelost of dat alleen partiële letterlijke matches overbleven na de correctielus.
 Een lege waarde in 'Gemarkeerde tekst' betekent dat er voor die chunk/code-combinatie geen relevant tekstdeel is teruggegeven.
 
 ```{r, echo=FALSE, results='asis', error=TRUE}
@@ -190,16 +201,18 @@ for (i in seq_len(nrow(paragraphs_df))) {
     analysis_result,
     paragraph_row$paragraph_id[[1]]
   )
-  if (!length(supporting_texts)) {
+  if (!length(supporting_texts) && isTRUE(paragraph_row$prompt_fits[[1]])) {
     next
   }
   #### 1 Verify quotes on presence in supporting texts ####
-  paragraph_text <- verify_and_decorate_quotes(
-    paragraph_text = paragraph_text,
-    supporting_texts = supporting_texts,
-    lang = "nl",
-    escape_html = FALSE
-  )
+  if (length(supporting_texts)) {
+    paragraph_text <- verify_and_decorate_quotes(
+      paragraph_text = paragraph_text,
+      supporting_texts = supporting_texts,
+      lang = "nl",
+      escape_html = FALSE
+    )
+  }
   
   #### 2 Check if paragraph has attribute about prompt not fitting in context window ####
   
