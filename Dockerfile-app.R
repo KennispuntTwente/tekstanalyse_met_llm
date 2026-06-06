@@ -1,6 +1,7 @@
 # 1 Load dependencies ----------------------------------------------------------
 
 source("R/load_dependencies.R")
+
 load_dependencies("docker")
 
 
@@ -20,6 +21,8 @@ load_dependencies("docker")
 #     with `KWALLM_MIRAI_QUEUE_MEMORY_MB`; set it to 0 to disable the cap.
 # - Large per-run user payloads are passed to local workers through `mori`
 #     shared-memory references and kept scoped to the running Shiny session.
+# - Set `mori__enabled = FALSE` below to disable `mori` and always use
+#     regular serialized worker payloads instead.
 # - When asynchronous processing is not needed, you can use
 #     `mirai::daemons(0)`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
@@ -195,6 +198,13 @@ options(
   #   only works when LLM provider has stream = TRUE;
   #     see R/component_llm_streaming.R
   paragraph_streaming = TRUE,
+
+  # - Enable mori-backed shared-memory payloads for async workers;
+  #   set to FALSE to force regular serialized worker arguments instead.
+  mori__enabled = TRUE,
+  # - Maximum total payload size in MB to share through mori per worker dispatch;
+  #   set to 0 to disable this cap. `KWALLM_MORI_MAX_MB` overrides this option.
+  mori__max_mb = 0,
 
   # - Default setting for anonymization of texts, and if user
   #   can toggle this setting;

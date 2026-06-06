@@ -156,7 +156,6 @@ load_dependencies <- function(mode = c("regular", "docker", "electron")) {
   library(bslib)
   library(htmltools)
   library(mirai)
-  library(mori)
   library(promises)
 
   # Make a fake call to 'jsonvalidate' to avoid `renv::status()` complaint

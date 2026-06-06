@@ -22,6 +22,8 @@ kwallm_worker_capture_options <- function() {
     "app__mode",
     "app_admin_name",
     "app_admin_email",
+    "mori__enabled",
+    "mori__max_mb",
     "logger__level",
     "logger__dir",
     "logger__retention",
@@ -59,10 +61,52 @@ kwallm_mori_enabled <- function(
   get_option = getOption,
   require_namespace = requireNamespace
 ) {
-  isTRUE(get_option("kwallm__mori_enabled", TRUE)) &&
+  isTRUE(get_option("mori__enabled", TRUE)) &&
     isTRUE(require_namespace("mori", quietly = TRUE)) &&
     isTRUE(require_namespace("openssl", quietly = TRUE)) &&
     isTRUE(require_namespace("digest", quietly = TRUE))
+}
+
+
+#' Resolve the configured mori shared-payload size cap
+#'
+#' @return Numeric size cap in MB, or NULL when uncapped.
+kwallm_mori_max_mb <- function(
+  get_option = getOption,
+  getenv = Sys.getenv
+) {
+  configured <- suppressWarnings(as.numeric(
+    getenv("KWALLM_MORI_MAX_MB", unset = NA_character_)
+  ))
+
+  if (is.na(configured)) {
+    configured <- suppressWarnings(as.numeric(
+      get_option("mori__max_mb", NA_real_)
+    ))
+  }
+
+  if (length(configured) != 1L || is.na(configured) || configured <= 0) {
+    return(NULL)
+  }
+
+  configured
+}
+
+
+kwallm_mori_max_bytes <- function(max_mb = kwallm_mori_max_mb()) {
+  if (is.null(max_mb)) {
+    return(NULL)
+  }
+
+  max_mb * 1024^2
+}
+
+
+kwallm_mori_value_size_bytes <- function(
+  x,
+  object_size = utils::object.size
+) {
+  suppressWarnings(as.numeric(object_size(x)))
 }
 
 
@@ -77,9 +121,7 @@ kwallm_mori_random_token <- function(bytes = 32L) {
     bytes <- 32L
   }
 
-  paste0(sprintf("%02x", as.integer(openssl::rand_bytes(bytes))),
-    collapse = ""
-  )
+  paste0(sprintf("%02x", as.integer(openssl::rand_bytes(bytes))), collapse = "")
 }
 
 
@@ -197,7 +239,11 @@ kwallm_mori_is_ref <- function(x) {
 kwallm_mori_share_worker_payload <- function(
   payload,
   keys = names(payload),
-  enabled = kwallm_mori_enabled()
+  enabled = kwallm_mori_enabled(),
+  max_mb = kwallm_mori_max_mb(),
+  object_size = utils::object.size,
+  share_fn = mori::share,
+  shared_name_fn = mori::shared_name
 ) {
   if (!is.list(payload) || is.null(names(payload))) {
     stop("`payload` must be a named list.", call. = FALSE)
@@ -207,6 +253,7 @@ kwallm_mori_share_worker_payload <- function(
   guard <- list()
   shared_names <- character()
   scope_key <- NULL
+  remaining_bytes <- kwallm_mori_max_bytes(max_mb)
 
   if (!isTRUE(enabled)) {
     return(structure(
@@ -224,12 +271,24 @@ kwallm_mori_share_worker_payload <- function(
   keys <- intersect(as.character(keys), names(payload))
 
   for (key in keys) {
+    payload_size <- kwallm_mori_value_size_bytes(
+      payload[[key]],
+      object_size = object_size
+    )
+
+    if (!is.null(remaining_bytes)) {
+      if (is.na(payload_size) || payload_size > remaining_bytes) {
+        args[[key]] <- payload[[key]]
+        next
+      }
+    }
+
     shared <- tryCatch(
-      mori::share(payload[[key]]),
+      share_fn(payload[[key]]),
       error = function(e) payload[[key]]
     )
     shared_name <- tryCatch(
-      mori::shared_name(shared),
+      shared_name_fn(shared),
       error = function(e) NULL
     )
 
@@ -245,6 +304,10 @@ kwallm_mori_share_worker_payload <- function(
       key = key,
       scope_key = scope_key
     )
+
+    if (!is.null(remaining_bytes)) {
+      remaining_bytes <- max(0, remaining_bytes - payload_size)
+    }
   }
 
   structure(
@@ -289,7 +352,8 @@ kwallm_mori_resolve_worker_arg <- function(x, scope_key = NULL) {
   }
 
   if (!requireNamespace("mori", quietly = TRUE)) {
-    stop("Package `mori` is required to resolve shared worker payloads.",
+    stop(
+      "Package `mori` is required to resolve shared worker payloads.",
       call. = FALSE
     )
   }
@@ -338,14 +402,15 @@ kwallm_worker_load_core_packages <- function(
     "bslib",
     "htmltools",
     "mirai",
-    "mori",
     "promises"
-  )
+  ),
+  require_namespace = requireNamespace,
+  library_fn = library
 ) {
   missing_packages <- packages[
     !vapply(
       packages,
-      requireNamespace,
+      require_namespace,
       logical(1),
       quietly = TRUE
     )
@@ -363,7 +428,7 @@ kwallm_worker_load_core_packages <- function(
 
   for (pkg in packages) {
     suppressPackageStartupMessages(
-      library(pkg, character.only = TRUE)
+      library_fn(pkg, character.only = TRUE)
     )
   }
 

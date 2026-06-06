@@ -20,6 +20,8 @@ test_that("kwallm_worker_source errors when the app R directory is missing", {
 test_that("kwallm_worker_capture_options keeps only configured worker options", {
   old_opts <- options(
     app__mode = "test",
+    mori__enabled = FALSE,
+    mori__max_mb = 64,
     logger__level = "DEBUG",
     send_prompt_with_retries__max_tries = 5L,
     topic_modelling__reduction_max_prompt_batches = 24L,
@@ -31,11 +33,55 @@ test_that("kwallm_worker_capture_options keeps only configured worker options", 
   captured <- kwallm_worker_capture_options()
 
   expect_identical(captured$app__mode, "test")
+  expect_identical(captured$mori__enabled, FALSE)
+  expect_identical(captured$mori__max_mb, 64)
   expect_identical(captured$logger__level, "DEBUG")
   expect_identical(captured$send_prompt_with_retries__max_tries, 5L)
   expect_identical(captured$topic_modelling__reduction_max_prompt_batches, 24L)
   expect_identical(captured$topic_modelling__reduction_max_iterations, 3L)
   expect_false("kwallm__worker_task" %in% names(captured))
+})
+
+
+test_that("kwallm_mori_max_mb prefers env var and disables non-positive caps", {
+  expect_identical(
+    kwallm_mori_max_mb(
+      get_option = function(name, default = NULL) 32,
+      getenv = function(name, unset = "") "48"
+    ),
+    48
+  )
+
+  expect_null(
+    kwallm_mori_max_mb(
+      get_option = function(name, default = NULL) 32,
+      getenv = function(name, unset = "") "0"
+    )
+  )
+
+  expect_identical(
+    kwallm_mori_max_mb(
+      get_option = function(name, default = NULL) 32,
+      getenv = function(name, unset = "") NA_character_
+    ),
+    32
+  )
+})
+
+
+test_that("kwallm_worker_load_core_packages does not require mori", {
+  loaded_packages <- character()
+
+  kwallm_worker_load_core_packages(
+    packages = c("mirai", "promises"),
+    require_namespace = function(pkg, quietly = TRUE) TRUE,
+    library_fn = function(package, character.only = FALSE) {
+      loaded_packages <<- c(loaded_packages, package)
+      invisible(TRUE)
+    }
+  )
+
+  expect_identical(loaded_packages, c("mirai", "promises"))
 })
 
 
@@ -50,6 +96,38 @@ test_that("kwallm_mori_share_worker_payload falls back when disabled", {
   expect_identical(payload$guard, list())
   expect_null(payload$scope_key)
   expect_identical(payload$shared_names, character())
+})
+
+
+test_that("kwallm_mori_share_worker_payload respects the configured size cap", {
+  testthat::skip_if_not_installed("openssl")
+  testthat::skip_if_not_installed("digest")
+
+  fake_share <- function(x) {
+    structure(x, shared_name = paste0("shared-", paste(x, collapse = "-")))
+  }
+  fake_shared_name <- function(x) attr(x, "shared_name")
+
+  payload <- kwallm_mori_share_worker_payload(
+    list(texts = c("alpha", "beta"), ids = 1:3),
+    keys = c("texts", "ids"),
+    enabled = TRUE,
+    max_mb = 1,
+    object_size = function(x) {
+      if (is.character(x)) {
+        return(2 * 1024^2)
+      }
+
+      256 * 1024
+    },
+    share_fn = fake_share,
+    shared_name_fn = fake_shared_name
+  )
+
+  expect_false(kwallm_mori_is_ref(payload$args$texts))
+  expect_true(kwallm_mori_is_ref(payload$args$ids))
+  expect_named(payload$shared_names, "ids")
+  expect_length(payload$guard, 1)
 })
 
 
