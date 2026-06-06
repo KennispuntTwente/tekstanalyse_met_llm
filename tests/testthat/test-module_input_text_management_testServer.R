@@ -37,7 +37,50 @@ test_that("text_management_server: errors if all anonymization methods disabled"
 })
 
 
-test_that("text_management_server: regex default produces anonymized preprocessed texts", {
+test_that("text_management_server: none default preserves preprocessed texts", {
+  withr::local_options(list(
+    anonymization__default = "none",
+    anonymization__none = TRUE,
+    anonymization__regex = TRUE,
+    anonymization__gliner_model = FALSE
+  ))
+
+  shiny::testServer(
+    function(input, output, session) {
+      lang <- make_test_lang("nl")
+      document_texts <- reactiveVal(c(
+        " Mail me at bob@example.com ",
+        "Call +31 6 1234 5678",
+        "Postcode 1234 AB"
+      ))
+
+      texts <- text_management_server(
+        id = "tm",
+        document_texts = reactive(document_texts()),
+        gliner_model = NULL,
+        processing = reactiveVal(FALSE),
+        lang = lang
+      )
+
+      list(document_texts = document_texts, texts = texts)
+    },
+    {
+      session$flushReact()
+
+      expect_equal(
+        texts$preprocessed,
+        c(
+          " Mail me at bob@example.com ",
+          "Call +31 6 1234 5678",
+          "Postcode 1234 AB"
+        )
+      )
+    }
+  )
+})
+
+
+test_that("text_management_server: regex mode produces anonymized preprocessed texts", {
   withr::local_options(list(
     anonymization__default = "regex",
     anonymization__none = TRUE,

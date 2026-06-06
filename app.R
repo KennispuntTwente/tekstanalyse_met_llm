@@ -183,7 +183,7 @@ options(
   # - Default setting for anonymization of texts, and if user
   #   can toggle this setting;
   #     see R/text_management.R
-  anonymization__default = "regex", # Default anonymization method ("none', "regex", or "gliner")
+  anonymization__default = "none", # Default anonymization method ("none', "regex", or "gliner")
   anonymization__none = TRUE, # If the "none" anonymization method is available
   anonymization__regex = TRUE, # If the "regex" anonymization method is available
   anonymization__gliner_model = TRUE, # If the "gliner" anonymization method is available

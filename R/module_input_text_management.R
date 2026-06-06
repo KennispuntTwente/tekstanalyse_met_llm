@@ -44,7 +44,7 @@ text_management_server <- function(
   # Resolve the default anonymization method, falling back if the configured
 
   # default is not enabled (documented order: regex -> gliner -> none).
-  opt_default <- getOption("anonymization__default", "regex")
+  opt_default <- getOption("anonymization__default", "none")
   if (!(opt_default %in% c("none", "regex", "gliner"))) {
     warning(
       "Invalid default anonymization method '",
@@ -786,7 +786,7 @@ if (FALSE) {
 
   # Example global options ---------------------------------------------------
   options(
-    anonymization__default = "regex", # "none" | "regex" | "gliner"
+    anonymization__default = "none", # "none" | "regex" | "gliner"
     anonymization__none = TRUE,
     anonymization__regex = TRUE,
     anonymization__gliner_model = TRUE # Enable GLiNER model usage
