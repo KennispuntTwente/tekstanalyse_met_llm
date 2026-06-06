@@ -273,11 +273,18 @@ processing_server <- function(
         when,
         debug_message = NULL,
         stop_stream = TRUE,
-        hide_stream = TRUE
+        hide_stream = TRUE,
+        shared_memory_guard = NULL
       ) {
+        force(shared_memory_guard)
+
         promise %...>%
-          setter %...!%
+          (function(value) {
+            force(shared_memory_guard)
+            setter(value)
+          }) %...!%
           {
+            force(shared_memory_guard)
             if (isTRUE(stop_stream)) {
               llm_stream$async$stop()
             }
@@ -340,6 +347,22 @@ processing_server <- function(
         invisible(NULL)
       }
 
+      share_worker_payload <- function(payload, keys = names(payload)) {
+        if (exists("kwallm_mori_share_worker_payload", mode = "function")) {
+          return(kwallm_mori_share_worker_payload(payload, keys = keys))
+        }
+
+        structure(
+          list(
+            args = payload,
+            guard = list(),
+            scope_key = NULL,
+            shared_names = character()
+          ),
+          class = "kwallm_mori_worker_payload"
+        )
+      }
+
       ## 2.3 Categorisatie -----------------------------------------------------
 
       # Handles the categorization mode.
@@ -384,6 +407,10 @@ processing_server <- function(
         req(isFALSE(context_window$any_fit_problem))
 
         log_context <- start_processing_run()
+        worker_payload <- share_worker_payload(list(
+          texts = texts$preprocessed,
+          analysis_unit_ids = current_analysis_unit_ids()
+        ))
 
         promise <- mirai::mirai(
           {
@@ -394,6 +421,13 @@ processing_server <- function(
               log_context = log_context
             )
             .kwallm__prompt_execution_reset()
+            if (exists("kwallm_mori_resolve_worker_arg", mode = "function")) {
+              texts <- kwallm_mori_resolve_worker_arg(texts, mori_scope_key)
+              analysis_unit_ids <- kwallm_mori_resolve_worker_arg(
+                analysis_unit_ids,
+                mori_scope_key
+              )
+            }
 
             on_progress <- function(i, n, text) {
               progress_primary$set_with_total(i, n, text)
@@ -456,9 +490,10 @@ processing_server <- function(
               app_root = kwallm_worker_app_root(),
               worker_options = kwallm_worker_capture_options(),
               log_context = log_context,
+              mori_scope_key = worker_payload$scope_key,
               llm_provider = models$main,
-              texts = texts$preprocessed,
-              analysis_unit_ids = current_analysis_unit_ids(),
+              texts = worker_payload$args$texts,
+              analysis_unit_ids = worker_payload$args$analysis_unit_ids,
               research_background = research_background(),
               style_prompt = style_prompt(),
               categories = categories$texts(),
@@ -486,7 +521,8 @@ processing_server <- function(
             results_table_pre(value$results)
           },
           when = "main processing of categorization",
-          debug_message = "Started async processing for categorization"
+          debug_message = "Started async processing for categorization",
+          shared_memory_guard = worker_payload$guard
         )
       }
 
@@ -518,6 +554,10 @@ processing_server <- function(
         req(isFALSE(context_window$any_fit_problem))
 
         log_context <- start_processing_run()
+        worker_payload <- share_worker_payload(list(
+          texts = texts$preprocessed,
+          analysis_unit_ids = current_analysis_unit_ids()
+        ))
 
         promise <- mirai::mirai(
           {
@@ -528,6 +568,13 @@ processing_server <- function(
               log_context = log_context
             )
             .kwallm__prompt_execution_reset()
+            if (exists("kwallm_mori_resolve_worker_arg", mode = "function")) {
+              texts <- kwallm_mori_resolve_worker_arg(texts, mori_scope_key)
+              analysis_unit_ids <- kwallm_mori_resolve_worker_arg(
+                analysis_unit_ids,
+                mori_scope_key
+              )
+            }
 
             on_progress <- function(i, n, text) {
               progress_primary$set_with_total(i, n, text)
@@ -559,9 +606,10 @@ processing_server <- function(
               app_root = kwallm_worker_app_root(),
               worker_options = kwallm_worker_capture_options(),
               log_context = log_context,
+              mori_scope_key = worker_payload$scope_key,
               llm_provider = models$main,
-              texts = texts$preprocessed,
-              analysis_unit_ids = current_analysis_unit_ids(),
+              texts = worker_payload$args$texts,
+              analysis_unit_ids = worker_payload$args$analysis_unit_ids,
               research_background = research_background(),
               scoring_characteristic = scoring_characteristic(),
               progress_primary = progress_primary$async,
@@ -578,7 +626,8 @@ processing_server <- function(
             results_table_pre(value$results)
           },
           when = "main processing of scoring",
-          debug_message = "Started async processing for scoring"
+          debug_message = "Started async processing for scoring",
+          shared_memory_guard = worker_payload$guard
         )
       }
 
@@ -614,6 +663,11 @@ processing_server <- function(
         req(isFALSE(context_window$too_many_batches))
 
         log_context <- start_processing_run(set_initial_progress = FALSE)
+        worker_payload <- share_worker_payload(list(
+          texts = texts$preprocessed,
+          analysis_unit_ids = current_analysis_unit_ids(),
+          text_batches = context_window$text_batches
+        ))
 
         promise <- mirai::mirai(
           {
@@ -624,6 +678,17 @@ processing_server <- function(
               log_context = log_context
             )
             .kwallm__prompt_execution_reset()
+            if (exists("kwallm_mori_resolve_worker_arg", mode = "function")) {
+              texts <- kwallm_mori_resolve_worker_arg(texts, mori_scope_key)
+              analysis_unit_ids <- kwallm_mori_resolve_worker_arg(
+                analysis_unit_ids,
+                mori_scope_key
+              )
+              text_batches <- kwallm_mori_resolve_worker_arg(
+                text_batches,
+                mori_scope_key
+              )
+            }
 
             # Step 1: Generate candidate topics
             log_info(
@@ -694,14 +759,15 @@ processing_server <- function(
               app_root = kwallm_worker_app_root(),
               worker_options = kwallm_worker_capture_options(),
               log_context = log_context,
+              mori_scope_key = worker_payload$scope_key,
               llm_provider_main = models$main,
               llm_provider_large = models$large,
-              texts = texts$preprocessed,
-              analysis_unit_ids = current_analysis_unit_ids(),
+              texts = worker_payload$args$texts,
+              analysis_unit_ids = worker_payload$args$analysis_unit_ids,
               research_background = research_background(),
               mode = mode(),
               handle_detailed_error = handle_detailed_error,
-              text_batches = context_window$text_batches,
+              text_batches = worker_payload$args$text_batches,
               n_tokens_context_window = context_window$n_tokens_context_window,
               n_tokens_context_window_reduction = context_window$n_tokens_context_window_reduction %||%
                 context_window$n_tokens_context_window,
@@ -729,7 +795,8 @@ processing_server <- function(
           when = "main processing (step 1-2) of topic modelling",
           debug_message = "Started async processing for topic modelling (step 1-2)",
           stop_stream = FALSE,
-          hide_stream = TRUE
+          hide_stream = TRUE,
+          shared_memory_guard = worker_payload$guard
         )
       }
 
@@ -869,6 +936,10 @@ processing_server <- function(
           is_async = TRUE,
           mode = getOption("app__mode", "unknown")
         )
+        worker_payload <- share_worker_payload(list(
+          texts = texts$preprocessed,
+          analysis_unit_ids = current_analysis_unit_ids()
+        ))
 
         promise <- mirai::mirai(
           {
@@ -879,6 +950,13 @@ processing_server <- function(
               log_context = log_context
             )
             .kwallm__prompt_execution_reset()
+            if (exists("kwallm_mori_resolve_worker_arg", mode = "function")) {
+              texts <- kwallm_mori_resolve_worker_arg(texts, mori_scope_key)
+              analysis_unit_ids <- kwallm_mori_resolve_worker_arg(
+                analysis_unit_ids,
+                mori_scope_key
+              )
+            }
 
             # Step 4: Assign topics via standalone batch function
             longest_assignment_text <- texts[[which.max(count_tokens(texts))]]
@@ -984,10 +1062,11 @@ processing_server <- function(
               app_root = kwallm_worker_app_root(),
               worker_options = kwallm_worker_capture_options(),
               log_context = log_context,
+              mori_scope_key = worker_payload$scope_key,
               topics = topics(),
               llm_provider = models$main,
-              texts = texts$preprocessed,
-              analysis_unit_ids = current_analysis_unit_ids(),
+              texts = worker_payload$args$texts,
+              analysis_unit_ids = worker_payload$args$analysis_unit_ids,
               research_background = research_background(),
               style_prompt = style_prompt(),
               mode = mode(),
@@ -1015,7 +1094,8 @@ processing_server <- function(
             results_table_pre(value$results)
           },
           when = "main processing (step 3-4) of topic modelling",
-          debug_message = "Started async processing for topic modelling (step 3-4)"
+          debug_message = "Started async processing for topic modelling (step 3-4)",
+          shared_memory_guard = worker_payload$guard
         )
       }
 
@@ -1107,6 +1187,10 @@ processing_server <- function(
         req(context_window$overlap)
 
         log_context <- start_processing_run()
+        worker_payload <- share_worker_payload(list(
+          texts = texts$preprocessed,
+          analysis_unit_ids = current_analysis_unit_ids()
+        ))
 
         promise <- mirai::mirai(
           {
@@ -1117,6 +1201,13 @@ processing_server <- function(
               log_context = log_context
             )
             .kwallm__prompt_execution_reset()
+            if (exists("kwallm_mori_resolve_worker_arg", mode = "function")) {
+              texts <- kwallm_mori_resolve_worker_arg(texts, mori_scope_key)
+              analysis_unit_ids <- kwallm_mori_resolve_worker_arg(
+                analysis_unit_ids,
+                mori_scope_key
+              )
+            }
 
             marking_output <- mark_texts(
               texts = texts,
@@ -1150,9 +1241,10 @@ processing_server <- function(
               app_root = kwallm_worker_app_root(),
               worker_options = kwallm_worker_capture_options(),
               log_context = log_context,
+              mori_scope_key = worker_payload$scope_key,
               llm_provider = models$main,
-              texts = texts$preprocessed,
-              analysis_unit_ids = current_analysis_unit_ids(),
+              texts = worker_payload$args$texts,
+              analysis_unit_ids = worker_payload$args$analysis_unit_ids,
               research_background = research_background(),
               style_prompt = style_prompt(),
               codes = codes$texts(),
@@ -1179,7 +1271,8 @@ processing_server <- function(
             results_table_pre(value$results)
           },
           when = "main processing of marking",
-          stop_stream = TRUE
+          stop_stream = TRUE,
+          shared_memory_guard = worker_payload$guard
         )
       }
 

@@ -215,6 +215,18 @@ marking_codes_server <- function(
         # Async generate codes
         queue$consumer$start()
         log_context <- log_context_capture(is_async = TRUE)
+        worker_payload <- if (
+          exists("kwallm_mori_share_worker_payload", mode = "function")
+        ) {
+          kwallm_mori_share_worker_payload(list(texts = texts$preprocessed))
+        } else {
+          list(
+            args = list(texts = texts$preprocessed),
+            guard = list(),
+            scope_key = NULL
+          )
+        }
+        shared_memory_guard <- worker_payload$guard
 
         mirai::mirai(
           {
@@ -224,6 +236,9 @@ marking_codes_server <- function(
               worker_options = worker_options,
               log_context = log_context
             )
+            if (exists("kwallm_mori_resolve_worker_arg", mode = "function")) {
+              texts <- kwallm_mori_resolve_worker_arg(texts, mori_scope_key)
+            }
 
             generate_codes_by_reading_texts(
               texts = texts,
@@ -241,7 +256,8 @@ marking_codes_server <- function(
               app_root = kwallm_worker_app_root(),
               worker_options = kwallm_worker_capture_options(),
               log_context = log_context,
-              texts = texts$preprocessed,
+              mori_scope_key = worker_payload$scope_key,
+              texts = worker_payload$args$texts,
               text_size_tokens = chunk_settings$text_size_tokens,
               overlap_size_tokens = chunk_settings$overlap_size_tokens,
               research_background = research_background(),
@@ -254,6 +270,7 @@ marking_codes_server <- function(
           )
         ) %...>%
           {
+            force(shared_memory_guard)
             generated_codes(.)
             code_generation_in_progress(FALSE)
             log_info(
@@ -263,6 +280,7 @@ marking_codes_server <- function(
             shinyjs::delay(500, queue$consumer$stop())
           } %...!%
           {
+            force(shared_memory_guard)
             code_generation_in_progress(FALSE)
             shinyjs::delay(500, queue$consumer$stop())
             app_error(

@@ -2,6 +2,11 @@
 
 # Keep this helper lightweight and deterministic.
 
+# In-process module tests mock mirai workers by evaluating expressions in the
+# same R session, so they do not run the real worker bootstrap that maps mori
+# refs. App subprocess and integration tests can still opt into mori normally.
+options(kwallm__mori_enabled = FALSE)
+
 # Provide a simple %||% operator (used throughout the app code without namespacing).
 `%||%` <- function(a, b) {
   if (is.null(a)) b else a

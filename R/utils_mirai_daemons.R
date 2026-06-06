@@ -23,6 +23,54 @@ kwallm_mirai_default_workers <- function(
 }
 
 
+#' Compute the configured mirai dispatcher queue memory cap
+#'
+#' @return Numeric memory cap in MB, or NULL to leave mirai unbounded.
+kwallm_mirai_default_queue_memory_mb <- function(
+  getenv = Sys.getenv,
+  system_memory = function() {
+    if (!requireNamespace("ps", quietly = TRUE)) {
+      return(NA_real_)
+    }
+    ps::ps_system_memory()[["avail"]]
+  }
+) {
+  configured <- suppressWarnings(as.numeric(
+    getenv("KWALLM_MIRAI_QUEUE_MEMORY_MB", unset = NA_character_)
+  ))
+  if (!is.na(configured)) {
+    if (configured <= 0) {
+      return(NULL)
+    }
+    return(configured)
+  }
+
+  available_bytes <- suppressWarnings(as.numeric(system_memory()))
+  if (is.na(available_bytes) || available_bytes <= 0) {
+    return(NULL)
+  }
+
+  # mirai expects MB. Keep roughly half of currently available RAM for queued
+  # payloads and leave the rest for the Shiny process plus local daemons.
+  max(64, floor(available_bytes / 2e6))
+}
+
+
+kwallm_mirai_status_memory_matches <- function(status, memory) {
+  status_memory <- status$memory
+  capacity <- NA_real_
+  if (!is.null(status_memory) && "capacity" %in% names(status_memory)) {
+    capacity <- suppressWarnings(as.numeric(status_memory[["capacity"]]))
+  }
+
+  if (is.null(memory)) {
+    return(is.na(capacity))
+  }
+
+  !is.na(capacity) && abs(capacity - memory) < .Machine$double.eps^0.5
+}
+
+
 #' Probe the current mirai daemon pool
 #'
 #' @param timeout_ms Timeout in milliseconds for the worker ping.
@@ -74,6 +122,7 @@ kwallm_mirai_probe <- function(
 #' @return Named list describing the daemon state after validation.
 kwallm_ensure_mirai_daemons <- function(
   n_workers = kwallm_mirai_default_workers(),
+  memory = kwallm_mirai_default_queue_memory_mb(),
   probe_timeout_ms = getOption("kwallm__mirai_probe_timeout_ms", 1000L),
   daemons_set = mirai::daemons_set,
   daemons = mirai::daemons,
@@ -84,6 +133,11 @@ kwallm_ensure_mirai_daemons <- function(
   n_workers <- suppressWarnings(as.integer(n_workers))
   if (is.na(n_workers) || n_workers < 1L) {
     n_workers <- 1L
+  }
+
+  memory <- suppressWarnings(as.numeric(memory))
+  if (length(memory) != 1L || is.na(memory) || memory <= 0) {
+    memory <- NULL
   }
 
   current_status <- tryCatch(
@@ -100,19 +154,29 @@ kwallm_ensure_mirai_daemons <- function(
   had_daemons <- isTRUE(tryCatch(daemons_set(), error = function(e) FALSE))
   pool_healthy <- FALSE
   recycled_pool <- FALSE
+  reconfigured_pool <- FALSE
+  memory_matches <- kwallm_mirai_status_memory_matches(current_status, memory)
+  needs_reconfigure <- had_daemons &&
+    current_connections > 0L &&
+    !isTRUE(memory_matches)
 
-  if (had_daemons && current_connections > 0L) {
+  if (had_daemons && current_connections > 0L && !needs_reconfigure) {
     pool_healthy <- isTRUE(probe(timeout_ms = probe_timeout_ms))
   }
 
-  if (had_daemons && !pool_healthy) {
-    recycled_pool <- TRUE
+  if (had_daemons && (!pool_healthy || needs_reconfigure)) {
+    recycled_pool <- !needs_reconfigure
+    reconfigured_pool <- needs_reconfigure
     tryCatch(daemons(0), error = function(e) NULL)
     sleep(0.1)
   }
 
   if (!had_daemons || !pool_healthy) {
-    daemons(n_workers)
+    if (is.null(memory)) {
+      daemons(n_workers)
+    } else {
+      daemons(n_workers, memory = memory)
+    }
 
     if (!isTRUE(probe(timeout_ms = probe_timeout_ms))) {
       stop("mirai daemons started but failed the health probe")
@@ -128,7 +192,9 @@ kwallm_ensure_mirai_daemons <- function(
     requested_workers = n_workers,
     had_daemons = had_daemons,
     recycled_pool = recycled_pool,
-    reused_pool = had_daemons && pool_healthy,
+    reconfigured_pool = reconfigured_pool,
+    reused_pool = had_daemons && pool_healthy && !needs_reconfigure,
+    memory = memory,
     status = final_status
   )
 }

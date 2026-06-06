@@ -314,6 +314,18 @@ text_split_server <- function(
 
       # Async text splitting
       log_context <- log_context_capture(is_async = TRUE)
+      worker_payload <- if (
+        exists("kwallm_mori_share_worker_payload", mode = "function")
+      ) {
+        kwallm_mori_share_worker_payload(list(input_rows = input_rows()))
+      } else {
+        list(
+          args = list(input_rows = input_rows()),
+          guard = list(),
+          scope_key = NULL
+        )
+      }
+      shared_memory_guard <- worker_payload$guard
 
       mirai::mirai(
         {
@@ -323,6 +335,12 @@ text_split_server <- function(
             worker_options = worker_options,
             log_context = log_context
           )
+          if (exists("kwallm_mori_resolve_worker_arg", mode = "function")) {
+            input_rows <- kwallm_mori_resolve_worker_arg(
+              input_rows,
+              mori_scope_key
+            )
+          }
 
           split_texts_with_semchunk(
             texts = input_rows$document_text,
@@ -338,7 +356,8 @@ text_split_server <- function(
             app_root = kwallm_worker_app_root(),
             worker_options = kwallm_worker_capture_options(),
             log_context = log_context,
-            input_rows = input_rows(),
+            mori_scope_key = worker_payload$scope_key,
+            input_rows = worker_payload$args$input_rows,
             chunk_size = max_tokens_val(),
             overlap = overlap_val(),
             queue = queue
@@ -347,6 +366,7 @@ text_split_server <- function(
         )
       ) %...>%
         {
+          force(shared_memory_guard)
           result <- .
 
           if (
@@ -396,6 +416,7 @@ text_split_server <- function(
           queue$consumer$stop()
         } %...!%
         {
+          force(shared_memory_guard)
           error <- .
 
           if (

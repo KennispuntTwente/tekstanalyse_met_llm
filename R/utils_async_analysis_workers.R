@@ -52,6 +52,278 @@ kwallm_worker_capture_options <- function() {
 }
 
 
+#' Check whether mori-backed worker payloads are enabled
+#'
+#' @return TRUE when mori should be used for worker payload references.
+kwallm_mori_enabled <- function(
+  get_option = getOption,
+  require_namespace = requireNamespace
+) {
+  isTRUE(get_option("kwallm__mori_enabled", TRUE)) &&
+    isTRUE(require_namespace("mori", quietly = TRUE)) &&
+    isTRUE(require_namespace("openssl", quietly = TRUE)) &&
+    isTRUE(require_namespace("digest", quietly = TRUE))
+}
+
+
+#' Generate a cryptographic token for mori worker capabilities
+#'
+#' @param bytes Number of random bytes.
+#'
+#' @return Hex-encoded random token.
+kwallm_mori_random_token <- function(bytes = 32L) {
+  bytes <- suppressWarnings(as.integer(bytes))
+  if (is.na(bytes) || bytes < 16L) {
+    bytes <- 32L
+  }
+
+  paste0(sprintf("%02x", as.integer(openssl::rand_bytes(bytes))),
+    collapse = ""
+  )
+}
+
+
+kwallm_mori_ref_signature_payload <- function(name, key, nonce) {
+  paste(
+    "kwallm_mori_ref_v1",
+    as.character(name)[1],
+    if (is.null(key)) "" else as.character(key)[1],
+    as.character(nonce)[1],
+    sep = "\n"
+  )
+}
+
+
+kwallm_mori_sign_ref <- function(scope_key, name, key, nonce) {
+  digest::hmac(
+    key = scope_key,
+    object = kwallm_mori_ref_signature_payload(name, key, nonce),
+    algo = "sha256",
+    serialize = FALSE
+  )
+}
+
+
+kwallm_mori_validate_scope_key <- function(scope_key) {
+  is.character(scope_key) &&
+    length(scope_key) == 1L &&
+    grepl("^[0-9a-f]{64}$", scope_key)
+}
+
+
+kwallm_mori_scalar_string <- function(x) {
+  is.character(x) && length(x) == 1L && !is.na(x)
+}
+
+
+kwallm_mori_validate_ref_shape <- function(x) {
+  kwallm_mori_scalar_string(x$name) &&
+    (is.null(x$key) || kwallm_mori_scalar_string(x$key)) &&
+    kwallm_mori_scalar_string(x$nonce) &&
+    grepl("^[0-9a-f]{32}$", x$nonce) &&
+    kwallm_mori_scalar_string(x$signature) &&
+    grepl("^[0-9a-f]{64}$", x$signature) &&
+    identical(x$signature_algorithm, "hmac-sha256")
+}
+
+
+kwallm_mori_constant_time_equal <- function(a, b) {
+  if (!kwallm_mori_scalar_string(a) || !kwallm_mori_scalar_string(b)) {
+    return(FALSE)
+  }
+
+  a_raw <- charToRaw(enc2utf8(a))
+  b_raw <- charToRaw(enc2utf8(b))
+  if (length(a_raw) != length(b_raw)) {
+    return(FALSE)
+  }
+
+  diff <- 0L
+  for (i in seq_along(a_raw)) {
+    diff <- bitwOr(
+      diff,
+      bitwXor(as.integer(a_raw[[i]]), as.integer(b_raw[[i]]))
+    )
+  }
+
+  identical(diff, 0L)
+}
+
+
+#' Create a worker-safe reference to a mori shared object
+#'
+#' @param name Shared memory name returned by `mori::shared_name()`.
+#' @param key Optional payload key used only for diagnostics.
+#' @param scope_key Per-dispatch secret used to sign refs.
+#'
+#' @return A small serializable reference object.
+kwallm_mori_make_ref <- function(name, key = NULL, scope_key) {
+  if (!kwallm_mori_validate_scope_key(scope_key)) {
+    stop("Invalid mori worker scope key.", call. = FALSE)
+  }
+
+  nonce <- kwallm_mori_random_token(16L)
+
+  structure(
+    list(
+      name = name,
+      key = key,
+      nonce = nonce,
+      signature = kwallm_mori_sign_ref(scope_key, name, key, nonce),
+      signature_algorithm = "hmac-sha256"
+    ),
+    class = "kwallm_mori_ref"
+  )
+}
+
+
+kwallm_mori_is_ref <- function(x) {
+  inherits(x, "kwallm_mori_ref")
+}
+
+
+#' Share selected payload fields for a worker
+#'
+#' The returned `args` list contains normal values for fields that cannot be
+#' shared and small `kwallm_mori_ref` objects for fields backed by shared memory.
+#' The `guard` list must remain referenced in the main process until the worker
+#' has resolved, otherwise R's garbage collector may release the shared region.
+#'
+#' @param payload Named list of worker arguments.
+#' @param keys Names in `payload` that may be shared.
+#' @param enabled Logical toggle, mostly for tests.
+#'
+#' @return A list with `args`, `guard`, and `shared_names`.
+kwallm_mori_share_worker_payload <- function(
+  payload,
+  keys = names(payload),
+  enabled = kwallm_mori_enabled()
+) {
+  if (!is.list(payload) || is.null(names(payload))) {
+    stop("`payload` must be a named list.", call. = FALSE)
+  }
+
+  args <- payload
+  guard <- list()
+  shared_names <- character()
+  scope_key <- NULL
+
+  if (!isTRUE(enabled)) {
+    return(structure(
+      list(
+        args = args,
+        guard = guard,
+        scope_key = scope_key,
+        shared_names = shared_names
+      ),
+      class = "kwallm_mori_worker_payload"
+    ))
+  }
+
+  scope_key <- kwallm_mori_random_token(32L)
+  keys <- intersect(as.character(keys), names(payload))
+
+  for (key in keys) {
+    shared <- tryCatch(
+      mori::share(payload[[key]]),
+      error = function(e) payload[[key]]
+    )
+    shared_name <- tryCatch(
+      mori::shared_name(shared),
+      error = function(e) NULL
+    )
+
+    if (!is.character(shared_name) || length(shared_name) != 1L) {
+      args[[key]] <- payload[[key]]
+      next
+    }
+
+    guard[[key]] <- shared
+    shared_names[[key]] <- shared_name
+    args[[key]] <- kwallm_mori_make_ref(
+      shared_name,
+      key = key,
+      scope_key = scope_key
+    )
+  }
+
+  structure(
+    list(
+      args = args,
+      guard = guard,
+      scope_key = scope_key,
+      shared_names = shared_names
+    ),
+    class = "kwallm_mori_worker_payload"
+  )
+}
+
+
+#' Resolve a mori worker argument inside the worker process
+#'
+#' @param x A regular object or `kwallm_mori_ref`.
+#' @param scope_key Per-dispatch secret that must verify `x`.
+#'
+#' @return The mapped shared object for refs, otherwise `x`.
+kwallm_mori_resolve_worker_arg <- function(x, scope_key = NULL) {
+  if (!kwallm_mori_is_ref(x)) {
+    return(x)
+  }
+
+  if (!kwallm_mori_validate_scope_key(scope_key)) {
+    stop("Invalid or missing mori worker scope key.", call. = FALSE)
+  }
+
+  if (!kwallm_mori_validate_ref_shape(x)) {
+    stop("Rejected invalid mori worker payload capability.", call. = FALSE)
+  }
+
+  expected_signature <- kwallm_mori_sign_ref(
+    scope_key = scope_key,
+    name = x$name,
+    key = x$key,
+    nonce = x$nonce
+  )
+  if (!kwallm_mori_constant_time_equal(x$signature, expected_signature)) {
+    stop("Rejected invalid mori worker payload capability.", call. = FALSE)
+  }
+
+  if (!requireNamespace("mori", quietly = TRUE)) {
+    stop("Package `mori` is required to resolve shared worker payloads.",
+      call. = FALSE
+    )
+  }
+
+  mapped <- tryCatch(
+    mori::map_shared(x$name),
+    error = function(e) {
+      stop(
+        paste0(
+          "Could not map shared worker payload",
+          if (!is.null(x$key)) paste0(" `", x$key, "`") else "",
+          ": ",
+          conditionMessage(e)
+        ),
+        call. = FALSE
+      )
+    }
+  )
+
+  if (is.null(mapped)) {
+    stop(
+      paste0(
+        "Invalid shared worker payload reference",
+        if (!is.null(x$key)) paste0(" for `", x$key, "`") else "",
+        "."
+      ),
+      call. = FALSE
+    )
+  }
+
+  mapped
+}
+
+
 #' Load the core packages needed inside async workers
 #'
 #' @param packages Character vector of package names.
@@ -66,6 +338,7 @@ kwallm_worker_load_core_packages <- function(
     "bslib",
     "htmltools",
     "mirai",
+    "mori",
     "promises"
   )
 ) {

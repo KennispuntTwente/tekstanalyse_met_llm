@@ -16,6 +16,10 @@ load_dependencies("regular")
 #     when the LLM is writing summarizing paragraphs
 # - To enable asynchronous processing, you need to use `mirai::daemons()`, e.g.,
 #     `mirai::daemons(n)` where n is the number of parallel workers
+# - The app configures mirai daemons with a bounded dispatcher queue. Override
+#     with `KWALLM_MIRAI_QUEUE_MEMORY_MB`; set it to 0 to disable the cap.
+# - Large per-run user payloads are passed to local workers through `mori`
+#     shared-memory references and kept scoped to the running Shiny session.
 # - When asynchronous processing is not needed, you can use
 #     `mirai::daemons(0)`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
@@ -27,6 +31,11 @@ test_async <- isTRUE(getOption("kwallm.test_async", FALSE)) ||
 
 if (!test_mode || test_async) {
   daemon_status <- kwallm_ensure_mirai_daemons()
+  queue_cap_label <- if (is.null(daemon_status$memory)) {
+    "no"
+  } else {
+    paste0(daemon_status$memory, " MB")
+  }
 
   if (isTRUE(daemon_status$recycled_pool)) {
     log_warn(
@@ -36,11 +45,21 @@ if (!test_mode || test_async) {
       ),
       component = "startup"
     )
+  } else if (isTRUE(daemon_status$reconfigured_pool)) {
+    log_info(
+      sprintf(
+        "Reconfigured mirai daemons; using %s async workers with %s queue cap",
+        daemon_status$status$connections,
+        queue_cap_label
+      ),
+      component = "startup"
+    )
   } else {
     log_info(
       sprintf(
-        "Using %s async workers (mirai daemons)",
-        daemon_status$status$connections
+        "Using %s async workers (mirai daemons, %s queue cap)",
+        daemon_status$status$connections,
+        queue_cap_label
       ),
       component = "startup"
     )
