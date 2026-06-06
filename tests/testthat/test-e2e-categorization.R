@@ -46,10 +46,7 @@ test_that("{shinytest2} recording: standard process - categorization", {
   wait_for_bound_input(app, "processing-process")
   wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
-  app$wait_for_value(
-    export = "processing-success",
-    timeout = 30000
-  )
+  wait_for_processing_success(app, timeout = 30000)
 
   # Read results
   results <- app$get_value(export = "processing-results_table")

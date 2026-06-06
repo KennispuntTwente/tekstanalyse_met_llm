@@ -36,10 +36,7 @@ test_that("categorization async integration writes paragraphs in a real mirai wo
   categories <- c("Positive feedback", "Negative feedback")
   provider <- kwallm_test_llm_provider("kwallm-fake-main-1024")
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  mirai::daemons(2)
-  withr::defer(tryCatch(mirai::daemons(0), error = function(e) NULL))
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 2L)
 
   worker <- mirai::mirai(
     {

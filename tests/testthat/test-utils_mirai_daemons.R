@@ -25,23 +25,7 @@ test_that("kwallm_mirai_default_workers clamps invalid configuration", {
 test_that("kwallm_ensure_mirai_daemons reuses a healthy daemon pool", {
   testthat::skip_if_not_installed("mirai")
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-
-  can_start_daemons <- TRUE
-  tryCatch(
-    {
-      mirai::daemons(1)
-      on.exit(tryCatch(mirai::daemons(0), error = function(e) NULL), add = TRUE)
-    },
-    error = function(e) {
-      can_start_daemons <<- FALSE
-    }
-  )
-  if (!isTRUE(can_start_daemons)) {
-    testthat::skip("mirai daemons not available in this environment")
-  }
-
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   result <- kwallm_ensure_mirai_daemons(n_workers = 1L)
 

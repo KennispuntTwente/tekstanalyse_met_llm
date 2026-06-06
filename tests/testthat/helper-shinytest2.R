@@ -24,7 +24,7 @@ wait_until <- function(
   interval = 100,
   description = "condition"
 ) {
-  deadline <- Sys.time() + (timeout / 1000)
+  deadline <- proc.time()[["elapsed"]] + (timeout / 1000)
 
   repeat {
     ready <- tryCatch(check_fn(), error = function(e) FALSE)
@@ -32,13 +32,33 @@ wait_until <- function(
       return(invisible(TRUE))
     }
 
-    if (Sys.time() >= deadline) {
+    if (proc.time()[["elapsed"]] >= deadline) {
       testthat::fail(sprintf("Timed out waiting for %s", description))
       return(invisible(FALSE))
     }
 
     Sys.sleep(interval / 1000)
   }
+}
+
+
+wait_for_processing_success <- function(app, timeout = 60000) {
+  app$wait_for_value(
+    export = "processing-success",
+    timeout = timeout,
+    ignore = c(NULL, FALSE)
+  )
+
+  wait_for_export(
+    app,
+    export = "processing-results_table",
+    predicate = function(x) is.data.frame(x) && nrow(x) > 0,
+    timeout = timeout,
+    description = "processing results table"
+  )
+
+  wait_for_download_bundle(app, timeout = timeout)
+  invisible(TRUE)
 }
 
 
@@ -454,6 +474,13 @@ set_fake_models <- function(
 
 
 skip_if_no_live_openai <- function() {
+  testthat::skip_if(
+    !identical(Sys.getenv("KWALLM_RUN_LIVE_PROVIDER_SMOKE", ""), "true"),
+    paste0(
+      "live-provider smoke tests are disabled unless ",
+      "KWALLM_RUN_LIVE_PROVIDER_SMOKE=true"
+    )
+  )
   testthat::skip_if(
     !nzchar(Sys.getenv("OPENAI_API_KEY", "")),
     "live-provider smoke requires OPENAI_API_KEY"

@@ -46,10 +46,7 @@ test_that("{shinytest2} recording: topic modelling auto-confirms in single-label
 
   wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
-  app$wait_for_value(
-    export = "processing-success",
-    timeout = 60000
-  )
+  wait_for_processing_success(app, timeout = 60000)
 
   results <- app$get_value(export = "processing-results_table")
   topic_columns <- names(results)[vapply(results, is.logical, logical(1))]

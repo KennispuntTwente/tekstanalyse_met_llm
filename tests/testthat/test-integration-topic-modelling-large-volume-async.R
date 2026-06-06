@@ -104,11 +104,7 @@ test_that("topic modelling async integration handles 3000 texts with fake LLM", 
   main_provider <- kwallm_test_llm_provider("kwallm-fake-main-1024")
   large_provider <- kwallm_test_llm_provider("kwallm-fake-reducer-320")
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  Sys.sleep(0.2)
-  mirai::daemons(2)
-  withr::defer(tryCatch(mirai::daemons(0), error = function(e) NULL))
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 2L)
 
   generation_worker <- mirai::mirai(
     {
@@ -286,11 +282,7 @@ test_that("topic reduction async integration (edit-topics path) uses production 
     "Eco-friendly packaging"
   )
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  Sys.sleep(0.2)
-  mirai::daemons(2)
-  withr::defer(tryCatch(mirai::daemons(0), error = function(e) NULL))
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 2L)
 
   # Mirror the exact production pattern from module_misc_edit_topics.R
   reduction_worker <- mirai::mirai(

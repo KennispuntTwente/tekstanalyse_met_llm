@@ -41,11 +41,7 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
     ignore = c(NULL, TRUE)
   )
 
-  app$wait_for_js(
-    "!!document.getElementById('model-main_model')",
-    timeout = 30000
-  )
-  app$set_inputs(`model-main_model` = "kwallm-fake-main-1024")
+  set_fake_models(app)
   app$set_inputs(`write_paragraphs_toggle-toggle` = "true")
 
   document_texts <- app$get_value(
@@ -62,22 +58,19 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
     fixed = TRUE
   )))
 
+  wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
-  app$wait_for_value(
-    export = "processing-success",
-    timeout = 60000
-  )
+  wait_for_processing_success(app, timeout = 60000)
 
   expect_true(isTRUE(app$get_value(export = "processing-processing")))
   expect_true(isTRUE(app$get_value(export = "processing-success")))
 
-  app$wait_for_value(
+  results <- app$get_value(export = "processing-results_table")
+  paragraphs <- wait_for_nonempty_export(
+    app,
     export = "processing-paragraph_entries",
     timeout = 10000
   )
-
-  results <- app$get_value(export = "processing-results_table")
-  paragraphs <- app$get_value(export = "processing-paragraph_entries")
 
   expect_true(all(preprocessed_texts %in% results$text))
   expect_true(length(paragraphs) > 0)

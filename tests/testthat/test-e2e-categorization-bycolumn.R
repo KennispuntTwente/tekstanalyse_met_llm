@@ -99,8 +99,8 @@ test_that("{shinytest2} recording: categorization with by_column grouping variab
     ignore = c(NULL, FALSE)
   )
 
-  app$wait_for_value(
-    export = "processing-success",
+  wait_for_processing_success(
+    app,
     timeout = 60000 # Longer timeout for by_column processing
   )
 

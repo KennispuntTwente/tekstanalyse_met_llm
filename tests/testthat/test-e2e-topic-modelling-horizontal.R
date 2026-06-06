@@ -91,25 +91,22 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   app$set_inputs(`write_paragraphs_toggle-toggle` = "true")
 
   # Start processing
+  wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
   wait_for_topic_edit_modal_ready(app)
   app$click("processing-edit_topics-confirm_topics")
-  app$wait_for_value(
-    export = "processing-success",
-    timeout = 30000
-  )
+  wait_for_processing_success(app, timeout = 30000)
 
   expect_true(isTRUE(app$get_value(export = "processing-processing")))
   expect_true(isTRUE(app$get_value(export = "processing-success")))
 
-  app$wait_for_value(
+  # Read results
+  results <- app$get_value(export = "processing-results_table")
+  paragraphs <- wait_for_nonempty_export(
+    app,
     export = "processing-paragraph_entries",
     timeout = 10000
   )
-
-  # Read results
-  results <- app$get_value(export = "processing-results_table")
-  paragraphs <- app$get_value(export = "processing-paragraph_entries")
 
   # Expect that all texts are present in column 'text'
   texts <- app$get_value(

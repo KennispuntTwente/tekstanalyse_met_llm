@@ -43,24 +43,7 @@ test_that("bootstrap exposes task entry points in a real mirai worker", {
   skip_if_not_installed("mirai")
   withr::local_dir(here::here())
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  Sys.sleep(0.2)
-
-  can_start_daemons <- TRUE
-  tryCatch(
-    {
-      mirai::daemons(1)
-      on.exit(tryCatch(mirai::daemons(0), error = function(e) NULL), add = TRUE)
-    },
-    error = function(e) {
-      can_start_daemons <<- FALSE
-    }
-  )
-  if (!isTRUE(can_start_daemons)) {
-    skip("mirai daemons not available in this environment")
-  }
-
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   for (task in names(async_worker_task_entry_points)) {
     worker <- mirai::mirai(
@@ -118,24 +101,7 @@ test_that("marking helper empty-match path works in a bootstrap worker", {
   skip_if_not_installed("mirai")
   withr::local_dir(here::here())
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  Sys.sleep(0.2)
-
-  can_start_daemons <- TRUE
-  tryCatch(
-    {
-      mirai::daemons(1)
-      on.exit(tryCatch(mirai::daemons(0), error = function(e) NULL), add = TRUE)
-    },
-    error = function(e) {
-      can_start_daemons <<- FALSE
-    }
-  )
-  if (!isTRUE(can_start_daemons)) {
-    skip("mirai daemons not available in this environment")
-  }
-
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   worker <- mirai::mirai(
     {

@@ -23,24 +23,7 @@ test_that("bootstrap worker resolves prompt trace helper chain", {
   testthat::skip_if_not_installed("mirai")
   withr::local_dir(here::here())
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  Sys.sleep(0.2)
-
-  can_start_daemons <- TRUE
-  tryCatch(
-    {
-      mirai::daemons(1)
-      on.exit(mirai::daemons(0), add = TRUE)
-    },
-    error = function(e) {
-      can_start_daemons <<- FALSE
-    }
-  )
-  if (!isTRUE(can_start_daemons)) {
-    testthat::skip("mirai daemons not available in this environment")
-  }
-
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   worker <- mirai::mirai(
     {
@@ -92,24 +75,7 @@ test_that("bootstrap worker resolves prompt trace logging helpers when tracing i
   old_opts <- options(send_prompt_with_retries__log_prompts = TRUE)
   withr::defer(options(old_opts), testthat::teardown_env())
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  Sys.sleep(0.2)
-
-  can_start_daemons <- TRUE
-  tryCatch(
-    {
-      mirai::daemons(1)
-      on.exit(mirai::daemons(0), add = TRUE)
-    },
-    error = function(e) {
-      can_start_daemons <<- FALSE
-    }
-  )
-  if (!isTRUE(can_start_daemons)) {
-    testthat::skip("mirai daemons not available in this environment")
-  }
-
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   worker <- mirai::mirai(
     {
