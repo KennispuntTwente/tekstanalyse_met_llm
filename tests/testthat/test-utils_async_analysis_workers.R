@@ -213,6 +213,12 @@ test_that("kwallm_mori refs reject missing, wrong, and tampered keys", {
     kwallm_mori_resolve_worker_arg(malformed_key, payload$scope_key),
     "Rejected invalid mori worker payload capability"
   )
+
+  malformed_object <- structure(1, class = "kwallm_mori_ref")
+  expect_error(
+    kwallm_mori_resolve_worker_arg(malformed_object, payload$scope_key),
+    "Rejected invalid mori worker payload capability"
+  )
 })
 
 

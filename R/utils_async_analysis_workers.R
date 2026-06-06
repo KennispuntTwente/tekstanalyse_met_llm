@@ -159,6 +159,15 @@ kwallm_mori_scalar_string <- function(x) {
 
 
 kwallm_mori_validate_ref_shape <- function(x) {
+  if (!is.list(x) || is.null(names(x))) {
+    return(FALSE)
+  }
+
+  required_fields <- c("name", "nonce", "signature", "signature_algorithm")
+  if (!all(required_fields %in% names(x))) {
+    return(FALSE)
+  }
+
   kwallm_mori_scalar_string(x$name) &&
     (is.null(x$key) || kwallm_mori_scalar_string(x$key)) &&
     kwallm_mori_scalar_string(x$nonce) &&
