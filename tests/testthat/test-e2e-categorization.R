@@ -55,17 +55,26 @@ test_that("{shinytest2} recording: standard process - categorization", {
   texts <- app$get_value(
     export = "text_management-texts__preprocessed"
   )
+  document_texts <- app$get_value(
+    export = "text_management-texts__document_text"
+  )
   expect_true(all(texts %in% results$text))
   expect_true(all.equal(
     table(texts),
     table(results$text),
     check.attributes = FALSE
   ))
-  expect_false(any(grepl(
+  expect_true(any(grepl(
     "kennispunttwente.nl",
-    app$get_value(export = "text_management-texts__preprocessed"),
+    document_texts,
     fixed = TRUE
   )))
+  expect_true(any(grepl(
+    "kennispunttwente.nl",
+    texts,
+    fixed = TRUE
+  )))
+  expect_identical(document_texts, texts)
 
   # Expect that all categories are present as columns in results
   expect_true(all(c("Positive", "Negative") %in% colnames(results)))
