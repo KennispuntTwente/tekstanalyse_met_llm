@@ -201,6 +201,25 @@ wait_for_nonempty_export <- function(app, export, timeout = 30000) {
 }
 
 
+wait_for_input_value <- function(
+  app,
+  input,
+  expected,
+  timeout = 30000,
+  interval = 100,
+  description = input
+) {
+  wait_until(
+    function() {
+      identical(app$get_value(input = input), expected)
+    },
+    timeout = timeout,
+    interval = interval,
+    description = description
+  )
+}
+
+
 skip_if_bundle_validation_unavailable <- function() {
   testthat::skip_if_not_installed("rmarkdown")
   testthat::skip_if_not_installed("zip")

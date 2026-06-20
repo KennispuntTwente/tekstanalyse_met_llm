@@ -86,6 +86,13 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
 
   # Set remaining options
   app$set_inputs(`human_in_the_loop_toggle-toggle` = "true")
+  wait_for_input_value(
+    app,
+    input = "human_in_the_loop_toggle-toggle",
+    expected = "true",
+    timeout = 10000,
+    description = "human-in-the-loop toggle to turn on"
+  )
   app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
   app$set_inputs(`interrater_toggle-toggle` = "false")
   app$set_inputs(`write_paragraphs_toggle-toggle` = "true")
