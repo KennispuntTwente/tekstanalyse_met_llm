@@ -238,7 +238,7 @@ if (getOption("anonymization__gliner_test", FALSE)) {
   invisible(gliner_load_model(test_model = TRUE))
 }
 
-if (!getOption("shiny.testmode", FALSE)) {
+if (!test_mode || test_async) {
   tryCatch(
     tiktoken_load_tokenizer(),
     error = function(e) {
