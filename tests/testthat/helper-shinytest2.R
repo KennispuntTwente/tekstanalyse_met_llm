@@ -118,6 +118,21 @@ wait_for_enabled_element <- function(app, id, timeout = 60000) {
 }
 
 
+wait_for_visible_element <- function(app, id, timeout = 30000) {
+  app$wait_for_js(
+    sprintf(
+      paste(
+        "var el = document.getElementById(%s);",
+        "!!el && !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length) &&",
+        "window.getComputedStyle(el).visibility !== 'hidden';"
+      ),
+      js_string(id)
+    ),
+    timeout = timeout
+  )
+}
+
+
 wait_for_select_option <- function(app, id, value, timeout = 30000) {
   wait_for_bound_input(app, id, timeout = timeout)
   app$wait_for_js(
@@ -136,6 +151,19 @@ wait_for_select_option <- function(app, id, value, timeout = 30000) {
 }
 
 
+wait_for_sections_view <- function(app, timeout = 30000) {
+  wait_for_input_value(
+    app,
+    input = "kwallm_layout_view",
+    expected = "sections",
+    timeout = timeout,
+    description = "sections layout to become active"
+  )
+  wait_for_visible_element(app, "kwallm_sections_nav", timeout = timeout)
+  invisible(TRUE)
+}
+
+
 wait_for_radio_value <- function(app, name, value, timeout = 60000) {
   selector <- sprintf("input[name='%s']:checked", name)
 
@@ -148,6 +176,29 @@ wait_for_radio_value <- function(app, name, value, timeout = 60000) {
       js_string(selector),
       js_string(value)
     ),
+    timeout = timeout
+  )
+}
+
+
+wait_for_section_step <- function(app, value, timeout = 60000) {
+  expected <- suppressWarnings(as.integer(value))
+
+  wait_for_export(
+    app,
+    export = "kwallm_current_section",
+    predicate = function(x) {
+      actual <- suppressWarnings(as.integer(x))
+      length(actual) == 1L && identical(actual, expected)
+    },
+    timeout = timeout,
+    description = sprintf("current section to become %s", value)
+  )
+
+  wait_for_radio_value(
+    app,
+    "kwallm_sections_step",
+    as.character(value),
     timeout = timeout
   )
 }

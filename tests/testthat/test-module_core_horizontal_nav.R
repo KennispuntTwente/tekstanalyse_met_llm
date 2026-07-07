@@ -52,13 +52,7 @@ test_that("progress percentage handles different section counts", {
 # 2 Section Boundary Validation Tests (Pure R) ------------------------------
 # Test the logic that validates section step input values
 
-validate_section_step <- function(input_value, n_sections) {
-  new <- suppressWarnings(as.integer(input_value))
-  if (is.na(new) || new < 1L || new > n_sections) {
-    return(NULL) # Invalid, should be ignored
-  }
-  new
-}
+validate_section_step <- kwallm_validate_section_step
 
 test_that("section step validation accepts valid values", {
   expect_equal(validate_section_step("1", 5L), 1L)
@@ -84,15 +78,7 @@ test_that("section step validation rejects invalid values", {
 # 3 Direction Calculation Tests (Pure R) ------------------------------------
 # Test the logic that determines slide animation direction
 
-calculate_direction <- function(old_section, new_section) {
-  if (new_section > old_section) {
-    "right"
-  } else if (new_section < old_section) {
-    "left"
-  } else {
-    "none"
-  }
-}
+calculate_direction <- kwallm_section_direction
 
 test_that("direction calculation returns correct animation direction", {
   expect_equal(calculate_direction(1L, 2L), "right")
@@ -344,6 +330,26 @@ test_that("prev/next observers guard on section bounds", {
   expect_true(
     grepl("cur\\s*>=\\s*n_sections", src_text, perl = TRUE),
     info = "next observer must guard on cur >= n_sections"
+  )
+})
+
+test_that("prev/next observers update server section state directly", {
+  src <- paste(
+    readLines(here::here("R", "module_core_main_ui_and_server.R")),
+    collapse = "\n"
+  )
+
+  expect_true(
+    grepl("set_current_section\\(\\s*cur - 1L", src, perl = TRUE),
+    info = "prev observer must route through set_current_section()"
+  )
+  expect_true(
+    grepl("set_current_section\\(\\s*cur \\+ 1L", src, perl = TRUE),
+    info = "next observer must route through set_current_section()"
+  )
+  expect_true(
+    grepl("exportTestValues(kwallm_current_section", src, fixed = TRUE),
+    info = "current section must be exported for shinytest2 synchronization"
   )
 })
 
