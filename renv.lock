@@ -2913,9 +2913,14 @@
     },
     "tidyprompt": {
       "Package": "tidyprompt",
-      "Version": "0.4.0",
-      "Source": "Repository",
-      "Repository": "CRAN"
+      "Version": "0.4.0.9000",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "kennispunttwente",
+      "RemoteRepo": "tidyprompt",
+      "RemoteRef": "28a15b3ea6560fa8802fdbecfa92eb1050a12aa4",
+      "RemoteSha": "28a15b3ea6560fa8802fdbecfa92eb1050a12aa4"
     },
     "tidyr": {
       "Package": "tidyr",
