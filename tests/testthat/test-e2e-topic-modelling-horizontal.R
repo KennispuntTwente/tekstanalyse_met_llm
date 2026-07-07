@@ -32,8 +32,14 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
       "test_texts.txt"
     )
   )
+  wait_for_nonempty_export(
+    app,
+    export = "text_management-texts__preprocessed",
+    timeout = 10000
+  )
 
   # Navigate to section 2 using next button
+  wait_for_enabled_element(app, "kwallm_sections_next")
   app$click("kwallm_sections_next")
   wait_for_radio_value(app, "kwallm_sections_step", "2")
 
@@ -59,6 +65,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   app$set_inputs(`assign_multiple_categories_toggle-toggle` = "true")
 
   # Navigate to section 4 using next button
+  wait_for_enabled_element(app, "kwallm_sections_next")
   app$click("kwallm_sections_next")
   wait_for_radio_value(app, "kwallm_sections_step", "4")
 
@@ -73,6 +80,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   )
 
   # Test back navigation - go back to section 3 and then forward again
+  wait_for_enabled_element(app, "kwallm_sections_prev")
   app$click("kwallm_sections_prev")
   wait_for_radio_value(app, "kwallm_sections_step", "3")
   expect_equal(app$get_value(input = "kwallm_sections_step"), "3")

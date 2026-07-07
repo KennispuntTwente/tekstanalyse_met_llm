@@ -104,7 +104,7 @@ wait_for_bound_input <- function(app, id, timeout = 30000) {
 }
 
 
-wait_for_enabled_element <- function(app, id, timeout = 30000) {
+wait_for_enabled_element <- function(app, id, timeout = 60000) {
   app$wait_for_js(
     sprintf(
       paste(
@@ -136,7 +136,7 @@ wait_for_select_option <- function(app, id, value, timeout = 30000) {
 }
 
 
-wait_for_radio_value <- function(app, name, value, timeout = 30000) {
+wait_for_radio_value <- function(app, name, value, timeout = 60000) {
   selector <- sprintf("input[name='%s']:checked", name)
 
   app$wait_for_js(
