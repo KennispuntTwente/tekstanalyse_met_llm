@@ -56,8 +56,7 @@ test_that("shinyQueue relays worker reactive assignments from mirai", {
   testthat::skip_if_not_installed("mirai")
   testthat::skip_if_not_installed("nanonext")
 
-  mirai::daemons(1)
-  withr::defer(mirai::daemons(0))
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   shiny::testServer(
     function(input, output, session) {
@@ -100,8 +99,7 @@ test_that("AsyncProgressBarController survives mirai serialization", {
   testthat::skip_if_not_installed("mirai")
   testthat::skip_if_not_installed("nanonext")
 
-  mirai::daemons(1)
-  withr::defer(mirai::daemons(0))
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   shiny::testServer(
     function(input, output, session) {
@@ -219,8 +217,7 @@ test_that("AsyncProgressBarController keeps progress scoped per Shiny session", 
     envir = env_b
   )
 
-  mirai::daemons(2)
-  withr::defer(mirai::daemons(0))
+  kwallm_test_start_mirai_daemons(n = 2L)
 
   worker_a <- mirai::mirai(
     {
@@ -280,23 +277,29 @@ test_that("AsyncInterruptor interrupts a mirai worker loop", {
   testthat::skip_if_not_installed("mirai")
   testthat::skip_if_not_installed("nanonext")
 
-  mirai::daemons(1)
-  withr::defer(mirai::daemons(0))
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   interrupter <- AsyncInterruptor$new()
   withr::defer(interrupter$destroy())
+  ready_path <- tempfile("kwallm-interrupt-ready-")
+  withr::defer(unlink(ready_path), testthat::teardown_env())
 
   worker <- mirai::mirai(
     {
+      writeLines("ready", ready_path)
       repeat {
         interrupter$execInterrupts()
         Sys.sleep(0.02)
       }
     },
-    interrupter = interrupter
+    interrupter = interrupter,
+    ready_path = ready_path
   )
 
-  Sys.sleep(0.15)
+  expect_true(spin_until(
+    function() file.exists(ready_path),
+    timeout = 5
+  ))
   interrupter$interrupt("cancelled by test")
 
   err <- tryCatch(worker[], error = function(e) e)
@@ -349,8 +352,7 @@ test_that("AsyncProgress keeps cumulative progress under rapid worker updates", 
     lockBinding("Progress", shiny_ns)
   })
 
-  mirai::daemons(1)
-  withr::defer(mirai::daemons(0))
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   shiny::testServer(
     function(input, output, session) {

@@ -115,11 +115,7 @@ test_that("categorization async integration handles 3000 texts with fake LLM", {
 
   provider <- kwallm_test_llm_provider("kwallm-fake-main-1024")
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  Sys.sleep(0.2)
-  mirai::daemons(2)
-  withr::defer(tryCatch(mirai::daemons(0), error = function(e) NULL))
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 2L)
 
   worker <- mirai::mirai(
     {
@@ -225,11 +221,7 @@ test_that("scoring async integration handles 3000 texts with fake LLM", {
   texts <- build_large_volume_analysis_texts(3000)
   provider <- kwallm_test_llm_provider("kwallm-fake-main-1024")
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  Sys.sleep(0.2)
-  mirai::daemons(2)
-  withr::defer(tryCatch(mirai::daemons(0), error = function(e) NULL))
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 2L)
 
   worker <- mirai::mirai(
     {
@@ -330,11 +322,7 @@ test_that("marking async integration handles 3000 texts with fake LLM", {
   codes <- c("refund", "support")
   provider <- kwallm_test_llm_provider("kwallm-fake-main-1024")
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  Sys.sleep(0.2)
-  mirai::daemons(2)
-  withr::defer(tryCatch(mirai::daemons(0), error = function(e) NULL))
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 2L)
 
   worker <- mirai::mirai(
     {

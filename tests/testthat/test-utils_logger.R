@@ -234,27 +234,7 @@ test_that("log_context_capture returns a valid kwallm_log_context", {
 test_that("log_context_apply bootstraps logger in mirai daemon worker", {
   testthat::skip_if_not_installed("mirai")
 
-  # First, ensure any existing daemons are reset
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-
-  # Mirai daemons can fail in constrained environments.
-  # If daemons cannot start, we skip (rather than failing unrelated CI).
-  can_start_daemons <- TRUE
-  tryCatch(
-    {
-      mirai::daemons(1)
-      on.exit(mirai::daemons(0), add = TRUE)
-    },
-    error = function(e) {
-      can_start_daemons <<- FALSE
-    }
-  )
-  if (!isTRUE(can_start_daemons)) {
-    testthat::skip("mirai daemons not available in this environment")
-  }
-
-  # Wait a moment for daemons to be ready
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   # Set up logging state in the main process
   log_dir <- withr::local_tempdir(pattern = "kwallm-logs-worker-")

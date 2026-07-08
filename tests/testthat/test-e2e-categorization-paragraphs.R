@@ -54,27 +54,18 @@ test_that("{shinytest2} recording: categorization with paragraph writing", {
   wait_for_bound_input(app, "processing-process")
   wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
-  app$wait_for_value(
-    export = "processing-success",
+  wait_for_processing_success(
+    app,
     timeout = 60000 # Longer timeout for paragraph writing
-  )
-
-  # Confirm results
-  app$expect_values(
-    export = c(
-      "processing-processing",
-      "processing-success"
-    )
-  )
-
-  app$wait_for_value(
-    export = "processing-paragraph_entries",
-    timeout = 10000
   )
 
   # Read results
   results <- app$get_value(export = "processing-results_table")
-  paragraphs <- app$get_value(export = "processing-paragraph_entries")
+  paragraphs <- wait_for_nonempty_export(
+    app,
+    export = "processing-paragraph_entries",
+    timeout = 10000
+  )
 
   # Expect that all texts are present in column 'text'
   texts <- app$get_value(

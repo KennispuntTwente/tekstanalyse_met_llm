@@ -29,24 +29,7 @@ test_that("kwallm_worker_bootstrap loads app functions and worker options in a r
   )
   withr::defer(options(old_opts), testthat::teardown_env())
 
-  tryCatch(mirai::daemons(0), error = function(e) NULL)
-  Sys.sleep(0.2)
-
-  can_start_daemons <- TRUE
-  tryCatch(
-    {
-      mirai::daemons(1)
-      on.exit(tryCatch(mirai::daemons(0), error = function(e) NULL), add = TRUE)
-    },
-    error = function(e) {
-      can_start_daemons <<- FALSE
-    }
-  )
-  if (!isTRUE(can_start_daemons)) {
-    skip("mirai daemons not available in this environment")
-  }
-
-  Sys.sleep(0.5)
+  kwallm_test_start_mirai_daemons(n = 1L)
 
   worker <- mirai::mirai(
     {

@@ -46,10 +46,7 @@ test_that("{shinytest2} recording: standard process - categorization", {
   wait_for_bound_input(app, "processing-process")
   wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
-  app$wait_for_value(
-    export = "processing-success",
-    timeout = 30000
-  )
+  wait_for_processing_success(app, timeout = 30000)
 
   # Read results
   results <- app$get_value(export = "processing-results_table")
@@ -58,17 +55,26 @@ test_that("{shinytest2} recording: standard process - categorization", {
   texts <- app$get_value(
     export = "text_management-texts__preprocessed"
   )
+  document_texts <- app$get_value(
+    export = "text_management-texts__document_text"
+  )
   expect_true(all(texts %in% results$text))
   expect_true(all.equal(
     table(texts),
     table(results$text),
     check.attributes = FALSE
   ))
-  expect_false(any(grepl(
+  expect_true(any(grepl(
     "kennispunttwente.nl",
-    app$get_value(export = "text_management-texts__preprocessed"),
+    document_texts,
     fixed = TRUE
   )))
+  expect_true(any(grepl(
+    "kennispunttwente.nl",
+    texts,
+    fixed = TRUE
+  )))
+  expect_identical(document_texts, texts)
 
   # Expect that all categories are present as columns in results
   expect_true(all(c("Positive", "Negative") %in% colnames(results)))

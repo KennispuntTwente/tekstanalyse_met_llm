@@ -25,6 +25,18 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
     )
   )
 
+  app$set_inputs(
+    `text_management-select_simple` = 0.123,
+    allow_no_input_binding_ = TRUE
+  )
+  wait_for_export(
+    app,
+    export = "text_management-anonymization_mode",
+    predicate = function(x) identical(x, "simple"),
+    timeout = 10000,
+    description = "anonymization mode regex"
+  )
+
   # Enter background
   app$set_inputs(
     `research_background-research_background` = "My research background"
@@ -48,25 +60,22 @@ test_that("{shinytest2} recording: standard process - topic modelling", {
   app$set_inputs(`write_paragraphs_toggle-toggle` = "true")
 
   # Start processing
+  wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
   wait_for_topic_edit_modal_ready(app)
   app$click("processing-edit_topics-confirm_topics")
-  app$wait_for_value(
-    export = "processing-success",
-    timeout = 30000
-  )
+  wait_for_processing_success(app, timeout = 30000)
 
   expect_true(isTRUE(app$get_value(export = "processing-processing")))
   expect_true(isTRUE(app$get_value(export = "processing-success")))
 
-  app$wait_for_value(
+  # Read results
+  results <- app$get_value(export = "processing-results_table")
+  paragraphs <- wait_for_nonempty_export(
+    app,
     export = "processing-paragraph_entries",
     timeout = 10000
   )
-
-  # Read results
-  results <- app$get_value(export = "processing-results_table")
-  paragraphs <- app$get_value(export = "processing-paragraph_entries")
 
   # Expect that all texts are present in column 'text'
   texts <- readLines(

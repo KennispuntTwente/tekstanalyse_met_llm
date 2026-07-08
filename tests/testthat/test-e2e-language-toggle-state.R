@@ -8,6 +8,7 @@ test_that("{shinytest2} language toggle preserves visible input state", {
     load_timeout = 120000,
     seed = 123
   )
+  on.exit(app$stop(), add = TRUE)
 
   is_disabled <- function(id) {
     app$get_js(sprintf("document.getElementById('%s').disabled", id))
@@ -86,6 +87,4 @@ test_that("{shinytest2} language toggle preserves visible input state", {
   expect_equal(app$get_value(input = "text_split-max_tokens"), 64)
   expect_equal(app$get_value(input = "text_split-overlap"), 4)
   expect_equal(app$get_value(input = "write_paragraphs_toggle-toggle"), "false")
-
-  app$stop()
 })

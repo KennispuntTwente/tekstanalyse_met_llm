@@ -63,10 +63,7 @@ test_that("{shinytest2} recording: scoring with inter-rater reliability", {
   wait_for_enabled_element(app, "processing-rater_modal-submit_next")
   app$click("processing-rater_modal-submit_next")
 
-  app$wait_for_value(
-    export = "processing-success",
-    timeout = 60000
-  )
+  wait_for_processing_success(app, timeout = 60000)
 
   results <- app$get_value(export = "processing-results_table")
 

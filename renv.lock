@@ -354,7 +354,7 @@
     },
     "bslib": {
       "Package": "bslib",
-      "Version": "0.10.0",
+      "Version": "0.11.0",
       "Source": "Repository",
       "Repository": "CRAN"
     },
@@ -1885,7 +1885,7 @@
     },
     "mirai": {
       "Package": "mirai",
-      "Version": "2.6.1",
+      "Version": "2.7.1",
       "Source": "Repository",
       "Repository": "CRAN"
     },
@@ -1930,7 +1930,7 @@
     },
     "nanonext": {
       "Package": "nanonext",
-      "Version": "1.8.2",
+      "Version": "1.9.1",
       "Source": "Repository",
       "Repository": "CRAN"
     },
@@ -2919,9 +2919,14 @@
     },
     "tidyprompt": {
       "Package": "tidyprompt",
-      "Version": "0.4.0",
-      "Source": "Repository",
-      "Repository": "CRAN"
+      "Version": "0.4.0.9000",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "kennispunttwente",
+      "RemoteRepo": "tidyprompt",
+      "RemoteRef": "28a15b3ea6560fa8802fdbecfa92eb1050a12aa4",
+      "RemoteSha": "28a15b3ea6560fa8802fdbecfa92eb1050a12aa4"
     },
     "tidyr": {
       "Package": "tidyr",
