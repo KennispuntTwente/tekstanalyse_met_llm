@@ -65,9 +65,15 @@ test_that("grouped paragraph streaming clears and replaces output per group", {
 
   events <- list(show = 0L, clear = 0L, set = character())
   stream_controller <- list(
-    show = function() events$show <<- events$show + 1L,
-    clear = function() events$clear <<- events$clear + 1L,
-    set = function(value) events$set <<- c(events$set, value)
+    show = function() {
+      events$show <<- events$show + 1L
+    },
+    clear = function() {
+      events$clear <<- events$clear + 1L
+    },
+    set = function(value) {
+      events$set <<- c(events$set, value)
+    }
   )
   helper_env$write_paragraph <- function(
     texts,
