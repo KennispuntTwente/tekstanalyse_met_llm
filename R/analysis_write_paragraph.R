@@ -414,7 +414,9 @@ write_paragraph <- function(
   send_paragraph_prompt <- function(
     prompt_to_send,
     scope_ids,
-    callback = NULL
+    callback = NULL,
+    batch_index = NULL,
+    reduction_iteration = NULL
   ) {
     if (!is.null(callback) && is.function(stream_reset_callback)) {
       stream_reset_callback()
@@ -426,6 +428,8 @@ write_paragraph <- function(
       execution_scope = list(
         kind = "analysis_unit_group",
         analysis_unit_ids = as.integer(scope_ids),
+        batch_index = batch_index,
+        reduction_iteration = reduction_iteration,
         subject_kind = subject_kind,
         subject_value = topic
       )
@@ -492,11 +496,17 @@ write_paragraph <- function(
           paragraph <- send_paragraph_prompt(
             sampled_prompt,
             sampled_ids,
-            callback = stream_callback
+            callback = stream_callback,
+            batch_index = 1L
           )
           list(paragraph = paragraph, texts = sampled, ids = sampled_ids)
         } else {
-          summarize_batches <- function(values, value_ids, are_summaries) {
+          summarize_batches <- function(
+            values,
+            value_ids,
+            are_summaries,
+            reduction_iteration
+          ) {
             value_batches <- .kwallm_paragraph_batches(
               texts = values,
               topic = topic,
@@ -545,7 +555,9 @@ write_paragraph <- function(
               summaries[[i]] <- send_paragraph_prompt(
                 batch_prompt,
                 batch_ids,
-                callback = stream_callback
+                callback = stream_callback,
+                batch_index = as.integer(i),
+                reduction_iteration = as.integer(reduction_iteration)
               )
               summary_ids[[i]] <- batch_ids
             }
@@ -567,7 +579,8 @@ write_paragraph <- function(
             reduced <- summarize_batches(
               current_values,
               current_ids,
-              are_summaries
+              are_summaries,
+              reduction_iteration = iteration
             )
             if (is.null(reduced)) {
               return(overflow_result())

@@ -185,6 +185,50 @@ test_that("batch strategy summarizes all texts and recursively reduces batches",
 })
 
 
+test_that("batch strategy records batch and reduction scope for every call", {
+  count_tokens <- function(x) nchar(x)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  texts <- paste0("text-", 1:6, "-", strrep("x", 180))
+  context_window <- count_tokens(tidyprompt::construct_prompt_text(
+    prompt_write_paragraph(texts[1:2], "weather", language = "en")
+  ))
+  get_context_window_size_in_tokens <- function(...) context_window
+  scopes <- list()
+  send_prompt_with_retries <- function(prompt, execution_scope, ...) {
+    force(prompt)
+    scopes[[length(scopes) + 1L]] <<- execution_scope
+    "short partial summary"
+  }
+  old <- options(
+    paragraph_summary_strategy = "batch",
+    paragraph_summary_max_reduction_iterations = 8L
+  )
+  withr::defer(options(old), testthat::teardown_env())
+  set.seed(42)
+
+  result <- write_paragraph(
+    texts = texts,
+    analysis_unit_ids = seq_along(texts),
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en"
+  )
+
+  expect_true(result$prompt_fits)
+  expect_gt(length(scopes), 1L)
+  iterations <- vapply(scopes, `[[`, integer(1), "reduction_iteration")
+  expect_identical(sort(unique(iterations)), seq_len(max(iterations)))
+  for (iteration in unique(iterations)) {
+    iteration_scopes <- scopes[iterations == iteration]
+    expect_identical(
+      vapply(iteration_scopes, `[[`, integer(1), "batch_index"),
+      seq_along(iteration_scopes)
+    )
+  }
+})
+
+
 test_that("sample strategy sends one random context-sized subset", {
   count_tokens <- function(x) nchar(x)
   source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
