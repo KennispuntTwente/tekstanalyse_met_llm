@@ -51,6 +51,10 @@
 #' @param assign_multiple_categories Logical; whether one text can map to more than one label.
 #' @param human_in_the_loop Logical; whether a human review step was used.
 #' @param write_paragraphs Logical; whether paragraph output was generated.
+#' @param paragraph_summary_strategy Paragraph overflow strategy, either
+#'   `"batch"` or `"sample"`.
+#' @param paragraph_summary_max_reduction_iterations Maximum recursive summary
+#'   reduction depth used by the batch strategy.
 #' @param context_window List with chunking or topic-generation settings.
 #' @param stage_prompt_previews Optional named list of prompt previews keyed by
 #'   stage id, usually built in `module_core_processing.R`. Common keys are
@@ -102,6 +106,14 @@ build_analysis_result <- function(
   assign_multiple_categories = FALSE,
   human_in_the_loop = FALSE,
   write_paragraphs = FALSE,
+  paragraph_summary_strategy = getOption(
+    "paragraph_summary_strategy",
+    "batch"
+  ),
+  paragraph_summary_max_reduction_iterations = getOption(
+    "paragraph_summary_max_reduction_iterations",
+    8L
+  ),
   context_window = list(),
   stage_prompt_previews = list(),
   stage_execution_rows = NULL,
@@ -227,6 +239,9 @@ build_analysis_result <- function(
     human_in_the_loop = human_in_the_loop,
     write_paragraphs = write_paragraphs,
     style_prompt = style_prompt,
+    paragraph_summary_strategy = paragraph_summary_strategy,
+    paragraph_summary_max_reduction_iterations =
+      paragraph_summary_max_reduction_iterations,
     context_window = context_window
   )
 
@@ -955,6 +970,8 @@ build_analysis_result <- function(
   human_in_the_loop = FALSE,
   write_paragraphs = FALSE,
   style_prompt = NULL,
+  paragraph_summary_strategy = "batch",
+  paragraph_summary_max_reduction_iterations = 8L,
   context_window = list()
 ) {
   paragraph_style_prompt <- if (
@@ -971,7 +988,11 @@ build_analysis_result <- function(
       assign_multiple_categories = isTRUE(assign_multiple_categories),
       human_in_the_loop = isTRUE(human_in_the_loop),
       write_paragraphs = isTRUE(write_paragraphs),
-      paragraph_style_prompt = paragraph_style_prompt
+      paragraph_style_prompt = paragraph_style_prompt,
+      paragraph_summary_strategy = as.character(paragraph_summary_strategy),
+      paragraph_summary_max_reduction_iterations = as.integer(
+        paragraph_summary_max_reduction_iterations
+      )
     ),
     scoring = ScoringConfig(
       scoring_characteristic = as.character(scoring_characteristic %||% "Score")
@@ -981,6 +1002,10 @@ build_analysis_result <- function(
       human_in_the_loop = isTRUE(human_in_the_loop),
       write_paragraphs = isTRUE(write_paragraphs),
       paragraph_style_prompt = paragraph_style_prompt,
+      paragraph_summary_strategy = as.character(paragraph_summary_strategy),
+      paragraph_summary_max_reduction_iterations = as.integer(
+        paragraph_summary_max_reduction_iterations
+      ),
       topic_generation_settings = data.frame(
         setting = c(
           "batch_size",
@@ -1000,6 +1025,10 @@ build_analysis_result <- function(
     marking = MarkingConfig(
       write_paragraphs = isTRUE(write_paragraphs),
       paragraph_style_prompt = paragraph_style_prompt,
+      paragraph_summary_strategy = as.character(paragraph_summary_strategy),
+      paragraph_summary_max_reduction_iterations = as.integer(
+        paragraph_summary_max_reduction_iterations
+      ),
       text_size_tokens = as.numeric(context_window$max_tokens %||% 0),
       overlap_size_tokens = as.numeric(context_window$overlap %||% 0)
     )

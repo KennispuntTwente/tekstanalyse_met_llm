@@ -25,6 +25,8 @@ test_that("kwallm_worker_bootstrap loads app functions and worker options in a r
     topic_modelling__always_add_not_applicable = FALSE,
     topic_modelling__reduction_max_prompt_batches = 24L,
     topic_modelling__reduction_max_iterations = 3L,
+    paragraph_summary_strategy = "sample",
+    paragraph_summary_max_reduction_iterations = 6L,
     tidyprompt.warn.auto.json = FALSE
   )
   withr::defer(options(old_opts), testthat::teardown_env())
@@ -82,7 +84,9 @@ test_that("kwallm_worker_bootstrap loads app functions and worker options in a r
           "send_prompt_with_retries__max_tries",
           "topic_modelling__always_add_not_applicable",
           "topic_modelling__reduction_max_prompt_batches",
-          "topic_modelling__reduction_max_iterations"
+          "topic_modelling__reduction_max_iterations",
+          "paragraph_summary_strategy",
+          "paragraph_summary_max_reduction_iterations"
         )
       ),
       kwallm_worker_bootstrap_globals()
@@ -110,6 +114,14 @@ test_that("kwallm_worker_bootstrap loads app functions and worker options in a r
   expect_identical(
     result$option_values$topic_modelling__reduction_max_iterations,
     3L
+  )
+  expect_identical(
+    result$option_values$paragraph_summary_strategy,
+    "sample"
+  )
+  expect_identical(
+    result$option_values$paragraph_summary_max_reduction_iterations,
+    6L
   )
   expect_identical(result$working_directory, kwallm_worker_app_root())
 })

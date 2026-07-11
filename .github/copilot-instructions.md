@@ -23,7 +23,10 @@ This repo is a Shiny app (R) with an Electron desktop wrapper and Docker image. 
 - Privacy & anonymization: `anonymization__default` ("none" | "regex" | "gliner") and related availability toggles control what users can select.
 - Topic extraction: `topic_modelling__batch_size_default`, `topic_modelling__batch_size_limit`, `topic_modelling__number_of_batches_limit`, `topic_modelling__draws_default`, `topic_modelling__draws_limit`.
 - Logging: `logger__level`, `logger__dir`, `logger__retention`.
-- Paragraph streaming: `paragraph_streaming` (default `TRUE`).
+- Paragraph summaries: `paragraph_streaming` controls live output;
+  `paragraph_summary_strategy` selects recursive `"batch"` reduction or a
+  context-sized random `"sample"`; `paragraph_summary_max_reduction_iterations`
+  caps recursive summary reduction.
 
 ## Async workers (mirai) — critical section
 All long-running work runs in `mirai::mirai()` daemon workers. Workers are separate R processes that do **not** share the Shiny session's environment.

@@ -317,10 +317,15 @@ mark_texts <- function(
 
     # Create streaming callback if streaming is enabled
     stream_callback <- NULL
+    stream_reset_callback <- NULL
     if (streaming_enabled && !is.null(llm_stream_async)) {
       try(llm_stream_async$show())
       stream_callback <- function(token, meta) {
         llm_stream_async$set(meta$partial_response %||% "")
+        invisible(TRUE)
+      }
+      stream_reset_callback <- function() {
+        llm_stream_async$clear()
         invisible(TRUE)
       }
     }
@@ -350,11 +355,6 @@ mark_texts <- function(
           silent = TRUE
         )
 
-        # Clear streaming panel before this paragraph
-        if (streaming_enabled && !is.null(llm_stream_async)) {
-          try(llm_stream_async$clear())
-        }
-
         paragraph <- write_paragraph(
           texts = paragraph_input$texts,
           analysis_unit_ids = paragraph_input$analysis_unit_ids,
@@ -365,7 +365,8 @@ mark_texts <- function(
           llm_provider = llm_provider,
           language = paragraph_language,
           focus_on_highlighted_text = TRUE,
-          stream_callback = stream_callback
+          stream_callback = stream_callback,
+          stream_reset_callback = stream_reset_callback
         )
 
         return(paragraph)

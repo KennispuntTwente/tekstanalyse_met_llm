@@ -55,6 +55,62 @@ test_that("collect_grouped_paragraph_inputs keeps analysis units aligned", {
   )
 })
 
+
+test_that("grouped paragraph streaming clears and replaces output per group", {
+  helper_env <- new.env(parent = environment())
+  sys.source(
+    here::here("R", "utils_processing_helpers.R"),
+    envir = helper_env
+  )
+
+  events <- list(show = 0L, clear = 0L, set = character())
+  stream_controller <- list(
+    show = function() events$show <<- events$show + 1L,
+    clear = function() events$clear <<- events$clear + 1L,
+    set = function(value) events$set <<- c(events$set, value)
+  )
+  helper_env$write_paragraph <- function(
+    texts,
+    analysis_unit_ids,
+    topic,
+    stream_callback,
+    stream_reset_callback,
+    ...
+  ) {
+    force(texts)
+    force(analysis_unit_ids)
+    stream_reset_callback()
+    stream_callback(
+      "token",
+      list(partial_response = paste("partial", topic))
+    )
+    list(topic = topic, paragraph = paste("summary", topic))
+  }
+  grouped <- list(
+    A = list(texts = "alpha", analysis_unit_ids = 1L),
+    B = list(texts = "beta", analysis_unit_ids = 2L)
+  )
+  lang <- list(
+    t = identity,
+    get_translation_language = function() "en"
+  )
+
+  result <- helper_env$write_grouped_paragraphs(
+    grouped_texts = grouped,
+    research_background = "",
+    style_prompt = "",
+    llm_provider = list(),
+    lang = lang,
+    llm_stream_async = stream_controller,
+    streaming_enabled = TRUE
+  )
+
+  expect_identical(events$show, 1L)
+  expect_identical(events$clear, 2L)
+  expect_identical(events$set, c("partial A", "partial B"))
+  expect_identical(names(result), c("A", "B"))
+})
+
 test_that("processing_texts_under_maximum validates count and notifies", {
   lang <- list(t = function(x) x)
   notification <- NULL

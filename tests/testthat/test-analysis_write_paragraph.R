@@ -1,5 +1,9 @@
 library(testthat)
 source(here::here("R", "utils_prompt_sanitization.R"), local = TRUE)
+source(here::here("R", "utils_create_text_batches.R"), local = TRUE)
+
+# Keep context-window tests independent of the Python tokenizer.
+count_tokens <- function(x) nchar(x)
 
 test_that("write_paragraph returns a warning record when the prompt overflows", {
   source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
@@ -132,4 +136,322 @@ test_that("write_paragraph checks prompt fit before sending", {
   expect_identical(result$paragraph, "")
   expect_false(result$prompt_fits)
   expect_identical(send_call_count, 0)
+})
+
+
+test_that("batch strategy summarizes all texts and recursively reduces batches", {
+  count_tokens <- function(x) nchar(x)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  texts <- paste0("text-", 1:6, "-", strrep(letters[1:6], 180))
+  two_text_prompt <- prompt_write_paragraph(
+    texts = texts[1:2],
+    topic = "weather",
+    language = "en"
+  )
+  context_window <- count_tokens(
+    tidyprompt::construct_prompt_text(two_text_prompt)
+  )
+  get_context_window_size_in_tokens <- function(...) context_window
+
+  sent_prompts <- character()
+  send_prompt_with_retries <- function(prompt, ...) {
+    sent_prompts <<- c(
+      sent_prompts,
+      tidyprompt::construct_prompt_text(prompt)
+    )
+    paste("Partial summary", length(sent_prompts))
+  }
+  old <- options(
+    paragraph_summary_strategy = "batch",
+    paragraph_summary_max_reduction_iterations = 8L
+  )
+  withr::defer(options(old), testthat::teardown_env())
+  set.seed(42)
+
+  result <- write_paragraph(
+    texts = texts,
+    analysis_unit_ids = seq_along(texts),
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en"
+  )
+
+  expect_true(result$prompt_fits)
+  expect_identical(result$texts, texts)
+  expect_identical(result$analysis_unit_ids, seq_along(texts))
+  expect_gt(length(sent_prompts), 1L)
+  expect_true(any(grepl("<summaries>", sent_prompts, fixed = TRUE)))
+})
+
+
+test_that("sample strategy sends one random context-sized subset", {
+  count_tokens <- function(x) nchar(x)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  texts <- paste0("text-", 1:6, "-", strrep(letters[1:6], 180))
+  context_window <- count_tokens(tidyprompt::construct_prompt_text(
+    prompt_write_paragraph(texts[1:2], "weather", language = "en")
+  ))
+  get_context_window_size_in_tokens <- function(...) context_window
+
+  calls <- list()
+  send_prompt_with_retries <- function(prompt, execution_scope, ...) {
+    calls[[length(calls) + 1L]] <<- list(
+      prompt = tidyprompt::construct_prompt_text(prompt),
+      ids = execution_scope$analysis_unit_ids
+    )
+    "Sample summary"
+  }
+  old <- options(paragraph_summary_strategy = "sample")
+  withr::defer(options(old), testthat::teardown_env())
+  set.seed(7)
+
+  result <- write_paragraph(
+    texts = texts,
+    analysis_unit_ids = seq_along(texts),
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en"
+  )
+
+  expect_true(result$prompt_fits)
+  expect_length(calls, 1L)
+  expect_gt(length(result$texts), 0L)
+  expect_lt(length(result$texts), length(texts))
+  expect_identical(result$analysis_unit_ids, calls[[1]]$ids)
+  expect_identical(result$texts, texts[result$analysis_unit_ids])
+})
+
+
+test_that("sample strategy skips individually oversized texts", {
+  count_tokens <- function(x) nchar(x)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  texts <- c(strrep("X", 5000), "small alpha", "small beta")
+  context_window <- count_tokens(tidyprompt::construct_prompt_text(
+    prompt_write_paragraph(texts[2:3], "weather", language = "en")
+  ))
+  get_context_window_size_in_tokens <- function(...) context_window
+  sent_ids <- NULL
+  send_prompt_with_retries <- function(prompt, execution_scope, ...) {
+    force(prompt)
+    sent_ids <<- execution_scope$analysis_unit_ids
+    "Sample summary"
+  }
+  old <- options(paragraph_summary_strategy = "sample")
+  withr::defer(options(old), testthat::teardown_env())
+  set.seed(11)
+
+  result <- write_paragraph(
+    texts = texts,
+    analysis_unit_ids = seq_along(texts),
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en"
+  )
+
+  expect_true(result$prompt_fits)
+  expect_false(1L %in% result$analysis_unit_ids)
+  expect_identical(result$analysis_unit_ids, sent_ids)
+  expect_false(any(result$texts == texts[[1]]))
+})
+
+
+test_that("batch strategy recursively summarizes summaries over multiple levels", {
+  count_tokens <- function(x) nchar(x)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  texts <- paste0("text-", 1:16, "-", strrep("x", 180))
+  context_window <- count_tokens(tidyprompt::construct_prompt_text(
+    prompt_write_paragraph(texts[1:2], "weather", language = "en")
+  ))
+  summary_lengths <- seq(20L, 400L, by = 5L)
+  two_fit <- vapply(summary_lengths, function(n) {
+    count_tokens(tidyprompt::construct_prompt_text(prompt_write_paragraph(
+      rep(strrep("s", n), 2L),
+      "weather",
+      language = "en",
+      texts_are_summaries = TRUE
+    ))) <= context_window
+  }, logical(1))
+  three_fit <- vapply(summary_lengths, function(n) {
+    count_tokens(tidyprompt::construct_prompt_text(prompt_write_paragraph(
+      rep(strrep("s", n), 3L),
+      "weather",
+      language = "en",
+      texts_are_summaries = TRUE
+    ))) <= context_window
+  }, logical(1))
+  candidates <- summary_lengths[two_fit & !three_fit]
+  expect_gt(length(candidates), 0L)
+  response <- strrep("s", candidates[[1]])
+
+  get_context_window_size_in_tokens <- function(...) context_window
+  calls <- list()
+  send_prompt_with_retries <- function(prompt, execution_scope, ...) {
+    calls[[length(calls) + 1L]] <<- list(
+      is_reduction = grepl(
+        "<summaries>",
+        tidyprompt::construct_prompt_text(prompt),
+        fixed = TRUE
+      ),
+      n_source_ids = length(execution_scope$analysis_unit_ids)
+    )
+    response
+  }
+  old <- options(
+    paragraph_summary_strategy = "batch",
+    paragraph_summary_max_reduction_iterations = 8L
+  )
+  withr::defer(options(old), testthat::teardown_env())
+  set.seed(23)
+
+  result <- write_paragraph(
+    texts = texts,
+    analysis_unit_ids = seq_along(texts),
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en"
+  )
+
+  expect_true(result$prompt_fits)
+  reduction_calls <- calls[vapply(calls, `[[`, logical(1), "is_reduction")]
+  expect_gt(length(reduction_calls), 1L)
+  expect_true(any(vapply(
+    reduction_calls,
+    `[[`,
+    integer(1),
+    "n_source_ids"
+  ) > 2L))
+})
+
+
+test_that("batch strategy stops safely when a reduction makes no progress", {
+  count_tokens <- function(x) nchar(x)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  texts <- paste0("text-", 1:3, "-", strrep("x", 180))
+  context_window <- count_tokens(tidyprompt::construct_prompt_text(
+    prompt_write_paragraph(texts[[1]], "weather", language = "en")
+  ))
+  get_context_window_size_in_tokens <- function(...) context_window
+  send_count <- 0L
+  send_prompt_with_retries <- function(...) {
+    send_count <<- send_count + 1L
+    strrep("s", 180)
+  }
+  old <- options(
+    paragraph_summary_strategy = "batch",
+    paragraph_summary_max_reduction_iterations = 8L
+  )
+  withr::defer(options(old), testthat::teardown_env())
+
+  result <- write_paragraph(
+    texts = texts,
+    analysis_unit_ids = seq_along(texts),
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en"
+  )
+
+  expect_false(result$prompt_fits)
+  expect_identical(result$paragraph, "")
+  expect_identical(send_count, 3L)
+})
+
+
+test_that("batch strategy honors the recursive reduction iteration cap", {
+  count_tokens <- function(x) nchar(x)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  texts <- paste0("text-", 1:4, "-", strrep("x", 180))
+  context_window <- count_tokens(tidyprompt::construct_prompt_text(
+    prompt_write_paragraph(texts[1:2], "weather", language = "en")
+  ))
+  get_context_window_size_in_tokens <- function(...) context_window
+  send_count <- 0L
+  send_prompt_with_retries <- function(...) {
+    send_count <<- send_count + 1L
+    "short partial summary"
+  }
+  old <- options(
+    paragraph_summary_strategy = "batch",
+    paragraph_summary_max_reduction_iterations = 1L
+  )
+  withr::defer(options(old), testthat::teardown_env())
+
+  result <- write_paragraph(
+    texts = texts,
+    analysis_unit_ids = seq_along(texts),
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en"
+  )
+
+  expect_false(result$prompt_fits)
+  expect_identical(send_count, 2L)
+})
+
+
+test_that("batch strategy resets and streams every intermediate synthesis", {
+  count_tokens <- function(x) nchar(x)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  texts <- paste0("text-", 1:6, "-", strrep("x", 180))
+  context_window <- count_tokens(tidyprompt::construct_prompt_text(
+    prompt_write_paragraph(texts[1:2], "weather", language = "en")
+  ))
+  get_context_window_size_in_tokens <- function(...) context_window
+
+  callback_attached <- logical()
+  streamed_values <- character()
+  stream_events <- character()
+  send_prompt_with_retries <- function(prompt, stream_callback = NULL, ...) {
+    force(prompt)
+    callback_attached <<- c(callback_attached, !is.null(stream_callback))
+    if (!is.null(stream_callback)) {
+      call_index <- length(callback_attached)
+      stream_callback(
+        "token",
+        list(partial_response = paste("partial response", call_index))
+      )
+    }
+    "short partial summary"
+  }
+  ui_callback <- function(token, meta) {
+    force(token)
+    streamed_values <<- c(streamed_values, meta$partial_response)
+    stream_events <<- c(stream_events, paste("set", meta$partial_response))
+  }
+  reset_callback <- function() {
+    stream_events <<- c(stream_events, "clear")
+  }
+  old <- options(
+    paragraph_summary_strategy = "batch",
+    paragraph_summary_max_reduction_iterations = 8L
+  )
+  withr::defer(options(old), testthat::teardown_env())
+  set.seed(31)
+
+  result <- write_paragraph(
+    texts = texts,
+    analysis_unit_ids = seq_along(texts),
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en",
+    stream_callback = ui_callback,
+    stream_reset_callback = reset_callback
+  )
+
+  expect_true(result$prompt_fits)
+  expect_gt(length(callback_attached), 1L)
+  expect_true(all(callback_attached))
+  expect_length(streamed_values, length(callback_attached))
+  expect_identical(stream_events[seq(1L, length(stream_events), by = 2L)],
+    rep("clear", length(callback_attached)))
+  expect_true(all(grepl(
+    "^set partial response",
+    stream_events[seq(2L, length(stream_events), by = 2L)]
+  )))
 })

@@ -533,6 +533,7 @@ write_grouped_paragraphs <- function(
   }
 
   stream_callback <- NULL
+  stream_reset_callback <- NULL
   if (isTRUE(streaming_enabled) && !is.null(llm_stream_async)) {
     # Stream partial paragraph text into the UI while the model is writing.
     llm_stream_async$show()
@@ -542,6 +543,10 @@ write_grouped_paragraphs <- function(
         partial_response <- ""
       }
       llm_stream_async$set(partial_response)
+      invisible(TRUE)
+    }
+    stream_reset_callback <- function() {
+      llm_stream_async$clear()
       invisible(TRUE)
     }
   }
@@ -567,10 +572,6 @@ write_grouped_paragraphs <- function(
         )
       }
 
-      if (isTRUE(streaming_enabled) && !is.null(llm_stream_async)) {
-        llm_stream_async$clear()
-      }
-
       # Write one paragraph for one category/topic.
       write_paragraph(
         texts = normalized_entry$texts,
@@ -581,7 +582,8 @@ write_grouped_paragraphs <- function(
         style_prompt = style_prompt,
         llm_provider = llm_provider,
         language = lang$get_translation_language(),
-        stream_callback = stream_callback
+        stream_callback = stream_callback,
+        stream_reset_callback = stream_reset_callback
       )
     }
   )

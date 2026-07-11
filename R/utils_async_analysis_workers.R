@@ -26,6 +26,8 @@ kwallm_worker_capture_options <- function() {
     "logger__dir",
     "logger__retention",
     "paragraph_streaming",
+    "paragraph_summary_strategy",
+    "paragraph_summary_max_reduction_iterations",
     "marking__max_combinations",
     "topic_modelling__always_add_not_applicable",
     "topic_modelling__reduction_max_prompt_batches",
