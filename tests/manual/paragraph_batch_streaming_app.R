@@ -76,11 +76,13 @@ paragraph_batch_streaming_demo_app <- function() {
 
   ui <- shiny::fluidPage(
     shiny::tags$head(
-      shiny::tags$style(shiny::HTML("\
+      shiny::tags$style(shiny::HTML(
+        "\
         body { max-width: 900px; margin: 0 auto; padding: 28px; }\
         .demo-status { font-weight: 600; margin: 16px 0 6px; }\
         .demo-note { color: #555; margin-bottom: 18px; }\
-      "))
+      "
+      ))
     ),
     shiny::h2("Batched paragraph streaming demo"),
     shiny::p(
@@ -110,7 +112,10 @@ paragraph_batch_streaming_demo_app <- function() {
         )
       )
     ),
-    shiny::div(class = "demo-status", shiny::textOutput("status", inline = TRUE)),
+    shiny::div(
+      class = "demo-status",
+      shiny::textOutput("status", inline = TRUE)
+    ),
     demo_env$llm_streaming_ui("demo_stream", visible = TRUE)
   )
 

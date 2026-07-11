@@ -267,22 +267,32 @@ test_that("batch strategy recursively summarizes summaries over multiple levels"
     prompt_write_paragraph(texts[1:2], "weather", language = "en")
   ))
   summary_lengths <- seq(20L, 400L, by = 5L)
-  two_fit <- vapply(summary_lengths, function(n) {
-    count_tokens(tidyprompt::construct_prompt_text(prompt_write_paragraph(
-      rep(strrep("s", n), 2L),
-      "weather",
-      language = "en",
-      texts_are_summaries = TRUE
-    ))) <= context_window
-  }, logical(1))
-  three_fit <- vapply(summary_lengths, function(n) {
-    count_tokens(tidyprompt::construct_prompt_text(prompt_write_paragraph(
-      rep(strrep("s", n), 3L),
-      "weather",
-      language = "en",
-      texts_are_summaries = TRUE
-    ))) <= context_window
-  }, logical(1))
+  two_fit <- vapply(
+    summary_lengths,
+    function(n) {
+      count_tokens(tidyprompt::construct_prompt_text(prompt_write_paragraph(
+        rep(strrep("s", n), 2L),
+        "weather",
+        language = "en",
+        texts_are_summaries = TRUE
+      ))) <=
+        context_window
+    },
+    logical(1)
+  )
+  three_fit <- vapply(
+    summary_lengths,
+    function(n) {
+      count_tokens(tidyprompt::construct_prompt_text(prompt_write_paragraph(
+        rep(strrep("s", n), 3L),
+        "weather",
+        language = "en",
+        texts_are_summaries = TRUE
+      ))) <=
+        context_window
+    },
+    logical(1)
+  )
   candidates <- summary_lengths[two_fit & !three_fit]
   expect_gt(length(candidates), 0L)
   response <- strrep("s", candidates[[1]])
@@ -318,12 +328,15 @@ test_that("batch strategy recursively summarizes summaries over multiple levels"
   expect_true(result$prompt_fits)
   reduction_calls <- calls[vapply(calls, `[[`, logical(1), "is_reduction")]
   expect_gt(length(reduction_calls), 1L)
-  expect_true(any(vapply(
-    reduction_calls,
-    `[[`,
-    integer(1),
-    "n_source_ids"
-  ) > 2L))
+  expect_true(any(
+    vapply(
+      reduction_calls,
+      `[[`,
+      integer(1),
+      "n_source_ids"
+    ) >
+      2L
+  ))
 })
 
 
@@ -448,8 +461,10 @@ test_that("batch strategy resets and streams every intermediate synthesis", {
   expect_gt(length(callback_attached), 1L)
   expect_true(all(callback_attached))
   expect_length(streamed_values, length(callback_attached))
-  expect_identical(stream_events[seq(1L, length(stream_events), by = 2L)],
-    rep("clear", length(callback_attached)))
+  expect_identical(
+    stream_events[seq(1L, length(stream_events), by = 2L)],
+    rep("clear", length(callback_attached))
+  )
   expect_true(all(grepl(
     "^set partial response",
     stream_events[seq(2L, length(stream_events), by = 2L)]

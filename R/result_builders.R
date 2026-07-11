@@ -240,8 +240,7 @@ build_analysis_result <- function(
     write_paragraphs = write_paragraphs,
     style_prompt = style_prompt,
     paragraph_summary_strategy = paragraph_summary_strategy,
-    paragraph_summary_max_reduction_iterations =
-      paragraph_summary_max_reduction_iterations,
+    paragraph_summary_max_reduction_iterations = paragraph_summary_max_reduction_iterations,
     context_window = context_window
   )
 

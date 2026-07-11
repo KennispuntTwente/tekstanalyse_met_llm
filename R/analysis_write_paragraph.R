@@ -62,9 +62,17 @@ prompt_write_paragraph <- function(
   text_blocks <- purrr::map_chr(seq_along(texts), function(i) {
     escaped <- escape_prompt_delimiters(texts[[i]], tag_names)
     paste0(
-      "<", item_tag, " ", i, ">\n",
+      "<",
+      item_tag,
+      " ",
+      i,
+      ">\n",
       escaped,
-      "\n</", item_tag, " ", i, ">"
+      "\n</",
+      item_tag,
+      " ",
+      i,
+      ">"
     )
   })
 
@@ -137,9 +145,13 @@ prompt_write_paragraph <- function(
     ) |>
     tidyprompt::add_text(
       paste0(
-        "<", container_tag, ">\n",
+        "<",
+        container_tag,
+        ">\n",
         paste(text_blocks, collapse = "\n\n"),
-        "\n</", container_tag, ">"
+        "\n</",
+        container_tag,
+        ">"
       ),
       sep = "\n\n"
     ) |>
@@ -225,15 +237,28 @@ prompt_write_paragraph <- function(
 
   item_tag <- if (isTRUE(texts_are_summaries)) "summary" else "text"
   tag_names <- c(
-    "text", "texts", "summary", "summaries", "topic",
-    "research_background", "style_instructions"
+    "text",
+    "texts",
+    "summary",
+    "summaries",
+    "topic",
+    "research_background",
+    "style_instructions"
   )
   formatter <- function(text, index) {
     escaped <- escape_prompt_delimiters(text, tag_names)
     paste0(
-      "<", item_tag, " ", index, ">\n",
+      "<",
+      item_tag,
+      " ",
+      index,
+      ">\n",
       escaped,
-      "\n</", item_tag, " ", index, ">"
+      "\n</",
+      item_tag,
+      " ",
+      index,
+      ">"
     )
   }
 
@@ -242,19 +267,23 @@ prompt_write_paragraph <- function(
   # approximate token weight, which avoids a tiny final batch in common cases.
   eligible <- seq_along(texts)
   if (isTRUE(skip_oversized)) {
-    eligible <- eligible[vapply(eligible, function(i) {
-      prompt <- prompt_write_paragraph(
-        texts = texts[[i]],
-        topic = topic,
-        research_background = research_background,
-        style_prompt = style_prompt,
-        language = language,
-        focus_on_highlighted_text = focus_on_highlighted_text,
-        texts_are_summaries = texts_are_summaries
-      )
-      count_tokens(tidyprompt::construct_prompt_text(prompt)) <=
-        n_tokens_context_window
-    }, logical(1))]
+    eligible <- eligible[vapply(
+      eligible,
+      function(i) {
+        prompt <- prompt_write_paragraph(
+          texts = texts[[i]],
+          topic = topic,
+          research_background = research_background,
+          style_prompt = style_prompt,
+          language = language,
+          focus_on_highlighted_text = focus_on_highlighted_text,
+          texts_are_summaries = texts_are_summaries
+        )
+        count_tokens(tidyprompt::construct_prompt_text(prompt)) <=
+          n_tokens_context_window
+      },
+      logical(1)
+    )]
   }
   if (!length(eligible)) {
     return(NULL)
@@ -299,19 +328,25 @@ prompt_write_paragraph <- function(
 
   # Token weights are an approximation because tag indexes also cost tokens.
   # Repack only if balancing happened to make a production prompt overflow.
-  if (any(vapply(balanced, function(batch) {
-    prompt <- prompt_write_paragraph(
-      texts = batch,
-      topic = topic,
-      research_background = research_background,
-      style_prompt = style_prompt,
-      language = language,
-      focus_on_highlighted_text = focus_on_highlighted_text,
-      texts_are_summaries = texts_are_summaries
-    )
-    count_tokens(tidyprompt::construct_prompt_text(prompt)) >
-      n_tokens_context_window
-  }, logical(1)))) {
+  if (
+    any(vapply(
+      balanced,
+      function(batch) {
+        prompt <- prompt_write_paragraph(
+          texts = batch,
+          topic = topic,
+          research_background = research_background,
+          style_prompt = style_prompt,
+          language = language,
+          focus_on_highlighted_text = focus_on_highlighted_text,
+          texts_are_summaries = texts_are_summaries
+        )
+        count_tokens(tidyprompt::construct_prompt_text(prompt)) >
+          n_tokens_context_window
+      },
+      logical(1)
+    ))
+  ) {
     initial <- lapply(initial, function(batch) {
       shuffled_indexes <- attr(batch, "source_indexes", exact = TRUE)
       attr(batch, "source_indexes") <- as.integer(shuffled[shuffled_indexes])
@@ -397,7 +432,10 @@ write_paragraph <- function(
     )
   }
 
-  overflow_result <- function(result_texts = texts, result_ids = analysis_unit_ids) {
+  overflow_result <- function(
+    result_texts = texts,
+    result_ids = analysis_unit_ids
+  ) {
     list(
       paragraph = "",
       texts = result_texts,
@@ -445,8 +483,10 @@ write_paragraph <- function(
             language = language,
             focus_on_highlighted_text = focus_on_highlighted_text
           )
-          if (count_tokens(tidyprompt::construct_prompt_text(sampled_prompt)) >
-            prompt_context$n_tokens_context_window) {
+          if (
+            count_tokens(tidyprompt::construct_prompt_text(sampled_prompt)) >
+              prompt_context$n_tokens_context_window
+          ) {
             return(overflow_result(sampled, sampled_ids))
           }
           paragraph <- send_paragraph_prompt(
@@ -494,9 +534,12 @@ write_paragraph <- function(
                 },
                 texts_are_summaries = are_summaries
               )
-              if (count_tokens(
-                tidyprompt::construct_prompt_text(batch_prompt)
-              ) > prompt_context$n_tokens_context_window) {
+              if (
+                count_tokens(
+                  tidyprompt::construct_prompt_text(batch_prompt)
+                ) >
+                  prompt_context$n_tokens_context_window
+              ) {
                 return(NULL)
               }
               summaries[[i]] <- send_paragraph_prompt(
