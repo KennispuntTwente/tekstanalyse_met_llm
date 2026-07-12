@@ -296,6 +296,51 @@ test_that("default strategy sends one random context-sized subset", {
 })
 
 
+test_that("sample strategy repacks when additive token estimates undercount", {
+  count_tokens <- function(x) nchar(x)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  texts <- c("first short source", "second short source")
+  combined_prompt <- tidyprompt::construct_prompt_text(
+    prompt_write_paragraph(texts, "weather", language = "en")
+  )
+  context_window <- nchar(combined_prompt)
+  count_tokens <- function(x) {
+    item_count <- lengths(regmatches(
+      x,
+      gregexpr("<text [0-9]+>", x, perl = TRUE)
+    ))
+    nchar(x) + ifelse(item_count > 1L, 100, 0)
+  }
+  get_context_window_size_in_tokens <- function(...) context_window
+  calls <- list()
+  send_prompt_with_retries <- function(prompt, execution_scope, ...) {
+    calls[[length(calls) + 1L]] <<- list(
+      prompt = tidyprompt::construct_prompt_text(prompt),
+      ids = execution_scope$analysis_unit_ids
+    )
+    "Sample summary"
+  }
+  old <- options(paragraph_summary_strategy = "sample")
+  withr::defer(options(old), testthat::teardown_env())
+  set.seed(3)
+
+  result <- write_paragraph(
+    texts = texts,
+    analysis_unit_ids = seq_along(texts),
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en"
+  )
+
+  expect_true(result$prompt_fits)
+  expect_length(calls, 1L)
+  expect_length(result$texts, 1L)
+  expect_identical(result$analysis_unit_ids, calls[[1]]$ids)
+  expect_lte(count_tokens(calls[[1]]$prompt), context_window)
+})
+
+
 test_that("sample strategy skips individually oversized texts", {
   count_tokens <- function(x) nchar(x)
   source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)

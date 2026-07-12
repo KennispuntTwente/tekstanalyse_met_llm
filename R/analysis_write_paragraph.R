@@ -291,6 +291,56 @@ prompt_write_paragraph <- function(
 
   shuffled <- eligible[sample.int(length(eligible))]
   shuffled_texts <- texts[shuffled]
+
+  prompt_fits <- function(batch) {
+    prompt <- prompt_write_paragraph(
+      texts = batch,
+      topic = topic,
+      research_background = research_background,
+      style_prompt = style_prompt,
+      language = language,
+      focus_on_highlighted_text = focus_on_highlighted_text,
+      texts_are_summaries = texts_are_summaries
+    )
+    count_tokens(tidyprompt::construct_prompt_text(prompt)) <=
+      n_tokens_context_window
+  }
+
+  exact_repack <- function(values, source_indexes) {
+    batches <- list()
+    current <- character()
+    current_indexes <- integer()
+
+    append_current <- function() {
+      batch <- current
+      attr(batch, "source_indexes") <- as.integer(current_indexes)
+      batches <<- c(batches, list(batch))
+    }
+
+    for (i in seq_along(values)) {
+      candidate <- c(current, values[[i]])
+      if (prompt_fits(candidate)) {
+        current <- candidate
+        current_indexes <- c(current_indexes, source_indexes[[i]])
+      } else {
+        if (!length(current)) {
+          return(NULL)
+        }
+        append_current()
+        current <- values[[i]]
+        current_indexes <- source_indexes[[i]]
+        if (!prompt_fits(current)) {
+          return(NULL)
+        }
+      }
+    }
+
+    if (length(current)) {
+      append_current()
+    }
+    batches
+  }
+
   initial <- create_text_batches(
     texts = shuffled_texts,
     batch_size = length(texts),
@@ -301,14 +351,27 @@ prompt_write_paragraph <- function(
     separator = "\n\n"
   )
   if (is.null(initial)) {
+    initial <- exact_repack(shuffled_texts, shuffled)
+  } else {
+    initial <- lapply(initial, function(batch) {
+      shuffled_indexes <- attr(batch, "source_indexes", exact = TRUE)
+      attr(batch, "source_indexes") <- as.integer(shuffled[shuffled_indexes])
+      batch
+    })
+  }
+  if (is.null(initial) || !length(initial)) {
     return(NULL)
+  }
+  if (!all(vapply(initial, prompt_fits, logical(1)))) {
+    initial <- exact_repack(shuffled_texts, shuffled)
+    if (is.null(initial) || !length(initial)) {
+      return(NULL)
+    }
   }
 
   n_batches <- length(initial)
   if (n_batches <= 1L) {
-    batch <- shuffled_texts
-    attr(batch, "source_indexes") <- as.integer(shuffled)
-    return(list(batch))
+    return(initial)
   }
 
   costs <- vapply(
@@ -332,26 +395,11 @@ prompt_write_paragraph <- function(
     any(vapply(
       balanced,
       function(batch) {
-        prompt <- prompt_write_paragraph(
-          texts = batch,
-          topic = topic,
-          research_background = research_background,
-          style_prompt = style_prompt,
-          language = language,
-          focus_on_highlighted_text = focus_on_highlighted_text,
-          texts_are_summaries = texts_are_summaries
-        )
-        count_tokens(tidyprompt::construct_prompt_text(prompt)) >
-          n_tokens_context_window
+        !prompt_fits(batch)
       },
       logical(1)
     ))
   ) {
-    initial <- lapply(initial, function(batch) {
-      shuffled_indexes <- attr(batch, "source_indexes", exact = TRUE)
-      attr(batch, "source_indexes") <- as.integer(shuffled[shuffled_indexes])
-      batch
-    })
     return(initial)
   }
 
