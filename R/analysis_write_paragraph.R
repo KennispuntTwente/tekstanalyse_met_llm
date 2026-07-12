@@ -438,14 +438,16 @@ write_paragraph <- function(
 
   overflow_result <- function(
     result_texts = texts,
-    result_ids = analysis_unit_ids
+    result_ids = analysis_unit_ids,
+    source_coverage = "complete"
   ) {
     list(
       paragraph = "",
       texts = result_texts,
       analysis_unit_ids = as.integer(result_ids),
       topic = topic,
-      prompt_fits = FALSE
+      prompt_fits = FALSE,
+      source_coverage = source_coverage
     )
   }
 
@@ -457,7 +459,12 @@ write_paragraph <- function(
           analysis_unit_ids,
           callback = stream_callback
         )
-        list(paragraph = paragraph, texts = texts, ids = analysis_unit_ids)
+        list(
+          paragraph = paragraph,
+          texts = texts,
+          ids = analysis_unit_ids,
+          source_coverage = "complete"
+        )
       } else {
         batches <- .kwallm_paragraph_batches(
           texts = texts,
@@ -491,7 +498,11 @@ write_paragraph <- function(
             count_tokens(tidyprompt::construct_prompt_text(sampled_prompt)) >
               prompt_context$n_tokens_context_window
           ) {
-            return(overflow_result(sampled, sampled_ids))
+            return(overflow_result(
+              sampled,
+              sampled_ids,
+              source_coverage = "sampled"
+            ))
           }
           paragraph <- send_paragraph_prompt(
             sampled_prompt,
@@ -499,7 +510,12 @@ write_paragraph <- function(
             callback = stream_callback,
             batch_index = 1L
           )
-          list(paragraph = paragraph, texts = sampled, ids = sampled_ids)
+          list(
+            paragraph = paragraph,
+            texts = sampled,
+            ids = sampled_ids,
+            source_coverage = "sampled"
+          )
         } else {
           summarize_batches <- function(
             values,
@@ -601,7 +617,8 @@ write_paragraph <- function(
           list(
             paragraph = reduced$values[[1]],
             texts = texts,
-            ids = analysis_unit_ids
+            ids = analysis_unit_ids,
+            source_coverage = "complete"
           )
         }
       }
@@ -625,6 +642,7 @@ write_paragraph <- function(
     texts = paragraph_result$texts,
     analysis_unit_ids = as.integer(paragraph_result$ids),
     topic = topic,
-    prompt_fits = TRUE
+    prompt_fits = TRUE,
+    source_coverage = paragraph_result$source_coverage
   ))
 }

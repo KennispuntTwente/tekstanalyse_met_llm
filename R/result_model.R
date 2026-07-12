@@ -303,6 +303,7 @@
     subject_id = integer(),
     paragraph_text = character(),
     prompt_fits = logical(),
+    source_coverage = character(),
     stringsAsFactors = FALSE
   )
 }
@@ -666,7 +667,8 @@ ParagraphSet <- S7::new_class(
         "subject_kind",
         "subject_id",
         "paragraph_text",
-        "prompt_fits"
+        "prompt_fits",
+        "source_coverage"
       ))
     ),
     paragraph_sources = S7::new_property(

@@ -265,6 +265,7 @@ test_that("sample strategy sends one random context-sized subset", {
   expect_lt(length(result$texts), length(texts))
   expect_identical(result$analysis_unit_ids, calls[[1]]$ids)
   expect_identical(result$texts, texts[result$analysis_unit_ids])
+  expect_identical(result$source_coverage, "sampled")
 })
 
 
@@ -299,6 +300,7 @@ test_that("sample strategy skips individually oversized texts", {
   expect_false(1L %in% result$analysis_unit_ids)
   expect_identical(result$analysis_unit_ids, sent_ids)
   expect_false(any(result$texts == texts[[1]]))
+  expect_identical(result$source_coverage, "sampled")
 })
 
 

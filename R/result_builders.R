@@ -1093,6 +1093,9 @@ build_analysis_result <- function(
       subject_id = as.integer(subject_id %||% NA_integer_),
       paragraph_text = as.character(paragraph$paragraph %||% ""),
       prompt_fits = prompt_fits,
+      source_coverage = as.character(
+        paragraph$source_coverage %||% "complete"
+      ),
       stringsAsFactors = FALSE
     )
 

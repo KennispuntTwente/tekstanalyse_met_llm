@@ -293,6 +293,70 @@ test_that("paragraph summary metadata validates strategy and reduction limit", {
   )
 })
 
+test_that("sampled paragraph coverage is preserved in exported results", {
+  texts_df <- .make_result_texts_df(c("Text 1", "Text 2"))
+  results_table <- data.frame(
+    text = c("Text 1", "Text 2"),
+    result = c("A", "A"),
+    stringsAsFactors = FALSE
+  )
+  paragraph_entries <- list(list(
+    topic = "A",
+    paragraph = "Summary based on a sample.",
+    texts = "Text 2",
+    analysis_unit_ids = 2L,
+    prompt_fits = TRUE,
+    source_coverage = "sampled"
+  ))
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    paragraph_entries = paragraph_entries,
+    uuid = "run-sampled-summary",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = "",
+    language = "en",
+    models = .test_models(),
+    categories = "A",
+    write_paragraphs = TRUE
+  )
+
+  expect_identical(
+    analysis_result@paragraphs@paragraphs$source_coverage,
+    "sampled"
+  )
+  metadata <- analysis_result_to_metadata_list(analysis_result)
+  expect_identical(
+    metadata$paragraphs$paragraphs[[1]]$source_coverage,
+    "sampled"
+  )
+  expect_identical(
+    analysis_result_to_export_sheets(
+      analysis_result
+    )$paragraphs$source_coverage,
+    "sampled"
+  )
+
+  skip_if_not_installed("rmarkdown")
+  skip_if_not_installed("zip")
+  skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+  temp_dir <- withr::local_tempdir()
+  bundle <- create_analysis_result_download_bundle(
+    analysis_result,
+    temp_dir = temp_dir
+  )
+  report_dir <- file.path(temp_dir, "sampled-report")
+  dir.create(report_dir)
+  zip::unzip(bundle, files = "report.html", exdir = report_dir)
+  report_html <- paste(
+    readLines(file.path(report_dir, "report.html"), warn = FALSE),
+    collapse = "\n"
+  )
+  expect_match(report_html, "random context-sized sample", fixed = TRUE)
+})
+
 test_that("marking paragraphs retain supporting excerpts in report helpers", {
   texts_df <- .make_result_texts_df(
     document_text = "Text about dogs"

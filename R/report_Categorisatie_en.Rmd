@@ -314,11 +314,24 @@ for (i in seq_len(nrow(paragraphs_df))) {
       )
     )
   }
+
+  warning_sampled_sources <- NULL
+  if (identical(paragraph_row$source_coverage[[1]], "sampled")) {
+    warning_sampled_sources <- htmltools::div(
+      class = "alert alert-warning p-2 text-center",
+      style = "max-width: 500px; margin-left: auto; margin-right: auto; font-size: 0.9rem;",
+      htmltools::tags$small(htmltools::tags$i(
+        "Because all texts did not fit in the model context window, this",
+        " summary is based on a random context-sized sample of the category texts."
+      ))
+    )
+  }
   
   # Append processed output
   output <- append(output, list(
     htmltools::HTML(paste0("<h4>", topic, "</h4>")),
     warning_context_window,
+    warning_sampled_sources,
     htmltools::HTML(paste0("<p>", paragraph_text, "</p>"))
   ))
 
