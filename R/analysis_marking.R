@@ -366,7 +366,8 @@ mark_texts <- function(
           language = paragraph_language,
           focus_on_highlighted_text = TRUE,
           stream_callback = stream_callback,
-          stream_reset_callback = stream_reset_callback
+          stream_reset_callback = stream_reset_callback,
+          interrupter = interrupter
         )
 
         return(paragraph)

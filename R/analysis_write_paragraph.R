@@ -421,7 +421,8 @@ write_paragraph <- function(
   language = c("nl", "en"),
   focus_on_highlighted_text = FALSE,
   stream_callback = NULL,
-  stream_reset_callback = NULL
+  stream_reset_callback = NULL,
+  interrupter = NULL
 ) {
   language <- match.arg(language)
   stopifnot(
@@ -466,6 +467,9 @@ write_paragraph <- function(
     batch_index = NULL,
     reduction_iteration = NULL
   ) {
+    if (!is.null(interrupter)) {
+      interrupter$execInterrupts()
+    }
     if (!is.null(callback) && is.function(stream_reset_callback)) {
       stream_reset_callback()
     }
@@ -675,6 +679,9 @@ write_paragraph <- function(
       }
     },
     error = function(e) {
+      if (inherits(e, "kwallm_async_interrupt")) {
+        stop(e)
+      }
       stop(paste0(
         "Failed to write paragraph about topic '",
         topic,

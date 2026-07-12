@@ -525,6 +525,53 @@ test_that("batch strategy honors the recursive reduction iteration cap", {
 })
 
 
+test_that("batch strategy checks cancellation between model calls", {
+  count_tokens <- function(x) nchar(x)
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  texts <- paste0("text-", 1:6, "-", strrep("x", 180))
+  context_window <- count_tokens(tidyprompt::construct_prompt_text(
+    prompt_write_paragraph(texts[1:2], "weather", language = "en")
+  ))
+  get_context_window_size_in_tokens <- function(...) context_window
+  send_count <- 0L
+  send_prompt_with_retries <- function(...) {
+    send_count <<- send_count + 1L
+    "short partial summary"
+  }
+  interrupt_checks <- 0L
+  interrupter <- list(execInterrupts = function() {
+    interrupt_checks <<- interrupt_checks + 1L
+    if (interrupt_checks == 2L) {
+      stop(structure(
+        list(message = "cancelled"),
+        class = c("kwallm_async_interrupt", "error", "condition")
+      ))
+    }
+    invisible(NULL)
+  })
+  old <- options(
+    paragraph_summary_strategy = "batch",
+    paragraph_summary_max_reduction_iterations = 8L
+  )
+  withr::defer(options(old), testthat::teardown_env())
+
+  expect_error(
+    write_paragraph(
+      texts = texts,
+      analysis_unit_ids = seq_along(texts),
+      topic = "weather",
+      llm_provider = list(parameters = list(model = "test")),
+      language = "en",
+      interrupter = interrupter
+    ),
+    "cancelled",
+    class = "kwallm_async_interrupt"
+  )
+  expect_identical(send_count, 1L)
+})
+
+
 test_that("batch strategy resets and streams every intermediate synthesis", {
   count_tokens <- function(x) nchar(x)
   source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)

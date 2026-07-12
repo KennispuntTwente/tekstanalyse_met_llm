@@ -583,7 +583,8 @@ write_grouped_paragraphs <- function(
         llm_provider = llm_provider,
         language = lang$get_translation_language(),
         stream_callback = stream_callback,
-        stream_reset_callback = stream_reset_callback
+        stream_reset_callback = stream_reset_callback,
+        interrupter = interrupter
       )
     }
   )
