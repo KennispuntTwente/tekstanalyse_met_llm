@@ -407,7 +407,7 @@ write_paragraph <- function(
 
   prompt_context <- .kwallm_prompt_context_window_info(prompt, llm_provider)
   strategy <- match.arg(
-    getOption("paragraph_summary_strategy", "batch"),
+    getOption("paragraph_summary_strategy", "sample"),
     c("batch", "sample")
   )
 

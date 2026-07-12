@@ -229,7 +229,7 @@ test_that("batch strategy records batch and reduction scope for every call", {
 })
 
 
-test_that("sample strategy sends one random context-sized subset", {
+test_that("default strategy sends one random context-sized subset", {
   count_tokens <- function(x) nchar(x)
   source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
 
@@ -247,7 +247,7 @@ test_that("sample strategy sends one random context-sized subset", {
     )
     "Sample summary"
   }
-  old <- options(paragraph_summary_strategy = "sample")
+  old <- options(paragraph_summary_strategy = NULL)
   withr::defer(options(old), testthat::teardown_env())
   set.seed(7)
 

@@ -108,7 +108,7 @@ build_analysis_result <- function(
   write_paragraphs = FALSE,
   paragraph_summary_strategy = getOption(
     "paragraph_summary_strategy",
-    "batch"
+    "sample"
   ),
   paragraph_summary_max_reduction_iterations = getOption(
     "paragraph_summary_max_reduction_iterations",
@@ -969,7 +969,7 @@ build_analysis_result <- function(
   human_in_the_loop = FALSE,
   write_paragraphs = FALSE,
   style_prompt = NULL,
-  paragraph_summary_strategy = "batch",
+  paragraph_summary_strategy = "sample",
   paragraph_summary_max_reduction_iterations = 8L,
   context_window = list()
 ) {

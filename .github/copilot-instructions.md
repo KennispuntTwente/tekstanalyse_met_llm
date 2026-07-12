@@ -24,8 +24,8 @@ This repo is a Shiny app (R) with an Electron desktop wrapper and Docker image. 
 - Topic extraction: `topic_modelling__batch_size_default`, `topic_modelling__batch_size_limit`, `topic_modelling__number_of_batches_limit`, `topic_modelling__draws_default`, `topic_modelling__draws_limit`.
 - Logging: `logger__level`, `logger__dir`, `logger__retention`.
 - Paragraph summaries: `paragraph_streaming` controls live output;
-  `paragraph_summary_strategy` selects recursive `"batch"` reduction or a
-  context-sized random `"sample"`; `paragraph_summary_max_reduction_iterations`
+  `paragraph_summary_strategy` selects a context-sized random `"sample"`
+  (default) or recursive `"batch"` reduction; `paragraph_summary_max_reduction_iterations`
   caps recursive summary reduction.
 
 ## Async workers (mirai) — critical section

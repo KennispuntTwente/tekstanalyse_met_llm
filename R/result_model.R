@@ -1149,7 +1149,7 @@ CategorizationConfig <- S7::new_class(
     ),
     paragraph_summary_strategy = S7::new_property(
       S7::class_character,
-      default = "batch",
+      default = "sample",
       validator = .kwallm_validate_paragraph_summary_strategy
     ),
     paragraph_summary_max_reduction_iterations = S7::new_property(
@@ -1199,7 +1199,7 @@ TopicConfig <- S7::new_class(
     ),
     paragraph_summary_strategy = S7::new_property(
       S7::class_character,
-      default = "batch",
+      default = "sample",
       validator = .kwallm_validate_paragraph_summary_strategy
     ),
     paragraph_summary_max_reduction_iterations = S7::new_property(
@@ -1232,7 +1232,7 @@ MarkingConfig <- S7::new_class(
     ),
     paragraph_summary_strategy = S7::new_property(
       S7::class_character,
-      default = "batch",
+      default = "sample",
       validator = .kwallm_validate_paragraph_summary_strategy
     ),
     paragraph_summary_max_reduction_iterations = S7::new_property(

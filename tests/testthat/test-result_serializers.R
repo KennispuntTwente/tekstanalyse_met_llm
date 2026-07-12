@@ -281,6 +281,10 @@ test_that("paragraph summary strategy is typed and exported as run metadata", {
 })
 
 test_that("paragraph summary metadata validates strategy and reduction limit", {
+  expect_identical(
+    CategorizationConfig()@paragraph_summary_strategy,
+    "sample"
+  )
   expect_error(
     CategorizationConfig(paragraph_summary_strategy = "unknown"),
     "batch.*sample"
