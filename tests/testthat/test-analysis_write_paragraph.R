@@ -166,6 +166,42 @@ test_that("write_paragraph checks prompt fit before sending", {
 })
 
 
+test_that("write_paragraph rejects invalid source text and provenance IDs", {
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+  provider <- list(parameters = list(model = "test"))
+
+  expect_error(
+    write_paragraph(
+      texts = NA_character_,
+      analysis_unit_ids = 1L,
+      topic = "weather",
+      llm_provider = provider,
+      language = "en"
+    )
+  )
+  expect_error(
+    write_paragraph(
+      texts = "   ",
+      analysis_unit_ids = 1L,
+      topic = "weather",
+      llm_provider = provider,
+      language = "en"
+    )
+  )
+  for (invalid_id in c(NA_real_, Inf, 1.5, 0, .Machine$integer.max + 1)) {
+    expect_error(
+      write_paragraph(
+        texts = "valid source",
+        analysis_unit_ids = invalid_id,
+        topic = "weather",
+        llm_provider = provider,
+        language = "en"
+      )
+    )
+  }
+})
+
+
 test_that("batch strategy summarizes all texts and recursively reduces batches", {
   count_tokens <- function(x) nchar(x)
   source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)

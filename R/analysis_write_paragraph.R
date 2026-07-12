@@ -428,16 +428,32 @@ write_paragraph <- function(
   stopifnot(
     is.character(texts),
     length(texts) > 0,
+    !anyNA(texts),
+    all(nzchar(trimws(texts))),
     is.numeric(analysis_unit_ids),
     length(analysis_unit_ids) == length(texts),
+    !anyNA(analysis_unit_ids),
+    all(is.finite(analysis_unit_ids)),
+    all(analysis_unit_ids == floor(analysis_unit_ids)),
+    all(analysis_unit_ids >= 1),
+    all(analysis_unit_ids <= .Machine$integer.max),
     is.character(topic),
     length(topic) == 1,
+    !is.na(topic),
+    nzchar(trimws(topic)),
     is.character(subject_kind),
     length(subject_kind) == 1,
+    !is.na(subject_kind),
+    nzchar(trimws(subject_kind)),
     is.character(research_background),
     length(research_background) == 1,
+    !is.na(research_background),
     (is.character(style_prompt) & length(style_prompt) == 1) |
-      is.null(style_prompt)
+      is.null(style_prompt),
+    is.null(style_prompt) || !is.na(style_prompt),
+    is.logical(focus_on_highlighted_text),
+    length(focus_on_highlighted_text) == 1,
+    !is.na(focus_on_highlighted_text)
   )
 
   stage_options <- options(
