@@ -33,6 +33,33 @@ test_that("write_paragraph returns a warning record when the prompt overflows", 
   expect_identical(result$topic, "Code A")
 })
 
+test_that("write_paragraph clears stale streaming output on unsent overflow", {
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+
+  get_context_window_size_in_tokens <- function(...) 10
+  count_tokens <- function(...) 999
+  send_prompt_with_retries <- function(...) {
+    testthat::fail("No prompt should be sent when no text fits")
+  }
+  reset_count <- 0L
+
+  result <- write_paragraph(
+    texts = "an oversized text",
+    analysis_unit_ids = 1L,
+    topic = "weather",
+    llm_provider = list(parameters = list(model = "test")),
+    language = "en",
+    stream_callback = function(...) invisible(NULL),
+    stream_reset_callback = function() {
+      reset_count <<- reset_count + 1L
+      invisible(NULL)
+    }
+  )
+
+  expect_false(result$prompt_fits)
+  expect_identical(reset_count, 1L)
+})
+
 test_that("prompt_write_paragraph builds structured tagged prompt", {
   source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
 

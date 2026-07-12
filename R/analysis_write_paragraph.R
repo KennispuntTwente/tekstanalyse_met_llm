@@ -441,6 +441,9 @@ write_paragraph <- function(
     result_ids = analysis_unit_ids,
     source_coverage = "complete"
   ) {
+    if (is.function(stream_reset_callback)) {
+      stream_reset_callback()
+    }
     list(
       paragraph = "",
       texts = result_texts,
