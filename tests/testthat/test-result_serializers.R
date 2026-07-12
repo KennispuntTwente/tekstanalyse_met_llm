@@ -209,6 +209,158 @@ test_that("metadata and export sheets include text counts", {
   )
 })
 
+test_that("paragraph summary strategy is typed and exported as run metadata", {
+  old <- options(
+    paragraph_summary_strategy = "sample",
+    paragraph_summary_max_reduction_iterations = 5L
+  )
+  withr::defer(options(old), testthat::teardown_env())
+
+  texts_df <- .make_result_texts_df(c("Text 1", "Text 2"))
+  results_table <- data.frame(
+    text = c("Text 1", "Text 2"),
+    result = c("A", "A"),
+    stringsAsFactors = FALSE
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    uuid = "run-summary-strategy",
+    mode = "Categorisatie",
+    research_background = "background",
+    style_prompt = "concise",
+    language = "en",
+    models = .test_models(),
+    categories = "A",
+    assign_multiple_categories = FALSE,
+    human_in_the_loop = FALSE,
+    write_paragraphs = TRUE
+  )
+
+  expect_identical(
+    analysis_result@mode_config@paragraph_summary_strategy,
+    "sample"
+  )
+  expect_identical(
+    analysis_result@mode_config@paragraph_summary_max_reduction_iterations,
+    5L
+  )
+
+  metadata <- analysis_result_to_metadata_list(analysis_result)
+  expect_identical(metadata$mode_config$paragraph_summary_strategy, "sample")
+  expect_identical(
+    metadata$mode_config$paragraph_summary_max_reduction_iterations,
+    5L
+  )
+
+  sheets <- analysis_result_to_export_sheets(analysis_result)
+  metadata_values <- stats::setNames(
+    sheets$metadata$value,
+    sheets$metadata$field
+  )
+  expect_identical(metadata_values[["paragraph_summary_strategy"]], "sample")
+  expect_identical(
+    metadata_values[["paragraph_summary_max_reduction_iterations"]],
+    "5"
+  )
+
+  json_path <- write_analysis_result_metadata_json(
+    analysis_result,
+    withr::local_tempdir()
+  )
+  exported_json <- jsonlite::fromJSON(json_path, simplifyVector = FALSE)
+  expect_identical(
+    exported_json$mode_config$paragraph_summary_strategy,
+    "sample"
+  )
+  expect_identical(
+    exported_json$mode_config$paragraph_summary_max_reduction_iterations,
+    5L
+  )
+})
+
+test_that("paragraph summary metadata validates strategy and reduction limit", {
+  expect_identical(
+    CategorizationConfig()@paragraph_summary_strategy,
+    "sample"
+  )
+  expect_error(
+    CategorizationConfig(paragraph_summary_strategy = "unknown"),
+    "batch.*sample"
+  )
+  expect_error(
+    CategorizationConfig(
+      paragraph_summary_max_reduction_iterations = 0L
+    ),
+    ">= 1"
+  )
+})
+
+test_that("sampled paragraph coverage is preserved in exported results", {
+  texts_df <- .make_result_texts_df(c("Text 1", "Text 2"))
+  results_table <- data.frame(
+    text = c("Text 1", "Text 2"),
+    result = c("A", "A"),
+    stringsAsFactors = FALSE
+  )
+  paragraph_entries <- list(list(
+    topic = "A",
+    paragraph = "Summary based on a sample.",
+    texts = "Text 2",
+    analysis_unit_ids = 2L,
+    prompt_fits = TRUE,
+    source_coverage = "sampled"
+  ))
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    paragraph_entries = paragraph_entries,
+    uuid = "run-sampled-summary",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = "",
+    language = "en",
+    models = .test_models(),
+    categories = "A",
+    write_paragraphs = TRUE
+  )
+
+  expect_identical(
+    analysis_result@paragraphs@paragraphs$source_coverage,
+    "sampled"
+  )
+  metadata <- analysis_result_to_metadata_list(analysis_result)
+  expect_identical(
+    metadata$paragraphs$paragraphs[[1]]$source_coverage,
+    "sampled"
+  )
+  expect_identical(
+    analysis_result_to_export_sheets(
+      analysis_result
+    )$paragraphs$source_coverage,
+    "sampled"
+  )
+
+  skip_if_not_installed("rmarkdown")
+  skip_if_not_installed("zip")
+  skip_if_not(isTRUE(rmarkdown::pandoc_available()))
+  temp_dir <- withr::local_tempdir()
+  bundle <- create_analysis_result_download_bundle(
+    analysis_result,
+    temp_dir = temp_dir
+  )
+  report_dir <- file.path(temp_dir, "sampled-report")
+  dir.create(report_dir)
+  zip::unzip(bundle, files = "report.html", exdir = report_dir)
+  report_html <- paste(
+    readLines(file.path(report_dir, "report.html"), warn = FALSE),
+    collapse = "\n"
+  )
+  expect_match(report_html, "random context-sized sample", fixed = TRUE)
+})
+
 test_that("marking paragraphs retain supporting excerpts in report helpers", {
   texts_df <- .make_result_texts_df(
     document_text = "Text about dogs"
