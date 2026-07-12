@@ -141,6 +141,35 @@ test_that("write_paragraph re-raises send_prompt_with_retries errors", {
 })
 
 
+test_that("write_paragraph clears partial streaming output on send errors", {
+  send_prompt_with_retries <- function(...) {
+    stop("LLM connection failed")
+  }
+  get_context_window_size_in_tokens <- function(...) 4096
+  count_tokens <- function(...) 100
+  source(here::here("R", "analysis_write_paragraph.R"), local = TRUE)
+  reset_count <- 0L
+
+  expect_error(
+    write_paragraph(
+      texts = "some text",
+      analysis_unit_ids = 1L,
+      topic = "weather",
+      llm_provider = list(parameters = list(model = "test")),
+      language = "en",
+      stream_callback = function(...) invisible(NULL),
+      stream_reset_callback = function() {
+        reset_count <<- reset_count + 1L
+        invisible(NULL)
+      }
+    ),
+    "Failed to write paragraph"
+  )
+
+  expect_identical(reset_count, 2L)
+})
+
+
 test_that("write_paragraph checks prompt fit before sending", {
   send_call_count <- 0
   send_prompt_with_retries <- function(...) {

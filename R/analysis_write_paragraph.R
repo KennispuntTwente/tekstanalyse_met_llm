@@ -476,6 +476,13 @@ write_paragraph <- function(
     c("batch", "sample")
   )
 
+  reset_stream_safely <- function() {
+    if (is.function(stream_reset_callback)) {
+      try(stream_reset_callback(), silent = TRUE)
+    }
+    invisible(NULL)
+  }
+
   send_paragraph_prompt <- function(
     prompt_to_send,
     scope_ids,
@@ -486,8 +493,8 @@ write_paragraph <- function(
     if (!is.null(interrupter)) {
       interrupter$execInterrupts()
     }
-    if (!is.null(callback) && is.function(stream_reset_callback)) {
-      stream_reset_callback()
+    if (!is.null(callback)) {
+      reset_stream_safely()
     }
     send_prompt_with_retries(
       prompt_to_send,
@@ -509,9 +516,7 @@ write_paragraph <- function(
     result_ids = analysis_unit_ids,
     source_coverage = "complete"
   ) {
-    if (is.function(stream_reset_callback)) {
-      stream_reset_callback()
-    }
+    reset_stream_safely()
     list(
       paragraph = "",
       texts = result_texts,
@@ -695,6 +700,7 @@ write_paragraph <- function(
       }
     },
     error = function(e) {
+      reset_stream_safely()
       if (inherits(e, "kwallm_async_interrupt")) {
         stop(e)
       }
