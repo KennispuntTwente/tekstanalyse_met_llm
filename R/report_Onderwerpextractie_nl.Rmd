@@ -106,9 +106,10 @@ if (!is.null(topic_n_batches)) {
 }
 step_1_text <- paste0(
   step_1_text,
-  " Het model kreeg de vraag om mogelijke onderwerpen terug te geven die niet te specifiek en niet te algemeen zijn. Dit vormt de lijst van kandidaats-onderwerpen. Voor deze stap is het model `",
+  " Het model kreeg de vraag om mogelijke onderwerpen terug te geven die niet te specifiek en niet te algemeen zijn. Dit vormt de lijst van kandidaats-onderwerpen. Voor deze stap is het model `
+  ",
   htmltools::htmlEscape(main_model),
-  "` gebruikt."
+  " gebruikt."
 )
 cat(step_1_text)
 ```

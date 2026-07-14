@@ -105,9 +105,9 @@ if (!is.null(topic_n_batches)) {
 }
 step_1_text <- paste0(
   step_1_text,
-  " The model was asked to respond with possible topics that are neither too specific nor too general. This forms the list of candidate topics. For this step, the model `",
+  " The model was asked to respond with possible topics that are neither too specific nor too general. This forms the list of candidate topics. For this step, the model ",
   htmltools::htmlEscape(main_model),
-  "` was used."
+  " was used."
 )
 cat(step_1_text)
 ```
