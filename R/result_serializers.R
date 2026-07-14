@@ -588,6 +588,54 @@ write_analysis_result_metadata_json <- function(
   stats::setNames(character(), integer())
 }
 
+# Orders category/topic paragraphs by the number of documents assigned to them.
+# We count through document-to-analysis-unit lineage so the ordering matches the
+# frequency table, including when one analyzed text represents multiple rows.
+.kwallm_report_paragraphs_by_frequency <- function(analysis_result) {
+  paragraphs <- analysis_result@paragraphs@paragraphs
+  result <- analysis_result@results
+
+  if (
+    nrow(paragraphs) < 2L ||
+      !inherits(result, c("CategorizationResult", "TopicResult"))
+  ) {
+    return(paragraphs)
+  }
+
+  assignments <- result@assignments
+  if (!nrow(assignments)) {
+    return(paragraphs)
+  }
+
+  document_units <- unique(
+    analysis_result@text_lineage@document_units[
+      c("document_id", "analysis_unit_id")
+    ]
+  )
+  assigned_documents <- merge(
+    document_units,
+    assignments[c("analysis_unit_id", "label_id")],
+    by = "analysis_unit_id",
+    all.x = FALSE,
+    all.y = FALSE
+  )
+  if (!nrow(assigned_documents)) {
+    return(paragraphs)
+  }
+
+  frequency <- table(assigned_documents$label_id)
+  paragraph_frequency <- as.integer(
+    frequency[as.character(paragraphs$subject_id)]
+  )
+  paragraph_frequency[is.na(paragraph_frequency)] <- 0L
+
+  paragraphs[
+    order(-paragraph_frequency, seq_len(nrow(paragraphs))),
+    ,
+    drop = FALSE
+  ]
+}
+
 # Resolves the supporting texts for one paragraph row.
 # We use excerpts when present and otherwise fall back to full document text.
 .kwallm_paragraph_supporting_texts <- function(analysis_result, paragraph_id) {

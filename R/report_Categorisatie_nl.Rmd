@@ -23,7 +23,7 @@ reliability_summary <- if (is.null(analysis_result@reliability)) {
 } else {
   analysis_result@reliability@summary
 }
-paragraphs_df <- analysis_result@paragraphs@paragraphs
+paragraphs_df <- .kwallm_report_paragraphs_by_frequency(analysis_result)
 has_paragraphs <- nrow(paragraphs_df) > 0
 paragraph_subject_lookup <- .kwallm_paragraph_subject_lookup(
   analysis_result
@@ -136,7 +136,7 @@ if (!assign_multiple_categories) {
       Percentage = round(Aantal / nrow(report_df) * 100, 2)
     ) |>
     dplyr::rename(Categorie = result) |>
-    dplyr::arrange(Categorie) |>
+    dplyr::arrange(dplyr::desc(Aantal), Categorie) |>
     DT::datatable(
       rownames = FALSE,
       extensions = 'Buttons',

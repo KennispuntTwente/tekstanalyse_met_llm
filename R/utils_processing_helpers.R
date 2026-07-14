@@ -773,6 +773,7 @@ analysis_result_report_globals <- function() {
     .kwallm_report_text_count_summary = .kwallm_report_text_count_summary,
     .kwallm_get_stage_model_id = .kwallm_get_stage_model_id,
     .kwallm_paragraph_subject_lookup = .kwallm_paragraph_subject_lookup,
+    .kwallm_report_paragraphs_by_frequency = .kwallm_report_paragraphs_by_frequency,
     .kwallm_paragraph_supporting_texts = .kwallm_paragraph_supporting_texts
   )
 }

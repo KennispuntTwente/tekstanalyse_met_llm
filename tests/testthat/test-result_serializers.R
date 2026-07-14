@@ -431,6 +431,108 @@ test_that("marking paragraphs retain supporting excerpts in report helpers", {
   expect_equal(metadata$results$markings[[1]]$match_method, "fuzzy")
 })
 
+test_that("report paragraphs are ordered by category frequency", {
+  texts_df <- .make_result_texts_df(c(
+    "Rare text",
+    "Common text",
+    "Common text"
+  ))
+  results_table <- data.frame(
+    text = texts_df$preprocessed,
+    result = c("Rare", "Common", "Common"),
+    stringsAsFactors = FALSE
+  )
+  paragraph_entries <- list(
+    list(
+      topic = "Rare",
+      paragraph = "Rare summary.",
+      texts = "Rare text",
+      analysis_unit_ids = 1L,
+      prompt_fits = TRUE
+    ),
+    list(
+      topic = "Common",
+      paragraph = "Common summary.",
+      texts = "Common text",
+      analysis_unit_ids = 2L,
+      prompt_fits = TRUE
+    )
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    paragraph_entries = paragraph_entries,
+    uuid = "run-paragraph-frequency-single",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = c("Rare", "Common"),
+    assign_multiple_categories = FALSE,
+    write_paragraphs = TRUE
+  )
+
+  ordered <- .kwallm_report_paragraphs_by_frequency(analysis_result)
+  labels <- .kwallm_paragraph_subject_lookup(analysis_result)
+
+  expect_identical(
+    unname(labels[as.character(ordered$subject_id)]),
+    c("Common", "Rare")
+  )
+  expect_identical(ordered$paragraph_id, c(2L, 1L))
+})
+
+test_that("multi-label report paragraphs are ordered by category frequency", {
+  texts_df <- .make_result_texts_df(c("Text 1", "Text 2", "Text 3"))
+  results_table <- data.frame(
+    text = texts_df$preprocessed,
+    Rare = c(TRUE, FALSE, FALSE),
+    Common = c(TRUE, TRUE, TRUE),
+    stringsAsFactors = FALSE
+  )
+  paragraph_entries <- list(
+    list(
+      topic = "Rare",
+      paragraph = "Rare summary.",
+      texts = "Text 1",
+      analysis_unit_ids = 1L,
+      prompt_fits = TRUE
+    ),
+    list(
+      topic = "Common",
+      paragraph = "Common summary.",
+      texts = texts_df$preprocessed,
+      analysis_unit_ids = 1:3,
+      prompt_fits = TRUE
+    )
+  )
+
+  analysis_result <- build_analysis_result(
+    texts_df = texts_df,
+    results_table = results_table,
+    paragraph_entries = paragraph_entries,
+    uuid = "run-paragraph-frequency-multi",
+    mode = "Categorisatie",
+    research_background = "",
+    style_prompt = NULL,
+    language = "en",
+    models = .test_models(),
+    categories = c("Rare", "Common"),
+    assign_multiple_categories = TRUE,
+    write_paragraphs = TRUE
+  )
+
+  ordered <- .kwallm_report_paragraphs_by_frequency(analysis_result)
+  labels <- .kwallm_paragraph_subject_lookup(analysis_result)
+
+  expect_identical(
+    unname(labels[as.character(ordered$subject_id)]),
+    c("Common", "Rare")
+  )
+})
+
 test_that("marking results deduplicate shared analysis-unit rows before report fan-out", {
   texts_df <- .make_result_texts_df(
     document_text = c("Shared text", "Shared text"),
