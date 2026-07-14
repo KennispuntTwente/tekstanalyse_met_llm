@@ -184,7 +184,10 @@ options(
   #   one context window: "sample" summarizes one randomized context-sized
   #   sample; "batch" summarizes every randomized, balanced batch and
   #   recursively reduces those summaries.
-  paragraph_summary_strategy = "sample", # "sample" or "batch"
+  paragraph_summary_strategy = getOption(
+    "paragraph_summary_strategy",
+    "sample"
+  ), # "sample" or "batch"
   paragraph_summary_max_reduction_iterations = 8,
 
   # - Default setting for anonymization of texts, and if user
