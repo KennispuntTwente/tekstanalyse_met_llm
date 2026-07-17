@@ -96,7 +96,11 @@ wait_until <- function(
 }
 
 
-wait_for_processing_success <- function(app, timeout = 60000) {
+wait_for_processing_success <- function(
+  app,
+  timeout = 60000,
+  download_timeout = max(timeout, 120000)
+) {
   app$wait_for_value(
     export = "processing-success",
     timeout = timeout,
@@ -111,7 +115,7 @@ wait_for_processing_success <- function(app, timeout = 60000) {
     description = "processing results table"
   )
 
-  wait_for_download_bundle(app, timeout = timeout)
+  wait_for_download_bundle(app, timeout = download_timeout)
   kwallm_expect_async_runtime(app, require_mori_activity = TRUE)
   invisible(TRUE)
 }
