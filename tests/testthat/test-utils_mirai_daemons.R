@@ -153,6 +153,9 @@ test_that("kwallm_ensure_mirai_daemons reuses a healthy daemon pool", {
 
   kwallm_test_start_mirai_daemons(n = 1L)
 
+  expect_true(isTRUE(getOption("mori__enabled")))
+  expect_false(isTRUE(getOption("kwallm.test_sync_mirai")))
+
   result <- kwallm_ensure_mirai_daemons(n_workers = 1L, memory = NULL)
 
   expect_true(result$had_daemons)
