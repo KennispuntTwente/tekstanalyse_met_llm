@@ -26,7 +26,8 @@ test_that("kwallm_mirai_default_queue_memory_mb reads configuration", {
   expect_identical(
     kwallm_mirai_default_queue_memory_mb(
       getenv = function(name, unset = NA_character_) "256",
-      system_memory = function() stop("should not inspect memory")
+      system_memory = function() stop("should not inspect memory"),
+      cgroup_memory = function() stop("should not inspect cgroup memory")
     ),
     256
   )
@@ -34,16 +35,76 @@ test_that("kwallm_mirai_default_queue_memory_mb reads configuration", {
   expect_null(
     kwallm_mirai_default_queue_memory_mb(
       getenv = function(name, unset = NA_character_) "0",
-      system_memory = function() stop("should not inspect memory")
+      system_memory = function() stop("should not inspect memory"),
+      cgroup_memory = function() stop("should not inspect cgroup memory")
     )
   )
 
   expect_identical(
     kwallm_mirai_default_queue_memory_mb(
       getenv = function(name, unset = NA_character_) unset,
-      system_memory = function() 400e6
+      system_memory = function() 400e6,
+      cgroup_memory = function() NULL
     ),
     200
+  )
+})
+
+
+test_that("queue memory uses the lower cgroup availability", {
+  expect_identical(
+    kwallm_mirai_default_queue_memory_mb(
+      getenv = function(name, unset = NA_character_) unset,
+      system_memory = function() 8e9,
+      cgroup_memory = function() 1e9
+    ),
+    500
+  )
+
+  expect_identical(
+    kwallm_mirai_default_queue_memory_mb(
+      getenv = function(name, unset = NA_character_) unset,
+      system_memory = function() 8e9,
+      cgroup_memory = function() 40e6
+    ),
+    20
+  )
+})
+
+
+test_that("cgroup memory detection supports v2 and v1", {
+  values <- c(
+    "/v2/max" = "1000000000",
+    "/v2/current" = "250000000",
+    "/v1/max" = "2000000000",
+    "/v1/current" = "500000000"
+  )
+  read_lines <- function(path, warn = FALSE, n = -1L) values[[path]]
+  file_exists <- function(path) path %in% names(values)
+
+  expect_identical(
+    kwallm_cgroup_available_memory_bytes(
+      file_exists = file_exists,
+      read_lines = read_lines,
+      v2_max_path = "/v2/max",
+      v2_current_path = "/v2/current",
+      v1_max_path = "/v1/max",
+      v1_current_path = "/v1/current"
+    ),
+    750000000
+  )
+
+  values[["/v2/max"]] <- "max"
+  expect_identical(
+    kwallm_cgroup_available_memory_bytes(
+      file_exists = file_exists,
+      read_lines = read_lines,
+      v2_max_path = "/v2/max",
+      v2_current_path = "/v2/current",
+      v1_max_path = "/v1/max",
+      v1_current_path = "/v1/current"
+    ),
+    1500000000
   )
 })
 

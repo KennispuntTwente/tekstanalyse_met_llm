@@ -26,6 +26,57 @@ kwallm_mirai_default_workers <- function(
 #' Compute the configured mirai dispatcher queue memory cap
 #'
 #' @return Numeric memory cap in MB, or NULL to leave mirai unbounded.
+kwallm_cgroup_available_memory_bytes <- function(
+  file_exists = file.exists,
+  read_lines = readLines,
+  v2_max_path = "/sys/fs/cgroup/memory.max",
+  v2_current_path = "/sys/fs/cgroup/memory.current",
+  v1_max_path = "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+  v1_current_path = "/sys/fs/cgroup/memory/memory.usage_in_bytes"
+) {
+  read_value <- function(path) {
+    if (!isTRUE(file_exists(path))) {
+      return(NA_character_)
+    }
+
+    tryCatch(
+      trimws(read_lines(path, warn = FALSE, n = 1L)[[1L]]),
+      error = function(e) NA_character_
+    )
+  }
+
+  calculate_available <- function(max_path, current_path) {
+    max_value <- read_value(max_path)
+    current_value <- read_value(current_path)
+    if (is.na(max_value) || identical(tolower(max_value), "max")) {
+      return(NA_real_)
+    }
+
+    max_bytes <- suppressWarnings(as.numeric(max_value))
+    current_bytes <- suppressWarnings(as.numeric(current_value))
+    # cgroup v1 represents an unlimited value using a number near INT64_MAX.
+    if (is.na(max_bytes) || max_bytes >= 2^60 || max_bytes <= 0 ||
+      is.na(current_bytes) || current_bytes < 0) {
+      return(NA_real_)
+    }
+
+    max(0, max_bytes - current_bytes)
+  }
+
+  v2_available <- calculate_available(v2_max_path, v2_current_path)
+  if (!is.na(v2_available)) {
+    return(v2_available)
+  }
+
+  v1_available <- calculate_available(v1_max_path, v1_current_path)
+  if (!is.na(v1_available)) {
+    return(v1_available)
+  }
+
+  NULL
+}
+
+
 kwallm_mirai_default_queue_memory_mb <- function(
   getenv = Sys.getenv,
   system_memory = function() {
@@ -33,7 +84,8 @@ kwallm_mirai_default_queue_memory_mb <- function(
       return(NA_real_)
     }
     ps::ps_system_memory()[["avail"]]
-  }
+  },
+  cgroup_memory = kwallm_cgroup_available_memory_bytes
 ) {
   configured <- suppressWarnings(as.numeric(
     getenv("KWALLM_MIRAI_QUEUE_MEMORY_MB", unset = NA_character_)
@@ -45,14 +97,21 @@ kwallm_mirai_default_queue_memory_mb <- function(
     return(configured)
   }
 
-  available_bytes <- suppressWarnings(as.numeric(system_memory()))
-  if (is.na(available_bytes) || available_bytes <= 0) {
+  available_candidates <- suppressWarnings(as.numeric(c(
+    system_memory(),
+    cgroup_memory()
+  )))
+  available_candidates <- available_candidates[
+    !is.na(available_candidates) & available_candidates > 0
+  ]
+  if (!length(available_candidates)) {
     return(NULL)
   }
+  available_bytes <- min(available_candidates)
 
   # mirai expects MB. Keep roughly half of currently available RAM for queued
   # payloads and leave the rest for the Shiny process plus local daemons.
-  max(64, floor(available_bytes / 2e6))
+  max(1, floor(available_bytes / 2e6))
 }
 
 
