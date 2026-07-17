@@ -10,7 +10,7 @@ dependencies = [
   # v0.2.25+ rewrote from_pretrained to be self-contained, fixing
   # compatibility with huggingface_hub >=1.0 and transformers >=5.
   "gliner>=0.2.25",
-  "torch>=2.13.0",
+  "torch>=2.8.0",
   "transformers>=5.5.0",
 ]
 [tool.uv.sources]
