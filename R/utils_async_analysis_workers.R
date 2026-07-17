@@ -399,6 +399,102 @@ kwallm_mori_resolve_worker_arg <- function(x, scope_key = NULL) {
 }
 
 
+#' Submit mirai work without blocking an event-loop thread
+#'
+#' A bounded mirai dispatcher makes `mirai()` block while its queue is full.
+#' Shiny must keep its main event loop responsive, so submissions use
+#' `try_mirai()` and retry asynchronously until capacity becomes available.
+#'
+#' @param .expr Expression to evaluate in a mirai worker.
+#' @param .args Named worker arguments.
+#' @param .timeout Optional mirai execution timeout in milliseconds.
+#' @param .compute Optional mirai compute profile.
+#' @param queue_timeout_ms Maximum time to wait for dispatcher capacity.
+#' @param retry_delay_seconds Delay between non-blocking submission attempts.
+#'
+#' @return A promise that resolves to the mirai result.
+kwallm_mirai_submit <- function(
+  .expr,
+  .args = list(),
+  .timeout = NULL,
+  .compute = NULL,
+  queue_timeout_ms = getOption("kwallm__mirai_queue_wait_timeout_ms", 30000L),
+  retry_delay_seconds = getOption("kwallm__mirai_queue_retry_seconds", 0.05),
+  try_mirai_fn = NULL,
+  later_fn = later::later,
+  clock = function() proc.time()[["elapsed"]],
+  promise_fn = promises::promise,
+  then_fn = promises::then
+) {
+  expr <- substitute(.expr)
+  if (is.null(try_mirai_fn)) {
+    try_mirai_fn <- if (isTRUE(getOption("kwallm.test_sync_mirai", FALSE))) {
+      mirai::mirai
+    } else {
+      mirai::try_mirai
+    }
+  }
+
+  queue_timeout_ms <- suppressWarnings(as.numeric(queue_timeout_ms))
+  if (length(queue_timeout_ms) != 1L || is.na(queue_timeout_ms) ||
+    queue_timeout_ms < 0) {
+    queue_timeout_ms <- 30000
+  }
+
+  retry_delay_seconds <- suppressWarnings(as.numeric(retry_delay_seconds))
+  if (length(retry_delay_seconds) != 1L || is.na(retry_delay_seconds) ||
+    retry_delay_seconds <= 0) {
+    retry_delay_seconds <- 0.05
+  }
+
+  deadline <- clock() + queue_timeout_ms / 1000
+
+  promise_fn(function(resolve, reject) {
+    attempt <- function() {
+      worker <- tryCatch(
+        do.call(
+          try_mirai_fn,
+          list(
+            .expr = expr,
+            .args = .args,
+            .timeout = .timeout,
+            .compute = .compute
+          )
+        ),
+        error = function(e) e
+      )
+
+      if (inherits(worker, "error")) {
+        reject(worker)
+        return(invisible(NULL))
+      }
+
+      if (is.null(worker)) {
+        if (clock() >= deadline) {
+          reject(simpleError(paste0(
+            "Timed out waiting for capacity in the async worker queue after ",
+            queue_timeout_ms,
+            " ms."
+          )))
+        } else {
+          later_fn(attempt, retry_delay_seconds)
+        }
+        return(invisible(NULL))
+      }
+
+      then_fn(
+        worker,
+        onFulfilled = resolve,
+        onRejected = reject
+      )
+      invisible(NULL)
+    }
+
+    attempt()
+  })
+}
+
+
 #' Load the core packages needed inside async workers
 #'
 #' @param packages Character vector of package names.

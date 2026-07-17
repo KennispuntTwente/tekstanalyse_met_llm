@@ -228,7 +228,7 @@ marking_codes_server <- function(
         }
         shared_memory_guard <- worker_payload$guard
 
-        mirai::mirai(
+        kwallm_mirai_submit(
           {
             kwallm_worker_bootstrap(
               task = "code_generation",

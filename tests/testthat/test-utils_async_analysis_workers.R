@@ -261,6 +261,89 @@ test_that("kwallm_mori shared refs are per-payload and not global", {
 })
 
 
+test_that("kwallm_mirai_submit retries without blocking when the queue is full", {
+  attempts <- 0L
+  scheduled <- list()
+  now <- 0
+  resolved <- NULL
+
+  result <- kwallm_mirai_submit(
+    42L,
+    queue_timeout_ms = 1000,
+    retry_delay_seconds = 0.1,
+    try_mirai_fn = function(...) {
+      attempts <<- attempts + 1L
+      if (attempts < 3L) {
+        return(NULL)
+      }
+      42L
+    },
+    later_fn = function(callback, delay) {
+      scheduled[[length(scheduled) + 1L]] <<- callback
+      now <<- now + delay
+      invisible(NULL)
+    },
+    clock = function() now,
+    promise_fn = function(action) {
+      action(
+        resolve = function(value) resolved <<- value,
+        reject = function(error) stop(error)
+      )
+      structure(list(), class = "test_promise")
+    },
+    then_fn = function(worker, onFulfilled, onRejected) {
+      onFulfilled(worker)
+    }
+  )
+
+  expect_s3_class(result, "test_promise")
+  expect_identical(attempts, 1L)
+  expect_length(scheduled, 1L)
+
+  scheduled[[1L]]()
+  expect_identical(attempts, 2L)
+  expect_length(scheduled, 2L)
+
+  scheduled[[2L]]()
+  expect_identical(attempts, 3L)
+  expect_identical(resolved, 42L)
+})
+
+
+test_that("kwallm_mirai_submit rejects after its queue wait timeout", {
+  scheduled <- NULL
+  now <- 0
+  rejection <- NULL
+
+  result <- kwallm_mirai_submit(
+    TRUE,
+    queue_timeout_ms = 10,
+    retry_delay_seconds = 0.1,
+    try_mirai_fn = function(...) NULL,
+    later_fn = function(callback, delay) {
+      scheduled <<- callback
+      now <<- now + delay
+      invisible(NULL)
+    },
+    clock = function() now,
+    promise_fn = function(action) {
+      action(
+        resolve = function(value) stop("unexpected resolution"),
+        reject = function(error) rejection <<- error
+      )
+      structure(list(), class = "test_promise")
+    }
+  )
+
+  expect_s3_class(result, "test_promise")
+  expect_true(is.function(scheduled))
+  scheduled()
+
+  expect_s3_class(rejection, "error")
+  expect_match(conditionMessage(rejection), "Timed out waiting for capacity")
+})
+
+
 test_that("kwallm_mori refs resolve through the app bootstrap in a real mirai worker", {
   testthat::skip_if_not_installed("mirai")
   testthat::skip_if_not_installed("mori")

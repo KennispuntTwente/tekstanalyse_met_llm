@@ -140,7 +140,7 @@ test_that("production mirai call sites all use kwallm worker bootstrap", {
 
   for (path in worker_files) {
     text <- paste(readLines(here::here(path), warn = FALSE), collapse = "\n")
-    mirai_count <- count_pattern_occurrences(text, "mirai::mirai\\(")
+    mirai_count <- count_pattern_occurrences(text, "kwallm_mirai_submit\\(")
     bootstrap_call_count <- count_pattern_occurrences(
       text,
       "kwallm_worker_bootstrap\\("
@@ -152,7 +152,7 @@ test_that("production mirai call sites all use kwallm worker bootstrap", {
 
     expect_true(
       mirai_count > 0L,
-      info = sprintf("Expected at least one mirai call in %s", path)
+      info = sprintf("Expected at least one non-blocking mirai call in %s", path)
     )
     expect_identical(
       bootstrap_call_count,

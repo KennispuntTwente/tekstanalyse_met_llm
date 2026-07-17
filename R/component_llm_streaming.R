@@ -231,7 +231,7 @@ if (FALSE) {
       stream$show()
 
       # Simulate streaming with a simple example
-      mirai::mirai(
+      kwallm_mirai_submit(
         {
           for (i in 1:10) {
             Sys.sleep(0.3)

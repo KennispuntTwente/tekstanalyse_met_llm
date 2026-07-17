@@ -327,7 +327,7 @@ text_split_server <- function(
       }
       shared_memory_guard <- worker_payload$guard
 
-      mirai::mirai(
+      kwallm_mirai_submit(
         {
           kwallm_worker_bootstrap(
             task = "text_split",

@@ -380,7 +380,7 @@ gliner_server <- function(
           shared_memory_guard <- worker_payload$guard
 
           ## 4 Spawn the mirai worker that runs GLiNER model on texts
-          mirai::mirai(
+          kwallm_mirai_submit(
             {
               kwallm_worker_bootstrap(
                 task = "gliner",

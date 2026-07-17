@@ -412,7 +412,7 @@ processing_server <- function(
           analysis_unit_ids = current_analysis_unit_ids()
         ))
 
-        promise <- mirai::mirai(
+        promise <- kwallm_mirai_submit(
           {
             kwallm_worker_bootstrap(
               task = "categorization",
@@ -559,7 +559,7 @@ processing_server <- function(
           analysis_unit_ids = current_analysis_unit_ids()
         ))
 
-        promise <- mirai::mirai(
+        promise <- kwallm_mirai_submit(
           {
             kwallm_worker_bootstrap(
               task = "scoring",
@@ -669,7 +669,7 @@ processing_server <- function(
           text_batches = context_window$text_batches
         ))
 
-        promise <- mirai::mirai(
+        promise <- kwallm_mirai_submit(
           {
             kwallm_worker_bootstrap(
               task = "topic_generation",
@@ -941,7 +941,7 @@ processing_server <- function(
           analysis_unit_ids = current_analysis_unit_ids()
         ))
 
-        promise <- mirai::mirai(
+        promise <- kwallm_mirai_submit(
           {
             kwallm_worker_bootstrap(
               task = "topic_assignment",
@@ -1192,7 +1192,7 @@ processing_server <- function(
           analysis_unit_ids = current_analysis_unit_ids()
         ))
 
-        promise <- mirai::mirai(
+        promise <- kwallm_mirai_submit(
           {
             kwallm_worker_bootstrap(
               task = "marking",
@@ -1576,7 +1576,7 @@ processing_server <- function(
 
         log_context <- log_context_capture(is_async = TRUE)
 
-        promise <- mirai::mirai(
+        promise <- kwallm_mirai_submit(
           {
             kwallm_worker_bootstrap(
               task = "download_bundle",
