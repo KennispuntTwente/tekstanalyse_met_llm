@@ -164,6 +164,86 @@ test_that("mori payload capability keys isolate concurrent worker payloads", {
 })
 
 
+test_that("concurrent workers preserve mori attributes and copy-on-write", {
+  skip_mori_integration()
+  kwallm_test_start_mirai_daemons(n = 2L)
+
+  source_data <- data.frame(
+    label = c("alpha", "beta", NA_character_),
+    group = factor(c("a", "b", "a"), levels = c("a", "b", "unused")),
+    observed_on = as.Date(c("2026-01-01", "2026-01-02", "2026-01-03")),
+    value = c(1, NA_real_, 3),
+    stringsAsFactors = FALSE
+  )
+  payload <- kwallm_mori_share_worker_payload(
+    list(data = source_data),
+    enabled = TRUE
+  )
+  guard <- payload$guard
+
+  worker_expr <- quote({
+    kwallm_worker_bootstrap(
+      task = "mori_concurrent_copy_on_write",
+      app_root = app_root,
+      worker_options = worker_options
+    )
+    mapped <- kwallm_mori_resolve_worker_arg(data_ref, mori_scope_key)
+    before <- list(
+      labels = as.character(mapped$label),
+      groups = as.character(mapped$group),
+      group_levels = levels(mapped$group),
+      dates = as.character(mapped$observed_on),
+      date_class = class(mapped$observed_on),
+      missing = is.na(mapped$value)
+    )
+    Sys.sleep(0.1)
+    mapped$label[[1L]] <- replacement
+    list(before = before, mutated_label = mapped$label[[1L]])
+  })
+  worker_args <- function(replacement) {
+    c(
+      list(
+        expr = worker_expr,
+        app_root = normalizePath(here::here(), winslash = "/", mustWork = TRUE),
+        worker_options = list(),
+        data_ref = payload$args$data,
+        mori_scope_key = payload$scope_key,
+        replacement = replacement
+      ),
+      kwallm_worker_bootstrap_globals()
+    )
+  }
+
+  first <- mirai::mirai(eval(expr), .args = worker_args("worker-a"))
+  second <- mirai::mirai(eval(expr), .args = worker_args("worker-b"))
+  first_result <- first[]
+  second_result <- second[]
+  force(guard)
+
+  for (result in list(first_result, second_result)) {
+    if (mirai::is_error_value(result)) {
+      fail(paste("mirai worker error:", as.character(result)))
+      next
+    }
+    expect_identical(result$before$labels, source_data$label)
+    expect_identical(result$before$groups, as.character(source_data$group))
+    expect_identical(result$before$group_levels, levels(source_data$group))
+    expect_identical(result$before$dates, as.character(source_data$observed_on))
+    expect_identical(result$before$date_class, "Date")
+    expect_identical(result$before$missing, is.na(source_data$value))
+  }
+  expect_identical(first_result$mutated_label, "worker-a")
+  expect_identical(second_result$mutated_label, "worker-b")
+
+  host_mapping <- kwallm_mori_resolve_worker_arg(
+    payload$args$data,
+    payload$scope_key
+  )
+  expect_identical(as.character(host_mapping$label), source_data$label)
+  kwallm_mori_release_guard(guard)
+})
+
+
 test_that("serialized AnalysisResult travels through mori shared memory", {
   skip_mori_integration()
 

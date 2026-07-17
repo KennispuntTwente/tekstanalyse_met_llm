@@ -645,9 +645,16 @@ kwallm_mori_share_worker_payload <- function(
 #'
 #' @param x A regular object or `kwallm_mori_ref`.
 #' @param scope_key Per-dispatch secret that must verify `x`.
+#' @param require_namespace Package availability check, injectable for tests.
+#' @param map_shared_fn Shared-memory mapping function, injectable for tests.
 #'
 #' @return The mapped shared object for refs, otherwise `x`.
-kwallm_mori_resolve_worker_arg <- function(x, scope_key = NULL) {
+kwallm_mori_resolve_worker_arg <- function(
+  x,
+  scope_key = NULL,
+  require_namespace = requireNamespace,
+  map_shared_fn = NULL
+) {
   if (!kwallm_mori_is_ref(x)) {
     return(x)
   }
@@ -670,15 +677,18 @@ kwallm_mori_resolve_worker_arg <- function(x, scope_key = NULL) {
     stop("Rejected invalid mori worker payload capability.", call. = FALSE)
   }
 
-  if (!requireNamespace("mori", quietly = TRUE)) {
+  if (!isTRUE(require_namespace("mori", quietly = TRUE))) {
     stop(
       "Package `mori` is required to resolve shared worker payloads.",
       call. = FALSE
     )
   }
+  if (is.null(map_shared_fn)) {
+    map_shared_fn <- mori::map_shared
+  }
 
   mapped <- tryCatch(
-    mori::map_shared(x$name),
+    map_shared_fn(x$name),
     error = function(e) {
       stop(
         paste0(

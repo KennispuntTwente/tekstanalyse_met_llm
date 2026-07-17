@@ -87,6 +87,26 @@ test_that("kwallm_mori_total_max_mb provides a bounded default", {
 })
 
 
+test_that("kwallm_mori_enabled requires the toggle and all dependencies", {
+  expect_false(kwallm_mori_enabled(
+    get_option = function(...) FALSE,
+    require_namespace = function(...) stop("should short-circuit")
+  ))
+
+  available <- c(mori = TRUE, openssl = TRUE, digest = FALSE)
+  expect_false(kwallm_mori_enabled(
+    get_option = function(...) TRUE,
+    require_namespace = function(package, quietly = TRUE) available[[package]]
+  ))
+
+  available[["digest"]] <- TRUE
+  expect_true(kwallm_mori_enabled(
+    get_option = function(...) TRUE,
+    require_namespace = function(package, quietly = TRUE) available[[package]]
+  ))
+})
+
+
 test_that("kwallm_worker_load_core_packages does not require mori", {
   loaded_packages <- character()
 
@@ -119,6 +139,22 @@ test_that("kwallm_mori_prune_orphans uses supported mori versions", {
     require_namespace = function(...) TRUE,
     namespace_exports = function(...) "share"
   ))
+})
+
+
+test_that("kwallm_mori_prune_orphans reports failures without stopping startup", {
+  warning_state <- new.env(parent = emptyenv())
+  warning_state$message <- NULL
+
+  expect_false(kwallm_mori_prune_orphans(
+    require_namespace = function(...) TRUE,
+    namespace_exports = function(...) "prune_shared",
+    prune_fn = function() stop("cleanup failed"),
+    warn_fn = function(message) {
+      warning_state$message <- message
+    }
+  ))
+  expect_match(warning_state$message, "cleanup failed", fixed = TRUE)
 })
 
 
@@ -245,6 +281,97 @@ test_that("mori share failures warn once and update fallback metrics", {
   expect_identical(budget_state$used_bytes, 0)
   expect_identical(metrics_state$fallback_fields, 2L)
   expect_identical(metrics_state$fallback_reasons[["share_error"]], 2L)
+})
+
+
+test_that("unsupported mori values fall back and release their budget", {
+  testthat::skip_if_not_installed("openssl")
+  testthat::skip_if_not_installed("digest")
+
+  budget_state <- new.env(parent = emptyenv())
+  budget_state$used_bytes <- 0
+  metrics_state <- new.env(parent = emptyenv())
+  metrics_state$shared_fields <- 0L
+  metrics_state$fallback_fields <- 0L
+  metrics_state$fallback_reasons <- integer()
+  callback <- function() TRUE
+
+  payload <- kwallm_mori_share_worker_payload(
+    list(callback = callback),
+    enabled = TRUE,
+    total_max_mb = 1,
+    object_size = function(x) 1024,
+    share_fn = identity,
+    shared_name_fn = function(x) NULL,
+    budget_state = budget_state,
+    metrics_state = metrics_state
+  )
+
+  expect_identical(payload$args$callback, callback)
+  expect_length(payload$guard, 0L)
+  expect_identical(budget_state$used_bytes, 0)
+  expect_identical(metrics_state$shared_fields, 0L)
+  expect_identical(metrics_state$fallback_fields, 1L)
+  expect_identical(metrics_state$fallback_reasons[["unsupported_type"]], 1L)
+})
+
+
+test_that("mori shared-name failures fall back without leaking reservations", {
+  testthat::skip_if_not_installed("openssl")
+  testthat::skip_if_not_installed("digest")
+
+  budget_state <- new.env(parent = emptyenv())
+  budget_state$used_bytes <- 0
+  metrics_state <- new.env(parent = emptyenv())
+  metrics_state$shared_fields <- 0L
+  metrics_state$fallback_fields <- 0L
+  metrics_state$fallback_reasons <- integer()
+  warning_state <- new.env(parent = emptyenv())
+  warning_state$message <- NULL
+
+  payload <- kwallm_mori_share_worker_payload(
+    list(texts = "payload"),
+    enabled = TRUE,
+    total_max_mb = 1,
+    object_size = function(x) 1024,
+    share_fn = identity,
+    shared_name_fn = function(x) stop("name lookup failed"),
+    budget_state = budget_state,
+    metrics_state = metrics_state,
+    warn_fn = function(message) {
+      warning_state$message <- message
+    }
+  )
+
+  expect_identical(payload$args$texts, "payload")
+  expect_length(payload$guard, 0L)
+  expect_identical(budget_state$used_bytes, 0)
+  expect_identical(metrics_state$fallback_reasons[["shared_name_error"]], 1L)
+  expect_match(warning_state$message, "name lookup failed", fixed = TRUE)
+})
+
+
+test_that("abandoned mori guards release aggregate budget during GC", {
+  testthat::skip_if_not_installed("openssl")
+  testthat::skip_if_not_installed("digest")
+
+  budget_state <- new.env(parent = emptyenv())
+  budget_state$used_bytes <- 0
+  payload <- kwallm_mori_share_worker_payload(
+    list(texts = "payload"),
+    enabled = TRUE,
+    total_max_mb = 1,
+    object_size = function(x) 1024,
+    share_fn = identity,
+    shared_name_fn = function(x) "/mori_test_guard_1",
+    budget_state = budget_state
+  )
+
+  expect_identical(budget_state$used_bytes, 1024)
+  rm(payload)
+  invisible(gc())
+  invisible(gc())
+  expect_identical(budget_state$used_bytes, 0)
 })
 
 
@@ -467,6 +594,120 @@ test_that("kwallm_mirai_submit rejects after its queue wait timeout", {
     conditionMessage(result_state$rejection),
     "Timed out waiting for capacity"
   )
+})
+
+
+test_that("kwallm_mori refs report worker-side mapping failures", {
+  testthat::skip_if_not_installed("openssl")
+  testthat::skip_if_not_installed("digest")
+
+  scope_key <- kwallm_mori_random_token()
+  ref <- kwallm_mori_make_ref(
+    "/mori_missing_region_1",
+    key = "texts",
+    scope_key = scope_key
+  )
+
+  expect_error(
+    kwallm_mori_resolve_worker_arg(
+      ref,
+      scope_key,
+      require_namespace = function(...) FALSE
+    ),
+    "Package `mori` is required"
+  )
+  expect_error(
+    kwallm_mori_resolve_worker_arg(
+      ref,
+      scope_key,
+      require_namespace = function(...) TRUE,
+      map_shared_fn = function(name) stop("region disappeared")
+    ),
+    "Could not map shared worker payload `texts`: region disappeared",
+    fixed = TRUE
+  )
+  expect_error(
+    kwallm_mori_resolve_worker_arg(
+      ref,
+      scope_key,
+      require_namespace = function(...) TRUE,
+      map_shared_fn = function(name) NULL
+    ),
+    "Invalid shared worker payload reference for `texts`",
+    fixed = TRUE
+  )
+})
+
+
+test_that("kwallm_mirai_submit forwards task configuration unchanged", {
+  state <- new.env(parent = emptyenv())
+  state$resolved <- NULL
+
+  result <- kwallm_mirai_submit(
+    x + y,
+    .args = list(x = 20L, y = 22L),
+    .timeout = 1234L,
+    .compute = "analysis",
+    try_mirai_fn = function(.expr, .args, .timeout, .compute) {
+      state$expr <- substitute(.expr)
+      state$args <- .args
+      state$timeout <- .timeout
+      state$compute <- .compute
+      structure(list(id = 1L), class = "test_worker")
+    },
+    promise_fn = function(action) {
+      action(
+        resolve = function(value) {
+          state$resolved <- value
+        },
+        reject = function(error) stop(error)
+      )
+      structure(list(), class = "test_promise")
+    },
+    then_fn = function(worker, onFulfilled, onRejected) {
+      expect_s3_class(worker, "test_worker")
+      onFulfilled(42L)
+    }
+  )
+
+  expect_s3_class(result, "test_promise")
+  expect_identical(state$expr, quote(x + y))
+  expect_identical(state$args, list(x = 20L, y = 22L))
+  expect_identical(state$timeout, 1234L)
+  expect_identical(state$compute, "analysis")
+  expect_identical(state$resolved, 42L)
+})
+
+
+test_that("kwallm_mirai_submit propagates submission and worker errors", {
+  errors <- list()
+  promise_fn <- function(action) {
+    action(
+      resolve = function(value) stop("unexpected resolution"),
+      reject = function(error) {
+        errors[[length(errors) + 1L]] <<- error
+      }
+    )
+    structure(list(), class = "test_promise")
+  }
+
+  kwallm_mirai_submit(
+    TRUE,
+    try_mirai_fn = function(...) stop("submission failed"),
+    promise_fn = promise_fn
+  )
+  kwallm_mirai_submit(
+    TRUE,
+    try_mirai_fn = function(...) structure(list(), class = "test_worker"),
+    promise_fn = promise_fn,
+    then_fn = function(worker, onFulfilled, onRejected) {
+      onRejected(simpleError("worker failed"))
+    }
+  )
+
+  expect_length(errors, 2L)
+  expect_match(conditionMessage(errors[[1L]]), "submission failed")
+  expect_match(conditionMessage(errors[[2L]]), "worker failed")
 })
 
 
