@@ -28,9 +28,8 @@ kwallm_expect_async_runtime <- function(app, require_mori_activity = FALSE) {
   )
 
   if (isTRUE(require_mori_activity)) {
-    testthat::expect_gt(
-      as.integer(runtime$mori_metrics$shared_fields),
-      0L,
+    testthat::expect_true(
+      as.integer(runtime$mori_metrics$shared_fields) > 0L,
       info = "Expected the completed E2E workflow to share a payload via mori"
     )
   }

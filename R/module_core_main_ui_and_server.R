@@ -122,7 +122,8 @@ main_server <- function(
           mirai_enabled = isTRUE(tryCatch(
             mirai::daemons_set(),
             error = function(e) FALSE
-          )) && mirai_connections > 0L,
+          )) &&
+            mirai_connections > 0L,
           mirai_connections = mirai_connections,
           sync_mirai = isTRUE(getOption("kwallm.test_sync_mirai", FALSE)),
           mori_enabled = isTRUE(kwallm_mori_enabled()),
