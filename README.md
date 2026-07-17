@@ -116,9 +116,16 @@ See `Dockerfile` for an example configuration. You can also use the pre-built co
 
 1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
 
-2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+2. `docker run --shm-size=1g -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
 
 3. Open the app in your browser (at `http://localhost:3838`)
+
+The `--shm-size` setting is required for efficient asynchronous processing:
+KWALLM uses Mori to share large text payloads with local workers through
+`/dev/shm`. Increase it for workloads whose concurrent shared payloads can
+exceed 1 GB. `KWALLM_MORI_TOTAL_MAX_MB` controls KWALLM's aggregate sharing
+budget (512 MB by default); payloads that cannot be shared fall back to regular
+serialization and emit a warning.
 
 The pre-built container does not have a specific LLM provider configured, but users can
 implement an LLM provider themselves while using it (any OpenAI-compatible API or [Ollama](https://ollama.com)).
@@ -345,9 +352,16 @@ Zie `Dockerfile` voor een voorbeeld-configuratie. Je kan ook de pre-built contai
 
 1. `docker pull ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
 
-2. `docker run -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
+2. `docker run --shm-size=1g -p 3838:3838 ghcr.io/kennispunttwente/tekstanalyse_met_llm:latest`
 
 3. Open de app in je browser (op `http://localhost:3838`)
+
+De instelling `--shm-size` is nodig voor efficiënte asynchrone verwerking:
+KWALLM gebruikt Mori om grote tekstpayloads via `/dev/shm` met lokale workers
+te delen. Verhoog deze waarde wanneer gelijktijdige gedeelde payloads groter
+dan 1 GB kunnen worden. `KWALLM_MORI_TOTAL_MAX_MB` bepaalt het totale
+deelgeheugenbudget van KWALLM (standaard 512 MB); payloads die niet gedeeld
+kunnen worden vallen terug op gewone serialisatie en geven een waarschuwing.
 
 Bij de pre-built container is geen specifieke LLM-provider geconfigureerd, maar gebruikers kunnen
 zelf tijdens het gebruik een LLM-provider configureren (elke OpenAI-compatible API of [Ollama](https://ollama.com)). 

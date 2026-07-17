@@ -103,6 +103,22 @@ test_that("kwallm_worker_load_core_packages does not require mori", {
 })
 
 
+test_that("kwallm_mori_prune_orphans uses supported mori versions", {
+  pruned <- FALSE
+  expect_true(kwallm_mori_prune_orphans(
+    require_namespace = function(...) TRUE,
+    namespace_exports = function(...) "prune_shared",
+    prune_fn = function() pruned <<- TRUE
+  ))
+  expect_true(pruned)
+
+  expect_false(kwallm_mori_prune_orphans(
+    require_namespace = function(...) TRUE,
+    namespace_exports = function(...) "share"
+  ))
+})
+
+
 test_that("kwallm_mori_share_worker_payload falls back when disabled", {
   payload <- kwallm_mori_share_worker_payload(
     list(texts = c("a", "b")),
@@ -185,6 +201,44 @@ test_that("mori aggregate budget rejects and later admits shared payloads", {
   expect_true(kwallm_mori_is_ref(third$args$texts))
   kwallm_mori_release_guard(third$guard)
   expect_identical(budget_state$used_bytes, 0)
+})
+
+
+test_that("mori share failures warn once and update fallback metrics", {
+  testthat::skip_if_not_installed("openssl")
+  testthat::skip_if_not_installed("digest")
+
+  budget_state <- new.env(parent = emptyenv())
+  budget_state$used_bytes <- 0
+  metrics_state <- new.env(parent = emptyenv())
+  metrics_state$shared_fields <- 0L
+  metrics_state$fallback_fields <- 0L
+  metrics_state$fallback_reasons <- integer()
+  warnings <- character()
+
+  share_payload <- function() {
+    kwallm_mori_share_worker_payload(
+      list(texts = "payload"),
+      enabled = TRUE,
+      object_size = function(x) 1024,
+      share_fn = function(x) stop("/dev/shm is too small"),
+      shared_name_fn = function(x) stop("should not be called"),
+      budget_state = budget_state,
+      metrics_state = metrics_state,
+      warn_fn = function(message) warnings <<- c(warnings, message)
+    )
+  }
+
+  first <- share_payload()
+  second <- share_payload()
+
+  expect_identical(first$args$texts, "payload")
+  expect_identical(second$args$texts, "payload")
+  expect_length(warnings, 1L)
+  expect_match(warnings, "/dev/shm is too small", fixed = TRUE)
+  expect_identical(budget_state$used_bytes, 0)
+  expect_identical(metrics_state$fallback_fields, 2L)
+  expect_identical(metrics_state$fallback_reasons[["share_error"]], 2L)
 })
 
 

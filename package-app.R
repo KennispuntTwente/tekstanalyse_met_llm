@@ -3,6 +3,7 @@
 source("R/load_dependencies.R")
 
 load_dependencies("electron")
+kwallm_mori_prune_orphans()
 
 
 # 2 Settings -------------------------------------------------------------------

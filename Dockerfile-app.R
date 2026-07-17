@@ -3,6 +3,7 @@
 source("R/load_dependencies.R")
 
 load_dependencies("docker")
+kwallm_mori_prune_orphans()
 
 
 # 2 Settings -------------------------------------------------------------------
@@ -21,6 +22,9 @@ load_dependencies("docker")
 #     with `KWALLM_MIRAI_QUEUE_MEMORY_MB`; set it to 0 to disable the cap.
 # - Large per-run user payloads are passed to local workers through `mori`
 #     shared-memory references and kept scoped to the running Shiny session.
+#     Linux containers must be started with sufficient `/dev/shm`, for example
+#     `docker run --shm-size=1g ...`; sharing failures are logged and fall back
+#     to regular serialization.
 # - Set `mori__enabled = FALSE` below to disable `mori` and always use
 #     regular serialized worker payloads instead.
 # - When asynchronous processing is not needed, you can use

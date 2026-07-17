@@ -70,6 +70,125 @@ kwallm_mori_enabled <- function(
 }
 
 
+.kwallm_mori_metrics_state <- new.env(parent = emptyenv())
+.kwallm_mori_metrics_state$shared_fields <- 0L
+.kwallm_mori_metrics_state$fallback_fields <- 0L
+.kwallm_mori_metrics_state$fallback_reasons <- integer()
+
+
+kwallm_mori_record_outcome <- function(
+  shared,
+  reason = NULL,
+  state = .kwallm_mori_metrics_state
+) {
+  if (isTRUE(shared)) {
+    shared_fields <- state$shared_fields
+    if (is.null(shared_fields)) {
+      shared_fields <- 0L
+    }
+    state$shared_fields <- as.integer(shared_fields) + 1L
+    return(invisible(NULL))
+  }
+
+  if (is.null(reason)) {
+    reason <- "unknown"
+  }
+  reason <- as.character(reason)[[1L]]
+  fallback_fields <- state$fallback_fields
+  if (is.null(fallback_fields)) {
+    fallback_fields <- 0L
+  }
+  state$fallback_fields <- as.integer(fallback_fields) + 1L
+  reasons <- state$fallback_reasons
+  if (is.null(reasons)) {
+    reasons <- integer()
+  }
+  reason_count <- if (reason %in% names(reasons)) reasons[[reason]] else 0L
+  reasons[[reason]] <- as.integer(reason_count) + 1L
+  state$fallback_reasons <- reasons
+  invisible(NULL)
+}
+
+
+kwallm_mori_metrics <- function(state = .kwallm_mori_metrics_state) {
+  shared_fields <- state$shared_fields
+  fallback_fields <- state$fallback_fields
+  fallback_reasons <- state$fallback_reasons
+  list(
+    shared_fields = as.integer(if (is.null(shared_fields)) 0L else shared_fields),
+    fallback_fields = as.integer(
+      if (is.null(fallback_fields)) 0L else fallback_fields
+    ),
+    fallback_reasons = if (is.null(fallback_reasons)) {
+      integer()
+    } else {
+      fallback_reasons
+    }
+  )
+}
+
+
+.kwallm_mori_warning_state <- new.env(parent = emptyenv())
+.kwallm_mori_warning_state$keys <- character()
+
+
+kwallm_mori_warn_once <- function(
+  key,
+  message,
+  state = .kwallm_mori_warning_state,
+  warn_fn = NULL
+) {
+  key <- as.character(key)[[1L]]
+  if (key %in% state$keys) {
+    return(invisible(FALSE))
+  }
+  state$keys <- c(state$keys, key)
+
+  if (is.null(warn_fn)) {
+    warn_fn <- if (exists("log_warn", mode = "function", inherits = TRUE)) {
+      function(value) log_warn(value, component = "async")
+    } else {
+      function(value) warning(value, call. = FALSE)
+    }
+  }
+  warn_fn(message)
+  invisible(TRUE)
+}
+
+
+kwallm_mori_prune_orphans <- function(
+  require_namespace = requireNamespace,
+  namespace_exports = getNamespaceExports,
+  prune_fn = NULL,
+  warn_fn = NULL
+) {
+  if (!isTRUE(require_namespace("mori", quietly = TRUE))) {
+    return(invisible(FALSE))
+  }
+  if (!("prune_shared" %in% namespace_exports("mori"))) {
+    return(invisible(FALSE))
+  }
+  if (is.null(prune_fn)) {
+    prune_fn <- mori::prune_shared
+  }
+
+  tryCatch(
+    {
+      prune_fn()
+      invisible(TRUE)
+    },
+    error = function(e) {
+      kwallm_mori_warn_once(
+        key = "prune_shared",
+        message = paste("Could not prune orphaned mori regions:", conditionMessage(e)),
+        warn_fn = warn_fn
+      )
+      invisible(FALSE)
+    }
+  )
+}
+
+
 #' Resolve the configured mori shared-payload size cap
 #'
 #' @return Numeric size cap in MB, or NULL when uncapped.
@@ -354,7 +473,9 @@ kwallm_mori_share_worker_payload <- function(
   object_size = utils::object.size,
   share_fn = mori::share,
   shared_name_fn = mori::shared_name,
-  budget_state = .kwallm_mori_budget_state
+  budget_state = .kwallm_mori_budget_state,
+  metrics_state = .kwallm_mori_metrics_state,
+  warn_fn = NULL
 ) {
   if (!is.list(payload) || is.null(names(payload))) {
     stop("`payload` must be a named list.", call. = FALSE)
@@ -390,6 +511,11 @@ kwallm_mori_share_worker_payload <- function(
 
     if (!is.null(remaining_bytes)) {
       if (is.na(payload_size) || payload_size > remaining_bytes) {
+        kwallm_mori_record_outcome(
+          FALSE,
+          reason = "dispatch_size_cap",
+          state = metrics_state
+        )
         args[[key]] <- payload[[key]]
         next
       }
@@ -400,26 +526,75 @@ kwallm_mori_share_worker_payload <- function(
       max_mb = total_max_mb,
       state = budget_state
     )) {
+      kwallm_mori_record_outcome(
+        FALSE,
+        reason = "aggregate_budget",
+        state = metrics_state
+      )
       args[[key]] <- payload[[key]]
       next
     }
 
-    shared <- tryCatch(
-      share_fn(payload[[key]]),
-      error = function(e) payload[[key]]
-    )
+    shared <- tryCatch(share_fn(payload[[key]]), error = function(e) e)
+    if (inherits(shared, "error")) {
+      kwallm_mori_budget_release(payload_size, state = budget_state)
+      kwallm_mori_record_outcome(
+        FALSE,
+        reason = "share_error",
+        state = metrics_state
+      )
+      kwallm_mori_warn_once(
+        key = paste("share_error", conditionMessage(shared), sep = ":"),
+        message = paste0(
+          "mori could not share worker payload `",
+          key,
+          "`; using regular serialization instead: ",
+          conditionMessage(shared)
+        ),
+        warn_fn = warn_fn
+      )
+      args[[key]] <- payload[[key]]
+      next
+    }
     shared_name <- tryCatch(
       shared_name_fn(shared),
-      error = function(e) NULL
+      error = function(e) e
     )
+
+    if (inherits(shared_name, "error")) {
+      kwallm_mori_budget_release(payload_size, state = budget_state)
+      kwallm_mori_record_outcome(
+        FALSE,
+        reason = "shared_name_error",
+        state = metrics_state
+      )
+      kwallm_mori_warn_once(
+        key = paste("shared_name_error", conditionMessage(shared_name), sep = ":"),
+        message = paste0(
+          "mori could not create a worker reference for `",
+          key,
+          "`; using regular serialization instead: ",
+          conditionMessage(shared_name)
+        ),
+        warn_fn = warn_fn
+      )
+      args[[key]] <- payload[[key]]
+      next
+    }
 
     if (!is.character(shared_name) || length(shared_name) != 1L) {
       kwallm_mori_budget_release(payload_size, state = budget_state)
+      kwallm_mori_record_outcome(
+        FALSE,
+        reason = "unsupported_type",
+        state = metrics_state
+      )
       args[[key]] <- payload[[key]]
       next
     }
 
     lease$bytes <- lease$bytes + payload_size
+    kwallm_mori_record_outcome(TRUE, state = metrics_state)
     guard[[key]] <- shared
     shared_names[[key]] <- shared_name
     args[[key]] <- kwallm_mori_make_ref(
