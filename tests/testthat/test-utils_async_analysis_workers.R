@@ -104,13 +104,16 @@ test_that("kwallm_worker_load_core_packages does not require mori", {
 
 
 test_that("kwallm_mori_prune_orphans uses supported mori versions", {
-  pruned <- FALSE
+  state <- new.env(parent = emptyenv())
+  state$pruned <- FALSE
   expect_true(kwallm_mori_prune_orphans(
     require_namespace = function(...) TRUE,
     namespace_exports = function(...) "prune_shared",
-    prune_fn = function() pruned <<- TRUE
+    prune_fn = function() {
+      state$pruned <- TRUE
+    }
   ))
-  expect_true(pruned)
+  expect_true(state$pruned)
 
   expect_false(kwallm_mori_prune_orphans(
     require_namespace = function(...) TRUE,
@@ -214,7 +217,8 @@ test_that("mori share failures warn once and update fallback metrics", {
   metrics_state$shared_fields <- 0L
   metrics_state$fallback_fields <- 0L
   metrics_state$fallback_reasons <- integer()
-  warnings <- character()
+  warning_state <- new.env(parent = emptyenv())
+  warning_state$messages <- character()
 
   share_payload <- function() {
     kwallm_mori_share_worker_payload(
@@ -225,7 +229,9 @@ test_that("mori share failures warn once and update fallback metrics", {
       shared_name_fn = function(x) stop("should not be called"),
       budget_state = budget_state,
       metrics_state = metrics_state,
-      warn_fn = function(message) warnings <<- c(warnings, message)
+      warn_fn = function(message) {
+        warning_state$messages <- c(warning_state$messages, message)
+      }
     )
   }
 
@@ -234,8 +240,8 @@ test_that("mori share failures warn once and update fallback metrics", {
 
   expect_identical(first$args$texts, "payload")
   expect_identical(second$args$texts, "payload")
-  expect_length(warnings, 1L)
-  expect_match(warnings, "/dev/shm is too small", fixed = TRUE)
+  expect_length(warning_state$messages, 1L)
+  expect_match(warning_state$messages, "/dev/shm is too small", fixed = TRUE)
   expect_identical(budget_state$used_bytes, 0)
   expect_identical(metrics_state$fallback_fields, 2L)
   expect_identical(metrics_state$fallback_reasons[["share_error"]], 2L)
@@ -376,7 +382,8 @@ test_that("kwallm_mirai_submit retries without blocking when the queue is full",
   attempts <- 0L
   scheduled <- list()
   now <- 0
-  resolved <- NULL
+  result_state <- new.env(parent = emptyenv())
+  result_state$resolved <- NULL
 
   result <- kwallm_mirai_submit(
     42L,
@@ -397,7 +404,9 @@ test_that("kwallm_mirai_submit retries without blocking when the queue is full",
     clock = function() now,
     promise_fn = function(action) {
       action(
-        resolve = function(value) resolved <<- value,
+        resolve = function(value) {
+          result_state$resolved <- value
+        },
         reject = function(error) stop(error)
       )
       structure(list(), class = "test_promise")
@@ -417,14 +426,15 @@ test_that("kwallm_mirai_submit retries without blocking when the queue is full",
 
   scheduled[[2L]]()
   expect_identical(attempts, 3L)
-  expect_identical(resolved, 42L)
+  expect_identical(result_state$resolved, 42L)
 })
 
 
 test_that("kwallm_mirai_submit rejects after its queue wait timeout", {
   scheduled <- NULL
   now <- 0
-  rejection <- NULL
+  result_state <- new.env(parent = emptyenv())
+  result_state$rejection <- NULL
 
   result <- kwallm_mirai_submit(
     TRUE,
@@ -440,7 +450,9 @@ test_that("kwallm_mirai_submit rejects after its queue wait timeout", {
     promise_fn = function(action) {
       action(
         resolve = function(value) stop("unexpected resolution"),
-        reject = function(error) rejection <<- error
+        reject = function(error) {
+          result_state$rejection <- error
+        }
       )
       structure(list(), class = "test_promise")
     }
@@ -450,8 +462,11 @@ test_that("kwallm_mirai_submit rejects after its queue wait timeout", {
   expect_true(is.function(scheduled))
   scheduled()
 
-  expect_s3_class(rejection, "error")
-  expect_match(conditionMessage(rejection), "Timed out waiting for capacity")
+  expect_s3_class(result_state$rejection, "error")
+  expect_match(
+    conditionMessage(result_state$rejection),
+    "Timed out waiting for capacity"
+  )
 })
 
 
