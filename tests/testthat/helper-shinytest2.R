@@ -63,7 +63,8 @@ wait_until <- function(
   check_fn,
   timeout = 30000,
   interval = 100,
-  description = "condition"
+  description = "condition",
+  diagnostics = NULL
 ) {
   deadline <- proc.time()[["elapsed"]] + (timeout / 1000)
 
@@ -74,8 +75,20 @@ wait_until <- function(
     }
 
     if (proc.time()[["elapsed"]] >= deadline) {
-      testthat::fail(sprintf("Timed out waiting for %s", description))
-      return(invisible(FALSE))
+      diagnostic_text <- if (is.function(diagnostics)) {
+        tryCatch(as.character(diagnostics()), error = function(e) "")
+      } else {
+        ""
+      }
+      diagnostic_text <- diagnostic_text[nzchar(diagnostic_text)]
+      stop(
+        paste(
+          sprintf("Timed out waiting for %s", description),
+          paste(diagnostic_text, collapse = "\n"),
+          sep = if (length(diagnostic_text)) "\n\n" else ""
+        ),
+        call. = FALSE
+      )
     }
 
     Sys.sleep(interval / 1000)
@@ -268,15 +281,42 @@ wait_for_export <- function(
   description = export
 ) {
   value <- NULL
+  last_error <- NULL
 
   wait_until(
     function() {
-      value <<- app$get_value(export = export)
+      value <<- tryCatch(
+        app$get_value(export = export),
+        error = function(e) {
+          last_error <<- e
+          NULL
+        }
+      )
       isTRUE(predicate(value))
     },
     timeout = timeout,
     interval = interval,
-    description = description
+    description = description,
+    diagnostics = function() {
+      logs <- tryCatch(app$get_logs(), error = function(e) NULL)
+      log_tail <- if (
+        is.data.frame(logs) &&
+          "message" %in% names(logs) &&
+          nrow(logs) > 0L
+      ) {
+        tail(as.character(logs$message), 80L)
+      } else {
+        character()
+      }
+      c(
+        if (!is.null(last_error)) {
+          paste("Last values error:", conditionMessage(last_error))
+        },
+        if (length(log_tail)) {
+          c("Shiny log tail:", log_tail)
+        }
+      )
+    }
   )
 
   value
