@@ -162,3 +162,86 @@ test_that("mori payload capability keys isolate concurrent worker payloads", {
   expect_identical(result$second, "session-b")
   expect_match(result$cross, "Rejected invalid mori worker payload capability")
 })
+
+
+test_that("serialized AnalysisResult travels through mori shared memory", {
+  skip_mori_integration()
+
+  analysis_result <- AnalysisResult(
+    metadata = AnalysisMetadata(
+      run_id = "mori-download-test",
+      mode_id = "scoring",
+      language = "en",
+      timestamp = Sys.time(),
+      research_background = ""
+    ),
+    text_lineage = TextLineage(
+      source_documents = data.frame(
+        source_document_id = 1L,
+        source_document_text = "Shared source text",
+        stringsAsFactors = FALSE
+      ),
+      documents = data.frame(
+        document_id = 1L,
+        source_document_id = 1L,
+        document_text = "Shared source text",
+        stringsAsFactors = FALSE
+      ),
+      analysis_units = data.frame(
+        analysis_unit_id = 1L,
+        preprocessed_text = "Shared source text",
+        stringsAsFactors = FALSE
+      ),
+      document_units = data.frame(
+        document_id = 1L,
+        analysis_unit_id = 1L,
+        stringsAsFactors = FALSE
+      )
+    ),
+    results = ScoringResult(
+      scores = data.frame(
+        analysis_unit_id = 1L,
+        score = 10,
+        stringsAsFactors = FALSE
+      ),
+      characteristic = "helpfulness"
+    ),
+    mode_config = ScoringConfig(scoring_characteristic = "helpfulness")
+  )
+
+  payload <- kwallm_mori_share_worker_payload(
+    list(analysis_result = serialize(analysis_result, NULL, version = 3)),
+    enabled = TRUE
+  )
+  guard <- payload$guard
+
+  result <- kwallm_mori_bootstrapped_worker(
+    quote({
+      kwallm_worker_bootstrap(
+        task = "mori_serialized_analysis_result",
+        app_root = app_root,
+        worker_options = worker_options
+      )
+      serialized <- kwallm_mori_resolve_worker_arg(
+        serialized,
+        mori_scope_key
+      )
+      restored <- unserialize(serialized)
+      list(
+        is_analysis_result = inherits(restored, "AnalysisResult"),
+        score = restored@results@scores$score,
+        document_text = restored@text_lineage@documents$document_text
+      )
+    }),
+    args = list(
+      serialized = payload$args$analysis_result,
+      mori_scope_key = payload$scope_key
+    )
+  )
+  force(guard)
+  kwallm_mori_release_guard(guard)
+
+  expect_true(result$is_analysis_result)
+  expect_identical(result$score, 10)
+  expect_identical(result$document_text, "Shared source text")
+})

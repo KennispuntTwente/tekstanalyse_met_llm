@@ -1577,6 +1577,9 @@ processing_server <- function(
         )
 
         log_context <- log_context_capture(is_async = TRUE)
+        worker_payload <- share_worker_payload(list(
+          analysis_result = serialize(analysis_result, NULL, version = 3)
+        ))
 
         promise <- kwallm_mirai_submit(
           {
@@ -1586,6 +1589,14 @@ processing_server <- function(
               worker_options = worker_options,
               log_context = log_context
             )
+            if (inherits(analysis_result, "kwallm_mori_ref")) {
+              analysis_result <- kwallm_mori_resolve_worker_arg(
+                analysis_result,
+                mori_scope_key
+              )
+            }
+            analysis_result <- unserialize(analysis_result)
+
             create_analysis_result_download_bundle(
               analysis_result = analysis_result,
               temp_dir = temp_dir
@@ -1596,7 +1607,8 @@ processing_server <- function(
               app_root = kwallm_worker_app_root(),
               worker_options = kwallm_worker_capture_options(),
               log_context = log_context,
-              analysis_result = analysis_result,
+              mori_scope_key = worker_payload$scope_key,
+              analysis_result = worker_payload$args$analysis_result,
               temp_dir = tempdir()
             ),
             kwallm_worker_bootstrap_globals()
@@ -1608,7 +1620,8 @@ processing_server <- function(
           setter = zip_file,
           when = "preparing download (excel, rmarkdown, zip)",
           stop_stream = FALSE,
-          hide_stream = FALSE
+          hide_stream = FALSE,
+          shared_memory_guard = worker_payload$guard
         )
 
         shinyjs::hide("process")
