@@ -167,9 +167,10 @@ test_that("kwallm_ensure_mirai_daemons recycles stale daemons when probe fails",
   state$has_daemons <- TRUE
   state$connections <- 1L
   daemon_calls <- integer()
+  probe_calls <- 0L
 
   result <- kwallm_ensure_mirai_daemons(
-    n_workers = 2L,
+    n_workers = 1L,
     daemons_set = function() state$has_daemons,
     daemons = function(n) {
       daemon_calls <<- c(daemon_calls, n)
@@ -185,19 +186,17 @@ test_that("kwallm_ensure_mirai_daemons recycles stale daemons when probe fails",
       )
     },
     probe = function(timeout_ms) {
-      if (state$connections == 1L) {
-        return(FALSE)
-      }
-      TRUE
+      probe_calls <<- probe_calls + 1L
+      probe_calls > 1L
     },
     sleep = function(seconds) NULL
   )
 
-  expect_identical(daemon_calls, c(0, 2))
+  expect_identical(daemon_calls, c(0, 1))
   expect_true(result$had_daemons)
   expect_true(result$recycled_pool)
   expect_false(result$reused_pool)
-  expect_identical(as.integer(result$status$connections[[1]]), 2L)
+  expect_identical(as.integer(result$status$connections[[1]]), 1L)
 })
 
 
@@ -242,3 +241,38 @@ test_that("kwallm_ensure_mirai_daemons reconfigures memory-mismatched pools", {
   expect_false(result$reused_pool)
 })
 
+
+test_that("kwallm_ensure_mirai_daemons reconfigures worker-count mismatches", {
+  state <- new.env(parent = emptyenv())
+  state$has_daemons <- TRUE
+  state$connections <- 1L
+  daemon_calls <- integer()
+
+  result <- kwallm_ensure_mirai_daemons(
+    n_workers = 2L,
+    memory = NULL,
+    daemons_set = function() state$has_daemons,
+    daemons = function(n) {
+      daemon_calls <<- c(daemon_calls, n)
+      state$has_daemons <- n > 0L
+      state$connections <- as.integer(n)
+      invisible(NULL)
+    },
+    status = function() {
+      list(
+        connections = state$connections,
+        daemons = state$connections,
+        memory = c(used = 0, peak = 0, capacity = NA_real_)
+      )
+    },
+    probe = function(timeout_ms) TRUE,
+    sleep = function(seconds) NULL
+  )
+
+  expect_identical(daemon_calls, c(0, 2))
+  expect_true(result$had_daemons)
+  expect_true(result$reconfigured_pool)
+  expect_false(result$recycled_pool)
+  expect_false(result$reused_pool)
+  expect_identical(as.integer(result$status$connections[[1L]]), 2L)
+})

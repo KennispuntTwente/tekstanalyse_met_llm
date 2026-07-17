@@ -220,9 +220,10 @@ kwallm_ensure_mirai_daemons <- function(
   recycled_pool <- FALSE
   reconfigured_pool <- FALSE
   memory_matches <- kwallm_mirai_status_memory_matches(current_status, memory)
+  worker_count_matches <- identical(current_connections, n_workers)
   needs_reconfigure <- had_daemons &&
     current_connections > 0L &&
-    !isTRUE(memory_matches)
+    (!isTRUE(memory_matches) || !isTRUE(worker_count_matches))
 
   if (had_daemons && current_connections > 0L && !needs_reconfigure) {
     pool_healthy <- isTRUE(probe(timeout_ms = probe_timeout_ms))
