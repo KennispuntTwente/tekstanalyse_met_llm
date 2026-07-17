@@ -3,18 +3,60 @@ js_string <- function(value) {
 }
 
 
+kwallm_expect_async_runtime <- function(app, require_mori_activity = FALSE) {
+  runtime <- app$get_value(export = "kwallm_async_runtime")
+
+  testthat::expect_true(
+    isTRUE(runtime$async_requested),
+    info = "The E2E subprocess must request production async mode"
+  )
+  testthat::expect_true(
+    isTRUE(runtime$mirai_enabled),
+    info = "The E2E subprocess must have connected mirai daemons"
+  )
+  testthat::expect_gt(
+    as.integer(runtime$mirai_connections),
+    0L
+  )
+  testthat::expect_false(
+    isTRUE(runtime$sync_mirai),
+    info = "E2E tests must not use the synchronous mirai test stub"
+  )
+  testthat::expect_true(
+    isTRUE(runtime$mori_enabled),
+    info = "The E2E subprocess must have mori sharing enabled"
+  )
+
+  if (isTRUE(require_mori_activity)) {
+    testthat::expect_gt(
+      as.integer(runtime$mori_metrics$shared_fields),
+      0L,
+      info = "Expected the completed E2E workflow to share a payload via mori"
+    )
+  }
+
+  invisible(runtime)
+}
+
+
 kwallm_app_driver <- function(..., options = list()) {
   if (is.null(options)) {
     options <- list()
   }
 
-  shinytest2::AppDriver$new(
+  app <- shinytest2::AppDriver$new(
     ...,
     options = utils::modifyList(
-      list(kwallm.test_async = TRUE),
+      list(
+        kwallm.test_async = TRUE,
+        kwallm.test_sync_mirai = FALSE,
+        mori__enabled = TRUE
+      ),
       options
     )
   )
+  kwallm_expect_async_runtime(app)
+  app
 }
 
 
@@ -58,6 +100,7 @@ wait_for_processing_success <- function(app, timeout = 60000) {
   )
 
   wait_for_download_bundle(app, timeout = timeout)
+  kwallm_expect_async_runtime(app, require_mori_activity = TRUE)
   invisible(TRUE)
 }
 

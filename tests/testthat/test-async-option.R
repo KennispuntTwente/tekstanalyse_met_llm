@@ -20,8 +20,14 @@ test_that("kwallm.test_async option enables mirai daemons in subprocess", {
     height = 600,
     width = 800,
     load_timeout = 30000,
-    options = list(kwallm.test_async = TRUE)
+    options = list(
+      kwallm.test_async = TRUE,
+      kwallm.test_sync_mirai = FALSE,
+      mori__enabled = TRUE
+    )
   )
+
+  kwallm_expect_async_runtime(app_with_async)
 
   # The app logs mirai daemon status on startup - check the logs
   logs <- app_with_async$get_logs()
@@ -32,7 +38,7 @@ test_that("kwallm.test_async option enables mirai daemons in subprocess", {
 
   # Should see "Using X async workers (mirai daemons)" in the logs
   expect_true(
-    grepl("Using [0-9]+ async workers \\(mirai daemons\\)", log_messages),
+    grepl("Using [0-9]+ async workers \\(mirai daemons", log_messages),
     info = paste(
       "Expected async workers log message. Got logs:\n",
       log_messages
