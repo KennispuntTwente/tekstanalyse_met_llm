@@ -59,6 +59,35 @@ test_that("all E2E tests use the production-async app driver", {
 })
 
 
+test_that("E2E waits preserve diagnostics and allow slow download renders", {
+  expect_error(
+    wait_until(
+      function() FALSE,
+      timeout = 0,
+      diagnostics = function() "worker log detail"
+    ),
+    "worker log detail",
+    fixed = TRUE
+  )
+
+  download_timeout <- formals(wait_for_processing_success)$download_timeout
+  expect_identical(
+    eval(
+      download_timeout,
+      envir = list2env(list(timeout = 60000), parent = baseenv())
+    ),
+    120000
+  )
+  expect_identical(
+    eval(
+      download_timeout,
+      envir = list2env(list(timeout = 180000), parent = baseenv())
+    ),
+    180000
+  )
+})
+
+
 test_that("kwallm.test_async option enables mirai daemons in subprocess", {
   # Start app WITH the option - should have daemons
   app_with_async <- AppDriver$new(
