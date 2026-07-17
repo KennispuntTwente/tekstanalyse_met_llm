@@ -69,6 +69,15 @@ test_that("queue memory uses the lower cgroup availability", {
     ),
     20
   )
+
+  expect_identical(
+    kwallm_mirai_default_queue_memory_mb(
+      getenv = function(name, unset = NA_character_) unset,
+      system_memory = function() 8e9,
+      cgroup_memory = function() 0
+    ),
+    1
+  )
 })
 
 
@@ -105,6 +114,20 @@ test_that("cgroup memory detection supports v2 and v1", {
       v1_current_path = "/v1/current"
     ),
     1500000000
+  )
+
+  values[["/v2/max"]] <- "100000000"
+  values[["/v2/current"]] <- "150000000"
+  expect_identical(
+    kwallm_cgroup_available_memory_bytes(
+      file_exists = file_exists,
+      read_lines = read_lines,
+      v2_max_path = "/v2/max",
+      v2_current_path = "/v2/current",
+      v1_max_path = "/v1/max",
+      v1_current_path = "/v1/current"
+    ),
+    0
   )
 })
 
@@ -218,3 +241,4 @@ test_that("kwallm_ensure_mirai_daemons reconfigures memory-mismatched pools", {
   expect_true(result$reconfigured_pool)
   expect_false(result$reused_pool)
 })
+

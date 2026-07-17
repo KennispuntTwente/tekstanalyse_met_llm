@@ -107,7 +107,7 @@ kwallm_mirai_default_queue_memory_mb <- function(
     cgroup_memory()
   )))
   available_candidates <- available_candidates[
-    !is.na(available_candidates) & available_candidates > 0
+    !is.na(available_candidates) & available_candidates >= 0
   ]
   if (!length(available_candidates)) {
     return(NULL)
