@@ -55,8 +55,13 @@ kwallm_cgroup_available_memory_bytes <- function(
     max_bytes <- suppressWarnings(as.numeric(max_value))
     current_bytes <- suppressWarnings(as.numeric(current_value))
     # cgroup v1 represents an unlimited value using a number near INT64_MAX.
-    if (is.na(max_bytes) || max_bytes >= 2^60 || max_bytes <= 0 ||
-      is.na(current_bytes) || current_bytes < 0) {
+    if (
+      is.na(max_bytes) ||
+        max_bytes >= 2^60 ||
+        max_bytes <= 0 ||
+        is.na(current_bytes) ||
+        current_bytes < 0
+    ) {
       return(NA_real_)
     }
 

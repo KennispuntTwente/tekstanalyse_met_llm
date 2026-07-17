@@ -435,7 +435,10 @@ gliner_server <- function(
           ) %...>%
             {
               force(shared_memory_guard)
-              on.exit(kwallm_mori_release_guard(shared_memory_guard), add = TRUE)
+              on.exit(
+                kwallm_mori_release_guard(shared_memory_guard),
+                add = TRUE
+              )
               ## SUCCESS ─ tidy predictions & then set state to "evaluating"
               preds <- .
 
@@ -499,7 +502,10 @@ gliner_server <- function(
             } %...!%
             {
               force(shared_memory_guard)
-              on.exit(kwallm_mori_release_guard(shared_memory_guard), add = TRUE)
+              on.exit(
+                kwallm_mori_release_guard(shared_memory_guard),
+                add = TRUE
+              )
               ## ERROR ─ notify the user and set state to "error"
               err <- .
               progress$close()

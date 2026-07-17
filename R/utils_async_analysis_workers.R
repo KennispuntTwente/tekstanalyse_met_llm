@@ -115,7 +115,9 @@ kwallm_mori_metrics <- function(state = .kwallm_mori_metrics_state) {
   fallback_fields <- state$fallback_fields
   fallback_reasons <- state$fallback_reasons
   list(
-    shared_fields = as.integer(if (is.null(shared_fields)) 0L else shared_fields),
+    shared_fields = as.integer(
+      if (is.null(shared_fields)) 0L else shared_fields
+    ),
     fallback_fields = as.integer(
       if (is.null(fallback_fields)) 0L else fallback_fields
     ),
@@ -180,7 +182,10 @@ kwallm_mori_prune_orphans <- function(
     error = function(e) {
       kwallm_mori_warn_once(
         key = "prune_shared",
-        message = paste("Could not prune orphaned mori regions:", conditionMessage(e)),
+        message = paste(
+          "Could not prune orphaned mori regions:",
+          conditionMessage(e)
+        ),
         warn_fn = warn_fn
       )
       invisible(FALSE)
@@ -298,12 +303,16 @@ kwallm_mori_new_lease <- function(state = .kwallm_mori_budget_state) {
   lease$released <- FALSE
   lease$state <- state
 
-  reg.finalizer(lease, function(x) {
-    if (!isTRUE(x$released)) {
-      kwallm_mori_budget_release(x$bytes, state = x$state)
-      x$released <- TRUE
-    }
-  }, onexit = TRUE)
+  reg.finalizer(
+    lease,
+    function(x) {
+      if (!isTRUE(x$released)) {
+        kwallm_mori_budget_release(x$bytes, state = x$state)
+        x$released <- TRUE
+      }
+    },
+    onexit = TRUE
+  )
 
   lease
 }
@@ -521,11 +530,13 @@ kwallm_mori_share_worker_payload <- function(
       }
     }
 
-    if (!kwallm_mori_budget_try_reserve(
-      payload_size,
-      max_mb = total_max_mb,
-      state = budget_state
-    )) {
+    if (
+      !kwallm_mori_budget_try_reserve(
+        payload_size,
+        max_mb = total_max_mb,
+        state = budget_state
+      )
+    ) {
       kwallm_mori_record_outcome(
         FALSE,
         reason = "aggregate_budget",
@@ -569,7 +580,11 @@ kwallm_mori_share_worker_payload <- function(
         state = metrics_state
       )
       kwallm_mori_warn_once(
-        key = paste("shared_name_error", conditionMessage(shared_name), sep = ":"),
+        key = paste(
+          "shared_name_error",
+          conditionMessage(shared_name),
+          sep = ":"
+        ),
         message = paste0(
           "mori could not create a worker reference for `",
           key,
@@ -729,14 +744,20 @@ kwallm_mirai_submit <- function(
   }
 
   queue_timeout_ms <- suppressWarnings(as.numeric(queue_timeout_ms))
-  if (length(queue_timeout_ms) != 1L || is.na(queue_timeout_ms) ||
-    queue_timeout_ms < 0) {
+  if (
+    length(queue_timeout_ms) != 1L ||
+      is.na(queue_timeout_ms) ||
+      queue_timeout_ms < 0
+  ) {
     queue_timeout_ms <- 30000
   }
 
   retry_delay_seconds <- suppressWarnings(as.numeric(retry_delay_seconds))
-  if (length(retry_delay_seconds) != 1L || is.na(retry_delay_seconds) ||
-    retry_delay_seconds <= 0) {
+  if (
+    length(retry_delay_seconds) != 1L ||
+      is.na(retry_delay_seconds) ||
+      retry_delay_seconds <= 0
+  ) {
     retry_delay_seconds <- 0.05
   }
 

@@ -152,7 +152,10 @@ test_that("production mirai call sites all use kwallm worker bootstrap", {
 
     expect_true(
       mirai_count > 0L,
-      info = sprintf("Expected at least one non-blocking mirai call in %s", path)
+      info = sprintf(
+        "Expected at least one non-blocking mirai call in %s",
+        path
+      )
     )
     expect_identical(
       bootstrap_call_count,
