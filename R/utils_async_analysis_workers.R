@@ -104,6 +104,104 @@ kwallm_mori_max_bytes <- function(max_mb = kwallm_mori_max_mb()) {
 }
 
 
+kwallm_mori_total_max_mb <- function(
+  get_option = getOption,
+  getenv = Sys.getenv
+) {
+  configured <- suppressWarnings(as.numeric(
+    getenv("KWALLM_MORI_TOTAL_MAX_MB", unset = NA_character_)
+  ))
+
+  if (is.na(configured)) {
+    configured <- suppressWarnings(as.numeric(
+      get_option("mori__total_max_mb", 512)
+    ))
+  }
+
+  if (length(configured) != 1L || is.na(configured) || configured <= 0) {
+    return(NULL)
+  }
+
+  configured
+}
+
+
+.kwallm_mori_budget_state <- new.env(parent = emptyenv())
+.kwallm_mori_budget_state$used_bytes <- 0
+
+
+kwallm_mori_budget_try_reserve <- function(
+  bytes,
+  max_mb = kwallm_mori_total_max_mb(),
+  state = .kwallm_mori_budget_state
+) {
+  bytes <- suppressWarnings(as.numeric(bytes))
+  if (length(bytes) != 1L || is.na(bytes) || bytes < 0) {
+    return(FALSE)
+  }
+
+  used_bytes <- suppressWarnings(as.numeric(state$used_bytes))
+  if (length(used_bytes) != 1L || is.na(used_bytes) || used_bytes < 0) {
+    used_bytes <- 0
+  }
+
+  max_bytes <- kwallm_mori_max_bytes(max_mb)
+  if (!is.null(max_bytes) && used_bytes + bytes > max_bytes) {
+    return(FALSE)
+  }
+
+  state$used_bytes <- used_bytes + bytes
+  TRUE
+}
+
+
+kwallm_mori_budget_release <- function(
+  bytes,
+  state = .kwallm_mori_budget_state
+) {
+  bytes <- suppressWarnings(as.numeric(bytes))
+  if (length(bytes) != 1L || is.na(bytes) || bytes <= 0) {
+    return(invisible(NULL))
+  }
+
+  used_bytes <- suppressWarnings(as.numeric(state$used_bytes))
+  if (length(used_bytes) != 1L || is.na(used_bytes) || used_bytes < 0) {
+    used_bytes <- 0
+  }
+  state$used_bytes <- max(0, used_bytes - bytes)
+  invisible(NULL)
+}
+
+
+kwallm_mori_new_lease <- function(state = .kwallm_mori_budget_state) {
+  lease <- new.env(parent = emptyenv())
+  lease$bytes <- 0
+  lease$released <- FALSE
+  lease$state <- state
+
+  reg.finalizer(lease, function(x) {
+    if (!isTRUE(x$released)) {
+      kwallm_mori_budget_release(x$bytes, state = x$state)
+      x$released <- TRUE
+    }
+  }, onexit = TRUE)
+
+  lease
+}
+
+
+kwallm_mori_release_guard <- function(guard) {
+  lease <- attr(guard, "kwallm_mori_lease", exact = TRUE)
+  if (!is.environment(lease) || isTRUE(lease$released)) {
+    return(invisible(NULL))
+  }
+
+  kwallm_mori_budget_release(lease$bytes, state = lease$state)
+  lease$released <- TRUE
+  invisible(NULL)
+}
+
+
 kwallm_mori_value_size_bytes <- function(
   x,
   object_size = utils::object.size
@@ -252,9 +350,11 @@ kwallm_mori_share_worker_payload <- function(
   keys = names(payload),
   enabled = kwallm_mori_enabled(),
   max_mb = kwallm_mori_max_mb(),
+  total_max_mb = kwallm_mori_total_max_mb(),
   object_size = utils::object.size,
   share_fn = mori::share,
-  shared_name_fn = mori::shared_name
+  shared_name_fn = mori::shared_name,
+  budget_state = .kwallm_mori_budget_state
 ) {
   if (!is.list(payload) || is.null(names(payload))) {
     stop("`payload` must be a named list.", call. = FALSE)
@@ -278,6 +378,7 @@ kwallm_mori_share_worker_payload <- function(
     ))
   }
 
+  lease <- kwallm_mori_new_lease(state = budget_state)
   scope_key <- kwallm_mori_random_token(32L)
   keys <- intersect(as.character(keys), names(payload))
 
@@ -294,6 +395,15 @@ kwallm_mori_share_worker_payload <- function(
       }
     }
 
+    if (!kwallm_mori_budget_try_reserve(
+      payload_size,
+      max_mb = total_max_mb,
+      state = budget_state
+    )) {
+      args[[key]] <- payload[[key]]
+      next
+    }
+
     shared <- tryCatch(
       share_fn(payload[[key]]),
       error = function(e) payload[[key]]
@@ -304,10 +414,12 @@ kwallm_mori_share_worker_payload <- function(
     )
 
     if (!is.character(shared_name) || length(shared_name) != 1L) {
+      kwallm_mori_budget_release(payload_size, state = budget_state)
       args[[key]] <- payload[[key]]
       next
     }
 
+    lease$bytes <- lease$bytes + payload_size
     guard[[key]] <- shared
     shared_names[[key]] <- shared_name
     args[[key]] <- kwallm_mori_make_ref(
@@ -319,6 +431,12 @@ kwallm_mori_share_worker_payload <- function(
     if (!is.null(remaining_bytes)) {
       remaining_bytes <- max(0, remaining_bytes - payload_size)
     }
+  }
+
+  if (lease$bytes > 0) {
+    attr(guard, "kwallm_mori_lease") <- lease
+  } else {
+    lease$released <- TRUE
   }
 
   structure(

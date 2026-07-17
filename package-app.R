@@ -205,6 +205,9 @@ options(
   # - Maximum total payload size in MB to share through mori per worker dispatch;
   #   set to 0 to disable this cap. `KWALLM_MORI_MAX_MB` overrides this option.
   mori__max_mb = 0,
+  # - Aggregate shared-memory budget across all queued/running sessions.
+  #   `KWALLM_MORI_TOTAL_MAX_MB` overrides this option.
+  mori__total_max_mb = 512,
 
   # - How to summarize a category/topic when all of its texts do not fit in
   #   one context window: "sample" summarizes one randomized context-sized

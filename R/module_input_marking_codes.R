@@ -271,6 +271,7 @@ marking_codes_server <- function(
         ) %...>%
           {
             force(shared_memory_guard)
+            on.exit(kwallm_mori_release_guard(shared_memory_guard), add = TRUE)
             generated_codes(.)
             code_generation_in_progress(FALSE)
             log_info(
@@ -281,6 +282,7 @@ marking_codes_server <- function(
           } %...!%
           {
             force(shared_memory_guard)
+            on.exit(kwallm_mori_release_guard(shared_memory_guard), add = TRUE)
             code_generation_in_progress(FALSE)
             shinyjs::delay(500, queue$consumer$stop())
             app_error(

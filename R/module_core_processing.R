@@ -281,10 +281,12 @@ processing_server <- function(
         promise %...>%
           (function(value) {
             force(shared_memory_guard)
+            on.exit(kwallm_mori_release_guard(shared_memory_guard), add = TRUE)
             setter(value)
           }) %...!%
           {
             force(shared_memory_guard)
+            on.exit(kwallm_mori_release_guard(shared_memory_guard), add = TRUE)
             if (isTRUE(stop_stream)) {
               llm_stream$async$stop()
             }

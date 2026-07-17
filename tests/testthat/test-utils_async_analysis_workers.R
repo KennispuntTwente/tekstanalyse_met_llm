@@ -69,6 +69,24 @@ test_that("kwallm_mori_max_mb prefers env var and disables non-positive caps", {
 })
 
 
+test_that("kwallm_mori_total_max_mb provides a bounded default", {
+  expect_identical(
+    kwallm_mori_total_max_mb(
+      get_option = function(name, default = NULL) default,
+      getenv = function(name, unset = "") unset
+    ),
+    512
+  )
+  expect_identical(
+    kwallm_mori_total_max_mb(
+      get_option = function(name, default = NULL) 512,
+      getenv = function(name, unset = "") "128"
+    ),
+    128
+  )
+})
+
+
 test_that("kwallm_worker_load_core_packages does not require mori", {
   loaded_packages <- character()
 
@@ -128,6 +146,45 @@ test_that("kwallm_mori_share_worker_payload respects the configured size cap", {
   expect_true(kwallm_mori_is_ref(payload$args$ids))
   expect_named(payload$shared_names, "ids")
   expect_length(payload$guard, 1)
+})
+
+
+test_that("mori aggregate budget rejects and later admits shared payloads", {
+  testthat::skip_if_not_installed("openssl")
+  testthat::skip_if_not_installed("digest")
+
+  budget_state <- new.env(parent = emptyenv())
+  budget_state$used_bytes <- 0
+  fake_share <- function(x) structure(x, shared_name = paste0("shared-", x))
+  fake_shared_name <- function(x) attr(x, "shared_name")
+  share_payload <- function() {
+    kwallm_mori_share_worker_payload(
+      list(texts = "payload"),
+      enabled = TRUE,
+      total_max_mb = 1,
+      object_size = function(x) 700 * 1024,
+      share_fn = fake_share,
+      shared_name_fn = fake_shared_name,
+      budget_state = budget_state
+    )
+  }
+
+  first <- share_payload()
+  expect_true(kwallm_mori_is_ref(first$args$texts))
+  expect_equal(budget_state$used_bytes, 700 * 1024)
+
+  second <- share_payload()
+  expect_false(kwallm_mori_is_ref(second$args$texts))
+  expect_equal(budget_state$used_bytes, 700 * 1024)
+
+  kwallm_mori_release_guard(first$guard)
+  kwallm_mori_release_guard(first$guard)
+  expect_identical(budget_state$used_bytes, 0)
+
+  third <- share_payload()
+  expect_true(kwallm_mori_is_ref(third$args$texts))
+  kwallm_mori_release_guard(third$guard)
+  expect_identical(budget_state$used_bytes, 0)
 })
 
 

@@ -367,6 +367,7 @@ text_split_server <- function(
       ) %...>%
         {
           force(shared_memory_guard)
+          on.exit(kwallm_mori_release_guard(shared_memory_guard), add = TRUE)
           result <- .
 
           if (
@@ -417,6 +418,7 @@ text_split_server <- function(
         } %...!%
         {
           force(shared_memory_guard)
+          on.exit(kwallm_mori_release_guard(shared_memory_guard), add = TRUE)
           error <- .
 
           if (
