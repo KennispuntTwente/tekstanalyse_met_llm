@@ -13,6 +13,52 @@
 
 library(shinytest2)
 
+
+test_that("all app entrypoints default to mori and mirai", {
+  app_entrypoints <- c("app.R", "package-app.R", "Dockerfile-app.R")
+
+  for (path in app_entrypoints) {
+    source_text <- paste(
+      readLines(here::here(path), warn = FALSE),
+      collapse = "\n"
+    )
+    expect_true(
+      grepl("mori__enabled = TRUE", source_text, fixed = TRUE),
+      info = sprintf("Expected mori to default to enabled in %s", path)
+    )
+    expect_true(
+      grepl("kwallm_ensure_mirai_daemons()", source_text, fixed = TRUE),
+      info = sprintf("Expected mirai daemon startup in %s", path)
+    )
+  }
+})
+
+
+test_that("all E2E tests use the production-async app driver", {
+  e2e_files <- list.files(
+    here::here("tests", "testthat"),
+    pattern = "^test-e2e-.*[.]R$",
+    full.names = TRUE
+  )
+  expect_gt(length(e2e_files), 0L)
+
+  for (path in e2e_files) {
+    source_text <- paste(readLines(path, warn = FALSE), collapse = "\n")
+    expect_true(
+      grepl("kwallm_app_driver(", source_text, fixed = TRUE),
+      info = sprintf(
+        "Expected %s to inherit enforced mori/mirai defaults",
+        basename(path)
+      )
+    )
+    expect_false(
+      grepl("AppDriver$new(", source_text, fixed = TRUE),
+      info = sprintf("Unexpected direct AppDriver construction in %s", path)
+    )
+  }
+})
+
+
 test_that("kwallm.test_async option enables mirai daemons in subprocess", {
   # Start app WITH the option - should have daemons
   app_with_async <- AppDriver$new(
