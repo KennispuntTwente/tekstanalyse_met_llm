@@ -23,7 +23,7 @@ reliability_summary <- if (is.null(analysis_result@reliability)) {
 } else {
   analysis_result@reliability@summary
 }
-paragraphs_df <- analysis_result@paragraphs@paragraphs
+paragraphs_df <- .kwallm_report_paragraphs_by_frequency(analysis_result)
 has_paragraphs <- nrow(paragraphs_df) > 0
 paragraph_subject_lookup <- .kwallm_paragraph_subject_lookup(
   analysis_result
@@ -106,9 +106,10 @@ if (!is.null(topic_n_batches)) {
 }
 step_1_text <- paste0(
   step_1_text,
-  " Het model kreeg de vraag om mogelijke onderwerpen terug te geven die niet te specifiek en niet te algemeen zijn. Dit vormt de lijst van kandidaats-onderwerpen. Voor deze stap is het model `",
+  " Het model kreeg de vraag om mogelijke onderwerpen terug te geven die niet te specifiek en niet te algemeen zijn. Dit vormt de lijst van kandidaats-onderwerpen. Voor deze stap is het model `
+  ",
   htmltools::htmlEscape(main_model),
-  "` gebruikt."
+  " gebruikt."
 )
 cat(step_1_text)
 ```
@@ -437,11 +438,24 @@ for (i in seq_len(nrow(paragraphs_df))) {
       )
     )
   }
+
+  warning_sampled_sources <- NULL
+  if (identical(paragraph_row$source_coverage[[1]], "sampled")) {
+    warning_sampled_sources <- htmltools::div(
+      class = "alert alert-warning p-2 text-center",
+      style = "max-width: 500px; margin-left: auto; margin-right: auto; font-size: 0.9rem;",
+      htmltools::tags$small(htmltools::tags$i(
+        "Omdat niet alle teksten in het context-window van het taalmodel",
+        " pasten, is deze samenvatting gebaseerd op een willekeurige steekproef van de onderwerpteksten."
+      ))
+    )
+  }
   
   # Append processed output
   output <- append(output, list(
   htmltools::HTML(paste0("<h4>", topic, "</h4>")),
     warning_context_window,
+    warning_sampled_sources,
     htmltools::HTML(paste0("<p>", paragraph_text, "</p>"))
   ))
 

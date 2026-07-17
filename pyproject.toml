@@ -11,7 +11,7 @@ dependencies = [
   # compatibility with huggingface_hub >=1.0 and transformers >=5.
   "gliner>=0.2.25",
   "torch>=2.8.0",
-  "transformers>=5.0.0rc3",
+  "transformers>=5.5.0",
 ]
 [tool.uv.sources]
 torch = [

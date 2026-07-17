@@ -16,8 +16,10 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   on.exit(app$stop(), add = TRUE)
 
   # Switch to horizontal/sections mode
+  wait_for_bound_input(app, "kwallm_layout_view")
   app$set_inputs(kwallm_layout_view = "sections")
-  wait_for_radio_value(app, "kwallm_sections_step", "1")
+  wait_for_sections_view(app)
+  wait_for_section_step(app, "1")
 
   # ---- Section 1: Texts ----
   # Verify we start on section 1
@@ -32,10 +34,16 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
       "test_texts.txt"
     )
   )
+  wait_for_nonempty_export(
+    app,
+    export = "text_management-texts__preprocessed",
+    timeout = 10000
+  )
 
   # Navigate to section 2 using next button
+  wait_for_enabled_element(app, "kwallm_sections_next")
   app$click("kwallm_sections_next")
-  wait_for_radio_value(app, "kwallm_sections_step", "2")
+  wait_for_section_step(app, "2")
 
   # ---- Section 2: Research & Mode ----
   expect_equal(app$get_value(input = "kwallm_sections_step"), "2")
@@ -50,7 +58,7 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
 
   # Navigate to section 3 using step button directly
   app$set_inputs(kwallm_sections_step = "3")
-  wait_for_radio_value(app, "kwallm_sections_step", "3")
+  wait_for_section_step(app, "3")
 
   # ---- Section 3: Analysis ----
   expect_equal(app$get_value(input = "kwallm_sections_step"), "3")
@@ -59,8 +67,9 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   app$set_inputs(`assign_multiple_categories_toggle-toggle` = "true")
 
   # Navigate to section 4 using next button
+  wait_for_enabled_element(app, "kwallm_sections_next")
   app$click("kwallm_sections_next")
-  wait_for_radio_value(app, "kwallm_sections_step", "4")
+  wait_for_section_step(app, "4")
 
   # ---- Section 4: LLM & Context ----
   expect_equal(app$get_value(input = "kwallm_sections_step"), "4")
@@ -73,19 +82,27 @@ test_that("{shinytest2} recording: topic modelling - horizontal mode", {
   )
 
   # Test back navigation - go back to section 3 and then forward again
+  wait_for_enabled_element(app, "kwallm_sections_prev")
   app$click("kwallm_sections_prev")
-  wait_for_radio_value(app, "kwallm_sections_step", "3")
+  wait_for_section_step(app, "3")
   expect_equal(app$get_value(input = "kwallm_sections_step"), "3")
 
   # Navigate directly to section 5 using step button
   app$set_inputs(kwallm_sections_step = "5")
-  wait_for_radio_value(app, "kwallm_sections_step", "5")
+  wait_for_section_step(app, "5")
 
   # ---- Section 5: Run ----
   expect_equal(app$get_value(input = "kwallm_sections_step"), "5")
 
   # Set remaining options
   app$set_inputs(`human_in_the_loop_toggle-toggle` = "true")
+  wait_for_input_value(
+    app,
+    input = "human_in_the_loop_toggle-toggle",
+    expected = "true",
+    timeout = 10000,
+    description = "human-in-the-loop toggle to turn on"
+  )
   app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
   app$set_inputs(`interrater_toggle-toggle` = "false")
   app$set_inputs(`write_paragraphs_toggle-toggle` = "true")

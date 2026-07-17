@@ -33,7 +33,7 @@ test_that("{shinytest2} live provider smoke: categorization workflow", {
   expect_true(is.character(chosen_model) && nzchar(chosen_model))
 
   app$set_inputs(`write_paragraphs_toggle-toggle` = "false")
-  wait_for_enabled_element(app, "processing-process", timeout = 30000)
+  wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
   wait_for_processing_success(app, timeout = 60000)
 
@@ -76,7 +76,7 @@ test_that("{shinytest2} live provider smoke: marking workflow", {
     ignore = c(NULL, TRUE)
   )
 
-  wait_for_enabled_element(app, "processing-process", timeout = 30000)
+  wait_for_enabled_element(app, "processing-process")
   app$click("processing-process")
   wait_for_processing_success(app, timeout = 90000)
 

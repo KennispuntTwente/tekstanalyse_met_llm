@@ -76,7 +76,9 @@ analysis_result_to_metadata_list <- function(analysis_result) {
         assign_multiple_categories = analysis_result@mode_config@assign_multiple_categories,
         human_in_the_loop = analysis_result@mode_config@human_in_the_loop,
         write_paragraphs = analysis_result@mode_config@write_paragraphs,
-        paragraph_style_prompt = analysis_result@mode_config@paragraph_style_prompt
+        paragraph_style_prompt = analysis_result@mode_config@paragraph_style_prompt,
+        paragraph_summary_strategy = analysis_result@mode_config@paragraph_summary_strategy,
+        paragraph_summary_max_reduction_iterations = analysis_result@mode_config@paragraph_summary_max_reduction_iterations
       ),
       scoring = list(
         scoring_characteristic = analysis_result@mode_config@scoring_characteristic
@@ -86,6 +88,8 @@ analysis_result_to_metadata_list <- function(analysis_result) {
         human_in_the_loop = analysis_result@mode_config@human_in_the_loop,
         write_paragraphs = analysis_result@mode_config@write_paragraphs,
         paragraph_style_prompt = analysis_result@mode_config@paragraph_style_prompt,
+        paragraph_summary_strategy = analysis_result@mode_config@paragraph_summary_strategy,
+        paragraph_summary_max_reduction_iterations = analysis_result@mode_config@paragraph_summary_max_reduction_iterations,
         topic_generation_settings = .kwallm_df_to_records(
           analysis_result@mode_config@topic_generation_settings
         )
@@ -93,6 +97,8 @@ analysis_result_to_metadata_list <- function(analysis_result) {
       marking = list(
         write_paragraphs = analysis_result@mode_config@write_paragraphs,
         paragraph_style_prompt = analysis_result@mode_config@paragraph_style_prompt,
+        paragraph_summary_strategy = analysis_result@mode_config@paragraph_summary_strategy,
+        paragraph_summary_max_reduction_iterations = analysis_result@mode_config@paragraph_summary_max_reduction_iterations,
         text_size_tokens = analysis_result@mode_config@text_size_tokens,
         overlap_size_tokens = analysis_result@mode_config@overlap_size_tokens
       )
@@ -182,6 +188,20 @@ analysis_result_to_export_sheets <- function(analysis_result) {
   stopifnot(inherits(analysis_result, "AnalysisResult"))
 
   text_counts <- .kwallm_analysis_result_text_counts(analysis_result)
+  supports_paragraphs <- inherits(
+    analysis_result@mode_config,
+    c("CategorizationConfig", "TopicConfig", "MarkingConfig")
+  )
+  paragraph_summary_strategy <- if (supports_paragraphs) {
+    analysis_result@mode_config@paragraph_summary_strategy
+  } else {
+    NULL
+  }
+  paragraph_summary_max_reduction_iterations <- if (supports_paragraphs) {
+    analysis_result@mode_config@paragraph_summary_max_reduction_iterations
+  } else {
+    NULL
+  }
 
   sheets <- list(
     metadata = data.frame(
@@ -194,6 +214,8 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         "research_background",
         "analysis_name",
         "app_version",
+        "paragraph_summary_strategy",
+        "paragraph_summary_max_reduction_iterations",
         "source_documents",
         "documents",
         "analysis_units"
@@ -207,6 +229,10 @@ analysis_result_to_export_sheets <- function(analysis_result) {
         analysis_result@metadata@research_background,
         analysis_result@metadata@analysis_name,
         .kwallm_excel_scalar(analysis_result@metadata@app_version),
+        .kwallm_excel_scalar(paragraph_summary_strategy),
+        .kwallm_excel_scalar(
+          paragraph_summary_max_reduction_iterations
+        ),
         .kwallm_excel_scalar(text_counts$source_documents),
         .kwallm_excel_scalar(text_counts$documents),
         .kwallm_excel_scalar(text_counts$analysis_units)
@@ -560,6 +586,54 @@ write_analysis_result_metadata_json <- function(
   }
 
   stats::setNames(character(), integer())
+}
+
+# Orders category/topic paragraphs by the number of documents assigned to them.
+# We count through document-to-analysis-unit lineage so the ordering matches the
+# frequency table, including when one analyzed text represents multiple rows.
+.kwallm_report_paragraphs_by_frequency <- function(analysis_result) {
+  paragraphs <- analysis_result@paragraphs@paragraphs
+  result <- analysis_result@results
+
+  if (
+    nrow(paragraphs) < 2L ||
+      !inherits(result, c("CategorizationResult", "TopicResult"))
+  ) {
+    return(paragraphs)
+  }
+
+  assignments <- result@assignments
+  if (!nrow(assignments)) {
+    return(paragraphs)
+  }
+
+  document_units <- unique(
+    analysis_result@text_lineage@document_units[
+      c("document_id", "analysis_unit_id")
+    ]
+  )
+  assigned_documents <- merge(
+    document_units,
+    assignments[c("analysis_unit_id", "label_id")],
+    by = "analysis_unit_id",
+    all.x = FALSE,
+    all.y = FALSE
+  )
+  if (!nrow(assigned_documents)) {
+    return(paragraphs)
+  }
+
+  frequency <- table(assigned_documents$label_id)
+  paragraph_frequency <- as.integer(
+    frequency[as.character(paragraphs$subject_id)]
+  )
+  paragraph_frequency[is.na(paragraph_frequency)] <- 0L
+
+  paragraphs[
+    order(-paragraph_frequency, seq_len(nrow(paragraphs))),
+    ,
+    drop = FALSE
+  ]
 }
 
 # Resolves the supporting texts for one paragraph row.

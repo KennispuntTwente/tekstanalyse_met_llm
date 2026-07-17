@@ -24,6 +24,18 @@ test_that("{shinytest2} recording: categorization with paragraphs under regex an
     )
   )
 
+  app$set_inputs(
+    `text_management-select_simple` = 0.123,
+    allow_no_input_binding_ = TRUE
+  )
+  wait_for_export(
+    app,
+    export = "text_management-anonymization_mode",
+    predicate = function(x) identical(x, "simple"),
+    timeout = 10000,
+    description = "anonymization mode regex"
+  )
+
   app$wait_for_value(
     export = "text_management-texts__preprocessed",
     timeout = 15000

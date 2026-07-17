@@ -206,6 +206,16 @@ options(
   #   set to 0 to disable this cap. `KWALLM_MORI_MAX_MB` overrides this option.
   mori__max_mb = 0,
 
+  # - How to summarize a category/topic when all of its texts do not fit in
+  #   one context window: "sample" summarizes one randomized context-sized
+  #   sample; "batch" summarizes every randomized, balanced batch and
+  #   recursively reduces those summaries.
+  paragraph_summary_strategy = getOption(
+    "paragraph_summary_strategy",
+    "sample"
+  ), # "sample" or "batch"
+  paragraph_summary_max_reduction_iterations = 8,
+
   # - Default setting for anonymization of texts, and if user
   #   can toggle this setting;
   #     see R/text_management.R

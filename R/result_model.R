@@ -139,6 +139,15 @@
   NULL
 }
 
+# Validates the configured overflow strategy for paragraph summaries.
+.kwallm_validate_paragraph_summary_strategy <- function(value) {
+  allowed <- c("batch", "sample")
+  if (length(value) != 1L || is.na(value) || !(value %in% allowed)) {
+    return("must be 'batch' or 'sample'")
+  }
+  NULL
+}
+
 # Validates one POSIXct timestamp.
 # We use this for the run timestamp stored in metadata.
 .kwallm_validate_posixct_scalar <- function(value) {
@@ -294,6 +303,7 @@
     subject_id = integer(),
     paragraph_text = character(),
     prompt_fits = logical(),
+    source_coverage = character(),
     stringsAsFactors = FALSE
   )
 }
@@ -657,7 +667,8 @@ ParagraphSet <- S7::new_class(
         "subject_kind",
         "subject_id",
         "paragraph_text",
-        "prompt_fits"
+        "prompt_fits",
+        "source_coverage"
       ))
     ),
     paragraph_sources = S7::new_property(
@@ -1135,6 +1146,16 @@ CategorizationConfig <- S7::new_class(
       NULL | S7::class_character,
       default = NULL,
       validator = .kwallm_validate_optional_scalar_string(allow_empty = TRUE)
+    ),
+    paragraph_summary_strategy = S7::new_property(
+      S7::class_character,
+      default = "sample",
+      validator = .kwallm_validate_paragraph_summary_strategy
+    ),
+    paragraph_summary_max_reduction_iterations = S7::new_property(
+      S7::class_integer,
+      default = 8L,
+      validator = .kwallm_validate_scalar_integer(min = 1L)
     )
   )
 )
@@ -1176,6 +1197,16 @@ TopicConfig <- S7::new_class(
       default = NULL,
       validator = .kwallm_validate_optional_scalar_string(allow_empty = TRUE)
     ),
+    paragraph_summary_strategy = S7::new_property(
+      S7::class_character,
+      default = "sample",
+      validator = .kwallm_validate_paragraph_summary_strategy
+    ),
+    paragraph_summary_max_reduction_iterations = S7::new_property(
+      S7::class_integer,
+      default = 8L,
+      validator = .kwallm_validate_scalar_integer(min = 1L)
+    ),
     topic_generation_settings = S7::new_property(
       S7::class_data.frame,
       default = quote(.kwallm_empty_topic_generation_settings()),
@@ -1198,6 +1229,16 @@ MarkingConfig <- S7::new_class(
       NULL | S7::class_character,
       default = NULL,
       validator = .kwallm_validate_optional_scalar_string(allow_empty = TRUE)
+    ),
+    paragraph_summary_strategy = S7::new_property(
+      S7::class_character,
+      default = "sample",
+      validator = .kwallm_validate_paragraph_summary_strategy
+    ),
+    paragraph_summary_max_reduction_iterations = S7::new_property(
+      S7::class_integer,
+      default = 8L,
+      validator = .kwallm_validate_scalar_integer(min = 1L)
     ),
     text_size_tokens = S7::new_property(
       S7::class_numeric,

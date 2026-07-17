@@ -23,6 +23,26 @@ main_ui <- function() {
 }
 
 
+kwallm_validate_section_step <- function(input_value, n_sections) {
+  new <- suppressWarnings(as.integer(input_value))
+  if (is.na(new) || new < 1L || new > n_sections) {
+    return(NULL)
+  }
+  new
+}
+
+
+kwallm_section_direction <- function(old_section, new_section) {
+  if (new_section > old_section) {
+    "right"
+  } else if (new_section < old_section) {
+    "left"
+  } else {
+    "none"
+  }
+}
+
+
 # Main server ------------------------------------------------------
 
 # Here we build the main server for the Shiny app
@@ -79,6 +99,7 @@ main_server <- function(
 
     n_sections <- 5L
     current_section <- reactiveVal(1L)
+    shiny::exportTestValues(kwallm_current_section = current_section())
 
     # Track last known layout view to restore after language change re-renders UI
     last_layout_view <- reactiveVal(NULL)
@@ -126,6 +147,60 @@ main_server <- function(
 
     # Note: Button visibility is handled client-side in JavaScript
     # See style_css_js.R kwallmUpdateNavButtons()
+
+    set_current_section <- function(
+      new_section,
+      method = "step",
+      update_control = FALSE
+    ) {
+      new <- kwallm_validate_section_step(new_section, n_sections)
+      if (is.null(new)) {
+        return(invisible(FALSE))
+      }
+
+      old <- current_section()
+      if (identical(new, old)) {
+        if (isTRUE(update_control)) {
+          shinyWidgets::updateRadioGroupButtons(
+            session = session,
+            inputId = "kwallm_sections_step",
+            selected = as.character(new)
+          )
+        }
+        return(invisible(FALSE))
+      }
+
+      current_section(new)
+
+      if (isTRUE(update_control)) {
+        shinyWidgets::updateRadioGroupButtons(
+          session = session,
+          inputId = "kwallm_sections_step",
+          selected = as.character(new)
+        )
+      }
+
+      if (identical(input$kwallm_layout_view, "sections")) {
+        show_single_section(
+          new,
+          direction = kwallm_section_direction(old, new)
+        )
+      }
+
+      log_action(
+        "section_navigated",
+        details = paste0(
+          "section=",
+          new,
+          ", from=",
+          old,
+          ", method=",
+          method
+        )
+      )
+
+      invisible(TRUE)
+    }
 
     # Keep prev/next button visibility in sync (works even when UI is re-rendered)
     observe({
@@ -201,32 +276,7 @@ main_server <- function(
     observeEvent(
       input$kwallm_sections_step,
       {
-        new <- suppressWarnings(as.integer(input$kwallm_sections_step))
-        if (is.na(new) || new < 1L || new > n_sections) {
-          return()
-        }
-
-        old <- current_section()
-        current_section(new)
-
-        if (!identical(input$kwallm_layout_view, "sections")) {
-          return()
-        }
-
-        direction <- if (new > old) {
-          "right"
-        } else if (new < old) {
-          "left"
-        } else {
-          "none"
-        }
-
-        show_single_section(new, direction = direction)
-
-        log_action(
-          "section_navigated",
-          details = paste0("section=", new, ", from=", old, ", method=step")
-        )
+        set_current_section(input$kwallm_sections_step, method = "step")
       },
       ignoreInit = TRUE
     )
@@ -241,21 +291,10 @@ main_server <- function(
         if (cur <= 1L) {
           return()
         }
-        shinyWidgets::updateRadioGroupButtons(
-          session = session,
-          inputId = "kwallm_sections_step",
-          selected = as.character(cur - 1L)
-        )
-
-        log_action(
-          "section_navigated",
-          details = paste0(
-            "section=",
-            cur - 1L,
-            ", from=",
-            cur,
-            ", method=prev"
-          )
+        set_current_section(
+          cur - 1L,
+          method = "prev",
+          update_control = TRUE
         )
       },
       ignoreInit = TRUE
@@ -271,21 +310,10 @@ main_server <- function(
         if (cur >= n_sections) {
           return()
         }
-        shinyWidgets::updateRadioGroupButtons(
-          session = session,
-          inputId = "kwallm_sections_step",
-          selected = as.character(cur + 1L)
-        )
-
-        log_action(
-          "section_navigated",
-          details = paste0(
-            "section=",
-            cur + 1L,
-            ", from=",
-            cur,
-            ", method=next"
-          )
+        set_current_section(
+          cur + 1L,
+          method = "next",
+          update_control = TRUE
         )
       },
       ignoreInit = TRUE
