@@ -53,15 +53,22 @@ test_that("mori payload round-trips through a real bootstrapped worker", {
         worker_options = worker_options
       )
 
+      resolved_texts <- kwallm_mori_resolve_worker_arg(
+        texts,
+        mori_scope_key
+      )
+      resolved_analysis_unit_ids <- kwallm_mori_resolve_worker_arg(
+        analysis_unit_ids,
+        mori_scope_key
+      )
+
       list(
-        texts = as.character(kwallm_mori_resolve_worker_arg(
-          texts,
-          mori_scope_key
-        )),
-        analysis_unit_ids = as.integer(kwallm_mori_resolve_worker_arg(
-          analysis_unit_ids,
-          mori_scope_key
-        ))
+        texts = resolved_texts,
+        analysis_unit_ids = resolved_analysis_unit_ids,
+        texts_are_shared = mori::is_shared(resolved_texts),
+        analysis_unit_ids_are_shared = mori::is_shared(
+          resolved_analysis_unit_ids
+        )
       )
     }),
     args = list(
@@ -74,6 +81,8 @@ test_that("mori payload round-trips through a real bootstrapped worker", {
 
   expect_identical(result$texts, c("alpha", "beta", "gamma"))
   expect_identical(result$analysis_unit_ids, c(10L, 11L, 12L))
+  expect_false(result$texts_are_shared)
+  expect_false(result$analysis_unit_ids_are_shared)
 })
 
 
@@ -308,6 +317,7 @@ test_that("serialized AnalysisResult travels through mori shared memory", {
       )
       restored <- unserialize(serialized)
       list(
+        serialized_is_shared = mori::is_shared(serialized),
         is_analysis_result = inherits(restored, "AnalysisResult"),
         score = restored@results@scores$score,
         document_text = restored@text_lineage@documents$document_text
@@ -322,6 +332,7 @@ test_that("serialized AnalysisResult travels through mori shared memory", {
   kwallm_mori_release_guard(guard)
 
   expect_true(result$is_analysis_result)
+  expect_false(result$serialized_is_shared)
   expect_identical(result$score, 10)
   expect_identical(result$document_text, "Shared source text")
 })

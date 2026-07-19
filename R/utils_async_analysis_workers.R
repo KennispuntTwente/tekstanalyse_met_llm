@@ -647,13 +647,16 @@ kwallm_mori_share_worker_payload <- function(
 #' @param scope_key Per-dispatch secret that must verify `x`.
 #' @param require_namespace Package availability check, injectable for tests.
 #' @param map_shared_fn Shared-memory mapping function, injectable for tests.
+#' @param duplicate_fn Function used to materialize the mapped value as regular
+#'   R memory before it can escape the worker task.
 #'
-#' @return The mapped shared object for refs, otherwise `x`.
+#' @return A materialized copy of the mapped object for refs, otherwise `x`.
 kwallm_mori_resolve_worker_arg <- function(
   x,
   scope_key = NULL,
   require_namespace = requireNamespace,
-  map_shared_fn = NULL
+  map_shared_fn = NULL,
+  duplicate_fn = rlang::duplicate
 ) {
   if (!kwallm_mori_is_ref(x)) {
     return(x)
@@ -713,7 +716,14 @@ kwallm_mori_resolve_worker_arg <- function(
     )
   }
 
-  mapped
+  # mori objects serialize as their shared-memory name rather than their
+  # contents. Letting one escape a worker task can therefore make the returned
+  # result (and later Excel/report exports) depend on the original mapping's
+  # lifetime. Some native serializers also cannot safely consume mori ALTREP
+  # vectors. Materialize at the worker boundary while the dispatch guard is
+  # still alive; this preserves shared-memory transport without leaking shared
+  # objects into application state or a subsequent worker dispatch.
+  duplicate_fn(mapped)
 }
 
 

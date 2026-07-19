@@ -400,6 +400,7 @@ test_that("kwallm_mori_share_worker_payload maps refs by signed capability", {
     payload$scope_key
   )
   expect_identical(as.character(mapped), c("alpha", "beta"))
+  expect_false(mori::is_shared(mapped))
 })
 
 
