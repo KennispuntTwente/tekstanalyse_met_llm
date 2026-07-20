@@ -36,6 +36,13 @@ kwallm_test_start_mirai_daemons <- function(
   probe_timeout_ms = 5000L
 ) {
   testthat::skip_if_not_installed("mirai")
+  withr::local_options(
+    list(
+      mori__enabled = TRUE,
+      kwallm.test_sync_mirai = FALSE
+    ),
+    .local_envir = parent.frame()
+  )
 
   n <- suppressWarnings(as.integer(n))
   if (is.na(n) || n < 1L) {

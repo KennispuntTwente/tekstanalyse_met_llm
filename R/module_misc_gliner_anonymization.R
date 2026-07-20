@@ -366,9 +366,21 @@ gliner_server <- function(
             session_id = session_id,
             is_async = TRUE
           )
+          worker_payload <- if (
+            exists("kwallm_mori_share_worker_payload", mode = "function")
+          ) {
+            kwallm_mori_share_worker_payload(list(pii_texts = pii_texts()))
+          } else {
+            list(
+              args = list(pii_texts = pii_texts()),
+              guard = list(),
+              scope_key = NULL
+            )
+          }
+          shared_memory_guard <- worker_payload$guard
 
           ## 4 Spawn the mirai worker that runs GLiNER model on texts
-          mirai::mirai(
+          kwallm_mirai_submit(
             {
               kwallm_worker_bootstrap(
                 task = "gliner",
@@ -376,6 +388,12 @@ gliner_server <- function(
                 worker_options = worker_options,
                 log_context = log_context
               )
+              if (exists("kwallm_mori_resolve_worker_arg", mode = "function")) {
+                pii_texts <- kwallm_mori_resolve_worker_arg(
+                  pii_texts,
+                  mori_scope_key
+                )
+              }
 
               if (is.null(gliner_model)) {
                 # If we are truly in async mode, we load the model here;
@@ -405,8 +423,9 @@ gliner_server <- function(
                 app_root = kwallm_worker_app_root(),
                 worker_options = kwallm_worker_capture_options(),
                 log_context = log_context,
+                mori_scope_key = worker_payload$scope_key,
                 gliner_model = gliner_model,
-                pii_texts = pii_texts(),
+                pii_texts = worker_payload$args$pii_texts,
                 labels = labels,
                 progress = progress,
                 queue = queue
@@ -415,6 +434,11 @@ gliner_server <- function(
             )
           ) %...>%
             {
+              force(shared_memory_guard)
+              on.exit(
+                kwallm_mori_release_guard(shared_memory_guard),
+                add = TRUE
+              )
               ## SUCCESS ─ tidy predictions & then set state to "evaluating"
               preds <- .
 
@@ -477,6 +501,11 @@ gliner_server <- function(
               queue$consumer$stop()
             } %...!%
             {
+              force(shared_memory_guard)
+              on.exit(
+                kwallm_mori_release_guard(shared_memory_guard),
+                add = TRUE
+              )
               ## ERROR ─ notify the user and set state to "error"
               err <- .
               progress$close()

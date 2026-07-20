@@ -13,6 +13,81 @@
 
 library(shinytest2)
 
+
+test_that("all app entrypoints default to mori and mirai", {
+  app_entrypoints <- c("app.R", "package-app.R", "Dockerfile-app.R")
+
+  for (path in app_entrypoints) {
+    source_text <- paste(
+      readLines(here::here(path), warn = FALSE),
+      collapse = "\n"
+    )
+    expect_true(
+      grepl("mori__enabled = TRUE", source_text, fixed = TRUE),
+      info = sprintf("Expected mori to default to enabled in %s", path)
+    )
+    expect_true(
+      grepl("kwallm_ensure_mirai_daemons()", source_text, fixed = TRUE),
+      info = sprintf("Expected mirai daemon startup in %s", path)
+    )
+  }
+})
+
+
+test_that("all E2E tests use the production-async app driver", {
+  e2e_files <- list.files(
+    here::here("tests", "testthat"),
+    pattern = "^test-e2e-.*[.]R$",
+    full.names = TRUE
+  )
+  expect_gt(length(e2e_files), 0L)
+
+  for (path in e2e_files) {
+    source_text <- paste(readLines(path, warn = FALSE), collapse = "\n")
+    expect_true(
+      grepl("kwallm_app_driver(", source_text, fixed = TRUE),
+      info = sprintf(
+        "Expected %s to inherit enforced mori/mirai defaults",
+        basename(path)
+      )
+    )
+    expect_false(
+      grepl("AppDriver$new(", source_text, fixed = TRUE),
+      info = sprintf("Unexpected direct AppDriver construction in %s", path)
+    )
+  }
+})
+
+
+test_that("E2E waits preserve diagnostics and allow slow download renders", {
+  expect_error(
+    wait_until(
+      function() FALSE,
+      timeout = 0,
+      diagnostics = function() "worker log detail"
+    ),
+    "worker log detail",
+    fixed = TRUE
+  )
+
+  download_timeout <- formals(wait_for_processing_success)$download_timeout
+  expect_identical(
+    eval(
+      download_timeout,
+      envir = list2env(list(timeout = 60000), parent = baseenv())
+    ),
+    120000
+  )
+  expect_identical(
+    eval(
+      download_timeout,
+      envir = list2env(list(timeout = 180000), parent = baseenv())
+    ),
+    180000
+  )
+})
+
+
 test_that("kwallm.test_async option enables mirai daemons in subprocess", {
   # Start app WITH the option - should have daemons
   app_with_async <- AppDriver$new(
@@ -20,8 +95,14 @@ test_that("kwallm.test_async option enables mirai daemons in subprocess", {
     height = 600,
     width = 800,
     load_timeout = 30000,
-    options = list(kwallm.test_async = TRUE)
+    options = list(
+      kwallm.test_async = TRUE,
+      kwallm.test_sync_mirai = FALSE,
+      mori__enabled = TRUE
+    )
   )
+
+  kwallm_expect_async_runtime(app_with_async)
 
   # The app logs mirai daemon status on startup - check the logs
   logs <- app_with_async$get_logs()
@@ -32,7 +113,7 @@ test_that("kwallm.test_async option enables mirai daemons in subprocess", {
 
   # Should see "Using X async workers (mirai daemons)" in the logs
   expect_true(
-    grepl("Using [0-9]+ async workers \\(mirai daemons\\)", log_messages),
+    grepl("Using [0-9]+ async workers \\(mirai daemons", log_messages),
     info = paste(
       "Expected async workers log message. Got logs:\n",
       log_messages

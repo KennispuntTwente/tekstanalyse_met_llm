@@ -1928,6 +1928,12 @@
       "Maintainer": "Hadley Wickham <hadley@posit.co>",
       "Repository": "RSPM"
     },
+    "mori": {
+      "Package": "mori",
+      "Version": "0.2.1",
+      "Source": "Repository",
+      "Repository": "CRAN"
+    },
     "nanonext": {
       "Package": "nanonext",
       "Version": "1.9.1",

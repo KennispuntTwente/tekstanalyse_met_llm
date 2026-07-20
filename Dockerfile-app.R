@@ -1,7 +1,9 @@
 # 1 Load dependencies ----------------------------------------------------------
 
 source("R/load_dependencies.R")
+
 load_dependencies("docker")
+kwallm_mori_prune_orphans()
 
 
 # 2 Settings -------------------------------------------------------------------
@@ -16,6 +18,15 @@ load_dependencies("docker")
 #     when the LLM is writing summarizing paragraphs
 # - To enable asynchronous processing, you need to use `mirai::daemons()`, e.g.,
 #     `mirai::daemons(n)` where n is the number of parallel workers
+# - The app configures mirai daemons with a bounded dispatcher queue. Override
+#     with `KWALLM_MIRAI_QUEUE_MEMORY_MB`; set it to 0 to disable the cap.
+# - Large per-run user payloads are passed to local workers through `mori`
+#     shared-memory references and kept scoped to the running Shiny session.
+#     Linux containers must be started with sufficient `/dev/shm`, for example
+#     `docker run --shm-size=1g ...`; sharing failures are logged and fall back
+#     to regular serialization.
+# - Set `mori__enabled = FALSE` below to disable `mori` and always use
+#     regular serialized worker payloads instead.
 # - When asynchronous processing is not needed, you can use
 #     `mirai::daemons(0)`; note that the progress bar may lag behind
 #     in that case, as this is built around asynchronous processing
@@ -27,6 +38,11 @@ test_async <- isTRUE(getOption("kwallm.test_async", FALSE)) ||
 
 if (!test_mode || test_async) {
   daemon_status <- kwallm_ensure_mirai_daemons()
+  queue_cap_label <- if (is.null(daemon_status$memory)) {
+    "no"
+  } else {
+    paste0(daemon_status$memory, " MB")
+  }
 
   if (isTRUE(daemon_status$recycled_pool)) {
     log_warn(
@@ -36,11 +52,21 @@ if (!test_mode || test_async) {
       ),
       component = "startup"
     )
+  } else if (isTRUE(daemon_status$reconfigured_pool)) {
+    log_info(
+      sprintf(
+        "Reconfigured mirai daemons; using %s async workers with %s queue cap",
+        daemon_status$status$connections,
+        queue_cap_label
+      ),
+      component = "startup"
+    )
   } else {
     log_info(
       sprintf(
-        "Using %s async workers (mirai daemons)",
-        daemon_status$status$connections
+        "Using %s async workers (mirai daemons, %s queue cap)",
+        daemon_status$status$connections,
+        queue_cap_label
       ),
       component = "startup"
     )
@@ -176,6 +202,16 @@ options(
   #   only works when LLM provider has stream = TRUE;
   #     see R/component_llm_streaming.R
   paragraph_streaming = TRUE,
+
+  # - Enable mori-backed shared-memory payloads for async workers;
+  #   set to FALSE to force regular serialized worker arguments instead.
+  mori__enabled = TRUE,
+  # - Maximum total payload size in MB to share through mori per worker dispatch;
+  #   set to 0 to disable this cap. `KWALLM_MORI_MAX_MB` overrides this option.
+  mori__max_mb = 0,
+  # - Aggregate shared-memory budget across all queued/running sessions.
+  #   `KWALLM_MORI_TOTAL_MAX_MB` overrides this option.
+  mori__total_max_mb = 512,
 
   # - How to summarize a category/topic when all of its texts do not fit in
   #   one context window: "sample" summarizes one randomized context-sized

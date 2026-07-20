@@ -3,18 +3,59 @@ js_string <- function(value) {
 }
 
 
+kwallm_expect_async_runtime <- function(app, require_mori_activity = FALSE) {
+  runtime <- app$get_value(export = "kwallm_async_runtime")
+
+  testthat::expect_true(
+    isTRUE(runtime$async_requested),
+    info = "The E2E subprocess must request production async mode"
+  )
+  testthat::expect_true(
+    isTRUE(runtime$mirai_enabled),
+    info = "The E2E subprocess must have connected mirai daemons"
+  )
+  testthat::expect_gt(
+    as.integer(runtime$mirai_connections),
+    0L
+  )
+  testthat::expect_false(
+    isTRUE(runtime$sync_mirai),
+    info = "E2E tests must not use the synchronous mirai test stub"
+  )
+  testthat::expect_true(
+    isTRUE(runtime$mori_enabled),
+    info = "The E2E subprocess must have mori sharing enabled"
+  )
+
+  if (isTRUE(require_mori_activity)) {
+    testthat::expect_true(
+      as.integer(runtime$mori_metrics$shared_fields) > 0L,
+      info = "Expected the completed E2E workflow to share a payload via mori"
+    )
+  }
+
+  invisible(runtime)
+}
+
+
 kwallm_app_driver <- function(..., options = list()) {
   if (is.null(options)) {
     options <- list()
   }
 
-  shinytest2::AppDriver$new(
+  app <- shinytest2::AppDriver$new(
     ...,
     options = utils::modifyList(
-      list(kwallm.test_async = TRUE),
+      list(
+        kwallm.test_async = TRUE,
+        kwallm.test_sync_mirai = FALSE,
+        mori__enabled = TRUE
+      ),
       options
     )
   )
+  kwallm_expect_async_runtime(app)
+  app
 }
 
 
@@ -22,7 +63,8 @@ wait_until <- function(
   check_fn,
   timeout = 30000,
   interval = 100,
-  description = "condition"
+  description = "condition",
+  diagnostics = NULL
 ) {
   deadline <- proc.time()[["elapsed"]] + (timeout / 1000)
 
@@ -33,8 +75,20 @@ wait_until <- function(
     }
 
     if (proc.time()[["elapsed"]] >= deadline) {
-      testthat::fail(sprintf("Timed out waiting for %s", description))
-      return(invisible(FALSE))
+      diagnostic_text <- if (is.function(diagnostics)) {
+        tryCatch(as.character(diagnostics()), error = function(e) "")
+      } else {
+        ""
+      }
+      diagnostic_text <- diagnostic_text[nzchar(diagnostic_text)]
+      stop(
+        paste(
+          sprintf("Timed out waiting for %s", description),
+          paste(diagnostic_text, collapse = "\n"),
+          sep = if (length(diagnostic_text)) "\n\n" else ""
+        ),
+        call. = FALSE
+      )
     }
 
     Sys.sleep(interval / 1000)
@@ -42,7 +96,11 @@ wait_until <- function(
 }
 
 
-wait_for_processing_success <- function(app, timeout = 60000) {
+wait_for_processing_success <- function(
+  app,
+  timeout = 60000,
+  download_timeout = max(timeout, 120000)
+) {
   app$wait_for_value(
     export = "processing-success",
     timeout = timeout,
@@ -57,7 +115,8 @@ wait_for_processing_success <- function(app, timeout = 60000) {
     description = "processing results table"
   )
 
-  wait_for_download_bundle(app, timeout = timeout)
+  wait_for_download_bundle(app, timeout = download_timeout)
+  kwallm_expect_async_runtime(app, require_mori_activity = TRUE)
   invisible(TRUE)
 }
 
@@ -226,15 +285,42 @@ wait_for_export <- function(
   description = export
 ) {
   value <- NULL
+  last_error <- NULL
 
   wait_until(
     function() {
-      value <<- app$get_value(export = export)
+      value <<- tryCatch(
+        app$get_value(export = export),
+        error = function(e) {
+          last_error <<- e
+          NULL
+        }
+      )
       isTRUE(predicate(value))
     },
     timeout = timeout,
     interval = interval,
-    description = description
+    description = description,
+    diagnostics = function() {
+      logs <- tryCatch(app$get_logs(), error = function(e) NULL)
+      log_tail <- if (
+        is.data.frame(logs) &&
+          "message" %in% names(logs) &&
+          nrow(logs) > 0L
+      ) {
+        tail(as.character(logs$message), 80L)
+      } else {
+        character()
+      }
+      c(
+        if (!is.null(last_error)) {
+          paste("Last values error:", conditionMessage(last_error))
+        },
+        if (length(log_tail)) {
+          c("Shiny log tail:", log_tail)
+        }
+      )
+    }
   )
 
   value

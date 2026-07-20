@@ -348,7 +348,8 @@ test_that("prev/next observers update server section state directly", {
     info = "next observer must route through set_current_section()"
   )
   expect_true(
-    grepl("exportTestValues(kwallm_current_section", src, fixed = TRUE),
+    grepl("exportTestValues(", src, fixed = TRUE) &&
+      grepl("kwallm_current_section = current_section()", src, fixed = TRUE),
     info = "current section must be exported for shinytest2 synchronization"
   )
 })

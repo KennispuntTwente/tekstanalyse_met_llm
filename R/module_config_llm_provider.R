@@ -658,7 +658,7 @@ llm_provider_server <- function(
 
         log_context <- log_context_capture(is_async = TRUE)
 
-        mirai::mirai(
+        kwallm_mirai_submit(
           {
             kwallm_worker_bootstrap(
               task = "llm_provider_models_fetch",

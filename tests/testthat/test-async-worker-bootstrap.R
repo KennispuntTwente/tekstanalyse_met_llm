@@ -140,7 +140,7 @@ test_that("production mirai call sites all use kwallm worker bootstrap", {
 
   for (path in worker_files) {
     text <- paste(readLines(here::here(path), warn = FALSE), collapse = "\n")
-    mirai_count <- count_pattern_occurrences(text, "mirai::mirai\\(")
+    mirai_count <- count_pattern_occurrences(text, "kwallm_mirai_submit\\(")
     bootstrap_call_count <- count_pattern_occurrences(
       text,
       "kwallm_worker_bootstrap\\("
@@ -152,7 +152,10 @@ test_that("production mirai call sites all use kwallm worker bootstrap", {
 
     expect_true(
       mirai_count > 0L,
-      info = sprintf("Expected at least one mirai call in %s", path)
+      info = sprintf(
+        "Expected at least one non-blocking mirai call in %s",
+        path
+      )
     )
     expect_identical(
       bootstrap_call_count,
@@ -164,6 +167,48 @@ test_that("production mirai call sites all use kwallm worker bootstrap", {
       mirai_count,
       info = sprintf(
         "Every mirai call in %s should export the bootstrap helper",
+        path
+      )
+    )
+  }
+})
+
+
+test_that("production mori call sites resolve refs and release both outcomes", {
+  worker_files <- c(
+    "R/module_core_processing.R",
+    "R/module_input_text_split.R",
+    "R/module_input_marking_codes.R",
+    "R/module_misc_gliner_anonymization.R"
+  )
+
+  for (path in worker_files) {
+    text <- paste(readLines(here::here(path), warn = FALSE), collapse = "\n")
+    share_count <- count_pattern_occurrences(
+      text,
+      "kwallm_mori_share_worker_payload\\("
+    )
+    resolve_count <- count_pattern_occurrences(
+      text,
+      "kwallm_mori_resolve_worker_arg\\("
+    )
+    release_count <- count_pattern_occurrences(
+      text,
+      "kwallm_mori_release_guard\\("
+    )
+
+    expect_true(
+      share_count >= 1L,
+      info = sprintf("Expected a mori payload share in %s", path)
+    )
+    expect_true(
+      resolve_count >= 1L,
+      info = sprintf("Expected worker-side mori resolution in %s", path)
+    )
+    expect_true(
+      release_count >= 2L,
+      info = sprintf(
+        "Expected mori guard release on fulfillment and rejection in %s",
         path
       )
     )

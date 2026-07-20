@@ -99,7 +99,38 @@ main_server <- function(
 
     n_sections <- 5L
     current_section <- reactiveVal(1L)
-    shiny::exportTestValues(kwallm_current_section = current_section())
+    shiny::exportTestValues(
+      kwallm_current_section = current_section(),
+      kwallm_async_runtime = {
+        mirai_status <- tryCatch(mirai::status(), error = function(e) list())
+        mirai_connections <- if (
+          !is.null(mirai_status$connections) &&
+            length(mirai_status$connections) > 0L
+        ) {
+          suppressWarnings(as.integer(mirai_status$connections[[1L]]))
+        } else {
+          0L
+        }
+        if (is.na(mirai_connections)) {
+          mirai_connections <- 0L
+        }
+
+        list(
+          async_requested = isTRUE(getOption("kwallm.test_async", FALSE)) ||
+            tolower(Sys.getenv("KWALLM_TEST_ASYNC", "false")) %in%
+              c("true", "1", "yes"),
+          mirai_enabled = isTRUE(tryCatch(
+            mirai::daemons_set(),
+            error = function(e) FALSE
+          )) &&
+            mirai_connections > 0L,
+          mirai_connections = mirai_connections,
+          sync_mirai = isTRUE(getOption("kwallm.test_sync_mirai", FALSE)),
+          mori_enabled = isTRUE(kwallm_mori_enabled()),
+          mori_metrics = kwallm_mori_metrics()
+        )
+      }
+    )
 
     # Track last known layout view to restore after language change re-renders UI
     last_layout_view <- reactiveVal(NULL)

@@ -463,7 +463,7 @@ edit_topics_server <- function(
 
         log_context <- log_context_capture(is_async = TRUE)
 
-        mirai::mirai(
+        kwallm_mirai_submit(
           {
             kwallm_worker_bootstrap(
               task = "topic_reduction",
