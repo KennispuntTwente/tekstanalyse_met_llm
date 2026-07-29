@@ -393,6 +393,77 @@ test_that("prompt tracing to file writes prompt and response with same prompt_id
   expect_equal(id_reply, id_send)
 })
 
+
+test_that("provider failures retain context in application and prompt trace logs", {
+  source(here::here("R", "utils_logger.R"), local = TRUE)
+  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+
+  log_dir <- withr::local_tempdir(pattern = "kwallm-provider-error-logs-")
+  trace_file <- file.path(log_dir, "prompt_trace_provider_error.log")
+  withr::local_options(
+    kwallm__logger_state = list(
+      initialized = TRUE,
+      use_logger_pkg = FALSE,
+      level = "DEBUG",
+      log_dir = log_dir,
+      log_dir_abs = log_dir,
+      retention = NULL,
+      app_mode = "test"
+    ),
+    kwallm__log_session_id = "sess1234",
+    send_prompt_with_retries__log_prompts_to_file = TRUE,
+    send_prompt_with_retries__prompt_trace_file = trace_file,
+    send_prompt_with_retries__prompt_trace_retention_files = NULL,
+    kwallm__prompt_trace_last_cleanup = NULL
+  )
+
+  provider_error <- paste0(
+    "Invalid parameter: 'response_format' of type 'json_schema' ",
+    "is not supported with this model."
+  )
+  local_mocked_bindings(
+    send_prompt = function(...) stop(provider_error, call. = FALSE),
+    .package = "tidyprompt"
+  )
+
+  suppressMessages(expect_error(
+    send_prompt_with_retries(
+      prompt = "mark this interview",
+      llm_provider = create_mock_llm_provider("provider-model"),
+      max_tries = 1,
+      retry_delay_seconds = 0
+    ),
+    provider_error,
+    fixed = TRUE
+  ))
+
+  app_log_file <- file.path(
+    log_dir,
+    paste0(format(Sys.Date(), "%Y-%m-%d"), ".log")
+  )
+  expect_true(file.exists(app_log_file))
+  app_log <- readLines(app_log_file, warn = FALSE)
+  warning_lines <- app_log[grepl("[WARN] [llm]", app_log, fixed = TRUE)]
+
+  expect_length(warning_lines, 1L)
+  expect_match(warning_lines, "[sess1234] [sync]", fixed = TRUE)
+  expect_match(warning_lines, "attempt 1/1", fixed = TRUE)
+  expect_match(warning_lines, provider_error, fixed = TRUE)
+  expect_match(warning_lines, "prompt_id=", fixed = TRUE)
+
+  expect_true(file.exists(trace_file))
+  trace_lines <- readLines(trace_file, warn = FALSE)
+  trace_text <- paste(trace_lines, collapse = "\n")
+
+  expect_match(trace_text, "---- CALL_ERROR ----", fixed = TRUE)
+  expect_match(trace_text, "session_id=sess1234", fixed = TRUE)
+  expect_match(trace_text, "model=provider-model", fixed = TRUE)
+  expect_match(trace_text, "attempt=1", fixed = TRUE)
+  expect_match(trace_text, "max_tries=1", fixed = TRUE)
+  expect_match(trace_text, provider_error, fixed = TRUE)
+})
+
+
 test_that("prompt trace retention deletes older trace files only", {
   source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
 

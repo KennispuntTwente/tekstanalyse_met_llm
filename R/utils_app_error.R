@@ -65,9 +65,19 @@ app_error <- function(
   cat(log_message)
 
   # Log error using the centralized logger
+  # Keep this as one structured log record: condition messages can contain
+  # newlines, which would otherwise leave continuation lines without the
+  # logger's timestamp/session/component prefix.
+  error_for_log <- gsub("[\r\n]+", " | ", error)
+  when_for_log <- gsub("[\r\n]+", " | ", when)
   tryCatch(
     log_error(
-      sprintf("Error occurred: %s | When: %s", error, when),
+      sprintf(
+        "Error occurred: %s | When: %s | Session ID: %s",
+        error_for_log,
+        when_for_log,
+        session_id
+      ),
       component = "error",
       fatal = fatal
     ),
