@@ -191,12 +191,11 @@ mark_texts <- function(
     },
     silent = TRUE
   )
-  df_result <- df |>
-    tidyr::crossing(code = codes) |>
-    dplyr::mutate(
-      marking_match = purrr::pmap(
-        list(chunk_text, code, analysis_unit_id, chunk_id, chunk_index),
-        function(txt, cd, analysis_unit_id, chunk_id, chunk_index) {
+  df_result <- tidyr::crossing(df, code = codes)
+  df_result$marking_match <- Map(
+    function(txt, cd, analysis_unit_id, chunk_id, chunk_index) {
+      tryCatch(
+        {
           current_count <<- current_count + 1
           if (current_count == 1 || current_count %% 10 == 0) {
             log_info(
@@ -249,9 +248,32 @@ mark_texts <- function(
           )
 
           .kwallm_normalize_marking_matches(txt, result)
+        },
+        error = function(e) {
+          stop(
+            sprintf(
+              paste0(
+                "Marking failed for analysis_unit_id=%s, chunk_id=%s, ",
+                "chunk_index=%s, code=%s.\nProvider error: %s"
+              ),
+              analysis_unit_id,
+              chunk_id,
+              chunk_index,
+              encodeString(as.character(cd), quote = "'"),
+              conditionMessage(e)
+            ),
+            call. = FALSE
+          )
         }
       )
-    ) |>
+    },
+    df_result$chunk_text,
+    df_result$code,
+    df_result$analysis_unit_id,
+    df_result$chunk_id,
+    df_result$chunk_index
+  )
+  df_result <- df_result |>
     tidyr::unnest(
       marking_match,
       keep_empty = TRUE

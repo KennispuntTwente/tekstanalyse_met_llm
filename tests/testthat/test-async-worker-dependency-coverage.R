@@ -142,3 +142,72 @@ test_that("marking helper empty-match path works in a bootstrap worker", {
   expect_identical(result$response_status[[1]], "matched_all")
   expect_true(all(is.na(result$marked_text)))
 })
+
+test_that("marking worker errors preserve chunk, code, and provider cause", {
+  skip_if_not_installed("mirai")
+  withr::local_dir(here::here())
+
+  kwallm_test_start_mirai_daemons(n = 1L)
+
+  worker <- mirai::mirai(
+    {
+      kwallm_worker_bootstrap(
+        task = "marking",
+        app_root = app_root,
+        worker_options = worker_options
+      )
+
+      semchunk_load_chunker <- function(...) {
+        function(text, ...) text
+      }
+      count_tokens <- function(x) nchar(x)
+      get_context_window_size_in_tokens <- function(...) 100000L
+      log_info <- function(...) invisible(NULL)
+      provider_error <- paste0(
+        "Invalid parameter: 'response_format' of type 'json_schema' ",
+        "is not supported with this model."
+      )
+      send_prompt_with_retries <- function(...) {
+        stop(provider_error)
+      }
+
+      mark_texts(
+        texts = "An interview excerpt",
+        analysis_unit_ids = 17L,
+        codes = "Interview",
+        text_size_tokens = 987L,
+        overlap_size_tokens = 0L,
+        llm_provider = list(parameters = list(model = "test-model")),
+        write_paragraphs = FALSE,
+        lang = NULL
+      )
+    },
+    .args = c(
+      list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options()
+      ),
+      kwallm_worker_bootstrap_globals()
+    )
+  )
+
+  result <- worker[]
+
+  expect_true(mirai::is_error_value(result))
+  expect_match(
+    as.character(result),
+    paste0(
+      "Marking failed for analysis_unit_id=17, chunk_id=1, ",
+      "chunk_index=1, code='Interview'."
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    as.character(result),
+    paste0(
+      "Provider error: Invalid parameter: 'response_format' of type ",
+      "'json_schema' is not supported with this model."
+    ),
+    fixed = TRUE
+  )
+})

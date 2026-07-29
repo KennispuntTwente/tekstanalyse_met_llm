@@ -339,6 +339,72 @@ test_that("mark_texts includes research background in live marking prompts", {
   expect_true(any(grepl("BACKGROUND_SENTINEL", prompt_texts, fixed = TRUE)))
 })
 
+test_that("mark_texts reports the failing chunk and code with the inner error", {
+  source(here::here("R", "utils_send_prompt_with_retries.R"), local = TRUE)
+  source(here::here("R", "analysis_marking.R"), local = TRUE)
+
+  withr::defer({
+    rm(
+      list = grep("^semchunker_", ls(envir = .GlobalEnv), value = TRUE),
+      envir = .GlobalEnv
+    )
+  })
+
+  semchunk_load_chunker <- function(...) {
+    function(text, ...) text
+  }
+  get_context_window_size_in_tokens <- function(...) 2048L
+  count_tokens <- function(x) nchar(x)
+  log_info <- function(...) invisible(NULL)
+  provider_error <- paste0(
+    "Invalid parameter: 'response_format' of type 'json_schema' ",
+    "is not supported with this model."
+  )
+  withr::local_options(
+    send_prompt_with_retries__max_tries = 1,
+    send_prompt_with_retries__retry_delay_seconds = 0
+  )
+  local_mocked_bindings(
+    send_prompt = function(...) stop(provider_error),
+    .package = "tidyprompt"
+  )
+
+  error <- tryCatch(
+    {
+      mark_texts(
+        texts = "An interview excerpt",
+        analysis_unit_ids = 17L,
+        codes = "Interview",
+        llm_provider = list(parameters = list(model = "test-model")),
+        lang = NULL,
+        write_paragraphs = FALSE
+      )
+      NULL
+    },
+    error = identity
+  )
+
+  expect_s3_class(error, "error")
+  expect_match(
+    conditionMessage(error),
+    paste0(
+      "Marking failed for analysis_unit_id=17, chunk_id=1, ",
+      "chunk_index=1, code='Interview'."
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    conditionMessage(error),
+    "Provider error: Error in LLM call after 1 attempts:",
+    fixed = TRUE
+  )
+  expect_match(
+    conditionMessage(error),
+    provider_error,
+    fixed = TRUE
+  )
+})
+
 test_that("mark_texts preserves chunk-code rows when nothing matches", {
   source(here::here("R", "analysis_marking.R"), local = TRUE)
 
