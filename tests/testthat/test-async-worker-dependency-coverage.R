@@ -211,3 +211,56 @@ test_that("marking worker errors preserve chunk, code, and provider cause", {
     fixed = TRUE
   )
 })
+
+test_that("topic reduction worker preserves batch context and provider cause", {
+  skip_if_not_installed("mirai")
+  withr::local_dir(here::here())
+
+  kwallm_test_start_mirai_daemons(n = 1L)
+
+  worker <- mirai::mirai(
+    {
+      kwallm_worker_bootstrap(
+        task = "topic_reduction",
+        app_root = app_root,
+        worker_options = worker_options
+      )
+
+      count_tokens <- function(...) 1L
+      get_context_window_size_in_tokens <- function(...) 100000L
+      log_info <- function(...) invisible(NULL)
+      send_prompt_with_retries <- function(...) {
+        stop("PROVIDER_ERROR_SENTINEL", call. = FALSE)
+      }
+
+      reduce_topics(
+        candidate_topics = c("Topic A", "Topic B"),
+        llm_provider = list(parameters = list(model = "test-model")),
+        language = "en",
+        always_add_not_applicable = FALSE
+      )
+    },
+    .args = c(
+      list(
+        app_root = kwallm_worker_app_root(),
+        worker_options = kwallm_worker_capture_options()
+      ),
+      kwallm_worker_bootstrap_globals()
+    )
+  )
+
+  result <- worker[]
+
+  expect_true(mirai::is_error_value(result))
+  expect_match(
+    as.character(result),
+    "Topic reduction failed for iteration=1, batch_index=1.",
+    fixed = TRUE
+  )
+  expect_match(
+    as.character(result),
+    "Cause: PROVIDER_ERROR_SENTINEL",
+    fixed = TRUE
+  )
+  expect_false(grepl("purrr_error_indexed", as.character(result), fixed = TRUE))
+})

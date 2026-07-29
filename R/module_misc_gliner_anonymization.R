@@ -12,6 +12,45 @@
 #     5: 'save' button where user finishes the anonymization process
 #       preprocessed texts are returned for use in the other modules
 
+.kwallm_gliner_predict_texts <- function(
+  pii_texts,
+  gliner_model,
+  labels,
+  progress = NULL
+) {
+  predictions <- vector("list", length(pii_texts))
+  names(predictions) <- pii_texts
+
+  for (text_index in seq_along(pii_texts)) {
+    predictions[[text_index]] <- tryCatch(
+      gliner_model$predict_entities(
+        text = pii_texts[[text_index]],
+        labels = labels
+      ),
+      error = function(e) {
+        stop(
+          sprintf(
+            "GLiNER failed for text_index=%d.\nCause: %s",
+            text_index,
+            conditionMessage(e)
+          ),
+          call. = FALSE
+        )
+      }
+    )
+
+    if (!is.null(progress)) {
+      progress$inc(
+        1 / length(pii_texts),
+        detail = sprintf("%d / %d", text_index, length(pii_texts))
+      )
+    }
+  }
+
+  predictions
+}
+
+
 #' GLiNER-based anonymization modal.
 #'
 #' @param pii_texts Reactive returning a character vector of texts to anonymize.
@@ -403,20 +442,12 @@ gliner_server <- function(
                 gliner_model <- gliner_load_model(queue = queue)
               }
 
-              purrr::imap(pii_texts, function(txt, i) {
-                res <- gliner_model$predict_entities(
-                  text = txt,
-                  labels = labels
-                )
-
-                # Bump progress after each text
-                n_txt <- length(pii_texts)
-                progress$inc(1 / n_txt, detail = sprintf("%d / %d", i, n_txt))
-
-                res
-              }) |>
-                # Return a named list; original texts are names
-                setNames(pii_texts)
+              .kwallm_gliner_predict_texts(
+                pii_texts = pii_texts,
+                gliner_model = gliner_model,
+                labels = labels,
+                progress = progress
+              )
             },
             .args = c(
               list(
@@ -510,16 +541,17 @@ gliner_server <- function(
               err <- .
               progress$close()
               queue$consumer$stop()
+              err_message <- kwallm_error_message(err)
 
               log_error(
-                paste("GLiNER error:", err$message),
+                paste("GLiNER error:", err_message),
                 component = "gliner"
               )
 
               shiny::showNotification(
                 paste0(
                   lang()$t("Er is een fout opgetreden bij het anonimiseren: "),
-                  err$message
+                  err_message
                 ),
                 type = "error"
               )

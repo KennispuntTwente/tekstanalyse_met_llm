@@ -437,8 +437,9 @@ text_split_server <- function(
             return(NULL)
           }
 
+          error_message <- kwallm_error_message(error)
           log_error(
-            paste("Text split error:", error$message %||% as.character(error)),
+            paste("Text split error:", error_message),
             component = "split"
           )
 
@@ -454,7 +455,7 @@ text_split_server <- function(
                 "Er is een fout opgetreden bij het splitsen van de teksten:"
               ),
               " ",
-              error$message
+              error_message
             ),
             type = "error",
             duration = 5

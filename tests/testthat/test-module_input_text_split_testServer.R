@@ -21,6 +21,7 @@ shinyQueue <- function() {
 }
 
 source(here::here("R", "utils_async_analysis_workers.R"), local = TRUE)
+source(here::here("R", "utils_handle_detailed_error.R"), local = TRUE)
 source(here::here("R", "module_input_text_split.R"), local = TRUE)
 
 kwallm_worker_app_root <- function(path = here::here()) {

@@ -54,7 +54,46 @@ gliner_load_model <- function(queue = NULL) {
 }
 
 source(here::here("R", "utils_async_analysis_workers.R"), local = TRUE)
+source(here::here("R", "utils_handle_detailed_error.R"), local = TRUE)
 source(here::here("R", "module_misc_gliner_anonymization.R"), local = TRUE)
+
+
+test_that("GLiNER prediction errors preserve text index and inner cause", {
+  call_count <- 0L
+  model <- list(
+    predict_entities = function(text, labels) {
+      force(text)
+      force(labels)
+      call_count <<- call_count + 1L
+      if (call_count == 2L) {
+        stop("PYTHON_PROVIDER_ERROR_SENTINEL", call. = FALSE)
+      }
+      list()
+    }
+  )
+
+  error <- tryCatch(
+    .kwallm_gliner_predict_texts(
+      pii_texts = c("first", "second"),
+      gliner_model = model,
+      labels = "person"
+    ),
+    error = identity
+  )
+
+  expect_s3_class(error, "error")
+  expect_match(
+    conditionMessage(error),
+    "GLiNER failed for text_index=2.",
+    fixed = TRUE
+  )
+  expect_match(
+    conditionMessage(error),
+    "Cause: PYTHON_PROVIDER_ERROR_SENTINEL",
+    fixed = TRUE
+  )
+  expect_false(inherits(error, "purrr_error_indexed"))
+})
 
 
 test_that("gliner_server passes worker setup globals for async model loading", {

@@ -746,16 +746,30 @@ reduce_topics <- function(
       )
     }
 
-    reduced_batches <- purrr::imap(
-      batches,
-      function(batch_topics, batch_index) {
+    reduced_batches <- vector("list", length(batches))
+    for (batch_index in seq_along(batches)) {
+      reduced_batches[[batch_index]] <- tryCatch(
         reduce_once(
-          topics_vec = batch_topics,
+          topics_vec = batches[[batch_index]],
           batch_index = batch_index,
           reduction_iteration = iteration
-        )
-      }
-    )
+        ),
+        error = function(e) {
+          stop(
+            sprintf(
+              paste0(
+                "Topic reduction failed for iteration=%d, batch_index=%d.",
+                "\nCause: %s"
+              ),
+              iteration,
+              batch_index,
+              conditionMessage(e)
+            ),
+            call. = FALSE
+          )
+        }
+      )
+    }
     combined <- .kwallm_normalize_topic_labels(unlist(reduced_batches))
 
     if (length(combined) == 0) {

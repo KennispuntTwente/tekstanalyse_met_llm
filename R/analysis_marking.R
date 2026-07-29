@@ -352,49 +352,48 @@ mark_texts <- function(
       }
     }
 
-    i <- -1
-    paragraphs <- purrr::imap(
-      text_list,
-      function(paragraph_input, code) {
-        i <<- i + 1
-        if (!is.null(interrupter)) {
-          interrupter$execInterrupts()
-        }
+    paragraphs <- vector("list", length(text_list))
+    names(paragraphs) <- names(text_list)
+    for (paragraph_index in seq_along(text_list)) {
+      paragraph_input <- text_list[[paragraph_index]]
+      code <- names(text_list)[[paragraph_index]]
 
-        try(
-          {
-            progress_set_with_total(
-              progress_secondary,
-              i,
-              length(text_list),
-              paste0(
-                translate("Schrijven over '"),
-                code,
-                "'..."
-              )
-            )
-          },
-          silent = TRUE
-        )
-
-        paragraph <- write_paragraph(
-          texts = paragraph_input$texts,
-          analysis_unit_ids = paragraph_input$analysis_unit_ids,
-          topic = code,
-          subject_kind = "code",
-          research_background = research_background,
-          style_prompt = style_prompt,
-          llm_provider = llm_provider,
-          language = paragraph_language,
-          focus_on_highlighted_text = TRUE,
-          stream_callback = stream_callback,
-          stream_reset_callback = stream_reset_callback,
-          interrupter = interrupter
-        )
-
-        return(paragraph)
+      if (!is.null(interrupter)) {
+        interrupter$execInterrupts()
       }
-    )
+
+      try(
+        {
+          progress_set_with_total(
+            progress_secondary,
+            paragraph_index - 1L,
+            length(text_list),
+            paste0(
+              translate("Schrijven over '"),
+              code,
+              "'..."
+            )
+          )
+        },
+        silent = TRUE
+      )
+
+      # Avoid purrr's indexed-error wrapper around paragraph/provider errors.
+      paragraphs[[paragraph_index]] <- write_paragraph(
+        texts = paragraph_input$texts,
+        analysis_unit_ids = paragraph_input$analysis_unit_ids,
+        topic = code,
+        subject_kind = "code",
+        research_background = research_background,
+        style_prompt = style_prompt,
+        llm_provider = llm_provider,
+        language = paragraph_language,
+        focus_on_highlighted_text = TRUE,
+        stream_callback = stream_callback,
+        stream_reset_callback = stream_reset_callback,
+        interrupter = interrupter
+      )
+    }
     try(
       {
         progress_hide(progress_secondary)

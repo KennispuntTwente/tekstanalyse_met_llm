@@ -117,6 +117,38 @@ test_that("grouped paragraph streaming clears and replaces output per group", {
   expect_identical(names(result), c("A", "B"))
 })
 
+test_that("grouped paragraph errors preserve the inner provider cause", {
+  helper_env <- new.env(parent = environment())
+  sys.source(
+    here::here("R", "utils_processing_helpers.R"),
+    envir = helper_env
+  )
+  helper_env$write_paragraph <- function(...) {
+    stop("PROVIDER_ERROR_SENTINEL", call. = FALSE)
+  }
+  lang <- list(
+    t = identity,
+    get_translation_language = function() "en"
+  )
+
+  error <- tryCatch(
+    helper_env$write_grouped_paragraphs(
+      grouped_texts = list(
+        Category_A = list(texts = "alpha", analysis_unit_ids = 11L)
+      ),
+      research_background = "",
+      style_prompt = "",
+      llm_provider = list(),
+      lang = lang
+    ),
+    error = identity
+  )
+
+  expect_s3_class(error, "error")
+  expect_identical(conditionMessage(error), "PROVIDER_ERROR_SENTINEL")
+  expect_false(inherits(error, "purrr_error_indexed"))
+})
+
 test_that("processing_texts_under_maximum validates count and notifies", {
   lang <- list(t = function(x) x)
   notification <- NULL

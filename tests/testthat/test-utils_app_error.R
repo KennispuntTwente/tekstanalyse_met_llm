@@ -7,6 +7,7 @@ showModal <- function(...) invisible(NULL)
 removeModal <- function(...) invisible(NULL)
 showNotification <- function(...) invisible(NULL)
 
+source(here::here("R", "utils_handle_detailed_error.R"), local = TRUE)
 source(here::here("R", "utils_app_error.R"), local = TRUE)
 
 make_translator <- function(lang_code = "nl") {
@@ -84,6 +85,58 @@ test_that("app_error: with NULL session stops after logging", {
     "boom",
     fixed = TRUE
   )
+})
+
+
+test_that("app_error shows condition messages without call-object wrappers", {
+  test_dir <- withr::local_tempdir()
+  withr::local_dir(test_dir)
+
+  sess <- make_fake_session()
+  provider_error <- paste0(
+    "Invalid parameter: 'response_format' of type 'json_schema' ",
+    "is not supported with this model."
+  )
+  wrapped_error <- structure(
+    list(
+      message = provider_error,
+      call = quote(onFulfilled(...))
+    ),
+    class = c("simpleError", "error", "condition")
+  )
+
+  output <- capture.output(app_error(
+    wrapped_error,
+    when = "main processing",
+    fatal = FALSE,
+    shiny_session = sess,
+    lang = make_translator("nl")
+  ))
+
+  expect_match(paste(output, collapse = "\n"), provider_error, fixed = TRUE)
+  expect_false(any(grepl("<simpleError", output, fixed = TRUE)))
+  expect_false(any(grepl("onFulfilled", output, fixed = TRUE)))
+})
+
+
+test_that("app error messages retain the deepest purrr cause without a backtrace", {
+  indexed_error <- tryCatch(
+    purrr::imap(
+      list(batch_one = "text"),
+      function(value, name) {
+        force(value)
+        force(name)
+        stop("PROVIDER_ERROR_SENTINEL", call. = FALSE)
+      }
+    ),
+    error = identity
+  )
+
+  message <- kwallm_error_message(indexed_error)
+
+  expect_match(message, "PROVIDER_ERROR_SENTINEL", fixed = TRUE)
+  expect_match(message, "batch_one", fixed = TRUE)
+  expect_false(grepl("Backtrace:", message, fixed = TRUE))
 })
 
 

@@ -224,6 +224,27 @@ test_that("categorize_texts supports progress, interruption, and early NA", {
   expect_equal(progress_events[[2]], list(i = 2, n = 3, text = "text b"))
 })
 
+test_that("categorize_texts preserves provider errors", {
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+
+  send_prompt_with_retries <- function(...) {
+    stop("PROVIDER_ERROR_SENTINEL", call. = FALSE)
+  }
+
+  error <- tryCatch(
+    categorize_texts(
+      texts = "text a",
+      analysis_unit_ids = 17L,
+      categories = c("cat1", "cat2"),
+      llm_provider = create_test_provider()
+    ),
+    error = identity
+  )
+
+  expect_s3_class(error, "error")
+  expect_identical(conditionMessage(error), "PROVIDER_ERROR_SENTINEL")
+})
+
 test_that("categorize_texts multi-label: early NA produces NA category columns", {
   source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)

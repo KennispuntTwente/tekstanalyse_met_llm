@@ -270,6 +270,26 @@ test_that("create_candidate_topics supports progress and interruption", {
   )
 })
 
+test_that("candidate topic generation preserves provider errors", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  send_prompt_with_retries <- function(...) {
+    stop("PROVIDER_ERROR_SENTINEL", call. = FALSE)
+  }
+
+  error <- tryCatch(
+    create_candidate_topics(
+      text_batches = list(c("alpha", "beta")),
+      llm_provider = create_test_provider(),
+      language = "en"
+    ),
+    error = identity
+  )
+
+  expect_s3_class(error, "error")
+  expect_identical(conditionMessage(error), "PROVIDER_ERROR_SENTINEL")
+})
+
 test_that("assign_topics returns binary columns for multi-label output", {
   source(here::here("R", "utils_processing_helpers.R"), local = TRUE)
   source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
@@ -303,6 +323,28 @@ test_that("assign_topics returns binary columns for multi-label output", {
   expect_identical(result[["Topic A"]], c(TRUE, TRUE))
   expect_identical(result[["Topic B"]], c(FALSE, TRUE))
   expect_identical(result$response_status, c("success", "success"))
+})
+
+test_that("topic assignment preserves provider errors", {
+  source(here::here("R", "analysis_deductive_categorization.R"), local = TRUE)
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  send_prompt_with_retries <- function(...) {
+    stop("PROVIDER_ERROR_SENTINEL", call. = FALSE)
+  }
+
+  error <- tryCatch(
+    assign_topics(
+      texts = "text a",
+      analysis_unit_ids = 17L,
+      topics = c("Topic A", "Topic B"),
+      llm_provider = create_test_provider()
+    ),
+    error = identity
+  )
+
+  expect_s3_class(error, "error")
+  expect_identical(conditionMessage(error), "PROVIDER_ERROR_SENTINEL")
 })
 
 test_that("assign_topics supports progress, interruption, and early NA", {
@@ -412,6 +454,41 @@ test_that("reduce_topics returns single topic without reduction when < 2 topics"
   # Single topic should be sentence-cased and returned as-is (no LLM call)
   expect_identical(as.vector(result), "Only topic")
   expect_equal(attr(result, "reduction_summary")$reduction_iterations, 0L)
+})
+
+test_that("reduce_topics reports batch context and the inner provider cause", {
+  source(here::here("R", "analysis_inductive_topic_modelling.R"), local = TRUE)
+
+  send_prompt_with_retries <- function(...) {
+    stop("PROVIDER_ERROR_SENTINEL", call. = FALSE)
+  }
+  count_tokens <- function(...) 1L
+  get_context_window_size_in_tokens <- function(...) 100000L
+  log_info <- function(...) invisible(NULL)
+
+  error <- tryCatch(
+    reduce_topics(
+      candidate_topics = c("Topic A", "Topic B"),
+      research_background = "",
+      llm_provider = create_test_provider(),
+      language = "en",
+      always_add_not_applicable = FALSE
+    ),
+    error = identity
+  )
+
+  expect_s3_class(error, "error")
+  expect_match(
+    conditionMessage(error),
+    "Topic reduction failed for iteration=1, batch_index=1.",
+    fixed = TRUE
+  )
+  expect_match(
+    conditionMessage(error),
+    "Cause: PROVIDER_ERROR_SENTINEL",
+    fixed = TRUE
+  )
+  expect_false(inherits(error, "purrr_error_indexed"))
 })
 
 test_that("reduce_topics with single topic always adds 'not applicable' when configured", {

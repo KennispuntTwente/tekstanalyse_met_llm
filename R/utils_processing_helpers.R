@@ -551,43 +551,48 @@ write_grouped_paragraphs <- function(
     }
   }
 
-  purrr::imap(
-    grouped_texts,
-    function(topic_entry, topic_name) {
-      normalized_entry <- normalize_group_entry(topic_entry)
+  paragraphs <- vector("list", length(grouped_texts))
+  names(paragraphs) <- names(grouped_texts)
 
-      if (!is.null(interrupter)) {
-        interrupter$execInterrupts()
-      }
+  for (group_index in seq_along(grouped_texts)) {
+    topic_name <- names(grouped_texts)[[group_index]]
+    normalized_entry <- normalize_group_entry(grouped_texts[[group_index]])
 
-      if (!is.null(progress_secondary)) {
-        progress_secondary$set_with_total(
-          which(names(grouped_texts) == topic_name),
-          length(grouped_texts),
-          paste0(
-            lang$t("Schrijven over '"),
-            topic_name,
-            "'..."
-          )
+    if (!is.null(interrupter)) {
+      interrupter$execInterrupts()
+    }
+
+    if (!is.null(progress_secondary)) {
+      progress_secondary$set_with_total(
+        group_index,
+        length(grouped_texts),
+        paste0(
+          lang$t("Schrijven over '"),
+          topic_name,
+          "'..."
         )
-      }
-
-      # Write one paragraph for one category/topic.
-      write_paragraph(
-        texts = normalized_entry$texts,
-        analysis_unit_ids = normalized_entry$analysis_unit_ids,
-        topic = topic_name,
-        subject_kind = subject_kind,
-        research_background = research_background,
-        style_prompt = style_prompt,
-        llm_provider = llm_provider,
-        language = lang$get_translation_language(),
-        stream_callback = stream_callback,
-        stream_reset_callback = stream_reset_callback,
-        interrupter = interrupter
       )
     }
-  )
+
+    # Write one paragraph for one category/topic. A base loop deliberately
+    # avoids purrr's indexed-error wrapper so the inner provider cause remains
+    # the primary error shown to the user.
+    paragraphs[[group_index]] <- write_paragraph(
+      texts = normalized_entry$texts,
+      analysis_unit_ids = normalized_entry$analysis_unit_ids,
+      topic = topic_name,
+      subject_kind = subject_kind,
+      research_background = research_background,
+      style_prompt = style_prompt,
+      llm_provider = llm_provider,
+      language = lang$get_translation_language(),
+      stream_callback = stream_callback,
+      stream_reset_callback = stream_reset_callback,
+      interrupter = interrupter
+    )
+  }
+
+  paragraphs
 }
 
 

@@ -41,6 +41,30 @@ test_that("score_texts preserves successful rows on partial failure", {
   expect_equal(call_count, 2)
 })
 
+test_that("score_texts preserves provider errors", {
+  source(
+    here::here("R", "analysis_deductive_scoring_characteristic.R"),
+    local = TRUE
+  )
+
+  send_prompt_with_retries <- function(...) {
+    stop("PROVIDER_ERROR_SENTINEL", call. = FALSE)
+  }
+
+  error <- tryCatch(
+    score_texts(
+      texts = "text a",
+      analysis_unit_ids = 17L,
+      scoring_characteristic = "quality",
+      llm_provider = create_test_provider()
+    ),
+    error = identity
+  )
+
+  expect_s3_class(error, "error")
+  expect_identical(conditionMessage(error), "PROVIDER_ERROR_SENTINEL")
+})
+
 # Closing-tag delimiter injection tests ----------------------------------------
 
 test_that("prompt_score escapes closing-tag delimiters in user content", {
