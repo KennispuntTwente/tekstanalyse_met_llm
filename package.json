@@ -13,7 +13,7 @@
     "build": "npm run prebuild && electron-packager . kwallm-text-analysis-app --platform=win32 --arch=x64 --out=dist --overwrite --icon=www/icon.ico --ignore=\"^/(dist|build|example|progress|progress_secondary|renv|scripts|app_errors|\\.github|\\.Rproj.user|\\.venv|\\.gitignore|\\.Rhistory|\\.dockerignore|\\.Rprofile|app\\.log|app\\.R|Dockerfile|Dockerfile-app\\.R|README|renv\\.lock|run\\.bat)$\""
   },
   "devDependencies": {
-    "@electron/packager": "^18.3.6",
+    "@electron/packager": "^20.0.4",
     "electron": "^41.1.1"
   },
   "dependencies": {
